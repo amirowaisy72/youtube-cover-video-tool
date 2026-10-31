@@ -332,11 +332,20 @@ def build_process_command(
     # 1.79x and 26% of its width was cropped off — faces looked
     # bigger, text at the edges was cut, exactly like a zoom.
     # Fix: at 1.0x use scale=decrease ("fit") — the WHOLE video
-    # fits inside the green box, no cropping, no zoom look. It is
-    # centred in the box, so any leftover space is just the cover's
-    # green showing around it. Only when the user actually zooms
-    # (>1.0x) does the video get bigger and crop, as the slider
-    # promises ("1.0x = video fits exactly").
+    # fits inside the green box, no cropping, no zoom look.
+    # LEFTOVER = BLACK, NOT GREEN (user, 2026-11-01): the fit video
+    # is centred in the box, so for mismatched aspects there is
+    # leftover space (e.g. green bars top/bottom for a 16:9 video
+    # in a ~1.3:1 box). The live preview shows that leftover as
+    # black (the video element letterboxes in black), but the old
+    # final video just overlaid the small video on the cover, so
+    # the leftover stayed green. Fix: pad the fit video with black
+    # to the full box size (pad filter, centred), then overlay the
+    # padded box at the box origin. The mask, when present, still
+    # clips the padded box to the green shape, so black only shows
+    # inside the shape, never on the cover outside it. Only when
+    # the user actually zooms (>1.0x) does the video get bigger
+    # and crop, as the slider promises ("1.0x = video fits exactly").
     # Implementation: if the source size is known, compute the fit
     # size in Python so we know whether to centre (fit smaller than
     # box) or crop (fit larger than box at higher zoom). If the
@@ -357,14 +366,16 @@ def build_process_command(
         fit_factor = min(w * zoom / sw_src, h * zoom / sh_src)
         fit_w, fit_h = round(sw_src * fit_factor), round(sh_src * fit_factor)
         if fit_w <= w and fit_h <= h:
-            # Fit, centred, no crop — the 1.0x case for mismatched aspects.
-            video_filters = [f"scale={fit_w}:{fit_h}"]
-            overlay_x, overlay_y = x + (w - fit_w) // 2, y + (h - fit_h) // 2
-            # For a mask, the mask crop must match the fit video's
-            # size and position (centred in the box), not the whole
-            # box — otherwise alphamerge size-matches fail, and a
-            # padded black area would show as black bars instead of
-            # the cover's green. See mask_chain below.
+            # Fit, centred, padded with black to the full box size.
+            # Overlay is then the box origin, not the centred fit
+            # position, because the padding already centres it.
+            # The mask crop below is therefore the whole box (w,h
+            # at x,y), not the fit size — alphamerge sizes must match.
+            video_filters = [
+                f"scale={fit_w}:{fit_h}",
+                f"pad={w}:{h}:{(w - fit_w) // 2}:{(h - fit_h) // 2}:black",
+            ]
+            overlay_x, overlay_y = x, y
             fit_is_padded = True
         else:
             # Zoomed past the box: crop back to the box, pan moves it.
@@ -407,14 +418,10 @@ def build_process_command(
         # to the video's rectangle, then alphamerge it onto the
         # video. Without this, a non-rectangular green shape would
         # still get a rectangular video spilling onto the cover.
-        # For a fit video (smaller than the box, centred), the mask
-        # crop is the fit video's own size/position inside the cover,
-        # not the whole box — otherwise alphamerge fails on size
-        # mismatch and green bars would turn black.
-        if fit_is_padded:
-            mw, mh, mx, my = fit_w, fit_h, overlay_x, overlay_y
-        else:
-            mw, mh, mx, my = w, h, x, y
+        # The video is always box-sized here (fit videos are padded
+        # to w x h first, zoomed videos are cropped to w x h), so
+        # the mask crop is always the whole box (w,h at x,y).
+        mw, mh, mx, my = w, h, x, y
         if scale != 1.0:
             mask_chain = f"[2:v]scale={int(output_width)}:-2,crop={mw}:{mh}:{mx}:{my}[mask]"
         else:

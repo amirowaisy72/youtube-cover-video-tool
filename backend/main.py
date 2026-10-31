@@ -438,7 +438,7 @@ def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
     apply_start = _time.time()
     cmd = video.build_process_command(
         source, cover, applied_path, green_rect,
-        flip=False, speed=speed, voice_enabled=voice_enabled,
+        flip=True, speed=speed, voice_enabled=voice_enabled,
         voice_pitch_factor=pitch, crf=18, preset="medium",
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
@@ -453,7 +453,7 @@ def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
             mask_img.save(mask_path)
             cmd = video.build_process_command(
                 source, cover, applied_path, green_rect,
-                flip=False, speed=speed, voice_enabled=voice_enabled,
+                flip=True, speed=speed, voice_enabled=voice_enabled,
                 voice_pitch_factor=pitch, crf=18, preset="medium",
                 output_width=settings.get("output_width"),
                 output_height=settings.get("output_height"),
@@ -609,7 +609,7 @@ def green_mask_endpoint(cover_id: str, x: int | None = None, y: int | None = Non
 class ProcessRequest(BaseModel):
     job_id: str
     cover_id: str
-    flip: bool = False
+    flip: bool = True
     speed: float | None = None
     voice_pitch: float | None = None
     compress: bool = True

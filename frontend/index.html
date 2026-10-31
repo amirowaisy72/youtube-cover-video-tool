@@ -34,33 +34,40 @@ tailwind.config = {
       <div class="logo">▶</div>
       <div>
         <h1 class="text-3xl font-bold tracking-tight">YouTube Cover Video Tool</h1>
-        <p class="subtitle">Free, local tool. Use only videos you own or have rights / licence for.</p>
+        <p class="subtitle">Use only videos you own or have rights for.</p>
       </div>
     </div>
     <p id="status" class="status mt-4"></p>
   </header>
 
   <nav class="tabs">
-    <button id="tab-btn-tool" class="tab-btn active" type="button">🎬 Tool</button>
-    <button id="tab-btn-admin" class="tab-btn" type="button">⚙️ Admin settings</button>
+    <button id="tab-btn-tool" class="tab-btn active px-4 py-3 rounded-xl font-semibold transition-colors" type="button">🎬 Tool</button>
+    <button id="tab-btn-admin" class="tab-btn px-4 py-3 rounded-xl font-semibold transition-colors" type="button">⚙️ Admin settings</button>
   </nav>
 
   <div id="tab-tool">
   <section class="card">
     <div class="step-head"><span class="step">★</span><h2>Auto mode — just give the link</h2></div>
-    <p class="muted">Turn Auto on, paste a YouTube link, and press Start Auto. The page blurs and a popup shows one overall progress bar with a timeline of what is happening. Everything else — cover, green shape, speed, voice, flip — uses Admin defaults, and the finished video is given at the end. No other clicks needed.</p>
+    <p class="muted">Paste a link, press Start Auto. Rest uses Admin defaults.</p>
     <div class="flex flex-col sm:flex-row gap-3">
-      <input id="auto-url" type="url" placeholder="Paste a YouTube link here for Auto mode" class="flex-1" />
-      <button id="btn-auto" class="btn-primary" type="button">▶ Start Auto</button>
+      <input id="auto-url" type="url" placeholder="Paste a YouTube link here for Auto mode" class="flex-1 min-w-0" />
+      <button id="btn-auto" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">▶ Start Auto</button>
     </div>
-    <p class="muted mt-2">Auto uses the cover you have selected (or your newest cover if none is selected). Upload a cover first if you have none yet.</p>
+    <p class="muted mt-2">Uses your selected cover, or newest if none.</p>
   </section>
 
+  <div class="manual-wizard-head">
+    <h2>Manual mode — step by step</h2>
+    <p class="muted">One step at a time.</p>
+    <p id="manual-step-indicator" class="pill">Step 1 of 5: Download video</p>
+    <div class="progress-track mt-3"><div id="manual-step-bar" class="progress-bar" style="width:20%"></div></div>
+  </div>
+  <div class="manual-step" data-manual-step="1">
   <section class="card">
     <div class="step-head"><span class="step">1</span><h2>YouTube link</h2></div>
     <div class="flex flex-col sm:flex-row gap-3">
-      <input id="yt-url" type="url" placeholder="Paste a YouTube link here" class="flex-1" />
-      <button id="btn-download" class="btn-primary">Download video</button>
+      <input id="yt-url" type="url" placeholder="Paste a YouTube link here" class="flex-1 min-w-0" />
+      <button id="btn-download" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Download video</button>
     </div>
     <div id="download-progress-wrap" class="progress-wrap" hidden>
       <div class="progress-track"><div id="download-progress-bar" class="progress-bar"></div></div>
@@ -69,36 +76,39 @@ tailwind.config = {
     <p id="job-info" class="muted mt-3"></p>
   </section>
 
+  </div>
+  <div class="manual-step" data-manual-step="2" hidden>
   <section class="card">
     <div class="step-head"><span class="step">2</span><h2>Cover</h2></div>
-    <p class="muted">Step 1: pick a cover image — it uploads by itself. Step 2: click any cover below to select it. No extra buttons needed.</p>
+    <p class="muted">Click a cover to select it. Uploads automatically.</p>
     <label class="field-label">Upload a new cover (with a green-screen area)</label>
     <div class="flex flex-col sm:flex-row gap-3 items-start">
-      <input id="cover-file" type="file" accept="image/png,image/jpeg,image/webp" class="flex-1" />
-      <button id="btn-cover-upload" class="btn">Upload cover</button>
+      <input id="cover-file" type="file" accept="image/png,image/jpeg,image/webp" class="flex-1 min-w-0" />
+      <button id="btn-cover-upload" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0">Upload cover</button>
     </div>
-    <p class="muted mt-2">Tip: after choosing a file, it uploads automatically — you do not need to press Upload.</p>
     <div id="cover-preview-wrap" class="mt-4" hidden>
       <label class="field-label">Selected cover</label>
       <img id="cover-preview" alt="Selected cover preview" class="cover-preview" />
       <p id="cover-selected-name" class="muted mt-2"></p>
-      <button id="btn-delete-selected-cover" class="btn mt-2" type="button">Delete selected cover</button>
+      <button id="btn-delete-selected-cover" class="btn mt-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Delete selected cover</button>
     </div>
-    <label class="field-label mt-4">Your uploaded covers — click one to select it</label>
+    <label class="field-label mt-4">Your covers — click to select</label>
     <div id="cover-grid" class="cover-grid"></div>
     <p id="cover-empty" class="muted">No covers yet. Upload one above and it will appear here.</p>
-    <label class="field-label mt-4">Or choose from the list</label>
+    <label class="field-label mt-4">Or choose:</label>
     <div class="flex flex-col sm:flex-row gap-3">
       <select id="cover-select" class="flex-1"><option value="">-- no covers yet --</option></select>
-      <button id="btn-covers-refresh" class="btn">Refresh covers</button>
+      <button id="btn-covers-refresh" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0">Refresh covers</button>
     </div>
   </section>
 
+  </div>
+  <div class="manual-step" data-manual-step="3" hidden>
   <section class="card">
-    <div class="step-head"><span class="step">3</span><h2>Edit</h2></div>
+    <div class="step-head"><span class="step">3</span><h2>Edit &amp; live preview</h2></div>
     <div class="flex flex-wrap items-center gap-3">
-      <button id="btn-flip" class="btn">Flip left / right</button>
-      <span id="flip-state" class="pill">Flip: off</span>
+      <button id="btn-flip" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0">Flip left / right</button>
+      <span id="flip-state" class="pill">Flip: on</span>
     </div>
     <label class="field-label mt-4">Speed: <span id="speed-value" class="pill">1.0x</span></label>
     <input id="speed" type="range" min="0.5" max="2" step="0.1" value="1" />
@@ -107,15 +117,15 @@ tailwind.config = {
     <input id="voice-pitch" type="range" min="0.9" max="1.2" step="0.01" value="1.05" />
     <label class="field-label mt-4">Zoom (video never leaves the green area): <span id="zoom-value" class="pill">1.0x</span></label>
     <input id="zoom" type="range" min="1" max="2" step="0.05" value="1" />
-    <p class="muted">1.0x = the whole video fits inside the green area, no cropping, no zoom look. At higher zoom the video gets bigger and is cropped, but it never leaves the green box.</p>
+    <p class="muted">1.0x = whole video fits, no crop.</p>
     <label class="check"><input id="compress" type="checkbox" checked /> Compress (smaller size, same look)</label>
-    <button id="btn-process" class="btn-primary mt-2" type="button">▶ Process video</button>
+    <button id="btn-process" class="btn-primary mt-2 w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-lg rounded-xl shadow transition-colors" type="button">▶ Process video</button>
     <div id="process-progress-wrap" class="progress-wrap" hidden>
       <div class="progress-track" title="Click to show / hide processing details"><div id="process-progress-bar" class="progress-bar"></div></div>
       <p id="process-progress-text" class="muted mt-2">Processing… 0%</p>
-      <button id="btn-process-details" class="btn mt-2" type="button">Show processing details ▾</button>
+      <button id="btn-process-details" class="btn mt-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Show processing details ▾</button>
       <div id="process-details" hidden>
-        <p class="muted mt-2">Click the progress bar above to show / hide this log. It updates live, like an installer log.</p>
+        <p class="muted mt-2">Live log.</p>
         <pre id="process-log" class="process-log">Waiting to start…</pre>
       </div>
     </div>
@@ -123,12 +133,12 @@ tailwind.config = {
 
   <section class="card">
     <div class="step-head"><span class="step">👁</span><h2>Live preview — realtime</h2></div>
-    <p class="muted">A cover appears here as soon as you choose it, even before any video is downloaded. As soon as a video downloads it appears inside the cover, clipped to the green area's actual shape — not just its rectangle — so a circle, rounded screen or any other green shape shows video only inside that shape. The live video has no control bar, so it looks like video inside the cover, not a separate player rectangle. Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
+    <p class="muted">Cover shows at once. Video appears inside its green shape when downloaded.</p>
     <div class="flex flex-wrap items-center gap-3 mb-3">
-      <button id="btn-live-hide" class="btn" type="button">Hide video — check cover</button>
+      <button id="btn-live-hide" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Hide video — check cover</button>
       <label class="field-label">Live zoom: <span id="live-zoom-value" class="pill">1.0x</span></label>
-      <button id="btn-live-zoom-out" class="btn" type="button">− Zoom out</button>
-      <button id="btn-live-zoom-in" class="btn" type="button">+ Zoom in</button>
+      <button id="btn-live-zoom-out" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">− Zoom out</button>
+      <button id="btn-live-zoom-in" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">+ Zoom in</button>
     </div>
     <div id="live-preview-box" class="live-preview-box">
       <img id="live-cover-img" alt="" class="live-cover-img" hidden />
@@ -139,16 +149,17 @@ tailwind.config = {
         <div class="live-handle bl" data-handle="bl" hidden></div>
         <div class="live-handle br" data-handle="br" hidden></div>
       </div>
-      <p id="live-empty" class="muted">No cover or video yet. Choose a cover and it appears here immediately, even before downloading a video.</p>
+      <p id="live-empty" class="muted">No cover or video yet.</p>
     </div>
-    <p class="muted mt-2">Hide removes the video so only the cover shows, letting you check whether the video sits correctly in the green area. No border is drawn around the video, so nothing hides the edge where video meets cover.</p>
-    <p class="muted live-hint">Control the video directly: click the video to select it and show its corners. Drag the video to move it up, down, left or right. Drag a corner to zoom. At 1x zoom the video cannot move, because it already fits exactly — moving only works after zooming, and the video never leaves the green box.</p>
+    <p class="muted live-hint">Click to select. Drag to move, drag a corner to zoom.</p>
     <p id="live-note" class="muted mt-2"></p>
   </section>
 
+  </div>
+  <div class="manual-step" data-manual-step="4" hidden>
   <section class="card" id="timeline-card">
     <div class="step-head"><span class="step">⏱</span><h2>Timeline — how long each step took</h2></div>
-    <p class="muted">Each step's real duration and file size are shown here, so you can see where the time went.</p>
+    <p class="muted">Time and size for each step.</p>
     <ul id="timeline-list" class="timeline-list"><li class="muted">Abhi koi step complete nahi hua.</li></ul>
   </section>
 
@@ -156,16 +167,18 @@ tailwind.config = {
     <div class="step-head"><span class="step">4</span><h2>Preview &amp; download</h2></div>
     <video id="preview-player" controls width="640" class="rounded-xl w-full"></video>
     <div class="mt-3">
-      <button id="btn-download-final" class="btn-primary">Download final video</button>
+      <button id="btn-download-final" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Download final video</button>
     </div>
-    <p class="muted mt-3">Local files: working files are temporary only — they are not a permanent library. After you download the final video, its source and preview are deleted from this computer to save space (the final video stays here for YouTube upload, and your downloaded copy is in your Downloads folder). After a successful YouTube upload, all local files for that job are deleted.</p>
+    <p class="muted mt-3">Working files are temporary. After download, source and preview are deleted.</p>
     <div class="flex flex-wrap gap-3 mt-3">
-      <button id="btn-delete-local-files" class="btn" type="button">Delete local working files for this job</button>
-      <button id="btn-start-over" class="btn" type="button">Start over (clear this job)</button>
+      <button id="btn-delete-local-files" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Delete local working files for this job</button>
+      <button id="btn-start-over" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Start over (clear this job)</button>
     </div>
     <p id="local-files-result" class="muted mt-3"></p>
   </section>
 
+  </div>
+  <div class="manual-step" data-manual-step="5" hidden>
   <section class="card">
     <div class="step-head"><span class="step">5</span><h2>Upload to YouTube</h2></div>
     <p id="yt-status" class="muted">YouTube: checking…</p>
@@ -180,36 +193,36 @@ tailwind.config = {
       <option value="public">Public</option>
     </select>
     <div class="mt-3">
-      <button id="btn-upload-yt" class="btn-primary">Upload to selected channel</button>
+      <button id="btn-upload-yt" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Upload to selected channel</button>
     </div>
     <p id="yt-result" class="muted mt-3"></p>
   </section>
-
+  </div>
   </div>
 
   <div id="tab-admin" hidden>
   <section class="card">
     <div class="step-head"><span class="step">⚙</span><h2>Admin settings</h2></div>
-    <p class="muted">These are only the defaults. Set them once and every video in the Tool tab will use them. You do not need to come back here every time.</p>
+    <p class="muted">Defaults for every video.</p>
     <div class="grid sm:grid-cols-2 gap-3 mt-3">
       <label class="field-label">Default speed
         <input id="set-speed" type="number" min="0.5" max="2" step="0.1" value="1" />
-        <span class="muted">How fast the video plays (1 = normal).</span>
+        <span class="muted">1 = normal.</span>
       </label>
       <label class="field-label">Voice pitch factor
         <input id="set-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
-        <span class="muted">How much the voice changes (1.05 = a slight change).</span>
+        <span class="muted">1.05 = slight change.</span>
       </label>
       <label class="field-label">Final encoder — size AND quality
         <select id="set-encoder">
           <option value="libx265" selected>HEVC H.265 (recommended — smaller file, same look)</option>
           <option value="libx264">H.264 (most compatible, bigger file)</option>
         </select>
-        <span class="muted">HEVC is how size goes down without quality going down. H.264 cannot do both: CRF 26 shrank but dulled, CRF 20 kept quality but grew. HEVC plays on YouTube and modern players; if your player does not support HEVC, pick H.264.</span>
+        <span class="muted">HEVC: smaller, same look. H.264: most compatible.</span>
       </label>
       <label class="field-label">CRF — quality vs size
         <input id="set-crf" type="number" min="18" max="32" step="1" value="22" />
-        <span class="muted">Lower number = better quality, bigger file. HEVC CRF 22 looks like H.264 CRF 20. Quality is never reduced to shrink the file.</span>
+        <span class="muted">Lower = better quality, bigger file.</span>
       </label>
       <label class="field-label">Preset — speed vs size
         <select id="set-preset">
@@ -219,15 +232,15 @@ tailwind.config = {
           <option value="medium">medium (smaller file)</option>
           <option value="slow">slow (slowest)</option>
         </select>
-        <span class="muted">Faster preset = faster processing, slightly bigger file.</span>
+        <span class="muted">Faster = bigger file.</span>
       </label>
     </div>
     <label class="check"><input id="set-voice-enabled" type="checkbox" checked /> Voice change enabled by default</label>
     <label class="check"><input id="set-auto-detect" type="checkbox" checked /> Auto-detect green area from the cover (recommended — video lands exactly in the green area)</label>
-    <p class="muted">If no green area is found in the cover, the manual green rectangle is used.</p>
+    <p class="muted">Fallback if no green is found.</p>
     <fieldset class="fieldset">
       <legend>Green rectangle — where the video goes in the cover</legend>
-      <p class="muted">These numbers are pixels in the cover image. The video goes inside this box. If you change the cover, check this box too.</p>
+      <p class="muted">Pixels in the cover image.</p>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <label class="field-label">X (left) <input id="set-green-x" type="number" value="0" /></label>
         <label class="field-label">Y (top) <input id="set-green-y" type="number" value="0" /></label>
@@ -235,12 +248,12 @@ tailwind.config = {
         <label class="field-label">Height <input id="set-green-h" type="number" value="360" /></label>
       </div>
     </fieldset>
-    <button id="btn-save-settings" class="btn-primary mt-3">Save admin settings</button>
+    <button id="btn-save-settings" class="btn-primary mt-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Save admin settings</button>
     <p id="settings-result" class="muted mt-3"></p>
   </section>
   </div>
 
-  <p class="footer-note">Local only — nothing is hosted live. Keep the launcher window open while you use the tool.</p>
+  <p class="footer-note">Local only. Keep the launcher open.</p>
 </main>
 
 <!-- Auto mode popup: page blurs behind it, one overall progress bar,
@@ -255,8 +268,8 @@ tailwind.config = {
     <div id="auto-timeline" class="auto-timeline"></div>
     <div id="auto-summary" class="auto-summary" hidden></div>
     <div class="auto-actions">
-      <a id="auto-download-link" class="btn-primary" hidden>Download final video</a>
-      <button id="btn-auto-close" class="btn" type="button" hidden>Close — see results</button>
+      <a id="auto-download-link" class="btn-primary inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" hidden>Download final video</a>
+      <button id="btn-auto-close" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Close — see results</button>
     </div>
     <p id="auto-error" class="muted" hidden></p>
   </div>

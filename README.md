@@ -131,9 +131,26 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    like a zoom even at 1.0x. Only a real zoom above 1.0x crops.
    Buttons: one solid style for all buttons (primary solid blue,
    secondary solid dark navy), no garish gradients, no truncation.
+   Buttons now use standard Tailwind button classes (px-6 py-3 /
+   px-4 py-2.5, rounded-xl) with proper padding.
    Live preview has no control bar, so it looks like video inside
    the cover, not a separate player rectangle; the live mask is
    RGBA, because a grayscale mask was ignored by browsers.
+   Manual mode is step by step: only one manual step is visible
+   at a time (Download, Cover, Edit & live preview, Preview &
+   download, Upload), with Next/Back buttons and a Step 1 of 5
+   indicator — the whole long form is never shown at once.
+   UI writing is kept short, only where necessary.
+   Flip is on by default (manual, Auto, and the API default).
+   Auto popup: the Download button only appears when the job is
+   done (a button display rule used to beat the hidden attribute
+   and show it early); `[hidden]` is now forced in CSS and the
+   button is re-hidden on every poll until done.
+   Fit leftover is black, not green: when a fit video is smaller
+   than the green box, it is padded with black to the full box
+   size before overlay, so leftover green bars become black —
+   exactly like the live preview — in both manual and Auto mode,
+   with or without the green-shape mask.
 
 ### Refresh safety and local storage (no disk waste)
 

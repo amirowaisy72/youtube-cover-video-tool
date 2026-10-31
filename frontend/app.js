@@ -1,7 +1,7 @@
 // Plain JS frontend — no build step. All API calls go to the FastAPI
 // backend that serves this page.
 let jobId = "";
-let flip = false;
+let flip = true;
 let greenRect = { x: 0, y: 0, w: 640, h: 360 };
 let liveCover = null;
 let autoDetectGreen = true;
@@ -216,7 +216,7 @@ async function restoreState() {
     if (saved.zoom) { document.getElementById("zoom").value = saved.zoom; document.getElementById("zoom-value").textContent = saved.zoom + "x"; document.getElementById("live-zoom-value").textContent = saved.zoom + "x"; }
     if (saved.title) document.getElementById("yt-title").value = saved.title;
     if (saved.description) document.getElementById("yt-description").value = saved.description;
-    flip = !!saved.flip;
+    flip = saved.flip !== undefined ? !!saved.flip : true;
     document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
     panX = saved.panX || 0; panY = saved.panY || 0;
     document.getElementById("job-info").textContent = "Job: " + jobId + " — " + job.status + " (restored after refresh).";
@@ -503,7 +503,9 @@ function openAutoPopup() {
   document.getElementById("auto-overlay").hidden = false;
   document.body.classList.add("auto-open");
   document.getElementById("auto-summary").hidden = true;
-  document.getElementById("auto-download-link").hidden = true;
+  const dl0 = document.getElementById("auto-download-link");
+  dl0.hidden = true;
+  dl0.removeAttribute("href");
   document.getElementById("btn-auto-close").hidden = true;
   document.getElementById("auto-error").hidden = true;
 }
@@ -542,6 +544,12 @@ document.getElementById("btn-auto").addEventListener("click", async () => {
           div.textContent = `✓ ${t.step} — ${t.duration_sec}s — ${t.detail || ""}`;
           tl.appendChild(div);
         });
+        // Until the job is actually done, the Download button must
+        // stay hidden on every poll — it used to show early because
+        // the button's display CSS beat the hidden attribute.
+        if (job.status !== "processed") {
+          document.getElementById("auto-download-link").hidden = true;
+        }
         if (job.status === "processed" && job.auto_summary) {
           clearInterval(autoTimer);
           const s = job.auto_summary;
@@ -759,6 +767,8 @@ document.getElementById("btn-delete-local-files").addEventListener("click", asyn
 document.getElementById("btn-start-over").addEventListener("click", () => {
   clearSavedState();
   jobId = ""; downloadReady = false;
+  flip = true;
+  document.getElementById("flip-state").textContent = "Flip: on";
   document.getElementById("yt-url").value = "";
   document.getElementById("job-info").textContent = "";
   document.getElementById("preview-player").removeAttribute("src");
@@ -832,6 +842,69 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
     document.getElementById("settings-result").textContent = "Save failed: " + err.message;
   }
 });
+
+// Manual mode, step by step: only one manual step is visible at a
+// time, so the user never sees the whole long form at once.
+// Step 1 Download, 2 Cover, 3 Edit & live preview, 4 Timeline +
+// Preview & download, 5 Upload to YouTube. Auto mode stays above
+// the wizard as its own short card.
+const MANUAL_STEPS = [
+  "Download video",
+  "Choose cover",
+  "Edit & live preview",
+  "Preview & download",
+  "Upload to YouTube",
+];
+let manualStep = 1;
+function showManualStep(n) {
+  manualStep = Math.max(1, Math.min(MANUAL_STEPS.length, n));
+  document.querySelectorAll(".manual-step").forEach((el) => {
+    el.hidden = parseInt(el.dataset.manualStep, 10) !== manualStep;
+  });
+  const ind = document.getElementById("manual-step-indicator");
+  if (ind) ind.textContent = `Step ${manualStep} of ${MANUAL_STEPS.length}: ${MANUAL_STEPS[manualStep - 1]}`;
+  const bar = document.getElementById("manual-step-bar");
+  if (bar) bar.style.width = (manualStep / MANUAL_STEPS.length * 100) + "%";
+  const head = document.querySelector(".manual-wizard-head");
+  if (head) head.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function manualNext() {
+  if (manualStep === 1 && !downloadReady) {
+    setStatus(jobId ? "Wait — the video is still downloading. Check the progress bar above." : "Download a video first, then press Next.");
+    return;
+  }
+  if (manualStep === 2 && !selectedCoverId) {
+    setStatus("Choose a cover first, then press Next.");
+    return;
+  }
+  showManualStep(manualStep + 1);
+}
+function buildManualNav() {
+  document.querySelectorAll(".manual-step").forEach((el) => {
+    const n = parseInt(el.dataset.manualStep, 10);
+    const nav = document.createElement("div");
+    nav.className = "flex flex-wrap gap-3 mt-4";
+    if (n > 1) {
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0";
+      back.textContent = "← Back";
+      back.addEventListener("click", () => showManualStep(n - 1));
+      nav.appendChild(back);
+    }
+    if (n < MANUAL_STEPS.length) {
+      const next = document.createElement("button");
+      next.type = "button";
+      next.className = "btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0";
+      next.textContent = `Next: ${MANUAL_STEPS[n]} →`;
+      next.addEventListener("click", manualNext);
+      nav.appendChild(next);
+    }
+    el.appendChild(nav);
+  });
+  showManualStep(1);
+}
+buildManualNav();
 
 function showTab(tab) {
   const isAdmin = tab === "admin";

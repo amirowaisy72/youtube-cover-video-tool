@@ -55,12 +55,11 @@ input[type="url"]:focus, input[type="text"]:focus, input[type="number"]:focus, s
 }
 input[type="file"] { color: #b8c6dd; }
 input[type="range"] { width: 100%; accent-color: #7aa7ff; }
-/* One clean button system for every button in the tool.
-   The old gradient buttons (light blue to cyan, dark text) looked
-   garish and inconsistent, and Tailwind's reset could make some
-   buttons look like plain text. Now: primary = solid blue, white
-   text; secondary = solid dark navy, white text. Same padding,
-   radius, font and hover for all, so no button looks odd.
+/* Buttons: Tailwind classes in index.html are the real style
+   (px-6 py-3 / px-4 py-2.5, bg-blue-600 / bg-slate-700, rounded-xl,
+   etc. — the standard button classes, with proper padding).
+   The rules below are only a fallback if Tailwind CDN is offline,
+   matching the same padding/colours, so buttons never look bare.
    Buttons never shrink or get cut off in a row with an input:
    white-space + flex-shrink keep the full label visible, and the
    input (min-width 0) shrinks instead. */
@@ -151,6 +150,16 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 .live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: contain; display: block; cursor: grab; touch-action: none; }
 .live-preview-box.has-cover .live-video:active { cursor: grabbing; }
 .live-green-box.selected { border: none; box-shadow: none; }
+
+/* hidden must actually hide: button/a display rules (inline-block)
+   otherwise beat the browser's [hidden] rule, so the Auto popup's
+   Download button showed before the video was ready. */
+[hidden] { display: none !important; }
+
+/* Manual wizard: only one step visible at a time. */
+.manual-wizard-head { margin: 24px 0 8px; }
+.manual-wizard-head h2 { font-size: 1.25rem; margin: 0 0 4px; }
+.manual-step[hidden] { display: none; }
 
 /* Auto mode popup: blur the page behind it, popup on top. */
 body.auto-open main { filter: blur(6px); pointer-events: none; user-select: none; }
