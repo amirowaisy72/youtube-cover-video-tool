@@ -34,6 +34,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
 # Allow `import video` / `import youtube_upload` when run as
@@ -57,9 +58,9 @@ DEFAULT_SETTINGS = {
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
     "crf": 22,
-    # veryfast is ~2-3x faster than medium at the same CRF (same look,
-    # slightly bigger file) — the old medium preset was a big slowdown.
-    "preset": "veryfast",
+    # Fastest possible preset, as requested: ultrafast is the fastest
+    # libx264 preset (same CRF/look, bigger file, much less CPU time).
+    "preset": "ultrafast",
     "green_rect": {"x": 0, "y": 0, "w": 640, "h": 360},
     # Auto-detect the green area from the cover image itself, so the
     # video lands exactly on the green screen, not at a guessed 0,0.
@@ -76,11 +77,11 @@ def load_settings() -> dict:
     if SETTINGS_FILE.exists():
         try:
             saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            # Speed migration: old installs saved "medium", which was
-            # the main encode slowdown. Upgrade it once to veryfast;
-            # the user can still pick medium/slow in the Admin tab.
-            if saved.get("preset") == "medium":
-                saved["preset"] = "veryfast"
+            # Speed migration: old installs saved "medium"/"veryfast".
+            # Upgrade to ultrafast (fastest possible, as requested);
+            # the user can still pick a slower preset in the Admin tab.
+            if saved.get("preset") in ("medium", "veryfast"):
+                saved["preset"] = "ultrafast"
             merged = dict(DEFAULT_SETTINGS)
             merged.update(saved)
             green = dict(DEFAULT_SETTINGS["green_rect"])
@@ -137,6 +138,24 @@ def yt_dlp_available() -> bool:
 
 
 app = FastAPI(title="YouTube Cover Video Tool")
+
+
+@app.on_event("startup")
+def cleanup_old_jobs() -> None:
+    """No permanent local library: delete job folders older than 24h
+    on startup, so working files never accumulate and waste disk."""
+    import time as _time
+    now = _time.time()
+    for directory in JOBS_DIR.iterdir():
+        if not directory.is_dir():
+            continue
+        try:
+            age = now - directory.stat().st_mtime
+        except OSError:
+            continue
+        if age > 24 * 3600:
+            import shutil as _shutil
+            _shutil.rmtree(directory, ignore_errors=True)
 
 
 # ---------------------------------------------------------------- settings
@@ -196,6 +215,16 @@ def get_cover(filename: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(404, "Cover not found.")
     return FileResponse(path)
+
+
+@app.delete("/api/covers/{cover_id}")
+def delete_cover(cover_id: str) -> dict:
+    """Delete one uploaded cover by its id (from the thumbnail grid)."""
+    matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
+    if not matches:
+        raise HTTPException(404, "Cover not found.")
+    matches[0].unlink()
+    return {"deleted": cover_id, "filename": matches[0].name}
 
 
 # ---------------------------------------------------------------- download
@@ -307,6 +336,16 @@ def get_job(job_id: str) -> dict:
     return read_job(job_id)
 
 
+@app.delete("/api/jobs/{job_id}")
+def delete_job(job_id: str) -> dict:
+    """Delete all local working files for one job (source, final, preview)."""
+    directory = JOBS_DIR / job_id
+    if not directory.exists():
+        raise HTTPException(404, "Job not found.")
+    shutil.rmtree(directory, ignore_errors=True)
+    return {"deleted": job_id}
+
+
 # ----------------------------------------------------------------- process
 @app.get("/api/detect-green/{cover_id}")
 def detect_green(cover_id: str) -> dict:
@@ -328,15 +367,25 @@ class ProcessRequest(BaseModel):
     voice_pitch: float | None = None
     compress: bool = True
     zoom: float | None = None
+    pan_x: float | None = None
+    pan_y: float | None = None
     green_rect: dict | None = None
 
 
 def _run_process(payload: ProcessRequest, settings: dict, directory,
                  source, cover, final_path, preview_path,
-                 speed, voice_enabled, pitch, green_rect, zoom) -> None:
+                 speed, voice_enabled, pitch, green_rect, zoom, pan_x, pan_y) -> None:
     import time as _time
     started = _time.time()
     preview_started = [None]
+
+    def _append_log(line: str) -> None:
+        job = read_job(payload.job_id)
+        log = job.get("process_log") or []
+        elapsed = _time.time() - started
+        log.append(f"[{int(elapsed // 60):02d}:{int(elapsed % 60):02d}] {line}")
+        job["process_log"] = log[-200:]
+        write_job(job)
 
     def on_progress(pct, elapsed, eta):
         # Only record the preview start time here; the full timeline
@@ -363,11 +412,11 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         voice_pitch_factor=float(pitch),
         compress=payload.compress,
         crf=int(settings.get("crf", 22)),
-        preset=str(settings.get("preset", "medium")),
+        preset=str(settings.get("preset", "ultrafast")),
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
-        zoom=zoom,
-        on_progress=on_progress,
+        zoom=zoom, pan_x=pan_x, pan_y=pan_y,
+        on_progress=on_progress, on_log=_append_log,
     )
     job = read_job(payload.job_id)
     ended = _time.time()
@@ -378,7 +427,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         pv_start = preview_started[0] or ended
         prev_timeline.append({
             "step": "Final video encode (libx264, "
-                    f"preset {settings.get('preset', 'veryfast')}, "
+                    f"preset {settings.get('preset', 'ultrafast')}, "
                     f"CRF {settings.get('crf', 22)}, max width "
                     f"{settings.get('output_width', 1280)}px)",
             "duration_sec": round(pv_start - started, 1),
@@ -387,7 +436,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
                       if source.exists() else "",
         })
         prev_timeline.append({
-            "step": "Preview encode (640px, fast preset)",
+            "step": "Preview encode (480px, ultrafast preset)",
             "duration_sec": round(ended - pv_start, 1),
             "detail": f"Preview {preview_path.stat().st_size / 1024 / 1024:.1f} MB"
                       if preview_path.exists() else "Preview not created",
@@ -403,6 +452,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         "voice_pitch": pitch,
         "compress": payload.compress,
         "zoom": zoom,
+        "pan_x": pan_x, "pan_y": pan_y,
         "green_rect_used": green_rect,
         "error": None if ok else message,
     })
@@ -431,6 +481,9 @@ def process_video(payload: ProcessRequest) -> dict:
         pitch = float(settings.get("voice_pitch_factor", 1.05))
     zoom = payload.zoom if payload.zoom is not None else 1.0
     zoom = max(1.0, min(2.0, float(zoom)))
+    max_pan = (zoom - 1) / 2 * 100
+    pan_x = max(-max_pan, min(max_pan, float(payload.pan_x or 0)))
+    pan_y = max(-max_pan, min(max_pan, float(payload.pan_y or 0)))
     # Green area: the frontend may already have auto-detected it and
     # sent it; otherwise auto-detect here from the cover itself.
     # Manual admin rectangle is the last fallback.
@@ -449,11 +502,17 @@ def process_video(payload: ProcessRequest) -> dict:
     job = read_job(payload.job_id)
     job.update({"status": "processing", "process_progress": 0,
                 "process_stage": "Starting…",
-                "green_rect_used": green_rect, "green_source": green_source})
+                "green_rect_used": green_rect, "green_source": green_source,
+                "process_log": [
+                    "[00:00] Starting processing…",
+                    f"[00:00] Green area ({green_source}): x={green_rect.get('x')}, y={green_rect.get('y')}, w={green_rect.get('w')}, h={green_rect.get('h')}",
+                    f"[00:00] Cover file: {cover.name}",
+                    f"[00:00] Source file: source.mp4 ({source.stat().st_size / 1024 / 1024:.1f} MB)",
+                ]})
     write_job(job)
     threading.Thread(target=_run_process, args=(
         payload, settings, directory, source, cover, final_path, preview_path,
-        speed, voice_enabled, pitch, green_rect, zoom), daemon=True).start()
+        speed, voice_enabled, pitch, green_rect, zoom, pan_x, pan_y), daemon=True).start()
     return {
         "job_id": payload.job_id,
         "status": "processing",
@@ -483,11 +542,25 @@ def get_preview(job_id: str) -> FileResponse:
 
 @app.get("/api/download/{job_id}")
 def get_final(job_id: str) -> FileResponse:
-    path = job_dir(job_id) / "final.mp4"
+    directory = job_dir(job_id)
+    path = directory / "final.mp4"
     if not path.exists():
         raise HTTPException(404, "Final video not ready yet. Process a video first.")
+
+    def _delete_source_and_preview() -> None:
+        # Save space after the final download: the downloaded copy is
+        # in the user's Downloads folder, and the final video stays
+        # here for YouTube upload. Only the bulky source and the
+        # redundant preview are removed (after the response is sent).
+        for name in ("source.mp4", "preview.mp4"):
+            try:
+                (directory / name).unlink()
+            except OSError:
+                pass
+
     return FileResponse(
-        path, media_type="video/mp4", filename=f"covered-{job_id}.mp4"
+        path, media_type="video/mp4", filename=f"covered-{job_id}.mp4",
+        background=BackgroundTask(_delete_source_and_preview),
     )
 
 
@@ -527,7 +600,11 @@ def upload_youtube(payload: UploadRequest) -> dict:
         raise HTTPException(400, str(exc))
     except Exception as exc:
         raise HTTPException(500, f"YouTube upload failed: {exc}")
-    return {"job_id": payload.job_id, "status": "uploaded", **result}
+    # Uploaded copy is now on YouTube — delete all local files for
+    # this job so nothing accumulates on disk.
+    shutil.rmtree(job_dir(payload.job_id), ignore_errors=True)
+    return {"job_id": payload.job_id, "status": "uploaded",
+            "local_files_deleted": True, **result}
 
 
 @app.get("/api/health")

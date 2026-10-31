@@ -72,6 +72,7 @@ tailwind.config = {
       <label class="field-label">Selected cover</label>
       <img id="cover-preview" alt="Selected cover preview" class="cover-preview" />
       <p id="cover-selected-name" class="muted mt-2"></p>
+      <button id="btn-delete-selected-cover" class="btn mt-2" type="button">Delete selected cover</button>
     </div>
     <label class="field-label mt-4">Your uploaded covers — click one to select it</label>
     <div id="cover-grid" class="cover-grid"></div>
@@ -94,33 +95,50 @@ tailwind.config = {
     <label class="check"><input id="voice-enabled" type="checkbox" checked /> Slight voice change</label>
     <label class="field-label">Voice pitch: <span id="voice-pitch-value" class="pill">1.05</span></label>
     <input id="voice-pitch" type="range" min="0.9" max="1.2" step="0.01" value="1.05" />
-    <label class="field-label mt-4">Zoom (video green area se bahar nahi jayegi): <span id="zoom-value" class="pill">1.0x</span></label>
+    <label class="field-label mt-4">Zoom (video never leaves the green area): <span id="zoom-value" class="pill">1.0x</span></label>
     <input id="zoom" type="range" min="1" max="2" step="0.05" value="1" />
-    <p class="muted">1.0x = video bilkul green area mein fit. Zyada zoom par video bari ho kar crop hogi, lekin green box se bahar kabhi nahi jayegi.</p>
+    <p class="muted">1.0x = video fits the green area exactly. At higher zoom the video gets bigger and is cropped, but it never leaves the green box.</p>
     <label class="check"><input id="compress" type="checkbox" checked /> Compress (smaller size, same look)</label>
-    <button id="btn-process" class="btn-primary mt-2">Process video</button>
+    <button id="btn-process" class="btn-primary mt-2" type="button">▶ Process video</button>
     <div id="process-progress-wrap" class="progress-wrap" hidden>
-      <div class="progress-track"><div id="process-progress-bar" class="progress-bar"></div></div>
+      <div class="progress-track" title="Click to show / hide processing details"><div id="process-progress-bar" class="progress-bar"></div></div>
       <p id="process-progress-text" class="muted mt-2">Processing… 0%</p>
+      <button id="btn-process-details" class="btn mt-2" type="button">Show processing details ▾</button>
+      <div id="process-details" hidden>
+        <p class="muted mt-2">Click the progress bar above to show / hide this log. It updates live, like an installer log.</p>
+        <pre id="process-log" class="process-log">Waiting to start…</pre>
+      </div>
     </div>
   </section>
 
   <section class="card">
     <div class="step-head"><span class="step">👁</span><h2>Live preview — realtime</h2></div>
-    <p class="muted">Download hote hi video yahan aa jayegi. Cover choose karte hi wo cover ke andar aa jayegi, Flip dabate hi ulta ho jayega, Speed badalte hi wahi speed chalegi. Voice change final Process wali preview mein sunai degi, kyunke browser mein live pitch change nahi hota.</p>
+    <p class="muted">As soon as a video downloads it appears here. When you choose a cover it goes inside the cover, Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <button id="btn-live-hide" class="btn" type="button">Hide video — check cover</button>
+      <label class="field-label">Live zoom: <span id="live-zoom-value" class="pill">1.0x</span></label>
+      <button id="btn-live-zoom-out" class="btn" type="button">− Zoom out</button>
+      <button id="btn-live-zoom-in" class="btn" type="button">+ Zoom in</button>
+    </div>
     <div id="live-preview-box" class="live-preview-box">
       <img id="live-cover-img" alt="" class="live-cover-img" hidden />
       <div id="live-green-box" class="live-green-box">
         <video id="live-video" controls muted playsinline class="live-video"></video>
+        <div class="live-handle tl" data-handle="tl" hidden></div>
+        <div class="live-handle tr" data-handle="tr" hidden></div>
+        <div class="live-handle bl" data-handle="bl" hidden></div>
+        <div class="live-handle br" data-handle="br" hidden></div>
       </div>
-      <p id="live-empty" class="muted">Abhi koi video download nahi hui. Download karte hi yahan live preview shuru ho jayega.</p>
+      <p id="live-empty" class="muted">No video downloaded yet. The live preview starts here as soon as you download one.</p>
     </div>
+    <p class="muted mt-2">The dashed border shows the exact edge of the green area. Hide removes the video so only the cover shows, letting you check whether the video sits correctly in the green area.</p>
+    <p class="muted live-hint">Control the video directly: click the video to select it and show its corners. Drag the video to move it up, down, left or right. Drag a corner to zoom. At 1x zoom the video cannot move, because it already fits exactly — moving only works after zooming, and the video never leaves the green box.</p>
     <p id="live-note" class="muted mt-2"></p>
   </section>
 
   <section class="card" id="timeline-card">
-    <div class="step-head"><span class="step">⏱</span><h2>Timeline — kis cheez mein kitna time laga</h2></div>
-    <p class="muted">Har step ki asal duration aur file size yahan dikhegi, taake pata chale time kahan laga.</p>
+    <div class="step-head"><span class="step">⏱</span><h2>Timeline — how long each step took</h2></div>
+    <p class="muted">Each step's real duration and file size are shown here, so you can see where the time went.</p>
     <ul id="timeline-list" class="timeline-list"><li class="muted">Abhi koi step complete nahi hua.</li></ul>
   </section>
 
@@ -130,6 +148,12 @@ tailwind.config = {
     <div class="mt-3">
       <button id="btn-download-final" class="btn-primary">Download final video</button>
     </div>
+    <p class="muted mt-3">Local files: working files are temporary only — they are not a permanent library. After you download the final video, its source and preview are deleted from this computer to save space (the final video stays here for YouTube upload, and your downloaded copy is in your Downloads folder). After a successful YouTube upload, all local files for that job are deleted.</p>
+    <div class="flex flex-wrap gap-3 mt-3">
+      <button id="btn-delete-local-files" class="btn" type="button">Delete local working files for this job</button>
+      <button id="btn-start-over" class="btn" type="button">Start over (clear this job)</button>
+    </div>
+    <p id="local-files-result" class="muted mt-3"></p>
   </section>
 
   <section class="card">
@@ -156,37 +180,37 @@ tailwind.config = {
   <div id="tab-admin" hidden>
   <section class="card">
     <div class="step-head"><span class="step">⚙</span><h2>Admin settings</h2></div>
-    <p class="muted">Ye sirf defaults hain. In ko ek dafa set kar lo, phir Tool tab mein har video inhi settings se process hogi. Aap ko har dafa yahan ane ki zaroorat nahi.</p>
+    <p class="muted">These are only the defaults. Set them once and every video in the Tool tab will use them. You do not need to come back here every time.</p>
     <div class="grid sm:grid-cols-2 gap-3 mt-3">
       <label class="field-label">Default speed
         <input id="set-speed" type="number" min="0.5" max="2" step="0.1" value="1" />
-        <span class="muted">Video kitni tez ya slow chalegi (1 = normal).</span>
+        <span class="muted">How fast the video plays (1 = normal).</span>
       </label>
       <label class="field-label">Voice pitch factor
         <input id="set-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
-        <span class="muted">Awaz kitni change hogi (1.05 = halki si change).</span>
+        <span class="muted">How much the voice changes (1.05 = a slight change).</span>
       </label>
       <label class="field-label">CRF — quality vs size
         <input id="set-crf" type="number" min="18" max="28" step="1" value="22" />
-        <span class="muted">Kam number = behtar quality, bari file. 20–23 behtareen hai.</span>
+        <span class="muted">Lower number = better quality, bigger file. 20–23 is recommended.</span>
       </label>
       <label class="field-label">Preset — speed vs size
         <select id="set-preset">
-          <option value="ultrafast">ultrafast (sab se tez, bari file)</option>
-          <option value="veryfast" selected>veryfast (tez, recommended)</option>
+          <option value="ultrafast" selected>ultrafast (fastest, recommended)</option>
+          <option value="veryfast">veryfast (fast)</option>
           <option value="fast">fast</option>
-          <option value="medium">medium (slow, chhoti file)</option>
-          <option value="slow">slow (sab se slow)</option>
+          <option value="medium">medium (slower, smaller file)</option>
+          <option value="slow">slow (slowest)</option>
         </select>
-        <span class="muted">Tez preset = jaldi process, thori bari file.</span>
+        <span class="muted">Faster preset = faster processing, slightly bigger file.</span>
       </label>
     </div>
     <label class="check"><input id="set-voice-enabled" type="checkbox" checked /> Voice change enabled by default</label>
-    <label class="check"><input id="set-auto-detect" type="checkbox" checked /> Auto-detect green area from the cover (recommended — video exactly green area mein aayegi)</label>
-    <p class="muted">Agar cover mein green area na mile to manual green rectangle istemal hoga.</p>
+    <label class="check"><input id="set-auto-detect" type="checkbox" checked /> Auto-detect green area from the cover (recommended — video lands exactly in the green area)</label>
+    <p class="muted">If no green area is found in the cover, the manual green rectangle is used.</p>
     <fieldset class="fieldset">
-      <legend>Green rectangle — cover mein video kahan aayegi</legend>
-      <p class="muted">Ye numbers cover image ke pixels mein hain. Video isi box ke andar aayegi. Agar cover badlo to ye box bhi check kar lo.</p>
+      <legend>Green rectangle — where the video goes in the cover</legend>
+      <p class="muted">These numbers are pixels in the cover image. The video goes inside this box. If you change the cover, check this box too.</p>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <label class="field-label">X (left) <input id="set-green-x" type="number" value="0" /></label>
         <label class="field-label">Y (top) <input id="set-green-y" type="number" value="0" /></label>

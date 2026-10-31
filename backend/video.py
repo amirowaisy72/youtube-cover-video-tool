@@ -82,7 +82,10 @@ def detect_green_rect(cover: str | Path) -> dict | None:
     for y in range(sh):
         for x in range(sw):
             r, g, b = px[x, y]
-            green[y][x] = g > 110 and g - r > 35 and g - b > 35
+            # Slightly looser than before: shadowed/darker green at
+            # the bottom of a green screen was previously missed,
+            # leaving a green strip visible under the video.
+            green[y][x] = g > 90 and g - r > 25 and g - b > 25
     # Largest connected component (4-direction flood fill).
     visited = [[False] * sw for _ in range(sh)]
     best = None
@@ -111,6 +114,20 @@ def detect_green_rect(cover: str | Path) -> dict | None:
     count, minx, miny, maxx, maxy = best
     if count < 0.05 * sw * sh:
         return None
+    # Expand the box while the next row/column is still mostly green:
+    # this catches a green edge that was split off by a shadow line.
+    def _row_green(y):
+        return sum(green[y][minx:maxx + 1]) >= 0.3 * (maxx - minx + 1) if 0 <= y < sh else False
+    def _col_green(x):
+        return sum(green[y][x] for y in range(miny, maxy + 1)) >= 0.3 * (maxy - miny + 1) if 0 <= x < sw else False
+    while _row_green(maxy + 1):
+        maxy += 1
+    while _row_green(miny - 1):
+        miny -= 1
+    while _col_green(maxx + 1):
+        maxx += 1
+    while _col_green(minx - 1):
+        minx -= 1
     fx, fy = orig_w / sw, orig_h / sh
     return {
         "x": int(minx * fx), "y": int(miny * fy),
@@ -142,7 +159,7 @@ def _parse_ffmpeg_time(line: str) -> float | None:
 
 def run_with_progress(cmd: list[str], duration: float | None,
                       base: float, span: float,
-                      on_progress=None) -> tuple[bool, str]:
+                      on_progress=None, on_log=None) -> tuple[bool, str]:
     """Run FFmpeg, parsing its time= output into a 0-100 progress value.
 
     base/span map this encode onto the overall job: the final encode
@@ -152,25 +169,58 @@ def run_with_progress(cmd: list[str], duration: float | None,
     """
     start = time.time()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, errors="replace")
+                            text=True, errors="replace", bufsize=1)
     tail: list[str] = []
+    last_log_bucket = [-1]
+    last_time_update = [0.0]
     try:
         assert proc.stdout is not None
-        for line in proc.stdout:
-            tail.append(line)
-            if len(tail) > 50:
-                tail.pop(0)
-            t = _parse_ffmpeg_time(line)
-            if on_progress and duration:
-                pct = base + min(span, span * t / duration)
-                elapsed = time.time() - start
-                eta = elapsed * (100 - pct) / pct if pct > 5 else None
-                on_progress(round(pct, 1), elapsed, eta)
-            elif on_progress:
-                # Unknown duration: climb slowly to base+span-5, never fake 100%.
-                elapsed = time.time() - start
-                pct = base + min(span - 5, elapsed * 2)
-                on_progress(round(pct, 1), elapsed, None)
+        # BUG FIX (this was why the bar stuck at 2%): FFmpeg progress
+        # lines are separated by carriage return (\r), NOT newline,
+        # and the old code also crashed on the first non-progress line
+        # (t=None). Reading char-by-char and splitting on \r or \n
+        # gives realtime updates, and lines without time= are skipped.
+        buf = ""
+        while True:
+            ch = proc.stdout.read(1)
+            if not ch:
+                break
+            if ch in ("\r", "\n"):
+                line = buf
+                buf = ""
+                if not line.strip():
+                    continue
+                tail.append(line)
+                if len(tail) > 50:
+                    tail.pop(0)
+                t = _parse_ffmpeg_time(line)
+                if t is None:
+                    continue
+                if on_progress and duration:
+                    pct = base + min(span, span * t / duration)
+                    elapsed = time.time() - start
+                    eta = elapsed * (100 - pct) / pct if pct > 5 else None
+                    # Throttle job.json writes to ~2/sec; FFmpeg emits
+                    # many lines per second and each write is a disk write.
+                    if elapsed - last_time_update[0] >= 0.5 or pct >= base + span - 1:
+                        last_time_update[0] = elapsed
+                        on_progress(round(pct, 1), elapsed, eta)
+                    # Installer-style log: one line per 10% milestone.
+                    bucket = int(pct // 10)
+                    if on_log and bucket != last_log_bucket[0]:
+                        last_log_bucket[0] = bucket
+                        fps_m = re.search(r"fps=([\d.]+)", line)
+                        sp_m = re.search(r"speed=([\d.]+)x", line)
+                        on_log(f"Encoding {pct:.0f}% — time {t:.0f}s"
+                               + (f", fps {fps_m.group(1)}" if fps_m else "")
+                               + (f", speed {sp_m.group(1)}x" if sp_m else ""))
+                elif on_progress:
+                    # Unknown duration: climb slowly, never fake 100%.
+                    elapsed = time.time() - start
+                    pct = base + min(span - 5, elapsed * 2)
+                    on_progress(round(pct, 1), elapsed, None)
+            else:
+                buf += ch
     finally:
         proc.wait()
     output = "".join(tail)
@@ -193,6 +243,8 @@ def build_process_command(
     output_width: int | None = None,
     output_height: int | None = None,
     zoom: float = 1.0,
+    pan_x: float = 0.0,
+    pan_y: float = 0.0,
 ) -> list[str]:
     """Build the FFmpeg command that composites a video onto a cover.
 
@@ -232,8 +284,15 @@ def build_process_command(
     # outside the green area, it just shows less of the video, bigger.
     zoom = max(1.0, min(2.0, float(zoom) if zoom else 1.0))
     if zoom > 1.0:
-        video_filters = [f"scale={round(w * zoom)}:{round(h * zoom)}",
-                         f"crop={w}:{h}"]
+        # Pan (percent of the green box, from the live preview drag)
+        # moves the crop window the opposite way, clamped so the crop
+        # never leaves the scaled video — i.e. the video never leaves
+        # the green box in the final output either.
+        sw, sh = round(w * zoom), round(h * zoom)
+        max_px, max_py = (sw - w) / 2, (sh - h) / 2
+        cx = int(max(0, min(sw - w, (sw - w) / 2 - float(pan_x or 0) / 100 * w)))
+        cy = int(max(0, min(sh - h, (sh - h) / 2 - float(pan_y or 0) / 100 * h)))
+        video_filters = [f"scale={sw}:{sh}", f"crop={w}:{h}:{cx}:{cy}"]
     else:
         video_filters = [f"scale={w}:{h}"]
     if flip:
@@ -278,6 +337,7 @@ def build_process_command(
         "-c:v", "libx264",
         "-crf", str(int(crf)),
         "-preset", str(preset),
+        "-threads", "0",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-movflags", "+faststart",
@@ -295,10 +355,10 @@ def build_preview_command(
         "ffmpeg",
         "-y",
         "-i", str(final_video),
-        "-vf", "scale=640:-2",
+        "-vf", "scale=480:-2",
         "-c:v", "libx264",
-        "-crf", "28",
-        "-preset", "fast",
+        "-crf", "32",
+        "-preset", "ultrafast",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-movflags", "+faststart",
@@ -322,7 +382,10 @@ def process_job(
     output_width: int | None = None,
     output_height: int | None = None,
     zoom: float = 1.0,
+    pan_x: float = 0.0,
+    pan_y: float = 0.0,
     on_progress=None,
+    on_log=None,
 ) -> tuple[bool, str]:
     """Run the full process + preview pipeline for one job.
 
@@ -334,9 +397,10 @@ def process_job(
     if missing:
         return False, missing
     if not compress:
-        # Without compression, use a near-lossless quality setting.
+        # Without compression, use a near-lossless quality setting,
+        # still on the fastest preset for speed.
         crf = 18
-        preset = "medium"
+        preset = "ultrafast"
     cmd = build_process_command(
         source, cover, output, green_rect,
         flip=flip, speed=speed,
@@ -344,25 +408,43 @@ def process_job(
         voice_pitch_factor=voice_pitch_factor,
         crf=crf, preset=preset,
         output_width=output_width, output_height=output_height,
-        zoom=zoom,
+        zoom=zoom, pan_x=pan_x, pan_y=pan_y,
     )
     # Effective output duration: source duration divided by speed.
     duration = get_duration(source)
     if duration:
         duration = duration / max(0.5, min(2.0, float(speed) or 1.0))
+    if on_log:
+        on_log(f"Input video: {Path(source).name} "
+               f"({Path(source).stat().st_size / 1024 / 1024:.1f} MB)" if Path(source).exists() else f"Input video: {Path(source).name}")
+        on_log(f"Input cover: {Path(cover).name} "
+               f"({Path(cover).stat().st_size / 1024 / 1024:.1f} MB)" if Path(cover).exists() else f"Input cover: {Path(cover).name}")
+        on_log(f"Green area: x={green_rect.get('x')}, y={green_rect.get('y')}, "
+               f"w={green_rect.get('w')}, h={green_rect.get('h')}")
+        on_log(f"Settings: preset={preset}, CRF={crf}, speed={speed}x, "
+               f"flip={'on' if flip else 'off'}, zoom={zoom}x, pan={pan_x}%,{pan_y}%")
+        on_log("Running FFmpeg: compositing video onto cover…")
     if on_progress:
         on_progress(2, 0, None)
     ok, out = run_with_progress(cmd, duration, 0, 90,
-                                on_progress=on_progress)
+                                on_progress=on_progress, on_log=on_log)
     if not ok:
         return False, f"FFmpeg failed while building the final video:\n{out}"
+    if on_log:
+        on_log(f"Final video written: {Path(output).name} "
+               f"({Path(output).stat().st_size / 1024 / 1024:.1f} MB)" if Path(output).exists() else "Final video written.")
+        on_log("Running FFmpeg: building 640px preview…")
     if on_progress:
         on_progress(92, 0, None)
     ok, out = run_with_progress(build_preview_command(output, preview_path),
-                                duration, 90, 10, on_progress=on_progress)
+                                duration, 90, 10, on_progress=on_progress, on_log=on_log)
     if not ok:
         # A missing preview is not fatal: the final video exists.
         return True, f"Final video done, but preview failed:\n{out}"
+    if on_log:
+        on_log(f"Preview written: {Path(preview_path).name} "
+               f"({Path(preview_path).stat().st_size / 1024 / 1024:.1f} MB)" if Path(preview_path).exists() else "Preview written.")
+        on_log("Done.")
     if on_progress:
         on_progress(100, 0, None)
     return True, "ok"

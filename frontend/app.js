@@ -5,6 +5,67 @@ let flip = false;
 let greenRect = { x: 0, y: 0, w: 640, h: 360 };
 let liveCover = null;
 let autoDetectGreen = true;
+// Pan in percent of the green box. At zoom 1 it is forced to 0,
+// so the video always fills the green box exactly; at higher zoom
+// it is clamped to the excess size, so the video never leaves the box.
+let panX = 0, panY = 0;
+let liveVideoHidden = false;
+let liveSelected = false;
+
+function getZoom() { return parseFloat(document.getElementById("zoom").value) || 1; }
+
+function clampPan() {
+  const zoom = getZoom();
+  const max = (zoom - 1) / 2 * 100;
+  panX = Math.max(-max, Math.min(max, panX));
+  panY = Math.max(-max, Math.min(max, panY));
+  if (zoom <= 1.01) { panX = 0; panY = 0; }
+}
+
+function setZoomValue(z) {
+  z = Math.max(1, Math.min(2, z));
+  document.getElementById("zoom").value = z;
+  document.getElementById("zoom-value").textContent = z.toFixed(2).replace(/0$/, "") + "x";
+  document.getElementById("live-zoom-value").textContent = document.getElementById("zoom-value").textContent;
+  clampPan();
+  updateLivePreview();
+}
+
+function applyLiveVideoLayout() {
+  saveState();
+  const video = document.getElementById("live-video");
+  const greenBox = document.getElementById("live-green-box");
+  const zoom = getZoom();
+  clampPan();
+  if (liveCover) {
+    // Percentages are relative to the cover display size, which has
+    // the same aspect as the original — no onload wait needed, so a
+    // changed green rectangle moves the box immediately.
+    const nw = document.getElementById("live-cover-img").naturalWidth || 1280;
+    const nh = document.getElementById("live-cover-img").naturalHeight || 720;
+    greenBox.style.left = (greenRect.x / nw * 100) + "%";
+    greenBox.style.top = (greenRect.y / nh * 100) + "%";
+    greenBox.style.width = (greenRect.w / nw * 100) + "%";
+    greenBox.style.height = (greenRect.h / nh * 100) + "%";
+  }
+  // Video is sized at zoom x the box and offset by pan, inside an
+  // overflow-hidden box, so it always fills the box exactly and
+  // can never spill outside it. object-fit: fill matches the final
+  // FFmpeg scale (stretch to w x h), so live and final match.
+  video.style.position = liveCover ? "absolute" : "";
+  video.style.width = (zoom * 100) + "%";
+  video.style.height = (zoom * 100) + "%";
+  video.style.left = (-(zoom - 1) / 2 * 100 + panX) + "%";
+  video.style.top = (-(zoom - 1) / 2 * 100 + panY) + "%";
+  video.style.transform = flip ? "scaleX(-1)" : "none";
+  video.style.display = liveVideoHidden ? "none" : "block";
+  greenBox.classList.toggle("selected", liveSelected && !!liveCover);
+  document.querySelectorAll(".live-handle").forEach((h) => {
+    h.hidden = !(liveSelected && !!liveCover);
+  });
+  document.getElementById("btn-live-hide").textContent =
+    liveVideoHidden ? "Show video" : "Hide video — check cover";
+}
 
 function updateLivePreview() {
   const box = document.getElementById("live-preview-box");
@@ -19,36 +80,138 @@ function updateLivePreview() {
     video.load();
   }
   video.playbackRate = parseFloat(document.getElementById("speed").value) || 1;
-  const zoom = parseFloat(document.getElementById("zoom").value) || 1;
-  // Zoom is a scale inside the green box (overflow hidden), so the
-  // video can never spill outside the green area.
-  video.style.transform = (flip ? "scaleX(-1) " : "") + `scale(${zoom})`;
+  const zoom = getZoom();
   if (liveCover) {
     box.classList.add("has-cover");
     img.hidden = false;
-    img.src = liveCover.path || ("/api/covers/" + liveCover.filename);
-    // Position the green box inside the cover once the cover image
-    // size is known; percentages keep it correct at any width.
-    img.onload = () => {
-      const nw = img.naturalWidth || 1280, nh = img.naturalHeight || 720;
-      greenBox.style.left = (greenRect.x / nw * 100) + "%";
-      greenBox.style.top = (greenRect.y / nh * 100) + "%";
-      greenBox.style.width = (greenRect.w / nw * 100) + "%";
-      greenBox.style.height = (greenRect.h / nh * 100) + "%";
-    };
+    const src = liveCover.path || ("/api/covers/" + liveCover.filename);
+    if (img.src !== src && !img.src.endsWith(src)) { img.src = src; }
   } else {
     box.classList.remove("has-cover");
     img.hidden = true;
     greenBox.style.left = ""; greenBox.style.top = ""; greenBox.style.width = ""; greenBox.style.height = "";
   }
+  applyLiveVideoLayout();
   const voiceOn = document.getElementById("voice-enabled").checked;
   const pitch = document.getElementById("voice-pitch").value;
   document.getElementById("live-note").textContent =
-    `Live: Flip ${flip ? "on" : "off"} • Speed ${document.getElementById("speed").value}x • Zoom ${zoom}x • Green ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} • Voice ${voiceOn ? "on (pitch " + pitch + ", final preview mein sunai degi)" : "off"}`;
+    `Live: Flip ${flip ? "on" : "off"} | Speed ${document.getElementById("speed").value}x | Zoom ${zoom}x | Pan ${panX.toFixed(0)}%, ${panY.toFixed(0)}% | Green ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} | Voice ${voiceOn ? "on (pitch " + pitch + ", heard in the final preview)" : "off"}`;
 }
+
+// Direct manipulation: drag the video to move it, click to select,
+// drag a corner handle to zoom. Pointer events cover mouse + touch.
+let dragState = null;
+document.getElementById("live-video").addEventListener("pointerdown", (e) => {
+  if (!liveCover) return;
+  dragState = { type: "move", startX: e.clientX, startY: e.clientY, panX, panY, moved: false };
+});
+document.querySelectorAll(".live-handle").forEach((handle) => {
+  handle.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    dragState = { type: "zoom", startX: e.clientX, startY: e.clientY, zoom: getZoom(), moved: false };
+  });
+});
+window.addEventListener("pointermove", (e) => {
+  if (!dragState) return;
+  const box = document.getElementById("live-green-box");
+  const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
+  if (Math.abs(dx) + Math.abs(dy) > 4) dragState.moved = true;
+  if (dragState.type === "move" && box.clientWidth) {
+    panX = dragState.panX + dx / box.clientWidth * 100;
+    panY = dragState.panY + dy / box.clientHeight * 100;
+    applyLiveVideoLayout();
+    document.getElementById("live-note").textContent =
+      `Live: Zoom ${getZoom()}x | Pan ${panX.toFixed(0)}%, ${panY.toFixed(0)}%`;
+  } else if (dragState.type === "zoom") {
+    setZoomValue(dragState.zoom + (dx + dy) / 300);
+  }
+});
+window.addEventListener("pointerup", (e) => {
+  if (!dragState) return;
+  const wasClick = !dragState.moved && dragState.type === "move";
+  dragState = null;
+  if (wasClick) {
+    liveSelected = !liveSelected;
+    applyLiveVideoLayout();
+  } else {
+    updateLivePreview();
+  }
+});
 
 function setStatus(text) {
   document.getElementById("status").textContent = text;
+}
+
+// Refresh persistence: the current job, cover and edits are saved
+// to localStorage on every change, so a page refresh resumes exactly
+// where you left off — downloading/processing polling restarts,
+// the live preview, timeline and log come back, and no work is lost.
+const STATE_KEY = "yt-cover-tool-state";
+function saveState() {
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({
+      jobId, selectedCoverId, flip, panX, panY, downloadReady,
+      url: document.getElementById("yt-url").value,
+      speed: document.getElementById("speed").value,
+      voiceEnabled: document.getElementById("voice-enabled").checked,
+      voicePitch: document.getElementById("voice-pitch").value,
+      compress: document.getElementById("compress").checked,
+      zoom: document.getElementById("zoom").value,
+      title: document.getElementById("yt-title").value,
+      description: document.getElementById("yt-description").value,
+    }));
+  } catch (e) { /* private mode etc. — refresh persistence just skips */ }
+}
+function readSavedState() {
+  try { return JSON.parse(localStorage.getItem(STATE_KEY) || "null"); }
+  catch (e) { return null; }
+}
+function clearSavedState() {
+  try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+}
+async function restoreState() {
+  const saved = readSavedState();
+  if (!saved || !saved.jobId) return;
+  try {
+    const job = await api("/api/jobs/" + saved.jobId);
+    if (!job || job.status === "unknown") { clearSavedState(); return; }
+    jobId = saved.jobId;
+    if (saved.url) document.getElementById("yt-url").value = saved.url;
+    if (saved.speed) { document.getElementById("speed").value = saved.speed; document.getElementById("speed-value").textContent = saved.speed + "x"; }
+    if (saved.voicePitch) { document.getElementById("voice-pitch").value = saved.voicePitch; document.getElementById("voice-pitch-value").textContent = saved.voicePitch; }
+    if (saved.voiceEnabled !== undefined) document.getElementById("voice-enabled").checked = saved.voiceEnabled;
+    if (saved.compress !== undefined) document.getElementById("compress").checked = saved.compress;
+    if (saved.zoom) { document.getElementById("zoom").value = saved.zoom; document.getElementById("zoom-value").textContent = saved.zoom + "x"; document.getElementById("live-zoom-value").textContent = saved.zoom + "x"; }
+    if (saved.title) document.getElementById("yt-title").value = saved.title;
+    if (saved.description) document.getElementById("yt-description").value = saved.description;
+    flip = !!saved.flip;
+    document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
+    panX = saved.panX || 0; panY = saved.panY || 0;
+    document.getElementById("job-info").textContent = "Job: " + jobId + " — " + job.status + " (restored after refresh).";
+    renderTimeline(job);
+    renderProcessLog(job);
+    if (job.status === "downloading") {
+      startDownloadPolling(jobId);
+    } else if (job.status === "processing") {
+      document.getElementById("process-progress-wrap").hidden = false;
+      startProcessPolling(jobId, "/api/preview/" + jobId);
+    } else if (job.status === "downloaded") {
+      downloadReady = true;
+      document.getElementById("download-progress-wrap").hidden = false;
+      document.getElementById("download-progress-bar").style.width = "100%";
+      document.getElementById("download-progress-text").textContent = "Downloaded 100%.";
+    } else if (job.status === "processed") {
+      downloadReady = true;
+      const player = document.getElementById("preview-player");
+      player.src = "/api/preview/" + jobId + "?t=" + Date.now();
+      player.load();
+    }
+    updateLivePreview();
+    setStatus("Restored after refresh: " + job.status + ". Your progress was not lost.");
+  } catch (e) {
+    // Job may have been cleaned up — start fresh, do not block the page.
+    clearSavedState();
+  }
 }
 
 function renderTimeline(job) {
@@ -57,8 +220,8 @@ function renderTimeline(job) {
   const entries = job.timeline || [];
   if (!entries.length) {
     const current = job.process_stage || job.status || "";
-    list.innerHTML = current ? `<li class="muted">Chal raha hai: ${current}</li>`
-                             : `<li class="muted">Abhi koi step complete nahi hua.</li>`;
+    list.innerHTML = current ? `<li class="muted">Running: ${current}</li>`
+                             : `<li class="muted">No step completed yet.</li>`;
     return;
   }
   list.innerHTML = "";
@@ -86,9 +249,9 @@ async function selectCover(cover) {
     try {
       const data = await api("/api/detect-green/" + cover.id);
       greenRect = data.green_rect;
-      setStatus(`Green area auto-detected: ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} — video exactly isi area mein aayegi.`);
+      setStatus(`Green area auto-detected: ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} — video will fill exactly this area.`);
     } catch (err) {
-      setStatus("Green area auto-detect nahi hui, manual rectangle istemal hoga: " + err.message);
+      setStatus("Green area auto-detection failed, using the manual rectangle: " + err.message);
     }
   }
   updateLivePreview();
@@ -137,7 +300,26 @@ async function loadCovers(autoSelectId) {
     img.alt = cover.display_name || cover.filename;
     const span = document.createElement("span");
     span.textContent = cover.display_name || cover.filename;
-    btn.append(img, span);
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "cover-delete";
+    del.textContent = "×";
+    del.title = "Delete this cover";
+    del.setAttribute("aria-label", "Delete cover " + (cover.display_name || cover.filename));
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete cover "${cover.display_name || cover.filename}"? This cannot be undone.`)) return;
+      try {
+        await api("/api/covers/" + cover.id, { method: "DELETE" });
+        if (selectedCoverId === cover.id) selectedCoverId = "";
+        if (liveCover && liveCover.id === cover.id) liveCover = null;
+        await loadCovers();
+        setStatus("Cover deleted.");
+      } catch (err) {
+        setStatus("Cover delete failed: " + err.message);
+      }
+    });
+    btn.append(img, span, del);
     btn.addEventListener("click", () => selectCover(cover));
     grid.appendChild(btn);
   }
@@ -263,6 +445,7 @@ document.getElementById("btn-download").addEventListener("click", async () => {
       body: JSON.stringify({ url }),
     });
     jobId = data.job_id;
+    saveState();
     document.getElementById("job-info").textContent = "Job: " + jobId + " — downloading…";
     startDownloadPolling(jobId);
   } catch (err) {
@@ -284,6 +467,21 @@ async function uploadSelectedCover() {
     setStatus("Cover upload failed: " + err.message);
   }
 }
+
+document.getElementById("btn-delete-selected-cover").addEventListener("click", async () => {
+  if (!selectedCoverId) return;
+  const name = document.getElementById("cover-selected-name").textContent;
+  if (!confirm(`Delete the selected cover? This cannot be undone.`)) return;
+  try {
+    await api("/api/covers/" + selectedCoverId, { method: "DELETE" });
+    selectedCoverId = "";
+    liveCover = null;
+    await loadCovers();
+    setStatus("Selected cover deleted.");
+  } catch (err) {
+    setStatus("Cover delete failed: " + err.message);
+  }
+});
 
 document.getElementById("btn-cover-upload").addEventListener("click", uploadSelectedCover);
 // Easy flow: choosing a file uploads it at once — no second click needed.
@@ -309,12 +507,43 @@ document.getElementById("voice-pitch").addEventListener("input", (e) => {
 
 document.getElementById("zoom").addEventListener("input", (e) => {
   document.getElementById("zoom-value").textContent = e.target.value + "x";
+  document.getElementById("live-zoom-value").textContent = e.target.value + "x";
   updateLivePreview();
 });
+document.getElementById("btn-live-hide").addEventListener("click", () => {
+  liveVideoHidden = !liveVideoHidden;
+  applyLiveVideoLayout();
+});
+document.getElementById("btn-live-zoom-in").addEventListener("click", () => setZoomValue(getZoom() + 0.1));
+document.getElementById("btn-live-zoom-out").addEventListener("click", () => setZoomValue(getZoom() - 0.1));
 
 document.getElementById("voice-enabled").addEventListener("change", updateLivePreview);
 
 let processTimer = null;
+let processDetailsVisible = false;
+
+function toggleProcessDetails() {
+  processDetailsVisible = !processDetailsVisible;
+  document.getElementById("process-details").hidden = !processDetailsVisible;
+  document.getElementById("btn-process-details").textContent =
+    processDetailsVisible ? "Hide processing details ▴" : "Show processing details ▾";
+}
+document.getElementById("btn-process-details").addEventListener("click", toggleProcessDetails);
+document.getElementById("process-progress-wrap").addEventListener("click", (e) => {
+  if (e.target.id === "btn-process-details") return;
+  if (e.target.closest("#process-details")) return;
+  toggleProcessDetails();
+});
+
+function renderProcessLog(job) {
+  const logEl = document.getElementById("process-log");
+  if (!logEl) return;
+  const lines = job.process_log || [];
+  if (lines.length) {
+    logEl.textContent = lines.join("\n");
+    if (processDetailsVisible) logEl.scrollTop = logEl.scrollHeight;
+  }
+}
 
 function startProcessPolling(id, previewUrl) {
   const wrap = document.getElementById("process-progress-wrap");
@@ -326,10 +555,11 @@ function startProcessPolling(id, previewUrl) {
     try {
       const job = await api("/api/jobs/" + id);
       renderTimeline(job);
+      renderProcessLog(job);
       const pct = job.process_progress || 0;
       bar.style.width = pct + "%";
-      const elapsed = job.process_elapsed ? ` • ${Math.round(job.process_elapsed)}s guzar gaye` : "";
-      const eta = job.process_eta ? ` • taqreeban ${Math.round(job.process_eta)}s baqi` : "";
+      const elapsed = job.process_elapsed ? ` • ${Math.round(job.process_elapsed)}s elapsed` : "";
+      const eta = job.process_eta ? ` • about ${Math.round(job.process_eta)}s left` : "";
       text.textContent = `${job.process_stage || "Processing…"} ${pct}%${elapsed}${eta}`;
       if (job.status === "processed") {
         clearInterval(processTimer);
@@ -368,6 +598,8 @@ document.getElementById("btn-process").addEventListener("click", async () => {
         voice_pitch: parseFloat(document.getElementById("voice-pitch").value),
         compress: document.getElementById("compress").checked,
         zoom: parseFloat(document.getElementById("zoom").value),
+        pan_x: panX,
+        pan_y: panY,
         green_rect: greenRect,
       }),
     });
@@ -380,6 +612,31 @@ document.getElementById("btn-process").addEventListener("click", async () => {
 document.getElementById("btn-download-final").addEventListener("click", () => {
   if (!jobId) { setStatus("Process a video first."); return; }
   window.location.href = "/api/download/" + jobId;
+});
+
+document.getElementById("btn-delete-local-files").addEventListener("click", async () => {
+  if (!jobId) { setStatus("No job to delete."); return; }
+  if (!confirm("Delete all local working files for this job (source, final, preview)? Your downloaded copy in Downloads is not affected.")) return;
+  try {
+    await api("/api/jobs/" + jobId, { method: "DELETE" });
+    document.getElementById("local-files-result").textContent = "Local working files deleted. Disk space freed.";
+    clearSavedState();
+    jobId = ""; downloadReady = false;
+    document.getElementById("job-info").textContent = "";
+    setStatus("Local files deleted. Start a new video to continue.");
+  } catch (err) {
+    setStatus("Local delete failed: " + err.message);
+  }
+});
+document.getElementById("btn-start-over").addEventListener("click", () => {
+  clearSavedState();
+  jobId = ""; downloadReady = false;
+  document.getElementById("yt-url").value = "";
+  document.getElementById("job-info").textContent = "";
+  document.getElementById("preview-player").removeAttribute("src");
+  document.getElementById("preview-player").load();
+  updateLivePreview();
+  setStatus("Cleared. Paste a new YouTube link to start over.");
 });
 
 document.getElementById("btn-upload-yt").addEventListener("click", async () => {
@@ -399,7 +656,8 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
       }),
     });
     document.getElementById("yt-result").textContent = "Uploaded: " + (data.url || data.video_id);
-    setStatus("Uploaded to YouTube.");
+    setStatus("Uploaded to YouTube. Local working files for this job were deleted to save space.");
+    if (data.local_files_deleted) { clearSavedState(); }
   } catch (err) {
     document.getElementById("yt-result").textContent = "";
     setStatus("YouTube upload failed: " + err.message);
@@ -456,6 +714,12 @@ function showTab(tab) {
 document.getElementById("tab-btn-tool").addEventListener("click", () => showTab("tool"));
 document.getElementById("tab-btn-admin").addEventListener("click", () => showTab("admin"));
 
-loadCovers();
-loadSettings();
-loadYoutubeStatus();
+(async () => {
+  await loadSettings();
+  const saved = readSavedState();
+  await loadCovers(saved && saved.selectedCoverId ? saved.selectedCoverId : undefined);
+  // loadCovers auto-selects; restoreState then re-applies the saved
+  // job, cover and edits, and restarts any in-progress polling.
+  await restoreState();
+  loadYoutubeStatus();
+})();

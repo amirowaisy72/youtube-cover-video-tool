@@ -66,6 +66,17 @@ button:hover, .btn:hover { background: #2d4770; }
   border: none; color: #081226;
 }
 .btn-primary:hover { filter: brightness(1.08); background: linear-gradient(135deg, #5b8cff, #38bdf8); }
+/* Process is the main action: make it unmistakably a button, not a
+   plain text link. ID specificity also beats any Tailwind reset
+   that was making it look like blue text on the dark background. */
+button#btn-process, #btn-process {
+  display: block; width: 100%; padding: 15px 18px; margin-top: 14px;
+  font-size: 1.08rem; font-weight: 800; letter-spacing: 0.2px;
+  color: #081226 !important; background: linear-gradient(135deg, #7aa7ff, #5eead4) !important;
+  border: none; border-radius: 14px; box-shadow: 0 8px 24px rgba(94, 234, 212, 0.30);
+  text-decoration: none; text-align: center; cursor: pointer;
+}
+button#btn-process:hover, #btn-process:hover { filter: brightness(1.08); }
 .progress-wrap { margin-top: 16px; }
 .progress-track {
   height: 14px; border-radius: 999px; overflow: hidden;
@@ -75,6 +86,12 @@ button:hover, .btn:hover { background: #2d4770; }
   height: 100%; width: 0%;
   background: linear-gradient(90deg, #5b8cff, #38bdf8, #5eead4);
   border-radius: 999px; transition: width 0.4s ease;
+}
+#process-progress-wrap .progress-track { cursor: pointer; }
+.process-log {
+  background: #0a1220; border: 1px solid rgba(142, 163, 194, 0.35); border-radius: 12px;
+  color: #c8f5e8; font-size: 0.82rem; line-height: 1.5; padding: 12px;
+  max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
 }
 .status {
   font-weight: 600; color: #dbe6f5;
@@ -87,9 +104,17 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 .fieldset legend { color: #b8c6dd; padding: 0 8px; }
 .cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .cover-thumb {
+  position: relative;
   border: 2px solid rgba(142, 163, 194, 0.3); border-radius: 14px; overflow: hidden;
   background: #0f1f38; cursor: pointer; padding: 0; text-align: left; color: inherit;
 }
+.cover-delete {
+  position: absolute; top: 6px; right: 6px; z-index: 5;
+  width: 28px; height: 28px; padding: 0; border-radius: 999px;
+  background: rgba(10, 18, 32, 0.85); color: #fff; border: 1px solid rgba(255,255,255,0.4);
+  font-size: 16px; line-height: 1; cursor: pointer;
+}
+.cover-delete:hover { background: #e11d48; }
 .cover-thumb img { width: 100%; height: 90px; object-fit: cover; display: block; }
 .cover-thumb span { display: block; padding: 8px; font-size: 0.82rem; word-break: break-word; }
 .cover-thumb.selected { border-color: #5eead4; box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.35); }
@@ -105,9 +130,17 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 .live-video { width: 100%; display: block; background: #000; }
 .live-green-box { width: 100%; }
 .live-preview-box.has-cover .live-green-box {
-  position: absolute; overflow: hidden;
+  position: absolute; overflow: hidden; border: 2px dashed #5eead4; box-sizing: border-box;
   /* left/top/width/height are set live from the green rectangle */
 }
-.live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: cover; }
+.live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: fill; display: block; cursor: grab; touch-action: none; }
+.live-preview-box.has-cover .live-video:active { cursor: grabbing; }
+.live-green-box.selected { border: 2px solid #5eead4; box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.4); }
+.live-handle { position: absolute; width: 18px; height: 18px; background: #5eead4; border: 2px solid #0e1a2e; border-radius: 4px; cursor: nwse-resize; z-index: 5; }
+.live-handle.tl { top: -9px; left: -9px; cursor: nwse-resize; }
+.live-handle.tr { top: -9px; right: -9px; cursor: nesw-resize; }
+.live-handle.bl { bottom: -9px; left: -9px; cursor: nesw-resize; }
+.live-handle.br { bottom: -9px; right: -9px; cursor: nwse-resize; }
+.live-hint { font-size: 0.85rem; }
 .live-preview-box.has-cover #live-empty { display: none; }
 .footer-note { text-align: center; color: #7d90ad; font-size: 0.85rem; margin-top: 24px; }

@@ -85,8 +85,41 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    Voice change + pitch, and Compress on/off, then press
    **Process video**. Zoom scales inside the green area and crops
    back to it, so a zoomed video can never spill outside the green area.
+   In the Live preview you can also control the video directly:
+   click it to select it (corner handles appear), drag it to move it
+   up/down/left/right after zooming, and drag a corner to zoom.
+   Drag position (pan) is sent to the final encode as a crop offset,
+   still clamped inside the green area. Hide/Show lets you check the
+   cover alone against the video. All tool UI text is in English.
    A progress bar in the Edit section itself shows % processed,
    stage (final/preview encode), elapsed time, and estimated time left.
+   Click the progress bar (or "Show processing details") for an
+   installer-style live log: input files and sizes, green area used,
+   settings, FFmpeg milestones, and output files. The bar now moves
+   in realtime — FFmpeg progress is read char-by-char (its lines use
+   carriage return, not newline) and lines without a timestamp no
+   longer crash it, which was why it used to stick at 2%.
+   Covers can be deleted: click × on any cover thumbnail, or
+   "Delete selected cover" under the selected cover.
+   Encoding uses `ultrafast` preset, all CPU threads, and a fast
+   480px preview encode for maximum speed.
+
+### Refresh safety and local storage (no disk waste)
+
+- **Refresh-safe:** the current job, cover, flip, speed, voice, zoom
+  and pan are saved to the browser's localStorage on every change.
+  Refreshing the page restores them and restarts any downloading or
+  processing polling — progress is not lost and work does not restart.
+- **No permanent local library:** `jobs/<id>/` is a temporary working
+  folder only. After you download the final video, its source and
+  preview are deleted from this computer (your downloaded copy is in
+  Downloads, and the final video stays here for YouTube upload).
+  After a successful YouTube upload, all local files for that job are
+  deleted. On server start, any job folder older than 24 hours is
+  deleted. You can also delete a job's local files anytime with
+  "Delete local working files for this job", or clear the current job
+  with "Start over". Covers you upload are kept (they are small images
+  you choose to reuse); delete any cover with its × button.
    The **Timeline** section shows how long each step actually took
    (download, final encode, preview encode) with file sizes.
    Output: `jobs/<job-id>/final.mp4` and a low-res
