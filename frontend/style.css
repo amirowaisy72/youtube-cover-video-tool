@@ -147,7 +147,7 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
      edge where video meets green area, so you cannot tell whether
      the video fully covers the green area or not. */
 }
-.live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; touch-action: none; }
+.live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; touch-action: none; background: #000; }
 .live-preview-box.has-cover .live-video:active { cursor: grabbing; }
 .live-green-box.selected { border: none; box-shadow: none; }
 

@@ -1,4 +1,4 @@
-# YouTube Cover Video Tool
+# Copyright free video generator
 
 A totally free, local tool that takes a YouTube link, downloads the video,
 places it into the green-screen area of a cover image, optionally flips it
@@ -155,6 +155,59 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    (live object-fit: cover, final scale=increase + crop), so
    there is no black area and no green leftover — the video
    itself fills the box, in both manual and Auto mode.
+   Original metadata: when a video downloads, its original
+   title, description and tags are fetched via yt-dlp (no extra
+   download), stored in the job, shown under the download step,
+   and prefilled into the YouTube upload form (title, description
+   and a new tags field, comma separated) — edit them or leave
+   them as-is before uploading.
+   Generated metadata, free and copyright-safe: after the final
+   video is ready, POST /api/generate-metadata builds a NEW title,
+   description and tags from the original keywords — locally in
+   backend/metadata.py, with NO AI API, no key, no credits and
+   no limits, offline and unlimited. The original description is
+   never copied, the new title is never identical, only single
+   keywords are carried over, and the new description is written
+   from scratch. The generated version is shown with the final
+   video and prefilled into the Upload step, with Regenerate,
+   "Use these for upload" and "Use original instead" buttons —
+   the user double-checks and edits it before anything is
+   published on YouTube.
+   Admin Flip default: Admin settings now has "Flip video by
+   default" (default_flip, default on). It controls manual jobs,
+   Auto mode and the Process API when flip is not sent — the
+   manual Flip button still toggles it per video.
+   Auto "Go to Final video": when Auto finishes, the popup shows
+   a "Go to Final video" button next to Download and Close. It
+   closes the popup, jumps to manual Step 4 (Preview & download)
+   and scrolls directly to the preview player.
+   Fit modes (Live preview + Admin, both modes): Live preview has
+   two mutually exclusive checkboxes — "Fit to green screen"
+   (default, cover: video fills the green box exactly, no black
+   area, sides cropped if aspects mismatch) and "Display full
+   width / height video" (contain: whole video, no crop, leftover
+   box area filled with black, never green). Live preview uses
+   object-fit cover/contain exactly matching the final FFmpeg
+   scale=increase+crop / scale=decrease+black-pad, so live and
+   final are identical — verified with a real FFmpeg test
+   (cover: box top/bottom red; full: box top/bottom black,
+   centre red, cover corner blue, no green in either).
+   Separate Admin defaults: Admin has "Auto mode defaults"
+   (speed, voice, pitch, flip, fit) and "Manual mode defaults"
+   (same controls, separate values). Auto uses Auto defaults,
+   Manual Edit starts with Manual defaults. Encoder, CRF, preset,
+   green rectangle and auto-detect are shared.
+   YouTube channels in Admin: Admin has a "YouTube channels"
+   section with step-by-step instructions (Google Cloud Console
+   → YouTube Data API v3 → OAuth Desktop app → Client ID/Secret
+   → Save → pip install → python scripts/youtube_connect.py →
+   restart). Client ID/Secret are saved locally to
+   client_secrets.json (gitignored, never pushed). Channels can
+   also be added by name + Channel ID (YouTube Studio → Settings
+   → Channel → Advanced settings) and will show in the Upload
+   step even before Google sign-in; upload itself still needs
+   the sign-in token, because YouTube uploads to the signed-in
+   account's channel.
 
 ### Refresh safety and local storage (no disk waste)
 

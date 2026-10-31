@@ -11,6 +11,35 @@ let autoDetectGreen = true;
 let panX = 0, panY = 0;
 let liveVideoHidden = false;
 let liveSelected = false;
+// Fit mode, mutually exclusive checkboxes in Live preview:
+// "cover" = Fit to green screen (default, fills box, no black area)
+// "full" = Display full video (no crop, leftover area is black)
+// Live preview and final video use the SAME mode, so what you see
+// live is exactly what the final video will be — never live black
+// but final green, or vice versa.
+let fitMode = "cover";
+function setFitMode(mode) {
+  fitMode = mode === "full" ? "full" : "cover";
+  document.getElementById("fit-cover").checked = fitMode === "cover";
+  document.getElementById("fit-full").checked = fitMode === "full";
+  saveState();
+  updateLivePreview();
+}
+document.getElementById("fit-cover").addEventListener("change", (e) => {
+  setFitMode(e.target.checked ? "cover" : "full");
+});
+document.getElementById("fit-full").addEventListener("change", (e) => {
+  setFitMode(e.target.checked ? "full" : "cover");
+});
+// Admin fit checkboxes are also mutually exclusive pairs.
+function bindFitPair(coverId, fullId) {
+  const c = document.getElementById(coverId), f = document.getElementById(fullId);
+  if (!c || !f) return;
+  c.addEventListener("change", () => { if (c.checked) f.checked = false; else f.checked = true; });
+  f.addEventListener("change", () => { if (f.checked) c.checked = false; else c.checked = true; });
+}
+bindFitPair("set-fit-cover", "set-fit-full");
+bindFitPair("set-manual-fit-cover", "set-manual-fit-full");
 
 function getZoom() { return parseFloat(document.getElementById("zoom").value) || 1; }
 
@@ -65,11 +94,11 @@ function applyLiveVideoLayout() {
     greenBox.style.webkitMaskImage = "";
   }
   // Video is sized at zoom x the box and offset by pan, inside an
-  // overflow-hidden box. object-fit: cover fills the box exactly
-  // at 1.0x, with no black area, matching the final FFmpeg
-  // scale=increase + crop, so live and final match. Zooming zooms
-  // the video itself, not a black letterbox area (contain used to
-  // do that: its black bars grew with zoom).
+  // overflow-hidden box. object-fit follows fitMode EXACTLY like
+  // the final FFmpeg encode: cover = scale=increase + crop (fills
+  // box, no black area), full = scale=decrease + black pad (whole
+  // video, no crop, leftover is black). Live and final match.
+  video.style.objectFit = fitMode === "full" ? "contain" : "cover";
   video.style.position = liveCover ? "absolute" : "";
   video.style.width = (zoom * 100) + "%";
   video.style.height = (zoom * 100) + "%";
@@ -183,7 +212,7 @@ const STATE_KEY = "yt-cover-tool-state";
 function saveState() {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({
-      jobId, selectedCoverId, flip, panX, panY, downloadReady,
+      jobId, selectedCoverId, flip, fitMode, panX, panY, downloadReady,
       url: document.getElementById("yt-url").value,
       speed: document.getElementById("speed").value,
       voiceEnabled: document.getElementById("voice-enabled").checked,
@@ -217,10 +246,26 @@ async function restoreState() {
     if (saved.zoom) { document.getElementById("zoom").value = saved.zoom; document.getElementById("zoom-value").textContent = saved.zoom + "x"; document.getElementById("live-zoom-value").textContent = saved.zoom + "x"; }
     if (saved.title) document.getElementById("yt-title").value = saved.title;
     if (saved.description) document.getElementById("yt-description").value = saved.description;
-    flip = saved.flip !== undefined ? !!saved.flip : true;
+    if (saved.flip !== undefined) flip = !!saved.flip;
+    // else keep the Admin default set by loadSettings()
+    if (saved.fitMode) setFitMode(saved.fitMode);
     document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
     panX = saved.panX || 0; panY = saved.panY || 0;
     document.getElementById("job-info").textContent = "Job: " + jobId + " — " + job.status + " (restored after refresh).";
+    showOriginalInfo(job);
+    if (job.generated_title) {
+      currentGenerated = job;
+      const box = document.getElementById("generated-info");
+      if (box) {
+        box.hidden = false;
+        document.getElementById("generated-title").textContent = job.generated_title;
+        document.getElementById("generated-tags").textContent = "Tags: " + (job.generated_tags || []).join(", ");
+        document.getElementById("generated-description").textContent = job.generated_description;
+      }
+      document.getElementById("yt-title").value = job.generated_title;
+      document.getElementById("yt-description").value = job.generated_description;
+      document.getElementById("yt-tags").value = (job.generated_tags || []).join(", ");
+    }
     renderTimeline(job);
     renderProcessLog(job);
     if (job.status === "downloading") {
@@ -372,6 +417,19 @@ async function loadSettings() {
   const s = await api("/api/settings");
   document.getElementById("set-speed").value = s.default_speed;
   document.getElementById("set-voice-enabled").checked = !!s.voice_enabled;
+  document.getElementById("set-flip").checked = s.default_flip !== false;
+  document.getElementById("set-fit-cover").checked = (s.fit_mode || "cover") === "cover";
+  document.getElementById("set-fit-full").checked = (s.fit_mode || "cover") === "full";
+  document.getElementById("set-manual-speed").value = s.manual_speed !== undefined ? s.manual_speed : s.default_speed;
+  document.getElementById("set-manual-pitch").value = s.manual_voice_pitch_factor !== undefined ? s.manual_voice_pitch_factor : s.voice_pitch_factor;
+  document.getElementById("set-manual-voice-enabled").checked = s.manual_voice_enabled !== undefined ? !!s.manual_voice_enabled : !!s.voice_enabled;
+  document.getElementById("set-manual-flip").checked = s.manual_flip !== undefined ? !!s.manual_flip : (s.default_flip !== false);
+  document.getElementById("set-manual-fit-cover").checked = (s.manual_fit_mode || "cover") === "cover";
+  document.getElementById("set-manual-fit-full").checked = (s.manual_fit_mode || "cover") === "full";
+  // Manual Edit starts with Manual defaults, NOT Auto defaults.
+  flip = document.getElementById("set-manual-flip").checked;
+  document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
+  setFitMode((s.manual_fit_mode || "cover") === "full" ? "full" : "cover");
   document.getElementById("set-pitch").value = s.voice_pitch_factor;
   document.getElementById("set-crf").value = s.crf;
   document.getElementById("set-preset").value = s.preset;
@@ -384,19 +442,93 @@ async function loadSettings() {
   document.getElementById("set-green-h").value = s.green_rect.h;
   autoDetectGreen = s.auto_detect_green !== false;
   document.getElementById("set-auto-detect").checked = autoDetectGreen;
-  document.getElementById("voice-enabled").checked = !!s.voice_enabled;
-  document.getElementById("voice-pitch").value = s.voice_pitch_factor;
-  document.getElementById("voice-pitch-value").textContent = s.voice_pitch_factor;
-  document.getElementById("speed").value = s.default_speed;
-  document.getElementById("speed-value").textContent = s.default_speed + "x";
+  document.getElementById("voice-enabled").checked = document.getElementById("set-manual-voice-enabled").checked;
+  document.getElementById("voice-pitch").value = document.getElementById("set-manual-pitch").value;
+  document.getElementById("voice-pitch-value").textContent = document.getElementById("set-manual-pitch").value;
+  document.getElementById("speed").value = document.getElementById("set-manual-speed").value;
+  document.getElementById("speed-value").textContent = document.getElementById("set-manual-speed").value + "x";
   greenRect = s.green_rect || greenRect;
+  adminChannels = Array.isArray(s.youtube_channels) ? s.youtube_channels : [];
+  renderAdminChannels();
   updateLivePreview();
 }
+
+// Admin YouTube channels: configured in Admin, shown in Upload.
+let adminChannels = [];
+function renderAdminChannels() {
+  const list = document.getElementById("yt-channel-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!adminChannels.length) {
+    list.innerHTML = '<li class="muted">No channels configured yet.</li>';
+    return;
+  }
+  adminChannels.forEach((ch, i) => {
+    const li = document.createElement("li");
+    li.textContent = `${ch.title} (${ch.id}) `;
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0";
+    del.textContent = "Delete";
+    del.addEventListener("click", async () => {
+      adminChannels.splice(i, 1);
+      await saveAdminChannels();
+    });
+    li.appendChild(del);
+    list.appendChild(li);
+  });
+}
+async function saveAdminChannels() {
+  const s = await api("/api/settings");
+  await api("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...s, youtube_channels: adminChannels }),
+  });
+  renderAdminChannels();
+  await loadYoutubeStatus();
+}
+document.getElementById("btn-add-channel").addEventListener("click", async () => {
+  const name = document.getElementById("yt-channel-name").value.trim();
+  const id = document.getElementById("yt-channel-id").value.trim();
+  if (!name || !id) { setStatus("Enter both a channel name and a Channel ID."); return; }
+  adminChannels.push({ title: name, id });
+  document.getElementById("yt-channel-name").value = "";
+  document.getElementById("yt-channel-id").value = "";
+  await saveAdminChannels();
+  setStatus("Channel added. It now shows in the Upload step.");
+});
+document.getElementById("btn-save-yt-credentials").addEventListener("click", async () => {
+  const clientId = document.getElementById("yt-client-id").value.trim();
+  const clientSecret = document.getElementById("yt-client-secret").value.trim();
+  if (!clientId || !clientSecret) {
+    document.getElementById("yt-credentials-result").textContent = "Enter both Client ID and Client Secret.";
+    return;
+  }
+  try {
+    await api("/api/youtube/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+    });
+    document.getElementById("yt-credentials-result").textContent = "Saved to client_secrets.json on this computer. Next: install the libraries and run python scripts/youtube_connect.py, then restart run.bat.";
+    document.getElementById("yt-client-secret").value = "";
+    await loadYoutubeStatus();
+  } catch (err) {
+    document.getElementById("yt-credentials-result").textContent = "Save failed: " + err.message;
+  }
+});
 
 async function loadYoutubeStatus() {
   try {
     const s = await api("/api/youtube/status");
     document.getElementById("yt-status").textContent = "YouTube: " + s.message;
+    const adminStatus = document.getElementById("yt-admin-status");
+    if (adminStatus) {
+      adminStatus.textContent = s.configured_channels && s.configured_channels.length
+        ? `Configured channels: ${s.configured_channels.length}. ${s.connected ? "Google sign-in is also connected." : "Google sign-in is not connected yet — upload needs the sign-in step above."}`
+        : "No channels configured yet.";
+    }
     const select = document.getElementById("channel-select");
     select.innerHTML = "";
     if (!s.channels.length) {
@@ -451,6 +583,7 @@ function startDownloadPolling(id) {
         text.textContent = `Downloading… ${pct}% — ${fmtMB(job.downloaded_bytes)} downloaded${fmtSpeed(job.speed)}`;
       }
       renderTimeline(job);
+      showOriginalInfo(job);
       if (job.status === "downloaded") {
         clearInterval(downloadTimer);
         bar.style.width = "100%";
@@ -469,6 +602,80 @@ function startDownloadPolling(id) {
     }
   }, 1000);
 }
+
+// Original metadata: after a download, show the source video's
+// original title, description and tags, and prefill the upload
+// form with them (title, description, tags) — the user can edit
+// any of them before uploading, or leave them as-is.
+function showOriginalInfo(job) {
+  if (!job || !job.original_title) return;
+  const box = document.getElementById("original-info");
+  if (!box) return;
+  box.hidden = false;
+  document.getElementById("original-title").textContent = job.original_title;
+  const tags = job.original_tags || [];
+  document.getElementById("original-tags").textContent = tags.length ? "Tags: " + tags.join(", ") : "";
+  document.getElementById("original-description").textContent = job.original_description || "";
+  const titleEl = document.getElementById("yt-title");
+  if (titleEl && !titleEl.value) titleEl.value = job.original_title;
+  const descEl = document.getElementById("yt-description");
+  if (descEl && !descEl.value) descEl.value = job.original_description || "";
+  const tagsEl = document.getElementById("yt-tags");
+  if (tagsEl && !tagsEl.value) tagsEl.value = tags.join(", ");
+}
+
+// Generated metadata: after the final video is ready, fetch the
+// new copyright-safe title/description/tags, show them with the
+// final video, and let the user double-check / edit them in the
+// Upload step before anything is published. Default upload form
+// uses the generated version, not the original.
+let generatedVariant = 0;
+let currentGenerated = null;
+async function loadGeneratedMetadata(variant) {
+  if (!jobId) return;
+  try {
+    const gen = await api("/api/generate-metadata", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: jobId, variant: variant || 0 }),
+    });
+    currentGenerated = gen;
+    const box = document.getElementById("generated-info");
+    if (box) {
+      box.hidden = false;
+      document.getElementById("generated-title").textContent = gen.generated_title;
+      document.getElementById("generated-tags").textContent = "Tags: " + (gen.generated_tags || []).join(", ");
+      document.getElementById("generated-description").textContent = gen.generated_description;
+    }
+    // Prefill upload form with the generated version by default.
+    document.getElementById("yt-title").value = gen.generated_title;
+    document.getElementById("yt-description").value = gen.generated_description;
+    document.getElementById("yt-tags").value = (gen.generated_tags || []).join(", ");
+  } catch (e) { /* no original metadata yet — just skip */ }
+}
+document.getElementById("btn-regenerate").addEventListener("click", async () => {
+  generatedVariant += 1;
+  await loadGeneratedMetadata(generatedVariant);
+});
+document.getElementById("btn-use-generated").addEventListener("click", () => {
+  if (!currentGenerated) return;
+  document.getElementById("yt-title").value = currentGenerated.generated_title;
+  document.getElementById("yt-description").value = currentGenerated.generated_description;
+  document.getElementById("yt-tags").value = (currentGenerated.generated_tags || []).join(", ");
+  showManualStep(5);
+  setStatus("Generated title, description and tags are in the upload form. Check them, then upload.");
+});
+document.getElementById("btn-use-original").addEventListener("click", async () => {
+  if (!jobId) return;
+  try {
+    const job = await api("/api/jobs/" + jobId);
+    document.getElementById("yt-title").value = job.original_title || "";
+    document.getElementById("yt-description").value = job.original_description || "";
+    document.getElementById("yt-tags").value = (job.original_tags || []).join(", ");
+    showManualStep(5);
+    setStatus("Original title, description and tags are in the upload form.");
+  } catch (e) { setStatus("Could not load original metadata."); }
+});
 
 document.getElementById("btn-download").addEventListener("click", async () => {
   const url = document.getElementById("yt-url").value.trim();
@@ -507,6 +714,7 @@ function openAutoPopup() {
   const dl0 = document.getElementById("auto-download-link");
   dl0.hidden = true;
   dl0.removeAttribute("href");
+  document.getElementById("btn-auto-goto-final").hidden = true;
   document.getElementById("btn-auto-close").hidden = true;
   document.getElementById("auto-error").hidden = true;
 }
@@ -516,6 +724,12 @@ function closeAutoPopup() {
   if (autoTimer) clearInterval(autoTimer);
 }
 document.getElementById("btn-auto-close").addEventListener("click", closeAutoPopup);
+document.getElementById("btn-auto-goto-final").addEventListener("click", () => {
+  closeAutoPopup();
+  showManualStep(4);
+  const player = document.getElementById("preview-player");
+  if (player) player.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 document.getElementById("btn-auto").addEventListener("click", async () => {
   const url = document.getElementById("auto-url").value.trim();
   if (!url) { setStatus("Paste a YouTube link for Auto mode first."); return; }
@@ -550,6 +764,7 @@ document.getElementById("btn-auto").addEventListener("click", async () => {
         // the button's display CSS beat the hidden attribute.
         if (job.status !== "processed") {
           document.getElementById("auto-download-link").hidden = true;
+          document.getElementById("btn-auto-goto-final").hidden = true;
         }
         if (job.status === "processed" && job.auto_summary) {
           clearInterval(autoTimer);
@@ -565,8 +780,11 @@ document.getElementById("btn-auto").addEventListener("click", async () => {
           const dl = document.getElementById("auto-download-link");
           dl.hidden = false;
           dl.href = "/api/download/" + jobId;
+          document.getElementById("btn-auto-goto-final").hidden = false;
           document.getElementById("btn-auto-close").hidden = false;
           document.getElementById("auto-stage-text").textContent = AUTO_STAGES.done;
+          showOriginalInfo(job);
+          loadGeneratedMetadata(0);
           // Load the finished job into the normal UI, so after Close
           // the user sees the preview and can edit further.
           downloadReady = true;
@@ -705,6 +923,7 @@ function startProcessPolling(id, previewUrl) {
         const player = document.getElementById("preview-player");
         player.src = previewUrl + "?t=" + Date.now();
         player.load();
+        loadGeneratedMetadata(0);
         setStatus("Done. Preview below — check it before downloading.");
       } else if (job.status === "failed") {
         clearInterval(processTimer);
@@ -738,6 +957,7 @@ document.getElementById("btn-process").addEventListener("click", async () => {
         pan_x: panX,
         pan_y: panY,
         green_rect: greenRect,
+        fit_mode: fitMode,
       }),
     });
     startProcessPolling(jobId, data.preview_url);
@@ -791,6 +1011,7 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
         job_id: jobId,
         title: title,
         description: document.getElementById("yt-description").value,
+        tags: document.getElementById("yt-tags").value,
         privacy_status: document.getElementById("yt-privacy").value,
       }),
     });
@@ -810,6 +1031,13 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         default_speed: parseFloat(document.getElementById("set-speed").value),
+        default_flip: document.getElementById("set-flip").checked,
+        fit_mode: document.getElementById("set-fit-cover").checked ? "cover" : "full",
+        manual_speed: parseFloat(document.getElementById("set-manual-speed").value),
+        manual_flip: document.getElementById("set-manual-flip").checked,
+        manual_voice_enabled: document.getElementById("set-manual-voice-enabled").checked,
+        manual_voice_pitch_factor: parseFloat(document.getElementById("set-manual-pitch").value),
+        manual_fit_mode: document.getElementById("set-manual-fit-cover").checked ? "cover" : "full",
         voice_enabled: document.getElementById("set-voice-enabled").checked,
         voice_pitch_factor: parseFloat(document.getElementById("set-pitch").value),
         crf: parseInt(document.getElementById("set-crf").value, 10),
@@ -825,6 +1053,15 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
       }),
     });
     document.getElementById("settings-result").textContent = "Settings saved.";
+    // Manual Edit follows Manual defaults after save, Auto follows Auto defaults.
+    flip = document.getElementById("set-manual-flip").checked;
+    document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
+    document.getElementById("speed").value = document.getElementById("set-manual-speed").value;
+    document.getElementById("speed-value").textContent = document.getElementById("set-manual-speed").value + "x";
+    document.getElementById("voice-enabled").checked = document.getElementById("set-manual-voice-enabled").checked;
+    document.getElementById("voice-pitch").value = document.getElementById("set-manual-pitch").value;
+    document.getElementById("voice-pitch-value").textContent = document.getElementById("set-manual-pitch").value;
+    setFitMode(document.getElementById("set-manual-fit-cover").checked ? "cover" : "full");
     autoDetectGreen = document.getElementById("set-auto-detect").checked;
     if (!autoDetectGreen) {
       greenRect = {

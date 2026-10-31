@@ -11,8 +11,14 @@ Flow:
                                          -> jobs/<id>/final.mp4 + preview.mp4
   4. GET  /api/preview/{job_id}           -> preview player file
   5. GET  /api/download/{job_id}         -> final file download
-  6. POST /api/upload-youtube {job_id, title, description}
+  6. POST /api/upload-youtube {job_id, title, description, tags}
                                          -> YouTube Data API (see youtube_upload.py)
+  Original metadata: when a video is downloaded (manual or Auto),
+  yt-dlp also returns its original title, description and tags.
+  They are stored in job.json (original_title, original_description,
+  original_tags), shown in the UI, and prefilled into the upload
+  form, so the user can upload with the original title/description/
+  tags or edit them first.
   7. GET/PUT /api/settings               -> admin defaults (JSON file)
 
 Totally free stack: Python + FastAPI + FFmpeg + yt-dlp. No Node build
@@ -43,6 +49,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import video  # noqa: E402
 import youtube_upload  # noqa: E402
+import metadata as local_metadata  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -55,6 +62,14 @@ COVERS_DIR.mkdir(exist_ok=True)
 
 DEFAULT_SETTINGS = {
     "default_speed": 1.0,
+    "default_flip": True,
+    "fit_mode": "cover",
+    "manual_speed": 1.0,
+    "manual_flip": True,
+    "manual_voice_enabled": True,
+    "manual_voice_pitch_factor": 1.05,
+    "manual_fit_mode": "cover",
+    "youtube_channels": [],
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
     "crf": 22,
@@ -95,6 +110,16 @@ def load_settings() -> dict:
                 saved["preset"] = "fast"
             if "encoder" not in saved:
                 saved["encoder"] = "libx265"
+            if "default_flip" not in saved:
+                saved["default_flip"] = True
+            if "fit_mode" not in saved:
+                saved["fit_mode"] = "cover"
+            for k, v in [("manual_speed", 1.0), ("manual_flip", True),
+                         ("manual_voice_enabled", True),
+                         ("manual_voice_pitch_factor", 1.05),
+                         ("manual_fit_mode", "cover")]:
+                if k not in saved:
+                    saved[k] = v
             if saved.get("output_width") in (1280,):
                 saved["output_width"] = 1920
             merged = dict(DEFAULT_SETTINGS)
@@ -152,7 +177,7 @@ def yt_dlp_available() -> bool:
         return False
 
 
-app = FastAPI(title="YouTube Cover Video Tool")
+app = FastAPI(title="Copyright free video generator")
 
 
 @app.on_event("startup")
@@ -242,6 +267,40 @@ def delete_cover(cover_id: str) -> dict:
     return {"deleted": cover_id, "filename": matches[0].name}
 
 
+def fetch_original_info(url: str) -> dict:
+    """Return the source video's original title, description, tags
+    and uploader via yt-dlp, without downloading. Never fails the
+    download: on any error it returns empty fields, and the caller
+    just shows nothing instead of blocking the video."""
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+            info = ydl.extract_info(url, download=False) or {}
+        return {
+            "original_title": info.get("title") or "",
+            "original_description": info.get("description") or "",
+            "original_tags": list(info.get("tags") or []),
+            "original_uploader": info.get("uploader") or "",
+        }
+    except Exception:
+        pass
+    try:
+        proc = subprocess.run(["yt-dlp", "-J", "--no-warnings", url],
+                              capture_output=True, text=True, timeout=60)
+        if proc.returncode == 0:
+            info = json.loads(proc.stdout or "{}")
+            return {
+                "original_title": info.get("title") or "",
+                "original_description": info.get("description") or "",
+                "original_tags": list(info.get("tags") or []),
+                "original_uploader": info.get("uploader") or "",
+            }
+    except Exception:
+        pass
+    return {"original_title": "", "original_description": "",
+            "original_tags": [], "original_uploader": ""}
+
+
 # ---------------------------------------------------------------- download
 class DownloadRequest(BaseModel):
     url: str = Field(..., min_length=8)
@@ -258,6 +317,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
     job = {"id": job_id, "status": "downloading", "url": url,
            "progress": 0, "downloaded_bytes": 0, "total_bytes": None,
            "speed": None, "eta": None, "timeline": []}
+    job.update(fetch_original_info(url))
     write_job(job)
 
     def hook(d: dict) -> None:
@@ -383,7 +443,8 @@ def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
             job.update(extra)
         write_job(job)
 
-    _set("downloading", 0, {"status": "downloading", "url": url, "timeline": timeline})
+    _set("downloading", 0, {"status": "downloading", "url": url, "timeline": timeline,
+                            **fetch_original_info(url)})
     # --- Stage 1: download (same yt-dlp settings as manual download)
     dl_start = _time.time()
     try:
@@ -438,7 +499,7 @@ def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
     apply_start = _time.time()
     cmd = video.build_process_command(
         source, cover, applied_path, green_rect,
-        flip=True, speed=speed, voice_enabled=voice_enabled,
+        flip=bool(settings.get("default_flip", True)), speed=speed, voice_enabled=voice_enabled, fit_mode=str(settings.get("fit_mode", "cover")),
         voice_pitch_factor=pitch, crf=18, preset="medium",
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
@@ -453,7 +514,7 @@ def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
             mask_img.save(mask_path)
             cmd = video.build_process_command(
                 source, cover, applied_path, green_rect,
-                flip=True, speed=speed, voice_enabled=voice_enabled,
+                flip=bool(settings.get("default_flip", True)), speed=speed, voice_enabled=voice_enabled, fit_mode=str(settings.get("fit_mode", "cover")),
                 voice_pitch_factor=pitch, crf=18, preset="medium",
                 output_width=settings.get("output_width"),
                 output_height=settings.get("output_height"),
@@ -541,6 +602,28 @@ def get_job(job_id: str) -> dict:
     return read_job(job_id)
 
 
+class GenerateMetadataRequest(BaseModel):
+    job_id: str
+    variant: int = 0
+
+
+@app.post("/api/generate-metadata")
+def generate_metadata_endpoint(payload: GenerateMetadataRequest) -> dict:
+    """Generate a NEW, copyright-safe title, description and tags
+    from the job's original metadata — locally, free, no AI API.
+    Stored in job.json so it shows with the final video, and the
+    user can edit it in the Upload step before publishing."""
+    job = read_job(payload.job_id)
+    if not job or job.get("status") == "unknown":
+        raise HTTPException(404, "Job not found.")
+    gen = local_metadata.generate_metadata(
+        job.get("original_title", ""), job.get("original_description", ""),
+        job.get("original_tags") or [], variant=payload.variant or 0)
+    job.update(gen)
+    write_job(job)
+    return {"job_id": payload.job_id, **gen}
+
+
 @app.delete("/api/jobs/{job_id}")
 def delete_job(job_id: str) -> dict:
     """Delete all local working files for one job (source, final, preview)."""
@@ -609,7 +692,7 @@ def green_mask_endpoint(cover_id: str, x: int | None = None, y: int | None = Non
 class ProcessRequest(BaseModel):
     job_id: str
     cover_id: str
-    flip: bool = True
+    flip: bool | None = None
     speed: float | None = None
     voice_pitch: float | None = None
     compress: bool = True
@@ -617,6 +700,7 @@ class ProcessRequest(BaseModel):
     pan_x: float | None = None
     pan_y: float | None = None
     green_rect: dict | None = None
+    fit_mode: str | None = None
 
 
 def _run_process(payload: ProcessRequest, settings: dict, directory,
@@ -664,6 +748,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
         zoom=zoom, pan_x=pan_x, pan_y=pan_y,
+        fit_mode=payload.fit_mode or str(settings.get("manual_fit_mode", "cover")),
         on_progress=on_progress, on_log=_append_log,
     )
     job = read_job(payload.job_id)
@@ -697,6 +782,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         "process_stage": "Done" if ok and final_path.exists() else "Failed",
         "cover_id": payload.cover_id,
         "flip": payload.flip,
+        "fit_mode": payload.fit_mode or str(settings.get("manual_fit_mode", "cover")),
         "speed": speed,
         "voice_pitch": pitch,
         "compress": payload.compress,
@@ -723,6 +809,8 @@ def process_video(payload: ProcessRequest) -> dict:
     if missing:
         raise HTTPException(400, missing)
 
+    if payload.flip is None:
+        payload.flip = bool(settings.get("default_flip", True))
     speed = payload.speed if payload.speed is not None else settings["default_speed"]
     voice_enabled = bool(settings.get("voice_enabled", True))
     pitch = payload.voice_pitch
@@ -817,19 +905,64 @@ def get_final(job_id: str) -> FileResponse:
 @app.get("/api/youtube/status")
 def get_youtube_status() -> dict:
     status = youtube_upload.youtube_status()
+    # Configured channels (Admin) always show, even before Google
+    # sign-in, merged with API channels when connected.
+    configured = []
+    for ch in load_settings().get("youtube_channels") or []:
+        if isinstance(ch, dict) and ch.get("id"):
+            configured.append({"id": ch["id"], "title": ch.get("title") or ch["id"],
+                               "configured": True})
+    api_channels = []
     if status["connected"]:
         try:
-            status["channels"] = youtube_upload.list_channels()
+            api_channels = youtube_upload.list_channels()
         except Exception as exc:  # keep the page usable on API errors
-            status["channels"] = []
             status["message"] = f"Connected, but channel list failed: {exc}"
+    seen = set()
+    merged = []
+    for ch in configured + api_channels:
+        if ch["id"] not in seen:
+            seen.add(ch["id"])
+            merged.append(ch)
+    status["channels"] = merged
+    status["configured_channels"] = configured
     return status
+
+
+class YoutubeCredentialsRequest(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+@app.post("/api/youtube/credentials")
+def save_youtube_credentials(payload: YoutubeCredentialsRequest) -> dict:
+    """Save Google OAuth credentials to client_secrets.json (local,
+    gitignored, never pushed). The file format is the Desktop-app
+    format Google Cloud downloads: {"installed": {client_id,
+    client_secret, ...}}. After saving, install the libraries and
+    run the connect script to create tokens/youtube_token.json."""
+    if not payload.client_id.strip() or not payload.client_secret.strip():
+        raise HTTPException(400, "Client ID and Client Secret are both required.")
+    data = {
+        "installed": {
+            "client_id": payload.client_id.strip(),
+            "client_secret": payload.client_secret.strip(),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "redirect_uris": ["http://localhost"],
+        }
+    }
+    youtube_upload.client_secrets_path().write_text(
+        json.dumps(data, indent=2), encoding="utf-8")
+    return {"saved": True, "path": str(youtube_upload.client_secrets_path())}
 
 
 class UploadRequest(BaseModel):
     job_id: str
     title: str
     description: str = ""
+    tags: str = ""
     privacy_status: str = "private"
 
 
@@ -843,6 +976,7 @@ def upload_youtube(payload: UploadRequest) -> dict:
             final_path,
             title=payload.title,
             description=payload.description,
+            tags=payload.tags or "",
             privacy_status=payload.privacy_status or "private",
         )
     except RuntimeError as exc:

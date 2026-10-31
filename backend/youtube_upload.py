@@ -71,6 +71,7 @@ def upload_video(
     video_path: str | Path,
     title: str,
     description: str = "",
+    tags: str = "",
     privacy_status: str = "private",
 ) -> dict:
     """Upload a video file. Raises RuntimeError if not configured.
@@ -91,12 +92,16 @@ def upload_video(
 
     creds = Credentials.from_authorized_user_file(str(token_path()))
     youtube = build("youtube", "v3", credentials=creds)
+    snippet = {
+        "title": title or Path(video_path).stem,
+        "description": description or "",
+        "categoryId": "22",
+    }
+    tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
+    if tag_list:
+        snippet["tags"] = tag_list
     body = {
-        "snippet": {
-            "title": title or Path(video_path).stem,
-            "description": description or "",
-            "categoryId": "22",
-        },
+        "snippet": snippet,
         "status": {"privacyStatus": privacy_status or "private"},
     }
     media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True)

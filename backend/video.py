@@ -283,6 +283,7 @@ def build_process_command(
     mask_path: str | Path | None = None,
     encoder: str = "libx265",
     output_duration: float | None = None,
+    fit_mode: str = "cover",
 ) -> list[str]:
     """Build the FFmpeg command that composites a video onto a cover.
 
@@ -324,24 +325,21 @@ def build_process_command(
     # atempo only accepts 0.5-100 in a single filter; our UI is 0.5-2.0.
     speed = max(0.5, min(2.0, speed))
 
-    # COVER FILL, LIKE BEFORE (user, 2026-11-01, after the fit +
-    # black-pad change): at 1.0x the video must fill the green
-    # box exactly, with no black area created at all, and zooming
-    # must zoom the video itself, not a black letterbox area.
-    # The fit change (scale=decrease + centred overlay, then black
-    # padding to the box) created black bars for mismatched aspects
-    # (e.g. a 16:9 video in a ~1.3:1 box), and in the live preview
-    # object-fit: contain made those bars grow when zooming, so
-    # zooming looked like only the black area was zooming. The user
-    # tested the same video before and it filled the green area
-    # exactly, with no black area, and wants that back. So: use
-    # scale=increase ("cover") — the video is scaled until it
-    # covers the box, then cropped back to the box, centred (pan
-    # moves it). Trade-off, stated plainly: at 1.0x a mismatched
-    # aspect video is cropped on the sides (a 16:9 video in a 1.3:1
-    # box loses ~26% of its width), exactly as it did before the
-    # fit change. That is what "exactly fills, no black area" costs.
-    # Only zoom above 1.0x enlarges it further, as the slider says.
+    # FIT MODES (user, 2026-11-01): two checkboxes, mutually
+    # exclusive, live preview and final must match EXACTLY for
+    # both — no case where live shows black but final shows green.
+    #   "cover" (Fit to green screen, DEFAULT): scale=increase,
+    #   crop to the box. Video fills the box exactly, no black
+    #   area, no green leftover. Trade-off: a mismatched aspect
+    #   video is cropped on the sides at 1.0x (16:9 in a 1.3:1 box
+    #   loses ~26% width). Zooming zooms the video itself.
+    #   "full" (Display full width/height video): scale=decrease,
+    #   pad with black to the full box. Whole video shows, no
+    #   crop at all. Trade-off: leftover box area is black, never
+    #   green, because the padded box covers the green box fully.
+    #   The mask, when present, clips the box-sized video to the
+    #   green shape in both modes, so black only shows inside the
+    #   shape, never on the cover outside it.
     # Implementation: if the source size is known, compute the
     # cover size in Python (max factor, so the box is covered).
     # If the source size is unknown, fall back to FFmpeg increase
@@ -356,27 +354,48 @@ def build_process_command(
     overlay_x, overlay_y = x, y
     src_size = get_media_size(source)
     fit_is_padded = False
+    fit_mode = (fit_mode or "cover").lower()
+    if fit_mode not in ("cover", "full"):
+        fit_mode = "cover"
     if src_size:
         sw_src, sh_src = src_size
-        fit_factor = max(w * zoom / sw_src, h * zoom / sh_src)
-        fit_w, fit_h = round(sw_src * fit_factor), round(sh_src * fit_factor)
-        # Cover fill: scale until the box is covered, then crop to
-        # the box. At zoom 1.0 this already covers, so no black
-        # area is ever created; at higher zoom it just crops more.
-        # fit_w/fit_h here are the cover size (see fit_factor below).
-        cx = int(max(0, min(fit_w - w, (fit_w - w) / 2 - pan_px)))
-        cy = int(max(0, min(fit_h - h, (fit_h - h) / 2 - pan_py)))
-        video_filters = [f"scale={fit_w}:{fit_h}", f"crop={w}:{h}:{cx}:{cy}"]
+        if fit_mode == "full":
+            # Whole video, no crop: fit inside the box, pad black
+            # to the full box. At zoom >1, fit size grows past the
+            # box, so crop back to the box like cover does.
+            fit_factor = min(w * zoom / sw_src, h * zoom / sh_src)
+            fit_w, fit_h = round(sw_src * fit_factor), round(sh_src * fit_factor)
+            if fit_w <= w and fit_h <= h:
+                video_filters = [
+                    f"scale={fit_w}:{fit_h}",
+                    f"pad={w}:{h}:{(w - fit_w) // 2}:{(h - fit_h) // 2}:black",
+                ]
+            else:
+                cx = int(max(0, min(fit_w - w, (fit_w - w) / 2 - pan_px)))
+                cy = int(max(0, min(fit_h - h, (fit_h - h) / 2 - pan_py)))
+                video_filters = [f"scale={fit_w}:{fit_h}", f"crop={w}:{h}:{cx}:{cy}"]
+        else:
+            # Cover fill: scale until the box is covered, then crop.
+            fit_factor = max(w * zoom / sw_src, h * zoom / sh_src)
+            fit_w, fit_h = round(sw_src * fit_factor), round(sh_src * fit_factor)
+            cx = int(max(0, min(fit_w - w, (fit_w - w) / 2 - pan_px)))
+            cy = int(max(0, min(fit_h - h, (fit_h - h) / 2 - pan_py)))
+            video_filters = [f"scale={fit_w}:{fit_h}", f"crop={w}:{h}:{cx}:{cy}"]
         overlay_x, overlay_y = x, y
         fit_is_padded = False
     else:
-        # Unknown source size (ffprobe failed): fall back to the old
-        # cover behaviour so mask sizes still match. This is rare —
-        # normal jobs always know the source size.
-        video_filters = [
-            f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=increase",
-            f"crop={w}:{h}:{crop_x}:{crop_y}",
-        ]
+        # Unknown source size: cover uses increase+crop, full uses
+        # decrease+pad, matching the live preview for each mode.
+        if fit_mode == "full":
+            video_filters = [
+                f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=decrease",
+                f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black",
+            ]
+        else:
+            video_filters = [
+                f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=increase",
+                f"crop={w}:{h}:{crop_x}:{crop_y}",
+            ]
     if flip:
         video_filters.append("hflip")
     video_filters.append(f"setpts=PTS/{speed}")
@@ -525,6 +544,7 @@ def process_job(
     pan_x: float = 0.0,
     pan_y: float = 0.0,
     encoder: str = "libx265",
+    fit_mode: str = "cover",
     on_progress=None,
     on_log=None,
 ) -> tuple[bool, str]:
@@ -579,7 +599,7 @@ def process_job(
         output_width=output_width, output_height=output_height,
         zoom=zoom, pan_x=pan_x, pan_y=pan_y,
         mask_path=mask_path, encoder=encoder,
-        output_duration=duration,
+        output_duration=duration, fit_mode=fit_mode,
     )
     source_size = Path(source).stat().st_size if Path(source).exists() else 0
     if on_log:
