@@ -56,15 +56,19 @@ function applyLiveVideoLayout() {
     greenBox.style.webkitMaskImage = maskUrl;
     greenBox.style.maskSize = "100% 100%";
     greenBox.style.webkitMaskSize = "100% 100%";
+    greenBox.style.maskRepeat = "no-repeat";
+    greenBox.style.webkitMaskRepeat = "no-repeat";
+    greenBox.style.maskMode = "alpha";
+    greenBox.style.webkitMaskMode = "alpha";
   } else {
     greenBox.style.maskImage = "";
     greenBox.style.webkitMaskImage = "";
   }
   // Video is sized at zoom x the box and offset by pan, inside an
-  // overflow-hidden box, so it always fills the box and can never
-  // spill outside it. object-fit: cover scales uniformly (equal
-  // zoom, no stretch) and crops the excess — matching the final
-  // FFmpeg scale=increase + crop, so live and final match.
+  // overflow-hidden box. object-fit: contain fits the WHOLE video
+  // inside the box at 1.0x (no cropping, no false zoom), matching
+  // the final FFmpeg scale=decrease + centred overlay, so live
+  // and final match. At higher zoom the box clips the bigger video.
   video.style.position = liveCover ? "absolute" : "";
   video.style.width = (zoom * 100) + "%";
   video.style.height = (zoom * 100) + "%";
@@ -109,6 +113,11 @@ function updateLivePreview() {
       video.load();
     }
     video.playbackRate = parseFloat(document.getElementById("speed").value) || 1;
+    // No controls on the live video on purpose: the browser's black
+    // control bar made the video look like a separate rectangle
+    // player pasted on the cover, instead of video inside the green
+    // shape. It plays automatically, muted, in a loop.
+    video.play().catch(() => {});
   } else {
     video.removeAttribute("src");
     video.load();

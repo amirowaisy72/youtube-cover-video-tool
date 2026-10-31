@@ -55,28 +55,41 @@ input[type="url"]:focus, input[type="text"]:focus, input[type="number"]:focus, s
 }
 input[type="file"] { color: #b8c6dd; }
 input[type="range"] { width: 100%; accent-color: #7aa7ff; }
-button, .btn {
-  padding: 11px 18px; border-radius: 12px; cursor: pointer;
+/* One clean button system for every button in the tool.
+   The old gradient buttons (light blue to cyan, dark text) looked
+   garish and inconsistent, and Tailwind's reset could make some
+   buttons look like plain text. Now: primary = solid blue, white
+   text; secondary = solid dark navy, white text. Same padding,
+   radius, font and hover for all, so no button looks odd.
+   Buttons never shrink or get cut off in a row with an input:
+   white-space + flex-shrink keep the full label visible, and the
+   input (min-width 0) shrinks instead. */
+button, .btn, a.btn-primary {
+  display: inline-block; padding: 11px 18px; border-radius: 12px; cursor: pointer;
   border: 1px solid rgba(142, 163, 194, 0.35);
-  background: #243a5e; color: #eef3fb; font-weight: 600;
+  background: #243a5e; color: #eef3fb; font-weight: 600; font-size: 0.95rem;
+  line-height: 1.4; text-decoration: none; text-align: center;
+  white-space: nowrap; flex-shrink: 0; box-sizing: border-box;
 }
-button:hover, .btn:hover { background: #2d4770; }
-.btn-primary {
-  background: linear-gradient(135deg, #5b8cff, #38bdf8);
-  border: none; color: #081226;
+button:hover, .btn:hover, a.btn-primary:hover { background: #2d4770; }
+.btn-primary, a.btn-primary {
+  background: #2563eb; border-color: #2563eb; color: #ffffff;
 }
-.btn-primary:hover { filter: brightness(1.08); background: linear-gradient(135deg, #5b8cff, #38bdf8); }
-/* Process is the main action: make it unmistakably a button, not a
-   plain text link. ID specificity also beats any Tailwind reset
-   that was making it look like blue text on the dark background. */
+.btn-primary:hover, a.btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+button:disabled, .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Process is the main action: same solid primary style, just full
+   width and a little larger — prominent by size, not by a gradient. */
 button#btn-process, #btn-process {
   display: block; width: 100%; padding: 15px 18px; margin-top: 14px;
-  font-size: 1.08rem; font-weight: 800; letter-spacing: 0.2px;
-  color: #081226 !important; background: linear-gradient(135deg, #7aa7ff, #5eead4) !important;
-  border: none; border-radius: 14px; box-shadow: 0 8px 24px rgba(94, 234, 212, 0.30);
+  font-size: 1.05rem; font-weight: 700;
+  color: #ffffff; background: #2563eb;
+  border: 1px solid #2563eb; border-radius: 14px;
   text-decoration: none; text-align: center; cursor: pointer;
+  white-space: normal;
 }
-button#btn-process:hover, #btn-process:hover { filter: brightness(1.08); }
+button#btn-process:hover, #btn-process:hover { background: #1d4ed8; border-color: #1d4ed8; }
+/* Inputs in a row with a button must shrink, not push the button off. */
+.card input[type="url"], .card input[type="text"] { min-width: 0; }
 .progress-wrap { margin-top: 16px; }
 .progress-track {
   height: 14px; border-radius: 999px; overflow: hidden;
@@ -104,7 +117,7 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 .fieldset legend { color: #b8c6dd; padding: 0 8px; }
 .cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .cover-thumb {
-  position: relative;
+  position: relative; display: block; width: 100%; white-space: normal;
   border: 2px solid rgba(142, 163, 194, 0.3); border-radius: 14px; overflow: hidden;
   background: #0f1f38; cursor: pointer; padding: 0; text-align: left; color: inherit;
 }
@@ -124,7 +137,7 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 .timeline-list li strong { color: #5eead4; }
 .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
 .tab-btn { flex: 1; padding: 12px; border-radius: 14px; border: 1px solid rgba(142, 163, 194, 0.3); background: #132540; color: #dbe6f5; font-weight: 600; cursor: pointer; }
-.tab-btn.active { background: linear-gradient(135deg, #7aa7ff, #5eead4); color: #0e1a2e; border-color: transparent; }
+.tab-btn.active { background: #2563eb; color: #ffffff; border-color: #2563eb; }
 .live-preview-box { position: relative; border-radius: 14px; overflow: hidden; background: #000; min-height: 120px; }
 .live-cover-img { width: 100%; display: block; }
 .live-video { width: 100%; display: block; background: #000; }
@@ -135,7 +148,7 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
      edge where video meets green area, so you cannot tell whether
      the video fully covers the green area or not. */
 }
-.live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; touch-action: none; }
+.live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: contain; display: block; cursor: grab; touch-action: none; }
 .live-preview-box.has-cover .live-video:active { cursor: grabbing; }
 .live-green-box.selected { border: none; box-shadow: none; }
 

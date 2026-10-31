@@ -125,6 +125,15 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    summary: downloaded size, size after cover/voice/speed/shape,
    and size after compression, plus a Download button and a
    Close button to see the result and edit further.
+   Zoom: 1.0x means the WHOLE video fits inside the green area
+   (fit, centred, no cropping) — the old cover scaling cropped
+   up to 26% of a 16:9 video in a 1.3:1 green box, which looked
+   like a zoom even at 1.0x. Only a real zoom above 1.0x crops.
+   Buttons: one solid style for all buttons (primary solid blue,
+   secondary solid dark navy), no garish gradients, no truncation.
+   Live preview has no control bar, so it looks like video inside
+   the cover, not a separate player rectangle; the live mask is
+   RGBA, because a grayscale mask was ignored by browsers.
 
 ### Refresh safety and local storage (no disk waste)
 

@@ -107,7 +107,7 @@ tailwind.config = {
     <input id="voice-pitch" type="range" min="0.9" max="1.2" step="0.01" value="1.05" />
     <label class="field-label mt-4">Zoom (video never leaves the green area): <span id="zoom-value" class="pill">1.0x</span></label>
     <input id="zoom" type="range" min="1" max="2" step="0.05" value="1" />
-    <p class="muted">1.0x = video fits the green area exactly. At higher zoom the video gets bigger and is cropped, but it never leaves the green box.</p>
+    <p class="muted">1.0x = the whole video fits inside the green area, no cropping, no zoom look. At higher zoom the video gets bigger and is cropped, but it never leaves the green box.</p>
     <label class="check"><input id="compress" type="checkbox" checked /> Compress (smaller size, same look)</label>
     <button id="btn-process" class="btn-primary mt-2" type="button">▶ Process video</button>
     <div id="process-progress-wrap" class="progress-wrap" hidden>
@@ -123,7 +123,7 @@ tailwind.config = {
 
   <section class="card">
     <div class="step-head"><span class="step">👁</span><h2>Live preview — realtime</h2></div>
-    <p class="muted">A cover appears here as soon as you choose it, even before any video is downloaded. As soon as a video downloads it appears inside the cover, clipped to the green area's actual shape — not just its rectangle — so a circle, rounded screen or any other green shape shows video only inside that shape. Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
+    <p class="muted">A cover appears here as soon as you choose it, even before any video is downloaded. As soon as a video downloads it appears inside the cover, clipped to the green area's actual shape — not just its rectangle — so a circle, rounded screen or any other green shape shows video only inside that shape. The live video has no control bar, so it looks like video inside the cover, not a separate player rectangle. Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
     <div class="flex flex-wrap items-center gap-3 mb-3">
       <button id="btn-live-hide" class="btn" type="button">Hide video — check cover</button>
       <label class="field-label">Live zoom: <span id="live-zoom-value" class="pill">1.0x</span></label>
@@ -133,7 +133,7 @@ tailwind.config = {
     <div id="live-preview-box" class="live-preview-box">
       <img id="live-cover-img" alt="" class="live-cover-img" hidden />
       <div id="live-green-box" class="live-green-box">
-        <video id="live-video" controls muted playsinline class="live-video"></video>
+        <video id="live-video" autoplay loop muted playsinline class="live-video"></video>
         <div class="live-handle tl" data-handle="tl" hidden></div>
         <div class="live-handle tr" data-handle="tr" hidden></div>
         <div class="live-handle bl" data-handle="bl" hidden></div>

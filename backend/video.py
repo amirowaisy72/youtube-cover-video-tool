@@ -324,28 +324,61 @@ def build_process_command(
     # atempo only accepts 0.5-100 in a single filter; our UI is 0.5-2.0.
     speed = max(0.5, min(2.0, speed))
 
-    # Zoom: scale up inside the green rectangle, then crop back to
-    # exactly that rectangle — so a zoomed video can never spill
-    # outside the green area, it just shows less of the video, bigger.
+    # FALSE-ZOOM FIX (user, 2026-11-01, Auto mode): at zoom 1.0x the
+    # video looked zoomed in even though the user never zoomed.
+    # Cause: the old code used scale=increase ("cover"), which
+    # scales the video until it COVERS the green box, cropping the
+    # excess. A 16:9 source in a ~1.3:1 green box was scaled by
+    # 1.79x and 26% of its width was cropped off — faces looked
+    # bigger, text at the edges was cut, exactly like a zoom.
+    # Fix: at 1.0x use scale=decrease ("fit") — the WHOLE video
+    # fits inside the green box, no cropping, no zoom look. It is
+    # centred in the box, so any leftover space is just the cover's
+    # green showing around it. Only when the user actually zooms
+    # (>1.0x) does the video get bigger and crop, as the slider
+    # promises ("1.0x = video fits exactly").
+    # Implementation: if the source size is known, compute the fit
+    # size in Python so we know whether to centre (fit smaller than
+    # box) or crop (fit larger than box at higher zoom). If the
+    # source size is unknown, fall back to FFmpeg decrease + centred
+    # overlay expressions, which give the same fit behaviour.
     zoom = max(1.0, min(2.0, float(zoom) if zoom else 1.0))
-    # Equal (uniform) zoom, never stretch: scale with
-    # force_original_aspect_ratio=increase so the video is scaled
-    # equally in both directions until it covers the green box,
-    # then crop to exactly the box. Pan moves the crop window the
-    # opposite way, clamped so the crop never leaves the scaled
-    # video — i.e. the video never leaves the green box either.
-    # Crop x/y use iw/ih expressions, so they stay correct whatever
-    # the source video's own aspect ratio is.
     pan_px = float(pan_x or 0) / 100 * w
     pan_py = float(pan_y or 0) / 100 * h
     # Commas inside min()/max() must be quoted, otherwise FFmpeg
     # reads them as filter separators ("No such filter: '0)'").
     crop_x = f"'min(max((iw-{w})/2-{pan_px:.0f},0),iw-{w})'"
     crop_y = f"'min(max((ih-{h})/2-{pan_py:.0f},0),ih-{h})'"
-    video_filters = [
-        f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=increase",
-        f"crop={w}:{h}:{crop_x}:{crop_y}",
-    ]
+    overlay_x, overlay_y = x, y
+    src_size = get_media_size(source)
+    fit_is_padded = False
+    if src_size:
+        sw_src, sh_src = src_size
+        fit_factor = min(w * zoom / sw_src, h * zoom / sh_src)
+        fit_w, fit_h = round(sw_src * fit_factor), round(sh_src * fit_factor)
+        if fit_w <= w and fit_h <= h:
+            # Fit, centred, no crop — the 1.0x case for mismatched aspects.
+            video_filters = [f"scale={fit_w}:{fit_h}"]
+            overlay_x, overlay_y = x + (w - fit_w) // 2, y + (h - fit_h) // 2
+            # For a mask, the mask crop must match the fit video's
+            # size and position (centred in the box), not the whole
+            # box — otherwise alphamerge size-matches fail, and a
+            # padded black area would show as black bars instead of
+            # the cover's green. See mask_chain below.
+            fit_is_padded = True
+        else:
+            # Zoomed past the box: crop back to the box, pan moves it.
+            cx = int(max(0, min(fit_w - w, (fit_w - w) / 2 - pan_px)))
+            cy = int(max(0, min(fit_h - h, (fit_h - h) / 2 - pan_py)))
+            video_filters = [f"scale={fit_w}:{fit_h}", f"crop={w}:{h}:{cx}:{cy}"]
+    else:
+        # Unknown source size (ffprobe failed): fall back to the old
+        # cover behaviour so mask sizes still match. This is rare —
+        # normal jobs always know the source size.
+        video_filters = [
+            f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=increase",
+            f"crop={w}:{h}:{crop_x}:{crop_y}",
+        ]
     if flip:
         video_filters.append("hflip")
     video_filters.append(f"setpts=PTS/{speed}")
@@ -371,25 +404,33 @@ def build_process_command(
 
     if mask_path:
         # Mask is full-cover size: scale it with the cover, then crop
-        # to the (scaled) green rectangle, then alphamerge it onto the
+        # to the video's rectangle, then alphamerge it onto the
         # video. Without this, a non-rectangular green shape would
         # still get a rectangular video spilling onto the cover.
-        if scale != 1.0:
-            mask_chain = f"[2:v]scale={int(output_width)}:-2,crop={w}:{h}:{x}:{y}[mask]"
+        # For a fit video (smaller than the box, centred), the mask
+        # crop is the fit video's own size/position inside the cover,
+        # not the whole box — otherwise alphamerge fails on size
+        # mismatch and green bars would turn black.
+        if fit_is_padded:
+            mw, mh, mx, my = fit_w, fit_h, overlay_x, overlay_y
         else:
-            mask_chain = f"[2:v]crop={w}:{h}:{x}:{y}[mask]"
+            mw, mh, mx, my = w, h, x, y
+        if scale != 1.0:
+            mask_chain = f"[2:v]scale={int(output_width)}:-2,crop={mw}:{mh}:{mx}:{my}[mask]"
+        else:
+            mask_chain = f"[2:v]crop={mw}:{mh}:{mx}:{my}[mask]"
         filter_complex = (
             f"{base_chain};"
             f"[1:v]{video_chain}[vid];"
             f"{mask_chain};"
             f"[vid][mask]alphamerge[va];"
-            f"[base][va]overlay={x}:{y}:shortest=1[outv]"
+            f"[base][va]overlay={overlay_x}:{overlay_y}:shortest=1[outv]"
         )
     else:
         filter_complex = (
             f"{base_chain};"
             f"[1:v]{video_chain}[vid];"
-            f"[base][vid]overlay={x}:{y}:shortest=1[outv]"
+            f"[base][vid]overlay={overlay_x}:{overlay_y}:shortest=1[outv]"
         )
 
     cmd = [

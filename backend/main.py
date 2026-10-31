@@ -591,8 +591,18 @@ def green_mask_endpoint(cover_id: str, x: int | None = None, y: int | None = Non
     if rect:
         mask = mask.crop((rect["x"], rect["y"],
                           rect["x"] + rect["w"], rect["y"] + rect["h"]))
+    # BUG FIX (2026-11-01, live video still looked rectangular):
+    # the old endpoint returned a grayscale (L) PNG. Browsers' CSS
+    # mask-image defaults to alpha, not luminance, so a grayscale
+    # mask with no alpha channel was ignored and the video stayed
+    # a rectangle. Return RGBA instead: white with alpha = mask
+    # (white = visible, black = transparent), so the mask works
+    # in Chrome/Edge/Firefox without relying on luminance mode.
+    from PIL import Image as _Image
+    rgba = _Image.new("RGBA", mask.size, (255, 255, 255, 255))
+    rgba.putalpha(mask)
     buf = BytesIO()
-    mask.save(buf, format="PNG")
+    rgba.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
