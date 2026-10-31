@@ -283,18 +283,24 @@ def build_process_command(
     # exactly that rectangle — so a zoomed video can never spill
     # outside the green area, it just shows less of the video, bigger.
     zoom = max(1.0, min(2.0, float(zoom) if zoom else 1.0))
-    if zoom > 1.0:
-        # Pan (percent of the green box, from the live preview drag)
-        # moves the crop window the opposite way, clamped so the crop
-        # never leaves the scaled video — i.e. the video never leaves
-        # the green box in the final output either.
-        sw, sh = round(w * zoom), round(h * zoom)
-        max_px, max_py = (sw - w) / 2, (sh - h) / 2
-        cx = int(max(0, min(sw - w, (sw - w) / 2 - float(pan_x or 0) / 100 * w)))
-        cy = int(max(0, min(sh - h, (sh - h) / 2 - float(pan_y or 0) / 100 * h)))
-        video_filters = [f"scale={sw}:{sh}", f"crop={w}:{h}:{cx}:{cy}"]
-    else:
-        video_filters = [f"scale={w}:{h}"]
+    # Equal (uniform) zoom, never stretch: scale with
+    # force_original_aspect_ratio=increase so the video is scaled
+    # equally in both directions until it covers the green box,
+    # then crop to exactly the box. Pan moves the crop window the
+    # opposite way, clamped so the crop never leaves the scaled
+    # video — i.e. the video never leaves the green box either.
+    # Crop x/y use iw/ih expressions, so they stay correct whatever
+    # the source video's own aspect ratio is.
+    pan_px = float(pan_x or 0) / 100 * w
+    pan_py = float(pan_y or 0) / 100 * h
+    # Commas inside min()/max() must be quoted, otherwise FFmpeg
+    # reads them as filter separators ("No such filter: '0)'").
+    crop_x = f"'min(max((iw-{w})/2-{pan_px:.0f},0),iw-{w})'"
+    crop_y = f"'min(max((ih-{h})/2-{pan_py:.0f},0),ih-{h})'"
+    video_filters = [
+        f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=increase",
+        f"crop={w}:{h}:{crop_x}:{crop_y}",
+    ]
     if flip:
         video_filters.append("hflip")
     video_filters.append(f"setpts=PTS/{speed}")
@@ -340,6 +346,7 @@ def build_process_command(
         "-threads", "0",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
+        "-b:a", "96k",
         "-movflags", "+faststart",
         str(output),
     ]
@@ -397,10 +404,9 @@ def process_job(
     if missing:
         return False, missing
     if not compress:
-        # Without compression, use a near-lossless quality setting,
-        # still on the fastest preset for speed.
+        # Without compression, use a near-lossless quality setting.
         crf = 18
-        preset = "ultrafast"
+        preset = "medium"
     cmd = build_process_command(
         source, cover, output, green_rect,
         flip=flip, speed=speed,
@@ -414,9 +420,10 @@ def process_job(
     duration = get_duration(source)
     if duration:
         duration = duration / max(0.5, min(2.0, float(speed) or 1.0))
+    source_size = Path(source).stat().st_size if Path(source).exists() else 0
     if on_log:
         on_log(f"Input video: {Path(source).name} "
-               f"({Path(source).stat().st_size / 1024 / 1024:.1f} MB)" if Path(source).exists() else f"Input video: {Path(source).name}")
+               f"({source_size / 1024 / 1024:.1f} MB)" if Path(source).exists() else f"Input video: {Path(source).name}")
         on_log(f"Input cover: {Path(cover).name} "
                f"({Path(cover).stat().st_size / 1024 / 1024:.1f} MB)" if Path(cover).exists() else f"Input cover: {Path(cover).name}")
         on_log(f"Green area: x={green_rect.get('x')}, y={green_rect.get('y')}, "
@@ -430,6 +437,34 @@ def process_job(
                                 on_progress=on_progress, on_log=on_log)
     if not ok:
         return False, f"FFmpeg failed while building the final video:\n{out}"
+    # Compression guarantee: if Compress is on and the final file is
+    # LARGER than the source (as happened: 28.9 MB source -> 124.7 MB
+    # final with ultrafast CRF 22), re-encode once with a higher CRF
+    # and medium preset. Ultrafast is fast but very inefficient —
+    # it disables the compression tools that make a file small.
+    # This second pass costs extra time, but only runs when needed.
+    if compress and Path(output).exists() and source_size and Path(output).stat().st_size > source_size:
+        if on_log:
+            on_log(f"Final ({Path(output).stat().st_size / 1024 / 1024:.1f} MB) is larger than "
+                   f"source ({source_size / 1024 / 1024:.1f} MB) — re-encoding smaller (CRF {min(32, crf + 6)}, medium preset)…")
+        retry_crf = min(32, int(crf) + 6)
+        retry_cmd = build_process_command(
+            source, cover, output, green_rect,
+            flip=flip, speed=speed,
+            voice_enabled=voice_enabled,
+            voice_pitch_factor=voice_pitch_factor,
+            crf=retry_crf, preset="medium",
+            output_width=output_width, output_height=output_height,
+            zoom=zoom, pan_x=pan_x, pan_y=pan_y,
+        )
+        ok2, out2 = run_with_progress(retry_cmd, duration, 0, 90,
+                                      on_progress=on_progress, on_log=on_log)
+        if ok2 and Path(output).exists():
+            if on_log:
+                on_log(f"Re-encoded final: {Path(output).stat().st_size / 1024 / 1024:.1f} MB")
+        else:
+            if on_log:
+                on_log("Smaller re-encode failed, keeping the first final video.")
     if on_log:
         on_log(f"Final video written: {Path(output).name} "
                f"({Path(output).stat().st_size / 1024 / 1024:.1f} MB)" if Path(output).exists() else "Final video written.")

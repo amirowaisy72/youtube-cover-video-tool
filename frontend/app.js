@@ -49,19 +49,20 @@ function applyLiveVideoLayout() {
     greenBox.style.height = (greenRect.h / nh * 100) + "%";
   }
   // Video is sized at zoom x the box and offset by pan, inside an
-  // overflow-hidden box, so it always fills the box exactly and
-  // can never spill outside it. object-fit: fill matches the final
-  // FFmpeg scale (stretch to w x h), so live and final match.
+  // overflow-hidden box, so it always fills the box and can never
+  // spill outside it. object-fit: cover scales uniformly (equal
+  // zoom, no stretch) and crops the excess — matching the final
+  // FFmpeg scale=increase + crop, so live and final match.
   video.style.position = liveCover ? "absolute" : "";
   video.style.width = (zoom * 100) + "%";
   video.style.height = (zoom * 100) + "%";
   video.style.left = (-(zoom - 1) / 2 * 100 + panX) + "%";
   video.style.top = (-(zoom - 1) / 2 * 100 + panY) + "%";
   video.style.transform = flip ? "scaleX(-1)" : "none";
-  video.style.display = liveVideoHidden ? "none" : "block";
-  greenBox.classList.toggle("selected", liveSelected && !!liveCover);
+  video.style.display = (!jobId || liveVideoHidden) ? "none" : "block";
+  greenBox.classList.toggle("selected", liveSelected && !!liveCover && !!jobId);
   document.querySelectorAll(".live-handle").forEach((h) => {
-    h.hidden = !(liveSelected && !!liveCover);
+    h.hidden = !(liveSelected && !!liveCover && !!jobId);
   });
   document.getElementById("btn-live-hide").textContent =
     liveVideoHidden ? "Show video" : "Hide video — check cover";
@@ -73,24 +74,34 @@ function updateLivePreview() {
   const greenBox = document.getElementById("live-green-box");
   const img = document.getElementById("live-cover-img");
   const empty = document.getElementById("live-empty");
-  if (!jobId) { empty.hidden = false; return; }
-  empty.hidden = true;
-  if (!video.src || !video.src.includes("/api/source/" + jobId)) {
-    video.src = "/api/source/" + jobId;
-    video.load();
-  }
-  video.playbackRate = parseFloat(document.getElementById("speed").value) || 1;
-  const zoom = getZoom();
+  // Cover shows immediately, even before any video is downloaded:
+  // any asset you choose appears on the screen right away.
   if (liveCover) {
+    empty.hidden = true;
     box.classList.add("has-cover");
     img.hidden = false;
     const src = liveCover.path || ("/api/covers/" + liveCover.filename);
-    if (img.src !== src && !img.src.endsWith(src)) { img.src = src; }
+    if (img.src !== src && !img.src.endsWith(src)) {
+      img.src = src;
+      img.onload = () => applyLiveVideoLayout();
+    }
   } else {
+    empty.hidden = !jobId;
     box.classList.remove("has-cover");
     img.hidden = true;
     greenBox.style.left = ""; greenBox.style.top = ""; greenBox.style.width = ""; greenBox.style.height = "";
   }
+  if (jobId) {
+    if (!video.src || !video.src.includes("/api/source/" + jobId)) {
+      video.src = "/api/source/" + jobId;
+      video.load();
+    }
+    video.playbackRate = parseFloat(document.getElementById("speed").value) || 1;
+  } else {
+    video.removeAttribute("src");
+    video.load();
+  }
+  const zoom = getZoom();
   applyLiveVideoLayout();
   const voiceOn = document.getElementById("voice-enabled").checked;
   const pitch = document.getElementById("voice-pitch").value;

@@ -101,8 +101,13 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    longer crash it, which was why it used to stick at 2%.
    Covers can be deleted: click × on any cover thumbnail, or
    "Delete selected cover" under the selected cover.
-   Encoding uses `ultrafast` preset, all CPU threads, and a fast
-   480px preview encode for maximum speed.
+   Encoding uses `medium` preset + CRF 26 + 96k audio for a small
+   final file (not `ultrafast` CRF 22, which was the cause of a
+   28.9 MB source becoming a 124.7 MB final — ultrafast disables
+   the compression tools that make a file small). If Compress is on
+   and the final is still larger than the source, it is automatically
+   re-encoded once at CRF 32 / medium preset to shrink it below the
+   source size where possible. Preview uses a fast 480px encode.
 
 ### Refresh safety and local storage (no disk waste)
 

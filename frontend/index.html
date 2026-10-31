@@ -113,7 +113,7 @@ tailwind.config = {
 
   <section class="card">
     <div class="step-head"><span class="step">👁</span><h2>Live preview — realtime</h2></div>
-    <p class="muted">As soon as a video downloads it appears here. When you choose a cover it goes inside the cover, Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
+    <p class="muted">A cover appears here as soon as you choose it, even before any video is downloaded. As soon as a video downloads it appears inside the cover, Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
     <div class="flex flex-wrap items-center gap-3 mb-3">
       <button id="btn-live-hide" class="btn" type="button">Hide video — check cover</button>
       <label class="field-label">Live zoom: <span id="live-zoom-value" class="pill">1.0x</span></label>
@@ -129,9 +129,9 @@ tailwind.config = {
         <div class="live-handle bl" data-handle="bl" hidden></div>
         <div class="live-handle br" data-handle="br" hidden></div>
       </div>
-      <p id="live-empty" class="muted">No video downloaded yet. The live preview starts here as soon as you download one.</p>
+      <p id="live-empty" class="muted">No cover or video yet. Choose a cover and it appears here immediately, even before downloading a video.</p>
     </div>
-    <p class="muted mt-2">The dashed border shows the exact edge of the green area. Hide removes the video so only the cover shows, letting you check whether the video sits correctly in the green area.</p>
+    <p class="muted mt-2">Hide removes the video so only the cover shows, letting you check whether the video sits correctly in the green area. No border is drawn around the video, so nothing hides the edge where video meets cover.</p>
     <p class="muted live-hint">Control the video directly: click the video to select it and show its corners. Drag the video to move it up, down, left or right. Drag a corner to zoom. At 1x zoom the video cannot move, because it already fits exactly — moving only works after zooming, and the video never leaves the green box.</p>
     <p id="live-note" class="muted mt-2"></p>
   </section>
@@ -191,15 +191,15 @@ tailwind.config = {
         <span class="muted">How much the voice changes (1.05 = a slight change).</span>
       </label>
       <label class="field-label">CRF — quality vs size
-        <input id="set-crf" type="number" min="18" max="28" step="1" value="22" />
-        <span class="muted">Lower number = better quality, bigger file. 20–23 is recommended.</span>
+        <input id="set-crf" type="number" min="18" max="32" step="1" value="26" />
+        <span class="muted">Lower number = better quality, bigger file. 26 keeps the final smaller than a typical YouTube source; 22 gives a much bigger file.</span>
       </label>
       <label class="field-label">Preset — speed vs size
         <select id="set-preset">
-          <option value="ultrafast" selected>ultrafast (fastest, recommended)</option>
+          <option value="ultrafast">ultrafast (fastest, bigger file)</option>
           <option value="veryfast">veryfast (fast)</option>
           <option value="fast">fast</option>
-          <option value="medium">medium (slower, smaller file)</option>
+          <option value="medium" selected>medium (smaller file, recommended)</option>
           <option value="slow">slow (slowest)</option>
         </select>
         <span class="muted">Faster preset = faster processing, slightly bigger file.</span>

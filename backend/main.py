@@ -57,10 +57,16 @@ DEFAULT_SETTINGS = {
     "default_speed": 1.0,
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
-    "crf": 22,
-    # Fastest possible preset, as requested: ultrafast is the fastest
-    # libx264 preset (same CRF/look, bigger file, much less CPU time).
-    "preset": "ultrafast",
+    "crf": 26,
+    # Size-first preset, as requested after the 28.9 MB -> 124.7 MB
+    # case: ultrafast is fastest but very inefficient (it disables
+    # the compression tools that make a file small), so a CRF 22
+    # ultrafast file was 4x larger than the YouTube source. Medium
+    # + CRF 26 is much smaller at similar visible quality; it is
+    # slower than ultrafast, but that is the size/speed trade-off.
+    # Users who want speed back can pick ultrafast in the Admin tab,
+    # knowing the file will grow again.
+    "preset": "medium",
     "green_rect": {"x": 0, "y": 0, "w": 640, "h": 360},
     # Auto-detect the green area from the cover image itself, so the
     # video lands exactly on the green screen, not at a guessed 0,0.
@@ -77,11 +83,13 @@ def load_settings() -> dict:
     if SETTINGS_FILE.exists():
         try:
             saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            # Speed migration: old installs saved "medium"/"veryfast".
-            # Upgrade to ultrafast (fastest possible, as requested);
-            # the user can still pick a slower preset in the Admin tab.
-            if saved.get("preset") in ("medium", "veryfast"):
-                saved["preset"] = "ultrafast"
+            # Size migration: old installs saved ultrafast/veryfast
+            # with CRF 22, which produced a final larger than source.
+            # Move to medium + CRF 26 for a smaller final file.
+            if saved.get("preset") in ("ultrafast", "veryfast"):
+                saved["preset"] = "medium"
+            if saved.get("crf") in (22,):
+                saved["crf"] = 26
             merged = dict(DEFAULT_SETTINGS)
             merged.update(saved)
             green = dict(DEFAULT_SETTINGS["green_rect"])
@@ -412,7 +420,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         voice_pitch_factor=float(pitch),
         compress=payload.compress,
         crf=int(settings.get("crf", 22)),
-        preset=str(settings.get("preset", "ultrafast")),
+        preset=str(settings.get("preset", "medium")),
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
         zoom=zoom, pan_x=pan_x, pan_y=pan_y,
@@ -427,7 +435,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         pv_start = preview_started[0] or ended
         prev_timeline.append({
             "step": "Final video encode (libx264, "
-                    f"preset {settings.get('preset', 'ultrafast')}, "
+                    f"preset {settings.get('preset', 'medium')}, "
                     f"CRF {settings.get('crf', 22)}, max width "
                     f"{settings.get('output_width', 1280)}px)",
             "duration_sec": round(pv_start - started, 1),
