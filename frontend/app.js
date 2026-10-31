@@ -47,6 +47,18 @@ function applyLiveVideoLayout() {
     greenBox.style.top = (greenRect.y / nh * 100) + "%";
     greenBox.style.width = (greenRect.w / nw * 100) + "%";
     greenBox.style.height = (greenRect.h / nh * 100) + "%";
+    // Shape-accurate clip: mask the green box itself (not the video
+    // element, which is zoom-sized) to the green area's actual shape,
+    // so a circle/rounded/L-shaped green area shows video only
+    // inside that shape, exactly like the final FFmpeg alphamerge.
+    const maskUrl = liveCover.id ? ("url(/api/green-mask/" + liveCover.id + "?x=" + greenRect.x + "&y=" + greenRect.y + "&w=" + greenRect.w + "&h=" + greenRect.h + ")") : "";
+    greenBox.style.maskImage = maskUrl;
+    greenBox.style.webkitMaskImage = maskUrl;
+    greenBox.style.maskSize = "100% 100%";
+    greenBox.style.webkitMaskSize = "100% 100%";
+  } else {
+    greenBox.style.maskImage = "";
+    greenBox.style.webkitMaskImage = "";
   }
   // Video is sized at zoom x the box and offset by pan, inside an
   // overflow-hidden box, so it always fills the box and can never
@@ -353,6 +365,9 @@ async function loadSettings() {
   document.getElementById("set-pitch").value = s.voice_pitch_factor;
   document.getElementById("set-crf").value = s.crf;
   document.getElementById("set-preset").value = s.preset;
+  if (document.getElementById("set-encoder")) {
+    document.getElementById("set-encoder").value = s.encoder || "libx265";
+  }
   document.getElementById("set-green-x").value = s.green_rect.x;
   document.getElementById("set-green-y").value = s.green_rect.y;
   document.getElementById("set-green-w").value = s.green_rect.w;
@@ -461,6 +476,99 @@ document.getElementById("btn-download").addEventListener("click", async () => {
     startDownloadPolling(jobId);
   } catch (err) {
     setStatus("Download failed: " + err.message);
+  }
+});
+
+// Auto mode: one link, popup with blur + overall progress + timeline,
+// then a size summary and a Close button to see results / edit further.
+let autoTimer = null;
+const AUTO_STAGES = {
+  downloading: "Downloading video from YouTube…",
+  applying: "Applying cover, green shape, speed and voice (Admin defaults)…",
+  compressing: "Compressing the finished video (smaller file, same look)…",
+  preview: "Building the preview…",
+  done: "Done — your finished video is ready.",
+  failed: "Auto failed.",
+};
+function openAutoPopup() {
+  document.getElementById("auto-overlay").hidden = false;
+  document.body.classList.add("auto-open");
+  document.getElementById("auto-summary").hidden = true;
+  document.getElementById("auto-download-link").hidden = true;
+  document.getElementById("btn-auto-close").hidden = true;
+  document.getElementById("auto-error").hidden = true;
+}
+function closeAutoPopup() {
+  document.getElementById("auto-overlay").hidden = true;
+  document.body.classList.remove("auto-open");
+  if (autoTimer) clearInterval(autoTimer);
+}
+document.getElementById("btn-auto-close").addEventListener("click", closeAutoPopup);
+document.getElementById("btn-auto").addEventListener("click", async () => {
+  const url = document.getElementById("auto-url").value.trim();
+  if (!url) { setStatus("Paste a YouTube link for Auto mode first."); return; }
+  try {
+    const data = await api("/api/auto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, cover_id: selectedCoverId || null }),
+    });
+    jobId = data.job_id;
+    saveState();
+    openAutoPopup();
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(async () => {
+      try {
+        const job = await api("/api/jobs/" + jobId);
+        const pct = job.auto_progress || 0;
+        document.getElementById("auto-progress-bar").style.width = pct + "%";
+        document.getElementById("auto-progress-text").textContent = pct + "%";
+        document.getElementById("auto-stage-text").textContent =
+          AUTO_STAGES[job.auto_stage] || (job.auto_stage || "Working…");
+        const tl = document.getElementById("auto-timeline");
+        tl.innerHTML = "";
+        (job.timeline || []).forEach((t) => {
+          const div = document.createElement("div");
+          div.className = "auto-step";
+          div.textContent = `✓ ${t.step} — ${t.duration_sec}s — ${t.detail || ""}`;
+          tl.appendChild(div);
+        });
+        if (job.status === "processed" && job.auto_summary) {
+          clearInterval(autoTimer);
+          const s = job.auto_summary;
+          const sum = document.getElementById("auto-summary");
+          sum.hidden = false;
+          sum.innerHTML =
+            `<b>Summary</b><br>` +
+            `Downloaded video: <b>${s.downloaded_mb} MB</b><br>` +
+            `After cover, voice, speed and shape: <b>${s.applied_mb} MB</b><br>` +
+            `After compression (${s.encoder}, CRF ${s.crf}): <b>${s.final_mb} MB</b><br>` +
+            `Saved by compression: <b>${s.saved_mb} MB (${s.saved_pct}%)</b>`;
+          const dl = document.getElementById("auto-download-link");
+          dl.hidden = false;
+          dl.href = "/api/download/" + jobId;
+          document.getElementById("btn-auto-close").hidden = false;
+          document.getElementById("auto-stage-text").textContent = AUTO_STAGES.done;
+          // Load the finished job into the normal UI, so after Close
+          // the user sees the preview and can edit further.
+          downloadReady = true;
+          const player = document.getElementById("preview-player");
+          if (player) { player.src = "/api/preview/" + jobId + "?t=" + Date.now(); player.load(); }
+          setStatus("Auto done. Close the popup to see the result and edit further.");
+        } else if (job.status === "failed") {
+          clearInterval(autoTimer);
+          const err = document.getElementById("auto-error");
+          err.hidden = false;
+          err.textContent = "Auto failed: " + (job.error || "unknown error");
+          document.getElementById("btn-auto-close").hidden = false;
+        }
+      } catch (err) {
+        clearInterval(autoTimer);
+        setStatus("Auto progress check failed: " + err.message);
+      }
+    }, 1000);
+  } catch (err) {
+    setStatus("Auto failed to start: " + err.message);
   }
 });
 
@@ -686,6 +794,7 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
         voice_pitch_factor: parseFloat(document.getElementById("set-pitch").value),
         crf: parseInt(document.getElementById("set-crf").value, 10),
         preset: document.getElementById("set-preset").value,
+        encoder: document.getElementById("set-encoder").value,
         auto_detect_green: document.getElementById("set-auto-detect").checked,
         green_rect: {
           x: parseInt(document.getElementById("set-green-x").value, 10),

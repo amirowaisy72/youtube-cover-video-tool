@@ -47,6 +47,16 @@ tailwind.config = {
 
   <div id="tab-tool">
   <section class="card">
+    <div class="step-head"><span class="step">★</span><h2>Auto mode — just give the link</h2></div>
+    <p class="muted">Turn Auto on, paste a YouTube link, and press Start Auto. The page blurs and a popup shows one overall progress bar with a timeline of what is happening. Everything else — cover, green shape, speed, voice, flip — uses Admin defaults, and the finished video is given at the end. No other clicks needed.</p>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <input id="auto-url" type="url" placeholder="Paste a YouTube link here for Auto mode" class="flex-1" />
+      <button id="btn-auto" class="btn-primary" type="button">▶ Start Auto</button>
+    </div>
+    <p class="muted mt-2">Auto uses the cover you have selected (or your newest cover if none is selected). Upload a cover first if you have none yet.</p>
+  </section>
+
+  <section class="card">
     <div class="step-head"><span class="step">1</span><h2>YouTube link</h2></div>
     <div class="flex flex-col sm:flex-row gap-3">
       <input id="yt-url" type="url" placeholder="Paste a YouTube link here" class="flex-1" />
@@ -113,7 +123,7 @@ tailwind.config = {
 
   <section class="card">
     <div class="step-head"><span class="step">👁</span><h2>Live preview — realtime</h2></div>
-    <p class="muted">A cover appears here as soon as you choose it, even before any video is downloaded. As soon as a video downloads it appears inside the cover, Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
+    <p class="muted">A cover appears here as soon as you choose it, even before any video is downloaded. As soon as a video downloads it appears inside the cover, clipped to the green area's actual shape — not just its rectangle — so a circle, rounded screen or any other green shape shows video only inside that shape. Flip flips it instantly, and Speed plays at that speed. Voice change is heard in the final Process preview, because a browser cannot change pitch live.</p>
     <div class="flex flex-wrap items-center gap-3 mb-3">
       <button id="btn-live-hide" class="btn" type="button">Hide video — check cover</button>
       <label class="field-label">Live zoom: <span id="live-zoom-value" class="pill">1.0x</span></label>
@@ -190,16 +200,23 @@ tailwind.config = {
         <input id="set-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
         <span class="muted">How much the voice changes (1.05 = a slight change).</span>
       </label>
+      <label class="field-label">Final encoder — size AND quality
+        <select id="set-encoder">
+          <option value="libx265" selected>HEVC H.265 (recommended — smaller file, same look)</option>
+          <option value="libx264">H.264 (most compatible, bigger file)</option>
+        </select>
+        <span class="muted">HEVC is how size goes down without quality going down. H.264 cannot do both: CRF 26 shrank but dulled, CRF 20 kept quality but grew. HEVC plays on YouTube and modern players; if your player does not support HEVC, pick H.264.</span>
+      </label>
       <label class="field-label">CRF — quality vs size
-        <input id="set-crf" type="number" min="18" max="32" step="1" value="26" />
-        <span class="muted">Lower number = better quality, bigger file. 26 keeps the final smaller than a typical YouTube source; 22 gives a much bigger file.</span>
+        <input id="set-crf" type="number" min="18" max="32" step="1" value="22" />
+        <span class="muted">Lower number = better quality, bigger file. HEVC CRF 22 looks like H.264 CRF 20. Quality is never reduced to shrink the file.</span>
       </label>
       <label class="field-label">Preset — speed vs size
         <select id="set-preset">
           <option value="ultrafast">ultrafast (fastest, bigger file)</option>
           <option value="veryfast">veryfast (fast)</option>
-          <option value="fast">fast</option>
-          <option value="medium" selected>medium (smaller file, recommended)</option>
+          <option value="fast" selected>fast (recommended)</option>
+          <option value="medium">medium (smaller file)</option>
           <option value="slow">slow (slowest)</option>
         </select>
         <span class="muted">Faster preset = faster processing, slightly bigger file.</span>
@@ -225,6 +242,25 @@ tailwind.config = {
 
   <p class="footer-note">Local only — nothing is hosted live. Keep the launcher window open while you use the tool.</p>
 </main>
+
+<!-- Auto mode popup: page blurs behind it, one overall progress bar,
+     a timeline of what is happening, and at the end a short size
+     summary + a Close button to see the results and edit further. -->
+<div id="auto-overlay" class="auto-overlay" hidden>
+  <div class="auto-card">
+    <h2>Auto processing</h2>
+    <p id="auto-stage-text" class="muted">Starting…</p>
+    <div class="progress-track"><div id="auto-progress-bar" class="progress-bar"></div></div>
+    <p id="auto-progress-text" class="muted mt-2">0%</p>
+    <div id="auto-timeline" class="auto-timeline"></div>
+    <div id="auto-summary" class="auto-summary" hidden></div>
+    <div class="auto-actions">
+      <a id="auto-download-link" class="btn-primary" hidden>Download final video</a>
+      <button id="btn-auto-close" class="btn" type="button" hidden>Close — see results</button>
+    </div>
+    <p id="auto-error" class="muted" hidden></p>
+  </div>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

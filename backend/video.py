@@ -135,6 +135,41 @@ def detect_green_rect(cover: str | Path) -> dict | None:
     }
 
 
+def green_mask(cover: str | Path) -> "object | None":
+    """Return a Pillow mask image for a cover: white where the cover
+    is green, black everywhere else, at the cover's full size.
+
+    This is the shape-accurate version of the green rectangle: the
+    video must appear only inside the green area's actual shape,
+    not inside its rectangular bounding box. If the green area is a
+    circle, a rounded screen, an L-shape, etc., a rectangle video
+    would spill onto the non-green parts of the cover. The mask
+    (same green test as detect_green_rect: G>90, G-R>25, G-B>25)
+    lets FFmpeg (alphamerge) and the live preview (CSS mask-image)
+    clip the video to exactly the green shape. Returns None if
+    Pillow is missing or the cover cannot be read.
+    """
+    try:
+        from PIL import Image, ImageChops
+    except ImportError:
+        return None
+    try:
+        img = Image.open(cover).convert("RGB")
+    except Exception:
+        return None
+    r, g, b = img.split()
+
+    def _thresh(im, t):
+        return im.point(lambda v: 255 if v > t else 0)
+
+    gr = ImageChops.subtract(g, r)
+    gb = ImageChops.subtract(g, b)
+    mask = ImageChops.logical_and(_thresh(gr, 25).convert("1"),
+                                  _thresh(gb, 25).convert("1"))
+    mask = ImageChops.logical_and(mask, _thresh(g, 90).convert("1"))
+    return mask.convert("L")
+
+
 def get_duration(path: str | Path) -> float | None:
     """Source duration in seconds via ffprobe, or None if unavailable."""
     if shutil.which("ffprobe") is None:
@@ -245,6 +280,9 @@ def build_process_command(
     zoom: float = 1.0,
     pan_x: float = 0.0,
     pan_y: float = 0.0,
+    mask_path: str | Path | None = None,
+    encoder: str = "libx265",
+    output_duration: float | None = None,
 ) -> list[str]:
     """Build the FFmpeg command that composites a video onto a cover.
 
@@ -254,10 +292,17 @@ def build_process_command(
       3. Change its speed with setpts (video) / atempo (audio).
       4. Optionally shift voice pitch: asetrate changes the pitch,
          then atempo restores the original duration.
-      5. Overlay the result onto the (looped) cover image at (x, y).
-      6. Encode libx264 with the admin CRF/preset. A higher CRF means
-         a smaller file; CRF 20-23 is a good "same look, smaller size"
-         range, which is the HandBrake-style compression behaviour.
+      5. If a green mask is given, alphamerge it onto the video so
+         the video shows only inside the green area's actual shape,
+         not its rectangle — outside the shape the cover shows.
+      6. Overlay the result onto the (looped) cover image at (x, y).
+      7. Encode with the admin encoder/CRF/preset. Default is HEVC
+         (libx265): at the same visible quality it makes a much
+         smaller file than H.264 (libx264) — that is how size goes
+         down without quality going down. H.264 cannot do both at
+         once: CRF 26 shrank it but dulled it, CRF 20 kept quality
+         but grew it. HEVC CRF 22 is the quality match for H.264
+         CRF 20, at roughly 25-40% smaller size.
     """
     x = int(green_rect.get("x", 0))
     y = int(green_rect.get("y", 0))
@@ -324,11 +369,28 @@ def build_process_command(
     else:
         base_chain = "[0:v]copy[base]"
 
-    filter_complex = (
-        f"{base_chain};"
-        f"[1:v]{video_chain}[vid];"
-        f"[base][vid]overlay={x}:{y}:shortest=1[outv]"
-    )
+    if mask_path:
+        # Mask is full-cover size: scale it with the cover, then crop
+        # to the (scaled) green rectangle, then alphamerge it onto the
+        # video. Without this, a non-rectangular green shape would
+        # still get a rectangular video spilling onto the cover.
+        if scale != 1.0:
+            mask_chain = f"[2:v]scale={int(output_width)}:-2,crop={w}:{h}:{x}:{y}[mask]"
+        else:
+            mask_chain = f"[2:v]crop={w}:{h}:{x}:{y}[mask]"
+        filter_complex = (
+            f"{base_chain};"
+            f"[1:v]{video_chain}[vid];"
+            f"{mask_chain};"
+            f"[vid][mask]alphamerge[va];"
+            f"[base][va]overlay={x}:{y}:shortest=1[outv]"
+        )
+    else:
+        filter_complex = (
+            f"{base_chain};"
+            f"[1:v]{video_chain}[vid];"
+            f"[base][vid]overlay={x}:{y}:shortest=1[outv]"
+        )
 
     cmd = [
         "ffmpeg",
@@ -336,11 +398,23 @@ def build_process_command(
         "-loop", "1",
         "-i", str(cover),
         "-i", str(source),
+    ]
+    if mask_path:
+        cmd += ["-loop", "1", "-i", str(mask_path)]
+    # -t is essential with a mask: the mask input is looped
+    # (infinite), so alphamerge keeps outputting frames after the
+    # source ends and neither overlay shortest=1 nor -shortest
+    # stops it — that is why a masked encode hung forever (a 3s
+    # source became a 472s file). -t stops at exactly the source
+    # duration (already divided by speed by the caller).
+    if output_duration:
+        cmd += ["-t", str(output_duration)]
+    cmd += [
         "-filter_complex", filter_complex,
         "-map", "[outv]",
         "-map", "1:a?",
         "-filter:a", audio_chain,
-        "-c:v", "libx264",
+        "-c:v", encoder,
         "-crf", str(int(crf)),
         "-preset", str(preset),
         "-threads", "0",
@@ -348,24 +422,48 @@ def build_process_command(
         "-c:a", "aac",
         "-b:a", "96k",
         "-movflags", "+faststart",
-        str(output),
+        "-shortest",
     ]
+    if encoder == "libx265":
+        # hvc1 tag: plays on Apple devices and YouTube; without it
+        # some players refuse HEVC in MP4.
+        cmd += ["-tag:v", "hvc1"]
+    cmd += [str(output)]
     return cmd
+
+
+def encoder_available(name: str) -> bool:
+    """True if this FFmpeg build has the named encoder (e.g. libx265)."""
+    if shutil.which("ffmpeg") is None:
+        return False
+    try:
+        proc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
+                              capture_output=True, text=True, timeout=30)
+        return name in (proc.stdout or "")
+    except Exception:
+        return False
 
 
 def build_preview_command(
     final_video: str | Path,
     preview_path: str | Path,
 ) -> list[str]:
-    """Build a small, fast preview encode of an already-made final video."""
+    """Build a preview encode of an already-made final video.
+
+    Preview used to be 480px / CRF 32 / ultrafast, which is why the
+    preview itself looked dull even when the final was fine — the
+    user judges quality from this preview. Now it is 720px / CRF 20 /
+    veryfast, close to the final's look. Preview is temporary and is
+    deleted after final download, so its bigger size does not matter.
+    """
     return [
         "ffmpeg",
         "-y",
         "-i", str(final_video),
-        "-vf", "scale=480:-2",
+        "-vf", "scale=720:-2",
         "-c:v", "libx264",
-        "-crf", "32",
-        "-preset", "ultrafast",
+        "-crf", "20",
+        "-preset", "veryfast",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-movflags", "+faststart",
@@ -391,6 +489,7 @@ def process_job(
     zoom: float = 1.0,
     pan_x: float = 0.0,
     pan_y: float = 0.0,
+    encoder: str = "libx265",
     on_progress=None,
     on_log=None,
 ) -> tuple[bool, str]:
@@ -407,6 +506,35 @@ def process_job(
         # Without compression, use a near-lossless quality setting.
         crf = 18
         preset = "medium"
+    # Quality-first rule (user, 2026-11-01): quality must never be
+    # reduced to shrink the file. If HEVC is requested but this
+    # FFmpeg build lacks libx265, fall back to H.264 CRF 20 (quality
+    # kept, file larger) and say so in the log, instead of failing.
+    if encoder == "libx265" and not encoder_available("libx265"):
+        encoder = "libx264"
+        crf = 20
+        if on_log:
+            on_log("HEVC (libx265) not in this FFmpeg build — falling back to H.264 CRF 20 for quality.")
+    if on_log and encoder == "libx265":
+        on_log(f"Final encoder: HEVC (libx265) CRF {crf} — smaller file at the same look as H.264.")
+    # Shape-accurate mask: build it from the cover itself (white =
+    # green, black = rest) and pass it to FFmpeg, so the video is
+    # clipped to the green shape, not to its rectangle. The mask is
+    # a job working file, deleted with the job's other temp files.
+    mask_path = None
+    try:
+        mask_img = green_mask(cover)
+        if mask_img is not None:
+            mask_path = Path(output).parent / "green_mask.png"
+            mask_img.save(mask_path)
+    except Exception:
+        mask_path = None
+    # Effective output duration: source duration divided by speed.
+    # Computed BEFORE building the command, because the masked
+    # encode needs it as -t (see build_process_command).
+    duration = get_duration(source)
+    if duration:
+        duration = duration / max(0.5, min(2.0, float(speed) or 1.0))
     cmd = build_process_command(
         source, cover, output, green_rect,
         flip=flip, speed=speed,
@@ -415,11 +543,9 @@ def process_job(
         crf=crf, preset=preset,
         output_width=output_width, output_height=output_height,
         zoom=zoom, pan_x=pan_x, pan_y=pan_y,
+        mask_path=mask_path, encoder=encoder,
+        output_duration=duration,
     )
-    # Effective output duration: source duration divided by speed.
-    duration = get_duration(source)
-    if duration:
-        duration = duration / max(0.5, min(2.0, float(speed) or 1.0))
     source_size = Path(source).stat().st_size if Path(source).exists() else 0
     if on_log:
         on_log(f"Input video: {Path(source).name} "
@@ -437,38 +563,18 @@ def process_job(
                                 on_progress=on_progress, on_log=on_log)
     if not ok:
         return False, f"FFmpeg failed while building the final video:\n{out}"
-    # Compression guarantee: if Compress is on and the final file is
-    # LARGER than the source (as happened: 28.9 MB source -> 124.7 MB
-    # final with ultrafast CRF 22), re-encode once with a higher CRF
-    # and medium preset. Ultrafast is fast but very inefficient —
-    # it disables the compression tools that make a file small.
-    # This second pass costs extra time, but only runs when needed.
-    if compress and Path(output).exists() and source_size and Path(output).stat().st_size > source_size:
+    # REMOVED (user, 2026-11-01, quality must never drop): the old
+    # auto re-encode that shrank a final larger than its source by
+    # raising CRF. That trades quality for size, which is now
+    # forbidden. A final larger than its source is kept as-is.
+    if Path(output).exists() and source_size and Path(output).stat().st_size > source_size:
         if on_log:
             on_log(f"Final ({Path(output).stat().st_size / 1024 / 1024:.1f} MB) is larger than "
-                   f"source ({source_size / 1024 / 1024:.1f} MB) — re-encoding smaller (CRF {min(32, crf + 6)}, medium preset)…")
-        retry_crf = min(32, int(crf) + 6)
-        retry_cmd = build_process_command(
-            source, cover, output, green_rect,
-            flip=flip, speed=speed,
-            voice_enabled=voice_enabled,
-            voice_pitch_factor=voice_pitch_factor,
-            crf=retry_crf, preset="medium",
-            output_width=output_width, output_height=output_height,
-            zoom=zoom, pan_x=pan_x, pan_y=pan_y,
-        )
-        ok2, out2 = run_with_progress(retry_cmd, duration, 0, 90,
-                                      on_progress=on_progress, on_log=on_log)
-        if ok2 and Path(output).exists():
-            if on_log:
-                on_log(f"Re-encoded final: {Path(output).stat().st_size / 1024 / 1024:.1f} MB")
-        else:
-            if on_log:
-                on_log("Smaller re-encode failed, keeping the first final video.")
+                   f"source ({source_size / 1024 / 1024:.1f} MB) — kept as-is for quality, not shrunk.")
     if on_log:
         on_log(f"Final video written: {Path(output).name} "
                f"({Path(output).stat().st_size / 1024 / 1024:.1f} MB)" if Path(output).exists() else "Final video written.")
-        on_log("Running FFmpeg: building 640px preview…")
+        on_log("Running FFmpeg: building 720px preview…")
     if on_progress:
         on_progress(92, 0, None)
     ok, out = run_with_progress(build_preview_command(output, preview_path),

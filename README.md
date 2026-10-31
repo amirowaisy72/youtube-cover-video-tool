@@ -101,13 +101,30 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    longer crash it, which was why it used to stick at 2%.
    Covers can be deleted: click × on any cover thumbnail, or
    "Delete selected cover" under the selected cover.
-   Encoding uses `medium` preset + CRF 26 + 96k audio for a small
-   final file (not `ultrafast` CRF 22, which was the cause of a
-   28.9 MB source becoming a 124.7 MB final — ultrafast disables
-   the compression tools that make a file small). If Compress is on
-   and the final is still larger than the source, it is automatically
-   re-encoded once at CRF 32 / medium preset to shrink it below the
-   source size where possible. Preview uses a fast 480px encode.
+   Encoding uses HEVC (libx265, preset fast, CRF 22) + 96k audio,
+   output up to 1920px wide: HEVC is how size goes down without
+   quality going down — H.264 CRF 26 shrank but dulled, H.264
+   CRF 20 kept quality but grew, while HEVC CRF 22 looks like
+   H.264 CRF 20 at roughly 25-40% smaller size. If libx265 is
+   missing, it falls back to H.264 CRF 20 for quality. Preview
+   uses a 720px / CRF 20 H.264 encode, so the preview you judge
+   by looks like the final (the old 480px / CRF 32 preview itself
+   looked dull) and plays in any browser.
+   Green shape, not just rectangle: the video is clipped to the
+   green area's actual shape (mask built from the cover's green
+   pixels, FFmpeg `alphamerge` for the final, CSS `mask-image` for
+   the live preview), so a circle, rounded screen or irregular
+   green area never gets a rectangular video spilling onto the
+   rest of the cover. Masked encodes use `-t` = source duration,
+   because a looped mask input otherwise makes alphamerge run
+   forever (a 3s source became a 472s file in testing).
+   **Auto mode:** press "Start Auto", give only a YouTube link,
+   and the page blurs behind a popup with one overall progress
+   bar and a timeline (download -> apply Admin defaults ->
+   compress -> preview). At the end the popup shows a short
+   summary: downloaded size, size after cover/voice/speed/shape,
+   and size after compression, plus a Download button and a
+   Close button to see the result and edit further.
 
 ### Refresh safety and local storage (no disk waste)
 
@@ -127,9 +144,9 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
   you choose to reuse); delete any cover with its × button.
    The **Timeline** section shows how long each step actually took
    (download, final encode, preview encode) with file sizes.
-   Output: `jobs/<job-id>/final.mp4` and a low-res
-   `jobs/<job-id>/preview.mp4`. Encoding uses `veryfast` preset and
-   caps the cover at 1280px wide for speed (same CRF/quality).
+   Output: `jobs/<job-id>/final.mp4` and a 720px
+   `jobs/<job-id>/preview.mp4`. Encoding uses `medium` preset,
+   CRF 20, and caps the cover at 1920px wide for quality.
 5. Watch the **Preview** player. If it looks right, press
    **Download final video**.
 6. For YouTube upload, see below, then choose a channel and upload.

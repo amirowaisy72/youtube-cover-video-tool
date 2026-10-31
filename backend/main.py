@@ -57,24 +57,23 @@ DEFAULT_SETTINGS = {
     "default_speed": 1.0,
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
-    "crf": 26,
-    # Size-first preset, as requested after the 28.9 MB -> 124.7 MB
-    # case: ultrafast is fastest but very inefficient (it disables
-    # the compression tools that make a file small), so a CRF 22
-    # ultrafast file was 4x larger than the YouTube source. Medium
-    # + CRF 26 is much smaller at similar visible quality; it is
-    # slower than ultrafast, but that is the size/speed trade-off.
-    # Users who want speed back can pick ultrafast in the Admin tab,
-    # knowing the file will grow again.
-    "preset": "medium",
+    "crf": 22,
+    # Size AND quality, as requested 2026-11-01: H.264 could not do
+    # both (CRF 26 shrank but dulled, CRF 20 kept quality but grew).
+    # HEVC (libx265) can: CRF 22 HEVC looks like H.264 CRF 20 at
+    # roughly 25-40% smaller size. Preset "fast" keeps HEVC encode
+    # time close to H.264 medium. If libx265 is missing, the code
+    # falls back to H.264 CRF 20 for quality.
+    "preset": "fast",
+    "encoder": "libx265",
     "green_rect": {"x": 0, "y": 0, "w": 640, "h": 360},
     # Auto-detect the green area from the cover image itself, so the
     # video lands exactly on the green screen, not at a guessed 0,0.
     # Falls back to green_rect when no green area is found.
     "auto_detect_green": True,
-    # Cap the final cover at 1280px wide: a 2048px cover encoded at
-    # full size was the other big slowdown; 1280 is still full HD.
-    "output_width": 1280,
+    # Cap the final cover at 1920px wide for quality: at 1280px the
+    # green-area video was downscaled to ~770px wide and lost detail.
+    "output_width": 1920,
     "output_height": None,
 }
 
@@ -83,13 +82,21 @@ def load_settings() -> dict:
     if SETTINGS_FILE.exists():
         try:
             saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            # Size migration: old installs saved ultrafast/veryfast
-            # with CRF 22, which produced a final larger than source.
-            # Move to medium + CRF 26 for a smaller final file.
+            # Quality migration (2026-11-01): old installs saved
+            # CRF 26 / 1280px, which dulled detailed videos. Move to
+            # CRF 20 / 1920px so the final keeps the source's look.
+            # At 1920px the green-area video stays near source
+            # resolution instead of being downscaled to ~770px wide.
             if saved.get("preset") in ("ultrafast", "veryfast"):
                 saved["preset"] = "medium"
-            if saved.get("crf") in (22,):
-                saved["crf"] = 26
+            if saved.get("crf") in (20, 26):
+                saved["crf"] = 22
+            if saved.get("preset") in ("medium",):
+                saved["preset"] = "fast"
+            if "encoder" not in saved:
+                saved["encoder"] = "libx265"
+            if saved.get("output_width") in (1280,):
+                saved["output_width"] = 1920
             merged = dict(DEFAULT_SETTINGS)
             merged.update(saved)
             green = dict(DEFAULT_SETTINGS["green_rect"])
@@ -338,6 +345,196 @@ def download_video(payload: DownloadRequest) -> dict:
     return {"job_id": job_id, "status": "downloading"}
 
 
+# ------------------------------------------------------------------ auto
+class AutoRequest(BaseModel):
+    url: str = Field(..., min_length=8)
+    cover_id: str | None = None
+
+
+def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
+    """Auto mode: download -> apply admin defaults -> compress -> preview.
+
+    The user only gives a download link. Everything else comes from
+    Admin defaults (speed, voice, pitch, encoder, CRF, preset, green
+    auto-detect) and the selected cover (or the newest cover). The
+    frontend blurs the page and shows a popup with one overall
+    progress bar and a timeline; this thread writes auto_stage,
+    auto_progress and, at the end, auto_summary to job.json, which
+    the popup polls. Summary sizes, in order:
+      downloaded: the YouTube source as downloaded
+      applied: after cover + voice + speed + shape are applied,
+        encoded at high quality (H.264 CRF 18, not yet compressed)
+      final: after the admin compression (HEVC CRF 22 by default)
+    The intermediate applied file is deleted after compression, so
+    only the final (and preview) remain, like normal jobs.
+    """
+    import time as _time
+    directory = job_dir(job_id)
+    source = directory / "source.mp4"
+    applied_path = directory / "applied.mp4"
+    final_path = directory / "final.mp4"
+    preview_path = directory / "preview.mp4"
+    timeline: list[dict] = []
+
+    def _set(stage: str, pct: float, extra: dict | None = None) -> None:
+        job = read_job(job_id)
+        job.update({"auto": True, "auto_stage": stage, "auto_progress": pct})
+        if extra:
+            job.update(extra)
+        write_job(job)
+
+    _set("downloading", 0, {"status": "downloading", "url": url, "timeline": timeline})
+    # --- Stage 1: download (same yt-dlp settings as manual download)
+    dl_start = _time.time()
+    try:
+        import yt_dlp
+        def hook(d: dict) -> None:
+            total = d.get("total_bytes") or d.get("total_bytes_estimate")
+            downloaded = d.get("downloaded_bytes", 0) or 0
+            pct = round(downloaded * 100 / total, 1) if total else 0
+            _set("downloading", round(pct * 0.25, 1))
+        opts = {
+            "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+            "merge_output_format": "mp4",
+            "concurrent_fragment_downloads": 8,
+            "outtmpl": str(source),
+            "progress_hooks": [hook],
+            "quiet": True, "no_warnings": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+    except Exception as exc:  # noqa: BLE001
+        _set("failed", 0, {"status": "failed", "error": str(exc)[-2000:]})
+        return
+    if not source.exists():
+        _set("failed", 0, {"status": "failed", "error": "Download finished but no file was created."})
+        return
+    downloaded_mb = source.stat().st_size / 1024 / 1024
+    timeline.append({"step": "YouTube download", "duration_sec": round(_time.time() - dl_start, 1),
+                     "detail": f"{downloaded_mb:.1f} MB"})
+    # --- Cover + admin defaults
+    settings = load_settings()
+    cover = None
+    if cover_id:
+        matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
+        cover = matches[0] if matches else None
+    if cover is None:
+        covers = sorted([p for p in COVERS_DIR.iterdir() if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}],
+                        key=lambda p: p.stat().st_mtime, reverse=True)
+        cover = covers[0] if covers else None
+    if cover is None:
+        _set("failed", 0, {"status": "failed", "error": "Auto needs a cover: upload a cover first, then start Auto."})
+        return
+    green_rect = settings.get("green_rect") or {"x": 0, "y": 0, "w": 640, "h": 360}
+    if settings.get("auto_detect_green", True):
+        detected = video.detect_green_rect(cover)
+        if detected:
+            green_rect = detected
+    speed = float(settings.get("default_speed", 1.0))
+    voice_enabled = bool(settings.get("voice_enabled", True))
+    pitch = float(settings.get("voice_pitch_factor", 1.05))
+    # --- Stage 2: apply everything, high quality (not yet compressed)
+    _set("applying", 25, {"status": "processing", "timeline": timeline})
+    apply_start = _time.time()
+    cmd = video.build_process_command(
+        source, cover, applied_path, green_rect,
+        flip=False, speed=speed, voice_enabled=voice_enabled,
+        voice_pitch_factor=pitch, crf=18, preset="medium",
+        output_width=settings.get("output_width"),
+        output_height=settings.get("output_height"),
+        zoom=1.0, pan_x=0.0, pan_y=0.0,
+        mask_path=None,
+    )
+    # Mask for shape accuracy, built from the cover itself.
+    try:
+        mask_img = video.green_mask(cover)
+        if mask_img is not None:
+            mask_path = directory / "green_mask.png"
+            mask_img.save(mask_path)
+            cmd = video.build_process_command(
+                source, cover, applied_path, green_rect,
+                flip=False, speed=speed, voice_enabled=voice_enabled,
+                voice_pitch_factor=pitch, crf=18, preset="medium",
+                output_width=settings.get("output_width"),
+                output_height=settings.get("output_height"),
+                zoom=1.0, pan_x=0.0, pan_y=0.0,
+                mask_path=mask_path, output_duration=None,
+            )
+            # Masked encode needs -t (see video.py): duration / speed.
+            dur = video.get_duration(source)
+            if dur:
+                dur = dur / max(0.5, min(2.0, speed))
+                cmd = cmd[:-1] + ["-t", str(dur), cmd[-1]]
+    except Exception:
+        pass
+    # Use run_with_progress directly: apply maps 25-70, compress 70-90.
+    ok, out = video.run_with_progress(cmd, video.get_duration(source), 0, 100,
+                                      on_progress=lambda p, e, eta: _set("applying", round(25 + p * 0.45, 1)))
+    if not ok or not applied_path.exists():
+        _set("failed", 0, {"status": "failed", "error": f"Auto apply step failed:\n{out}"[-2000:]})
+        return
+    applied_mb = applied_path.stat().st_size / 1024 / 1024
+    timeline.append({"step": "Apply cover + voice + speed + shape (admin defaults)",
+                     "duration_sec": round(_time.time() - apply_start, 1),
+                     "detail": f"{applied_mb:.1f} MB"})
+    # --- Stage 3: compress with admin encoder/CRF/preset
+    _set("compressing", 70, {"status": "processing", "timeline": timeline})
+    comp_start = _time.time()
+    encoder = str(settings.get("encoder", "libx265"))
+    crf = int(settings.get("crf", 22))
+    preset = str(settings.get("preset", "fast"))
+    if encoder == "libx265" and not video.encoder_available("libx265"):
+        encoder = "libx264"
+        crf = 20
+    comp_cmd = ["ffmpeg", "-y", "-i", str(applied_path),
+                "-c:v", encoder, "-crf", str(crf), "-preset", preset,
+                "-pix_fmt", "yuv420p", "-c:a", "copy",
+                "-movflags", "+faststart"]
+    if encoder == "libx265":
+        comp_cmd += ["-tag:v", "hvc1"]
+    comp_cmd += [str(final_path)]
+    ok, out = video.run_with_progress(comp_cmd, video.get_duration(source), 0, 100,
+                                      on_progress=lambda p, e, eta: _set("compressing", round(70 + p * 0.20, 1)))
+    if not ok or not final_path.exists():
+        _set("failed", 0, {"status": "failed", "error": f"Auto compress step failed:\n{out}"[-2000:]})
+        return
+    final_mb = final_path.stat().st_size / 1024 / 1024
+    timeline.append({"step": f"Compress ({encoder}, CRF {crf}, preset {preset})",
+                     "duration_sec": round(_time.time() - comp_start, 1),
+                     "detail": f"{final_mb:.1f} MB"})
+    try:
+        applied_path.unlink()
+    except OSError:
+        pass
+    # --- Stage 4: preview (H.264, browser-playable, like normal jobs)
+    _set("preview", 90, {"status": "processing", "timeline": timeline})
+    video.run_with_progress(video.build_preview_command(final_path, preview_path),
+                            video.get_duration(source), 0, 100,
+                            on_progress=lambda p, e, eta: _set("preview", round(90 + p * 0.10, 1)))
+    summary = {
+        "downloaded_mb": round(downloaded_mb, 1),
+        "applied_mb": round(applied_mb, 1),
+        "final_mb": round(final_mb, 1),
+        "saved_mb": round(applied_mb - final_mb, 1),
+        "saved_pct": round((applied_mb - final_mb) / applied_mb * 100, 1) if applied_mb else 0,
+        "encoder": encoder, "crf": crf,
+    }
+    _set("done", 100, {"status": "processed", "timeline": timeline,
+                       "auto_summary": summary, "cover_id": cover_id,
+                       "process_progress": 100, "process_stage": "Done"})
+
+
+@app.post("/api/auto")
+def auto_video(payload: AutoRequest) -> dict:
+    if not yt_dlp_available():
+        raise HTTPException(400, "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.")
+    job_id = uuid.uuid4().hex[:12]
+    directory = job_dir(job_id)
+    threading.Thread(target=_run_auto, args=(job_id, payload.url, payload.cover_id),
+                     daemon=True).start()
+    return {"job_id": job_id, "status": "downloading", "auto": True}
+
+
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str) -> dict:
     """Download progress for the frontend progress bar."""
@@ -365,6 +562,38 @@ def detect_green(cover_id: str) -> dict:
     if not rect:
         raise HTTPException(404, "No green area found in this cover. Use the manual rectangle in Admin settings.")
     return {"cover_id": cover_id, "green_rect": rect, "source": "auto-detected"}
+
+
+@app.get("/api/green-mask/{cover_id}")
+def green_mask_endpoint(cover_id: str, x: int | None = None, y: int | None = None,
+                        w: int | None = None, h: int | None = None):
+    """Green-shape mask for one cover, cropped to its green rectangle.
+
+    White = green area, black = rest. The live preview uses this as
+    a CSS mask-image on the green box, so the live video is clipped
+    to the green shape exactly like the final FFmpeg alphamerge.
+    If no green area is found, a plain white rectangle is returned,
+    so the preview behaves as before (rectangle video).
+    """
+    from io import BytesIO
+    from fastapi.responses import Response
+    matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
+    if not matches:
+        raise HTTPException(404, "Cover not found.")
+    mask = video.green_mask(matches[0])
+    if mask is None:
+        raise HTTPException(404, "Mask could not be built.")
+    rect = None
+    if x is not None and y is not None and w and h:
+        rect = {"x": x, "y": y, "w": w, "h": h}
+    else:
+        rect = video.detect_green_rect(matches[0])
+    if rect:
+        mask = mask.crop((rect["x"], rect["y"],
+                          rect["x"] + rect["w"], rect["y"] + rect["h"]))
+    buf = BytesIO()
+    mask.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
 
 
 class ProcessRequest(BaseModel):
@@ -420,7 +649,8 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         voice_pitch_factor=float(pitch),
         compress=payload.compress,
         crf=int(settings.get("crf", 22)),
-        preset=str(settings.get("preset", "medium")),
+        preset=str(settings.get("preset", "fast")),
+        encoder=str(settings.get("encoder", "libx265")),
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
         zoom=zoom, pan_x=pan_x, pan_y=pan_y,
@@ -434,17 +664,18 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
     if ok and final_path.exists():
         pv_start = preview_started[0] or ended
         prev_timeline.append({
-            "step": "Final video encode (libx264, "
-                    f"preset {settings.get('preset', 'medium')}, "
+            "step": "Final video encode ("
+                    f"{'HEVC libx265' if settings.get('encoder', 'libx265') == 'libx265' else 'libx264'}, "
+                    f"preset {settings.get('preset', 'fast')}, "
                     f"CRF {settings.get('crf', 22)}, max width "
-                    f"{settings.get('output_width', 1280)}px)",
+                    f"{settings.get('output_width', 1920)}px)",
             "duration_sec": round(pv_start - started, 1),
             "detail": f"Source {source.stat().st_size / 1024 / 1024:.1f} MB → "
                       f"final {final_path.stat().st_size / 1024 / 1024:.1f} MB"
                       if source.exists() else "",
         })
         prev_timeline.append({
-            "step": "Preview encode (480px, ultrafast preset)",
+            "step": "Preview encode (720px, veryfast preset)",
             "duration_sec": round(ended - pv_start, 1),
             "detail": f"Preview {preview_path.stat().st_size / 1024 / 1024:.1f} MB"
                       if preview_path.exists() else "Preview not created",
