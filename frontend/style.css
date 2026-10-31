@@ -163,6 +163,8 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 
 /* Auto mode popup: blur the page behind it, popup on top. */
 body.auto-open main { filter: blur(6px); pointer-events: none; user-select: none; }
+/* Processing lock: same blur + block, only the processing card shows. */
+body.processing-open main { filter: blur(6px); pointer-events: none; user-select: none; }
 .auto-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(5, 12, 25, 0.55); padding: 16px; }
 .auto-overlay[hidden] { display: none; }
 .auto-card { background: #1b2f4d; border: 1px solid #2b4a73; border-radius: 16px; padding: 24px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }

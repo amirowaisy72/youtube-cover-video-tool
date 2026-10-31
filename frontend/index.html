@@ -163,6 +163,7 @@ tailwind.config = {
     </div>
     <p class="muted live-hint">Click to select. Drag to move, drag a corner to zoom.</p>
     <p id="live-note" class="muted mt-2"></p>
+    <button id="btn-process-below-preview" class="btn-primary w-full mt-3 px-6 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors" type="button">▶ Process video</button>
   </section>
 
   </div>
@@ -182,10 +183,13 @@ tailwind.config = {
     <p class="muted mt-3">Working files are temporary. After download, source and preview are deleted.</p>
     <div id="generated-info" hidden>
       <label class="field-label">New title, description, tags — check before publishing</label>
-      <p class="muted">Generated locally, free, no AI API. Original text was not copied.</p>
-      <p id="generated-title" class="font-semibold"></p>
-      <p id="generated-tags" class="muted"></p>
-      <details class="mt-2"><summary class="muted">Description</summary><p id="generated-description" class="muted"></p></details>
+      <p class="muted">Generated locally, free, no AI API. Original text was not copied. You can also edit them here yourself (optional) — your edits go to the upload form.</p>
+      <label class="field-label mt-2">Title (editable)</label>
+      <input id="generated-title" type="text" />
+      <label class="field-label mt-2">Tags (editable, comma separated)</label>
+      <input id="generated-tags" type="text" />
+      <label class="field-label mt-2">Description (editable)</label>
+      <textarea id="generated-description" rows="4"></textarea>
       <div class="flex flex-wrap gap-3 mt-3">
         <button id="btn-use-generated" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Use these for upload</button>
         <button id="btn-regenerate" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Regenerate</button>
@@ -299,6 +303,13 @@ tailwind.config = {
   <section class="card mt-4">
     <div class="step-head"><span class="step">▶</span><h2>YouTube channels</h2></div>
     <p class="muted">Configure channels here. They will show in the Upload step.</p>
+    <div class="auto-summary">
+      <b>⚠️ Important — please read before adding a channel:</b><br />
+      Adding a channel name + Channel ID here only adds it to the list in the Upload step. <b>It does NOT enable uploading by itself.</b><br />
+      Uploading needs the Google sign-in steps below (Client ID + Client Secret saved, libraries installed, <b>python scripts/youtube_connect.py</b> run, token created, then restart run.bat).<br />
+      If Google sign-in is complete, your channels appear automatically — manual add is not needed.<br />
+      Upload always goes to the channel of the Google account you signed in with.
+    </div>
     <p id="yt-admin-status" class="muted"></p>
     <ol class="muted mt-2" style="list-style:decimal; padding-left:20px;">
       <li>Go to <b>Google Cloud Console</b> (console.cloud.google.com), create a project, enable <b>YouTube Data API v3</b>.</li>
@@ -323,6 +334,7 @@ tailwind.config = {
       <button id="btn-add-channel" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Add channel</button>
     </div>
     <ul id="yt-channel-list" class="timeline-list mt-3"></ul>
+    <p class="muted mt-2">Note: Adding a channel here only shows it in the Upload list. It does not enable uploading — that needs Google sign-in (steps above).</p>
   </section>
   </div>
 
@@ -346,6 +358,21 @@ tailwind.config = {
       <button id="btn-auto-close" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Close — see results</button>
     </div>
     <p id="auto-error" class="muted" hidden></p>
+  </div>
+</div>
+
+<!-- Processing lock: while Process video runs, the whole page blurs
+     and nothing else is clickable. Only this card shows, with the
+     same progress and log, so the user cannot change speed, flip,
+     zoom, cover or any other setting mid-process and get an
+     unexpected final video. It closes automatically when done. -->
+<div id="process-overlay" class="auto-overlay" hidden>
+  <div class="auto-card">
+    <h2>Processing video…</h2>
+    <p class="muted">Please wait. All other controls are locked until this finishes.</p>
+    <div class="progress-track"><div id="process-overlay-bar" class="progress-bar"></div></div>
+    <p id="process-overlay-text" class="muted mt-2">Processing… 0%</p>
+    <pre id="process-overlay-log" class="process-log">Waiting to start…</pre>
   </div>
 </div>
 <script src="app.js"></script>

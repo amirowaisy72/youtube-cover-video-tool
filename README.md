@@ -208,6 +208,23 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    step even before Google sign-in; upload itself still needs
    the sign-in token, because YouTube uploads to the signed-in
    account's channel.
+   Processing lock: when Process video is clicked, the whole page
+   blurs and nothing else is clickable — only a Processing card
+   shows, with the same progress bar, text and log. The lock
+   closes automatically on Done or on failure, and also applies
+   if the page is refreshed while a process is still running.
+   This stops the user changing speed, flip, zoom, cover or any
+   other setting mid-process and getting an unexpected final
+   video. A second Process video button sits below the Live
+   preview video, doing exactly the same action as the main one,
+   so processing can start right after checking the preview.
+   Editable metadata in Step 4: the generated title, tags and
+   description are editable text fields, not read-only text.
+   Editing them is optional — typing there updates the Upload
+   form live, and "Use these for upload" sends the edited
+   version, not the original generated one. Regenerate overwrites
+   them with a new generated version; "Use original instead"
+   fills both Step 4 and the Upload form with the original.
 
 ### Refresh safety and local storage (no disk waste)
 

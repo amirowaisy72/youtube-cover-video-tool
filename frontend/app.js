@@ -258,9 +258,9 @@ async function restoreState() {
       const box = document.getElementById("generated-info");
       if (box) {
         box.hidden = false;
-        document.getElementById("generated-title").textContent = job.generated_title;
-        document.getElementById("generated-tags").textContent = "Tags: " + (job.generated_tags || []).join(", ");
-        document.getElementById("generated-description").textContent = job.generated_description;
+        document.getElementById("generated-title").value = job.generated_title;
+        document.getElementById("generated-tags").value = (job.generated_tags || []).join(", ");
+        document.getElementById("generated-description").value = job.generated_description;
       }
       document.getElementById("yt-title").value = job.generated_title;
       document.getElementById("yt-description").value = job.generated_description;
@@ -272,6 +272,7 @@ async function restoreState() {
       startDownloadPolling(jobId);
     } else if (job.status === "processing") {
       document.getElementById("process-progress-wrap").hidden = false;
+      showProcessLock();
       startProcessPolling(jobId, "/api/preview/" + jobId);
     } else if (job.status === "downloaded") {
       downloadReady = true;
@@ -643,9 +644,9 @@ async function loadGeneratedMetadata(variant) {
     const box = document.getElementById("generated-info");
     if (box) {
       box.hidden = false;
-      document.getElementById("generated-title").textContent = gen.generated_title;
-      document.getElementById("generated-tags").textContent = "Tags: " + (gen.generated_tags || []).join(", ");
-      document.getElementById("generated-description").textContent = gen.generated_description;
+      document.getElementById("generated-title").value = gen.generated_title;
+      document.getElementById("generated-tags").value = (gen.generated_tags || []).join(", ");
+      document.getElementById("generated-description").value = gen.generated_description;
     }
     // Prefill upload form with the generated version by default.
     document.getElementById("yt-title").value = gen.generated_title;
@@ -658,12 +659,18 @@ document.getElementById("btn-regenerate").addEventListener("click", async () => 
   await loadGeneratedMetadata(generatedVariant);
 });
 document.getElementById("btn-use-generated").addEventListener("click", () => {
-  if (!currentGenerated) return;
-  document.getElementById("yt-title").value = currentGenerated.generated_title;
-  document.getElementById("yt-description").value = currentGenerated.generated_description;
-  document.getElementById("yt-tags").value = (currentGenerated.generated_tags || []).join(", ");
+  // Use the CURRENT edited values in Step 4, not the stored generated ones,
+  // so a user's own edits are what goes to upload.
+  document.getElementById("yt-title").value = document.getElementById("generated-title").value;
+  document.getElementById("yt-description").value = document.getElementById("generated-description").value;
+  document.getElementById("yt-tags").value = document.getElementById("generated-tags").value;
   showManualStep(5);
   setStatus("Generated title, description and tags are in the upload form. Check them, then upload.");
+});
+["generated-title", "generated-description", "generated-tags"].forEach((id) => {
+  const el = document.getElementById(id);
+  const target = id === "generated-title" ? "yt-title" : id === "generated-description" ? "yt-description" : "yt-tags";
+  el.addEventListener("input", () => { document.getElementById(target).value = el.value; });
 });
 document.getElementById("btn-use-original").addEventListener("click", async () => {
   if (!jobId) return;
@@ -672,6 +679,9 @@ document.getElementById("btn-use-original").addEventListener("click", async () =
     document.getElementById("yt-title").value = job.original_title || "";
     document.getElementById("yt-description").value = job.original_description || "";
     document.getElementById("yt-tags").value = (job.original_tags || []).join(", ");
+    document.getElementById("generated-title").value = job.original_title || "";
+    document.getElementById("generated-description").value = job.original_description || "";
+    document.getElementById("generated-tags").value = (job.original_tags || []).join(", ");
     showManualStep(5);
     setStatus("Original title, description and tags are in the upload form.");
   } catch (e) { setStatus("Could not load original metadata."); }
@@ -900,10 +910,27 @@ function renderProcessLog(job) {
   }
 }
 
+function showProcessLock() {
+  document.body.classList.add("processing-open");
+  document.getElementById("process-overlay").hidden = false;
+  document.getElementById("process-overlay-bar").style.width = "0%";
+  document.getElementById("process-overlay-text").textContent = "Processing… 0%";
+  document.getElementById("btn-process").disabled = true;
+  document.getElementById("btn-process-below-preview").disabled = true;
+}
+function hideProcessLock() {
+  document.body.classList.remove("processing-open");
+  document.getElementById("process-overlay").hidden = true;
+  document.getElementById("btn-process").disabled = false;
+  document.getElementById("btn-process-below-preview").disabled = false;
+}
 function startProcessPolling(id, previewUrl) {
   const wrap = document.getElementById("process-progress-wrap");
   const bar = document.getElementById("process-progress-bar");
   const text = document.getElementById("process-progress-text");
+  const overlayBar = document.getElementById("process-overlay-bar");
+  const overlayText = document.getElementById("process-overlay-text");
+  const overlayLog = document.getElementById("process-overlay-log");
   wrap.hidden = false;
   if (processTimer) clearInterval(processTimer);
   processTimer = setInterval(async () => {
@@ -913,13 +940,19 @@ function startProcessPolling(id, previewUrl) {
       renderProcessLog(job);
       const pct = job.process_progress || 0;
       bar.style.width = pct + "%";
+      overlayBar.style.width = pct + "%";
       const elapsed = job.process_elapsed ? ` • ${Math.round(job.process_elapsed)}s elapsed` : "";
       const eta = job.process_eta ? ` • about ${Math.round(job.process_eta)}s left` : "";
       text.textContent = `${job.process_stage || "Processing…"} ${pct}%${elapsed}${eta}`;
+      overlayText.textContent = text.textContent;
+      overlayLog.textContent = document.getElementById("process-log").textContent;
       if (job.status === "processed") {
         clearInterval(processTimer);
         bar.style.width = "100%";
+        overlayBar.style.width = "100%";
         text.textContent = "Done 100% — preview ready.";
+        overlayText.textContent = "Done 100% — preview ready.";
+        hideProcessLock();
         const player = document.getElementById("preview-player");
         player.src = previewUrl + "?t=" + Date.now();
         player.load();
@@ -927,10 +960,12 @@ function startProcessPolling(id, previewUrl) {
         setStatus("Done. Preview below — check it before downloading.");
       } else if (job.status === "failed") {
         clearInterval(processTimer);
+        hideProcessLock();
         setStatus("Processing failed: " + (job.error || "unknown error"));
       }
     } catch (err) {
       clearInterval(processTimer);
+      hideProcessLock();
       setStatus("Processing progress check failed: " + err.message);
     }
   }, 1000);
@@ -942,6 +977,7 @@ document.getElementById("btn-process").addEventListener("click", async () => {
   const coverId = selectedCoverId || document.getElementById("cover-select").value;
   if (!coverId) { setStatus("Choose a cover first."); return; }
   setStatus("Processing… see the progress bar right here in Edit.");
+  showProcessLock();
   try {
     const data = await api("/api/process", {
       method: "POST",
@@ -962,8 +998,15 @@ document.getElementById("btn-process").addEventListener("click", async () => {
     });
     startProcessPolling(jobId, data.preview_url);
   } catch (err) {
+    hideProcessLock();
     setStatus("Processing failed: " + err.message);
   }
+});
+
+// Same Process action, from below the Live preview video, so the
+// user does not have to scroll back up after checking the preview.
+document.getElementById("btn-process-below-preview").addEventListener("click", () => {
+  document.getElementById("btn-process").click();
 });
 
 document.getElementById("btn-download-final").addEventListener("click", () => {
