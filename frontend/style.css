@@ -1,0 +1,35 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  background: #f6f6f6;
+  color: #222;
+}
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px;
+}
+h1 { margin-bottom: 4px; }
+section {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+label { display: block; margin: 8px 0; }
+input[type="url"], input[type="text"], input[type="number"], select {
+  padding: 8px;
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+}
+button {
+  padding: 9px 16px;
+  margin: 6px 6px 6px 0;
+  cursor: pointer;
+}
+.status { font-weight: 600; }
+.note { color: #555; }
+video { max-width: 100%; background: #000; }
+fieldset { margin: 12px 0; }

@@ -1,0 +1,10 @@
+jobs/
+uploads/
+*.mp4
+tokens/
+client_secrets.json
+.env
+__pycache__/
+*.pyc
+.venv/
+backend/settings.json

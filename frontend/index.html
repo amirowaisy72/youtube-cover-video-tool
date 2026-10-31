@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouTube Cover Video Tool</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <h1>YouTube Cover Video Tool</h1>
+  <p class="note">Free, local tool. Use only videos you own or have rights / licence for.</p>
+  <p id="status" class="status"></p>
+
+  <section>
+    <h2>1. YouTube link</h2>
+    <input id="yt-url" type="url" placeholder="Paste a YouTube link here" />
+    <button id="btn-download">Download video</button>
+    <p id="job-info"></p>
+  </section>
+
+  <section>
+    <h2>2. Cover</h2>
+    <label>Upload a cover image (with a green-screen area):
+      <input id="cover-file" type="file" accept="image/png,image/jpeg,image/webp" />
+    </label>
+    <button id="btn-cover-upload">Upload cover</button>
+    <label>Choose a cover:
+      <select id="cover-select"><option value="">-- no covers yet --</option></select>
+    </label>
+    <button id="btn-covers-refresh">Refresh covers</button>
+  </section>
+
+  <section>
+    <h2>3. Edit</h2>
+    <button id="btn-flip">Flip left / right</button>
+    <span id="flip-state">Flip: off</span>
+    <label>Speed:
+      <input id="speed" type="range" min="0.5" max="2" step="0.1" value="1" />
+      <span id="speed-value">1.0x</span>
+    </label>
+    <label><input id="voice-enabled" type="checkbox" checked /> Slight voice change</label>
+    <label>Voice pitch:
+      <input id="voice-pitch" type="range" min="0.9" max="1.2" step="0.01" value="1.05" />
+      <span id="voice-pitch-value">1.05</span>
+    </label>
+    <label><input id="compress" type="checkbox" checked /> Compress (smaller size, same look)</label>
+    <button id="btn-process">Process video</button>
+  </section>
+
+  <section>
+    <h2>4. Preview &amp; download</h2>
+    <video id="preview-player" controls width="640"></video>
+    <div>
+      <button id="btn-download-final">Download final video</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. Upload to YouTube</h2>
+    <p id="yt-status">YouTube: checking…</p>
+    <label>Channel:
+      <select id="channel-select"><option value="">-- not connected --</option></select>
+    </label>
+    <input id="yt-title" type="text" placeholder="Video title" />
+    <input id="yt-description" type="text" placeholder="Video description (optional)" />
+    <label>Privacy:
+      <select id="yt-privacy">
+        <option value="private">Private</option>
+        <option value="unlisted">Unlisted</option>
+        <option value="public">Public</option>
+      </select>
+    </label>
+    <button id="btn-upload-yt">Upload to selected channel</button>
+    <p id="yt-result"></p>
+  </section>
+
+  <section>
+    <h2>Admin settings</h2>
+    <p>These are the defaults used when you process a video.</p>
+    <label>Default speed: <input id="set-speed" type="number" min="0.5" max="2" step="0.1" value="1" /></label>
+    <label><input id="set-voice-enabled" type="checkbox" checked /> Voice change enabled by default</label>
+    <label>Voice pitch factor: <input id="set-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" /></label>
+    <label>CRF (lower = bigger / better, 20–23 recommended): <input id="set-crf" type="number" min="18" max="28" step="1" value="22" /></label>
+    <label>Preset:
+      <select id="set-preset">
+        <option value="fast">fast</option>
+        <option value="medium" selected>medium</option>
+        <option value="slow">slow</option>
+      </select>
+    </label>
+    <fieldset>
+      <legend>Green rectangle (cover area where the video goes)</legend>
+      <label>X: <input id="set-green-x" type="number" value="0" /></label>
+      <label>Y: <input id="set-green-y" type="number" value="0" /></label>
+      <label>Width: <input id="set-green-w" type="number" value="640" /></label>
+      <label>Height: <input id="set-green-h" type="number" value="360" /></label>
+    </fieldset>
+    <button id="btn-save-settings">Save admin settings</button>
+    <p id="settings-result"></p>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
