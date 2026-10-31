@@ -65,10 +65,11 @@ function applyLiveVideoLayout() {
     greenBox.style.webkitMaskImage = "";
   }
   // Video is sized at zoom x the box and offset by pan, inside an
-  // overflow-hidden box. object-fit: contain fits the WHOLE video
-  // inside the box at 1.0x (no cropping, no false zoom), matching
-  // the final FFmpeg scale=decrease + centred overlay, so live
-  // and final match. At higher zoom the box clips the bigger video.
+  // overflow-hidden box. object-fit: cover fills the box exactly
+  // at 1.0x, with no black area, matching the final FFmpeg
+  // scale=increase + crop, so live and final match. Zooming zooms
+  // the video itself, not a black letterbox area (contain used to
+  // do that: its black bars grew with zoom).
   video.style.position = liveCover ? "absolute" : "";
   video.style.width = (zoom * 100) + "%";
   video.style.height = (zoom * 100) + "%";

@@ -324,33 +324,28 @@ def build_process_command(
     # atempo only accepts 0.5-100 in a single filter; our UI is 0.5-2.0.
     speed = max(0.5, min(2.0, speed))
 
-    # FALSE-ZOOM FIX (user, 2026-11-01, Auto mode): at zoom 1.0x the
-    # video looked zoomed in even though the user never zoomed.
-    # Cause: the old code used scale=increase ("cover"), which
-    # scales the video until it COVERS the green box, cropping the
-    # excess. A 16:9 source in a ~1.3:1 green box was scaled by
-    # 1.79x and 26% of its width was cropped off — faces looked
-    # bigger, text at the edges was cut, exactly like a zoom.
-    # Fix: at 1.0x use scale=decrease ("fit") — the WHOLE video
-    # fits inside the green box, no cropping, no zoom look.
-    # LEFTOVER = BLACK, NOT GREEN (user, 2026-11-01): the fit video
-    # is centred in the box, so for mismatched aspects there is
-    # leftover space (e.g. green bars top/bottom for a 16:9 video
-    # in a ~1.3:1 box). The live preview shows that leftover as
-    # black (the video element letterboxes in black), but the old
-    # final video just overlaid the small video on the cover, so
-    # the leftover stayed green. Fix: pad the fit video with black
-    # to the full box size (pad filter, centred), then overlay the
-    # padded box at the box origin. The mask, when present, still
-    # clips the padded box to the green shape, so black only shows
-    # inside the shape, never on the cover outside it. Only when
-    # the user actually zooms (>1.0x) does the video get bigger
-    # and crop, as the slider promises ("1.0x = video fits exactly").
-    # Implementation: if the source size is known, compute the fit
-    # size in Python so we know whether to centre (fit smaller than
-    # box) or crop (fit larger than box at higher zoom). If the
-    # source size is unknown, fall back to FFmpeg decrease + centred
-    # overlay expressions, which give the same fit behaviour.
+    # COVER FILL, LIKE BEFORE (user, 2026-11-01, after the fit +
+    # black-pad change): at 1.0x the video must fill the green
+    # box exactly, with no black area created at all, and zooming
+    # must zoom the video itself, not a black letterbox area.
+    # The fit change (scale=decrease + centred overlay, then black
+    # padding to the box) created black bars for mismatched aspects
+    # (e.g. a 16:9 video in a ~1.3:1 box), and in the live preview
+    # object-fit: contain made those bars grow when zooming, so
+    # zooming looked like only the black area was zooming. The user
+    # tested the same video before and it filled the green area
+    # exactly, with no black area, and wants that back. So: use
+    # scale=increase ("cover") — the video is scaled until it
+    # covers the box, then cropped back to the box, centred (pan
+    # moves it). Trade-off, stated plainly: at 1.0x a mismatched
+    # aspect video is cropped on the sides (a 16:9 video in a 1.3:1
+    # box loses ~26% of its width), exactly as it did before the
+    # fit change. That is what "exactly fills, no black area" costs.
+    # Only zoom above 1.0x enlarges it further, as the slider says.
+    # Implementation: if the source size is known, compute the
+    # cover size in Python (max factor, so the box is covered).
+    # If the source size is unknown, fall back to FFmpeg increase
+    # + crop, which gives the same cover behaviour.
     zoom = max(1.0, min(2.0, float(zoom) if zoom else 1.0))
     pan_px = float(pan_x or 0) / 100 * w
     pan_py = float(pan_y or 0) / 100 * h
@@ -363,25 +358,17 @@ def build_process_command(
     fit_is_padded = False
     if src_size:
         sw_src, sh_src = src_size
-        fit_factor = min(w * zoom / sw_src, h * zoom / sh_src)
+        fit_factor = max(w * zoom / sw_src, h * zoom / sh_src)
         fit_w, fit_h = round(sw_src * fit_factor), round(sh_src * fit_factor)
-        if fit_w <= w and fit_h <= h:
-            # Fit, centred, padded with black to the full box size.
-            # Overlay is then the box origin, not the centred fit
-            # position, because the padding already centres it.
-            # The mask crop below is therefore the whole box (w,h
-            # at x,y), not the fit size — alphamerge sizes must match.
-            video_filters = [
-                f"scale={fit_w}:{fit_h}",
-                f"pad={w}:{h}:{(w - fit_w) // 2}:{(h - fit_h) // 2}:black",
-            ]
-            overlay_x, overlay_y = x, y
-            fit_is_padded = True
-        else:
-            # Zoomed past the box: crop back to the box, pan moves it.
-            cx = int(max(0, min(fit_w - w, (fit_w - w) / 2 - pan_px)))
-            cy = int(max(0, min(fit_h - h, (fit_h - h) / 2 - pan_py)))
-            video_filters = [f"scale={fit_w}:{fit_h}", f"crop={w}:{h}:{cx}:{cy}"]
+        # Cover fill: scale until the box is covered, then crop to
+        # the box. At zoom 1.0 this already covers, so no black
+        # area is ever created; at higher zoom it just crops more.
+        # fit_w/fit_h here are the cover size (see fit_factor below).
+        cx = int(max(0, min(fit_w - w, (fit_w - w) / 2 - pan_px)))
+        cy = int(max(0, min(fit_h - h, (fit_h - h) / 2 - pan_py)))
+        video_filters = [f"scale={fit_w}:{fit_h}", f"crop={w}:{h}:{cx}:{cy}"]
+        overlay_x, overlay_y = x, y
+        fit_is_padded = False
     else:
         # Unknown source size (ffprobe failed): fall back to the old
         # cover behaviour so mask sizes still match. This is rare —

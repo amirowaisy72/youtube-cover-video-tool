@@ -125,10 +125,13 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    summary: downloaded size, size after cover/voice/speed/shape,
    and size after compression, plus a Download button and a
    Close button to see the result and edit further.
-   Zoom: 1.0x means the WHOLE video fits inside the green area
-   (fit, centred, no cropping) — the old cover scaling cropped
-   up to 26% of a 16:9 video in a 1.3:1 green box, which looked
-   like a zoom even at 1.0x. Only a real zoom above 1.0x crops.
+   Zoom: 1.0x means the video fills the green area exactly
+   (cover, no black area) — restored at the user's request after
+   the fit change, because fit created black bars and zooming
+   then zoomed only the black bars. Trade-off: a mismatched
+   aspect video is cropped on the sides at 1.0x (a 16:9 video in
+   a 1.3:1 green box loses ~26% of its width). Only a real zoom
+   above 1.0x crops further.
    Buttons: one solid style for all buttons (primary solid blue,
    secondary solid dark navy), no garish gradients, no truncation.
    Buttons now use standard Tailwind button classes (px-6 py-3 /
@@ -146,11 +149,12 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    done (a button display rule used to beat the hidden attribute
    and show it early); `[hidden]` is now forced in CSS and the
    button is re-hidden on every poll until done.
-   Fit leftover is black, not green: when a fit video is smaller
-   than the green box, it is padded with black to the full box
-   size before overlay, so leftover green bars become black —
-   exactly like the live preview — in both manual and Auto mode,
-   with or without the green-shape mask.
+   Cover fill, like before: the fit + black-pad change was
+   reverted, because fit created black bars and zooming zoomed
+   only those bars. The video now covers the green box exactly
+   (live object-fit: cover, final scale=increase + crop), so
+   there is no black area and no green leftover — the video
+   itself fills the box, in both manual and Auto mode.
 
 ### Refresh safety and local storage (no disk waste)
 
