@@ -66,18 +66,32 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
 ## How to use it
 
 1. Paste a YouTube link and press **Download video**.
-   The file is saved to `jobs/<job-id>/source.mp4`.
-2. Upload a cover image (PNG/JPG/WebP) that has a green-screen area,
-   then choose it in the cover list.
-3. In **Admin settings**, set the green rectangle (`x`, `y`, `w`, `h`) —
-   that is the area of the cover where the video will be placed.
-   Measure it once from your cover image (for example, in any image
-   editor that shows pixel coordinates). The defaults are
-   x=0, y=0, w=640, h=360.
-4. Set Flip (left/right only), Speed (0.5x–2x), Voice change + pitch,
-   and Compress on/off, then press **Process video**.
+   The file is saved to `jobs/<job-id>/source.mp4`. A progress bar
+   shows % downloaded, MB downloaded/total, speed, and time left.
+   Downloads are capped at 720p (the video only shows in a small
+   green area, so 1080p/4K only wasted time) with 8 parallel fragments.
+2. Upload a cover image (PNG/JPG/WebP) that has a green-screen area.
+   It uploads automatically when you pick the file, and you can pick
+   any already-uploaded cover from its thumbnail grid.
+3. **Green area is auto-detected** from the cover itself (largest
+   green area, via Pillow) — the video fills exactly that area, not a
+   guessed 0,0 rectangle. If no green area is found, the manual
+   rectangle from the **Admin settings tab** is used instead.
+   The Admin tab is separate from the Tool tab, with a plain-language
+   explanation under every setting.
+4. Watch the **Live preview** below Edit: it updates in realtime as
+   you download, pick a cover, flip, change speed, or zoom.
+   Set Flip (left/right only), Speed (0.5x–2x), **Zoom (1.0x–2.0x)**,
+   Voice change + pitch, and Compress on/off, then press
+   **Process video**. Zoom scales inside the green area and crops
+   back to it, so a zoomed video can never spill outside the green area.
+   A progress bar in the Edit section itself shows % processed,
+   stage (final/preview encode), elapsed time, and estimated time left.
+   The **Timeline** section shows how long each step actually took
+   (download, final encode, preview encode) with file sizes.
    Output: `jobs/<job-id>/final.mp4` and a low-res
-   `jobs/<job-id>/preview.mp4`.
+   `jobs/<job-id>/preview.mp4`. Encoding uses `veryfast` preset and
+   caps the cover at 1280px wide for speed (same CRF/quality).
 5. Watch the **Preview** player. If it looks right, press
    **Download final video**.
 6. For YouTube upload, see below, then choose a channel and upload.
