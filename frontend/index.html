@@ -56,6 +56,20 @@ tailwind.config = {
     <p class="muted mt-2">Uses your selected cover, or newest if none.</p>
   </section>
 
+  <section class="card">
+    <div class="step-head"><span class="step">▦</span><h2>Group Auto — many videos, one task</h2></div>
+    <p class="muted">Paste one link per line, choose a preset and an upload choice for each video, then create the group task. It then works through all videos by itself: makes each video, and uploads the ones you chose.</p>
+    <label class="field-label mt-2">Group name</label>
+    <input id="group-name" type="text" placeholder="Group name, e.g. Group 1" />
+    <label class="field-label mt-3">Video links — one per line</label>
+    <textarea id="group-urls" rows="5" placeholder="https://www.youtube.com/watch?v=...&#10;https://www.youtube.com/watch?v=..."></textarea>
+    <button id="btn-group-build" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0 mt-3" type="button">Build list</button>
+    <div id="group-rows" class="mt-3"></div>
+    <button id="btn-group-start" class="btn-primary mt-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button" hidden>▶ Create group task &amp; start</button>
+    <p id="group-result" class="muted mt-3"></p>
+    <ul id="group-progress-list" class="timeline-list mt-3"></ul>
+  </section>
+
   <div class="manual-wizard-head">
     <h2>Manual mode — step by step</h2>
     <p class="muted">One step at a time.</p>
@@ -122,8 +136,8 @@ tailwind.config = {
     <label class="field-label">Voice pitch: <span id="voice-pitch-value" class="pill">1.05</span></label>
     <input id="voice-pitch" type="range" min="0.9" max="1.2" step="0.01" value="1.05" />
     <label class="field-label mt-4">Zoom (video never leaves the green area): <span id="zoom-value" class="pill">1.0x</span></label>
-    <input id="zoom" type="range" min="1" max="2" step="0.05" value="1" />
-    <p class="muted">1.0x = video fills green area exactly, no black area.</p>
+    <input id="zoom" type="range" min="0.5" max="2" step="0.05" value="1" />
+    <p class="muted">0.5x–2.0x. Below 1.0x the video shrinks inside the box (black around it). In Fit to green screen, 1.0x fills the box exactly, no black area.</p>
     <label class="check"><input id="compress" type="checkbox" checked /> Compress (smaller size, same look)</label>
     <button id="btn-process" class="btn-primary mt-2 w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-lg rounded-xl shadow transition-colors" type="button">▶ Process video</button>
     <div id="process-progress-wrap" class="progress-wrap" hidden>
@@ -230,17 +244,66 @@ tailwind.config = {
   <div id="tab-admin" hidden>
   <section class="card">
     <div class="step-head"><span class="step">⚙</span><h2>Admin settings</h2></div>
-    <p class="muted">Auto mode defaults and Manual mode defaults, separate.</p>
-    <h3 class="mt-3 font-semibold">Auto mode defaults</h3>
+    <p class="muted">Presets save Manual + Auto settings together. Click Manual or Auto to customise that mode only.</p>
+    <fieldset class="fieldset mt-3">
+      <legend>Presets — save a setting, name it, load it, edit it</legend>
+      <p class="muted">Adjust Manual and Auto below, give the combination a name, and press Save preset. To edit a preset: load it, change any setting, then Save preset again with the same name — it overwrites the old one.</p>
+      <div class="flex flex-col sm:flex-row gap-3 mt-3">
+        <select id="preset-select" class="flex-1 min-w-0"></select>
+        <input id="preset-name" type="text" placeholder="Preset name, e.g. Preset 1" class="flex-1 min-w-0" />
+      </div>
+      <div class="flex flex-wrap gap-3 mt-3">
+        <button id="btn-save-preset" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Save preset</button>
+        <button id="btn-load-preset" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Load preset</button>
+        <button id="btn-rename-preset" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Rename preset</button>
+        <button id="btn-delete-preset" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Delete preset</button>
+      </div>
+      <p id="preset-result" class="muted mt-3"></p>
+    </fieldset>
+    <div class="flex flex-wrap gap-3 mt-4">
+      <button id="btn-admin-tab-manual" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Manual</button>
+      <button id="btn-admin-tab-auto" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Auto</button>
+    </div>
+    <div id="admin-manual-section">
+      <h3 class="mt-3 font-semibold">Manual mode defaults</h3>
+      <p class="muted">Manual Edit starts with these. Auto mode ignores them.</p>
+      <div class="grid sm:grid-cols-2 gap-3 mt-3">
+        <label class="field-label">Manual speed
+          <input id="set-manual-speed" type="number" min="0.5" max="2" step="0.1" value="1" />
+        </label>
+        <label class="field-label">Manual voice pitch factor
+          <input id="set-manual-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
+        </label>
+      </div>
+      <label class="check"><input id="set-manual-voice-enabled" type="checkbox" checked /> Manual voice change enabled by default</label>
+      <label class="check"><input id="set-manual-flip" type="checkbox" checked /> Manual flip video by default (left / right)</label>
+      <div class="flex flex-wrap gap-3 mt-2">
+        <label class="check"><input id="set-manual-fit-cover" type="checkbox" checked /> Fit to green screen</label>
+        <label class="check"><input id="set-manual-fit-full" type="checkbox" /> Display full width / height video</label>
+      </div>
+    </div>
+    <div id="admin-auto-section" hidden>
+      <h3 class="mt-3 font-semibold">Auto mode defaults</h3>
+      <p class="muted">Auto mode uses these, with no manual clicks. Manual mode ignores them.</p>
+      <div class="grid sm:grid-cols-2 gap-3 mt-3">
+        <label class="field-label">Default speed
+          <input id="set-speed" type="number" min="0.5" max="2" step="0.1" value="1" />
+          <span class="muted">1 = normal.</span>
+        </label>
+        <label class="field-label">Voice pitch factor
+          <input id="set-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
+          <span class="muted">1.05 = slight change.</span>
+        </label>
+      </div>
+      <label class="check"><input id="set-voice-enabled" type="checkbox" checked /> Voice change enabled by default</label>
+      <label class="check"><input id="set-flip" type="checkbox" checked /> Flip video by default (left / right)</label>
+      <div class="flex flex-wrap gap-3 mt-2">
+        <label class="check"><input id="set-fit-cover" type="checkbox" checked /> Fit to green screen</label>
+        <label class="check"><input id="set-fit-full" type="checkbox" /> Display full width / height video</label>
+      </div>
+    </div>
+    <h3 class="mt-4 font-semibold">Shared — used by both modes</h3>
     <div class="grid sm:grid-cols-2 gap-3 mt-3">
-      <label class="field-label">Default speed
-        <input id="set-speed" type="number" min="0.5" max="2" step="0.1" value="1" />
-        <span class="muted">1 = normal.</span>
-      </label>
-      <label class="field-label">Voice pitch factor
-        <input id="set-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
-        <span class="muted">1.05 = slight change.</span>
-      </label>
       <label class="field-label">Final encoder — size AND quality
         <select id="set-encoder">
           <option value="libx265" selected>HEVC H.265 (recommended — smaller file, same look)</option>
@@ -262,28 +325,6 @@ tailwind.config = {
         </select>
         <span class="muted">Faster = bigger file.</span>
       </label>
-    </div>
-    <label class="check"><input id="set-voice-enabled" type="checkbox" checked /> Voice change enabled by default</label>
-    <label class="check"><input id="set-flip" type="checkbox" checked /> Flip video by default (left / right)</label>
-    <div class="flex flex-wrap gap-3 mt-2">
-      <label class="check"><input id="set-fit-cover" type="checkbox" checked /> Fit to green screen</label>
-      <label class="check"><input id="set-fit-full" type="checkbox" /> Display full width / height video</label>
-    </div>
-    <h3 class="mt-4 font-semibold">Manual mode defaults</h3>
-    <p class="muted">Manual Edit starts with these. Auto mode ignores them.</p>
-    <div class="grid sm:grid-cols-2 gap-3 mt-3">
-      <label class="field-label">Manual speed
-        <input id="set-manual-speed" type="number" min="0.5" max="2" step="0.1" value="1" />
-      </label>
-      <label class="field-label">Manual voice pitch factor
-        <input id="set-manual-pitch" type="number" min="0.9" max="1.2" step="0.01" value="1.05" />
-      </label>
-    </div>
-    <label class="check"><input id="set-manual-voice-enabled" type="checkbox" checked /> Manual voice change enabled by default</label>
-    <label class="check"><input id="set-manual-flip" type="checkbox" checked /> Manual flip video by default (left / right)</label>
-    <div class="flex flex-wrap gap-3 mt-2">
-      <label class="check"><input id="set-manual-fit-cover" type="checkbox" checked /> Fit to green screen</label>
-      <label class="check"><input id="set-manual-fit-full" type="checkbox" /> Display full width / height video</label>
     </div>
     <label class="check"><input id="set-auto-detect" type="checkbox" checked /> Auto-detect green area from the cover (recommended — video lands exactly in the green area)</label>
     <p class="muted">Fallback if no green is found.</p>

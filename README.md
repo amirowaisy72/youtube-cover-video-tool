@@ -225,6 +225,45 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    version, not the original generated one. Regenerate overwrites
    them with a new generated version; "Use original instead"
    fills both Step 4 and the Upload form with the original.
+   Admin tabs + Presets: Admin no longer shows Manual and Auto
+   settings scattered together. Two buttons at the top — Manual
+   and Auto — open only that mode's settings; shared settings
+   (encoder, CRF, preset, green rectangle, auto-detect) stay
+   below both. A Preset is a named snapshot of Manual + Auto +
+   shared settings, saved locally in settings.json (gitignored,
+   never pushed). Give it a name and press Save preset; Load
+   preset applies it at once; to edit it, load it, change any
+   setting, then Save preset again with the same name to
+   overwrite it. Rename and Delete are also in the Presets box.
+   Zoom fix (2026-11-01): in Full mode, corner-drag zoom used to
+   zoom the black bars, not the video, because the bars were
+   inside the zoom-sized video element (object-fit: contain).
+   Now the live element is sized to the video's contain-fit size
+   x zoom, with no bars inside it — bars are empty black box
+   background outside it, so zooming grows the video, shrinks
+   the bars, then removes them. Final FFmpeg uses the same
+   scale -> crop-to-box-or-smaller -> pad-black-to-box, fixing
+   the old crop that failed when only one dimension exceeded
+   the box. Zoom range is now 0.5x–2.0x in live and final:
+   below 1.0x the video shrinks inside the box with black
+   around it, never green. Verified by real encode: Full 1.0
+   bars black, Full 1.5 bars gone (top/bottom red), Full 0.7
+   and Cover 0.5 smaller with black bars, no green anywhere.
+   Group Auto: in the Tool tab, "Group Auto — many videos, one
+   task" takes one YouTube link per line, then Build list gives
+   each video its own Preset dropdown (or Admin defaults) and its
+   own upload choice: Do not upload — save locally, or Upload —
+   Public / Private / Unlisted (unlisted = only people with the
+   link can watch, not in search). Create group task & start
+   then works through the videos one by one by itself: download,
+   apply that video's preset, compress, preview, generate
+   metadata, then either keep the final file locally for later
+   download (skip), or upload it to YouTube with that privacy.
+   A failed video does not stop the rest. Uploaded videos have
+   their working files deleted; skipped or failed-upload videos
+   keep their final file and a download link in the group list.
+   Upload still needs Google sign-in (see YouTube channels in
+   Admin); without it, upload items fail but stay downloadable.
 
 ### Refresh safety and local storage (no disk waste)
 

@@ -55,10 +55,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 JOBS_DIR = BASE_DIR / "jobs"
 COVERS_DIR = BASE_DIR / "covers"
+GROUPS_DIR = BASE_DIR / "groups"
 SETTINGS_FILE = BASE_DIR / "backend" / "settings.json"
 
 JOBS_DIR.mkdir(exist_ok=True)
 COVERS_DIR.mkdir(exist_ok=True)
+GROUPS_DIR.mkdir(exist_ok=True)
 
 DEFAULT_SETTINGS = {
     "default_speed": 1.0,
@@ -69,6 +71,7 @@ DEFAULT_SETTINGS = {
     "manual_voice_enabled": True,
     "manual_voice_pitch_factor": 1.05,
     "manual_fit_mode": "cover",
+    "profiles": {},
     "youtube_channels": [],
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
@@ -114,6 +117,8 @@ def load_settings() -> dict:
                 saved["default_flip"] = True
             if "fit_mode" not in saved:
                 saved["fit_mode"] = "cover"
+            if "profiles" not in saved or not isinstance(saved.get("profiles"), dict):
+                saved["profiles"] = {}
             for k, v in [("manual_speed", 1.0), ("manual_flip", True),
                          ("manual_voice_enabled", True),
                          ("manual_voice_pitch_factor", 1.05),
@@ -411,7 +416,7 @@ class AutoRequest(BaseModel):
     cover_id: str | None = None
 
 
-def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
+def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: dict | None = None) -> None:
     """Auto mode: download -> apply admin defaults -> compress -> preview.
 
     The user only gives a download link. Everything else comes from
@@ -473,8 +478,15 @@ def _run_auto(job_id: str, url: str, cover_id: str | None) -> None:
     downloaded_mb = source.stat().st_size / 1024 / 1024
     timeline.append({"step": "YouTube download", "duration_sec": round(_time.time() - dl_start, 1),
                      "detail": f"{downloaded_mb:.1f} MB"})
-    # --- Cover + admin defaults
+    # --- Cover + admin defaults (or a preset's Auto + shared settings,
+    # when this job is part of a group task with a preset per video)
     settings = load_settings()
+    if settings_override:
+        for k in ("default_speed", "default_flip", "fit_mode", "voice_enabled",
+                  "voice_pitch_factor", "encoder", "crf", "preset",
+                  "green_rect", "auto_detect_green"):
+            if k in settings_override:
+                settings[k] = settings_override[k]
     cover = None
     if cover_id:
         matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
@@ -600,6 +612,170 @@ def auto_video(payload: AutoRequest) -> dict:
 def get_job(job_id: str) -> dict:
     """Download progress for the frontend progress bar."""
     return read_job(job_id)
+
+
+# ----------------------------------------------------------------- group auto
+class GroupItemRequest(BaseModel):
+    url: str = Field(..., min_length=8)
+    preset_name: str | None = None
+    cover_id: str | None = None
+    upload: str = "skip"  # skip | public | private | unlisted
+
+
+class GroupRequest(BaseModel):
+    name: str = "Group 1"
+    items: list[GroupItemRequest] = Field(..., min_length=1)
+
+
+def _read_group(group_id: str) -> dict | None:
+    path = GROUPS_DIR / f"{group_id}.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+
+
+def _write_group(group: dict) -> None:
+    (GROUPS_DIR / f"{group['id']}.json").write_text(
+        json.dumps(group, indent=2), encoding="utf-8")
+
+
+def _run_group(group_id: str) -> None:
+    """Run a group task sequentially, one video at a time.
+
+    Each video: download -> apply its preset (or Admin Auto defaults)
+    -> compress -> preview -> generate metadata -> then either save
+    locally (upload=skip, final file stays for later download) or
+    upload to YouTube with its chosen privacy (public / private /
+    unlisted). A failed video does not stop the rest of the group.
+    Uploaded videos have their working files deleted, like a normal
+    upload; skipped / failed-upload videos keep their final file.
+    """
+    group = _read_group(group_id)
+    if not group:
+        return
+    group["status"] = "running"
+    _write_group(group)
+    settings = load_settings()
+    profiles = settings.get("profiles") or {}
+    for idx, item in enumerate(group["items"]):
+        group["current_index"] = idx
+        item["status"] = "processing"
+        _write_group(group)
+        job_id = uuid.uuid4().hex[:12]
+        item["job_id"] = job_id
+        _write_group(group)
+        # Create the job record first, so _run_auto can update it.
+        job_dir(job_id)
+        write_job({"id": job_id, "status": "downloading", "url": item["url"]})
+        preset = None
+        if item.get("preset_name") and item["preset_name"] in profiles:
+            preset = profiles[item["preset_name"]]
+        try:
+            _run_auto(job_id, item["url"], item.get("cover_id"), settings_override=preset)
+        except Exception as exc:  # noqa: BLE001
+            item["status"] = "failed"
+            item["error"] = str(exc)[-1000:]
+            _write_group(group)
+            continue
+        job = read_job(job_id)
+        if job.get("status") != "processed":
+            item["status"] = "failed"
+            item["error"] = (job.get("error") or "Processing failed.")[-1000:]
+            _write_group(group)
+            continue
+        # Generated metadata, like Auto done in the frontend.
+        try:
+            gen = local_metadata.generate_metadata(
+                job.get("original_title", ""), job.get("original_description", ""),
+                job.get("original_tags") or [], variant=0)
+            job.update(gen)
+            write_job(job)
+            item["title"] = gen.get("generated_title") or job.get("original_title") or item["url"]
+        except Exception:
+            item["title"] = job.get("original_title") or item["url"]
+        upload = item.get("upload") or "skip"
+        if upload == "skip":
+            item["status"] = "done_local"
+            item["download_url"] = f"/api/download/{job_id}"
+            _write_group(group)
+            continue
+        # Upload with the chosen privacy: public, private, or unlisted
+        # (unlisted = only people with the link can watch, not in search).
+        if upload not in ("public", "private", "unlisted"):
+            upload = "private"
+        try:
+            final_path = job_dir(job_id) / "final.mp4"
+            result = youtube_upload.upload_video(
+                final_path,
+                title=job.get("generated_title") or job.get("original_title") or "Video",
+                description=job.get("generated_description") or "",
+                tags=", ".join(job.get("generated_tags") or []),
+                privacy_status=upload,
+            )
+            item["status"] = "uploaded"
+            item["youtube_video_id"] = result.get("video_id")
+            item["youtube_url"] = f"https://www.youtube.com/watch?v={result.get('video_id')}" if result.get("video_id") else ""
+            _write_group(group)
+            shutil.rmtree(job_dir(job_id), ignore_errors=True)
+        except Exception as exc:  # noqa: BLE001
+            item["status"] = "failed_upload"
+            item["error"] = str(exc)[-1000:]
+            item["download_url"] = f"/api/download/{job_id}"
+            _write_group(group)
+            continue
+    group["status"] = "done"
+    group["current_index"] = None
+    _write_group(group)
+
+
+@app.post("/api/groups")
+def create_group(payload: GroupRequest) -> dict:
+    if not yt_dlp_available():
+        raise HTTPException(400, "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.")
+    group_id = uuid.uuid4().hex[:12]
+    group = {
+        "id": group_id,
+        "name": payload.name or "Group 1",
+        "status": "running",
+        "current_index": 0,
+        "items": [
+            {"url": it.url, "preset_name": it.preset_name, "cover_id": it.cover_id,
+             "upload": it.upload or "skip", "status": "waiting", "job_id": None}
+            for it in payload.items
+        ],
+    }
+    _write_group(group)
+    threading.Thread(target=_run_group, args=(group_id,), daemon=True).start()
+    return group
+
+
+@app.get("/api/groups")
+def list_groups() -> dict:
+    groups = []
+    for path in sorted(GROUPS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        g = _read_group(path.stem)
+        if g:
+            groups.append({"id": g["id"], "name": g["name"], "status": g["status"],
+                           "total": len(g["items"]),
+                           "done": sum(1 for it in g["items"] if it["status"] in ("done_local", "uploaded", "failed", "failed_upload"))})
+    return {"groups": groups}
+
+
+@app.get("/api/groups/{group_id}")
+def get_group(group_id: str) -> dict:
+    group = _read_group(group_id)
+    if not group:
+        raise HTTPException(404, "Group not found.")
+    # Attach live progress for the currently processing item.
+    for item in group["items"]:
+        if item.get("job_id") and item["status"] == "processing":
+            job = read_job(item["job_id"])
+            item["progress"] = job.get("auto_progress") or job.get("process_progress") or 0
+            item["stage"] = job.get("auto_stage") or job.get("process_stage") or ""
+    return group
 
 
 class GenerateMetadataRequest(BaseModel):

@@ -45,14 +45,16 @@ function getZoom() { return parseFloat(document.getElementById("zoom").value) ||
 
 function clampPan() {
   const zoom = getZoom();
+  if (zoom <= 1.01) { panX = 0; panY = 0; return; }
   const max = (zoom - 1) / 2 * 100;
   panX = Math.max(-max, Math.min(max, panX));
   panY = Math.max(-max, Math.min(max, panY));
-  if (zoom <= 1.01) { panX = 0; panY = 0; }
 }
 
 function setZoomValue(z) {
-  z = Math.max(1, Math.min(2, z));
+  // Zoom now goes BELOW 1.0x too (0.5x–2.0x): sometimes the video
+  // needs to shrink inside the green box, not only grow.
+  z = Math.max(0.5, Math.min(2, z));
   document.getElementById("zoom").value = z;
   document.getElementById("zoom-value").textContent = z.toFixed(2).replace(/0$/, "") + "x";
   document.getElementById("live-zoom-value").textContent = document.getElementById("zoom-value").textContent;
@@ -93,17 +95,49 @@ function applyLiveVideoLayout() {
     greenBox.style.maskImage = "";
     greenBox.style.webkitMaskImage = "";
   }
-  // Video is sized at zoom x the box and offset by pan, inside an
-  // overflow-hidden box. object-fit follows fitMode EXACTLY like
-  // the final FFmpeg encode: cover = scale=increase + crop (fills
-  // box, no black area), full = scale=decrease + black pad (whole
-  // video, no crop, leftover is black). Live and final match.
-  video.style.objectFit = fitMode === "full" ? "contain" : "cover";
+  // Green box background is black, so any empty area inside the
+  // box is black, never green — in live and in the final video.
+  greenBox.style.background = "#000";
+  // FIX (user, 2026-11-01): in Full mode, dragging a corner used to
+  // zoom the BLACK BARS, not the video. Root cause: the video
+  // element was zoom-sized with object-fit: contain, so the bars
+  // were INSIDE the element and scaled with it. Fix: size the
+  // element to the video's contain-fit size x zoom, with
+  // object-fit: fill, so the element IS the video — no bars inside
+  // it. Bars are now just empty black box background outside the
+  // element, so zooming shrinks them and finally removes them,
+  // exactly like the final FFmpeg scale + pad / crop. Cover mode
+  // at zoom >= 1 keeps its proven cover behaviour; cover at
+  // zoom < 1 uses the same fit-size logic, so the video shrinks
+  // with black around it instead of revealing green.
   video.style.position = liveCover ? "absolute" : "";
-  video.style.width = (zoom * 100) + "%";
-  video.style.height = (zoom * 100) + "%";
-  video.style.left = (-(zoom - 1) / 2 * 100 + panX) + "%";
-  video.style.top = (-(zoom - 1) / 2 * 100 + panY) + "%";
+  if (fitMode === "full" || zoom < 1) {
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+    const boxAspect = greenRect.w / Math.max(1, greenRect.h);
+    const vidAspect = vw / Math.max(1, vh);
+    let fitW, fitH;
+    if (fitMode === "full") {
+      if (vidAspect >= boxAspect) { fitW = 100; fitH = 100 * boxAspect / vidAspect; }
+      else { fitH = 100; fitW = 100 * vidAspect / boxAspect; }
+    } else {
+      if (vidAspect >= boxAspect) { fitH = 100; fitW = 100 * vidAspect / boxAspect; }
+      else { fitW = 100; fitH = 100 * boxAspect / vidAspect; }
+    }
+    const wPct = fitW * zoom;
+    const hPct = fitH * zoom;
+    video.style.objectFit = "fill";
+    video.style.width = wPct + "%";
+    video.style.height = hPct + "%";
+    video.style.left = ((100 - wPct) / 2 + panX) + "%";
+    video.style.top = ((100 - hPct) / 2 + panY) + "%";
+  } else {
+    video.style.objectFit = "cover";
+    video.style.width = (zoom * 100) + "%";
+    video.style.height = (zoom * 100) + "%";
+    video.style.left = (-(zoom - 1) / 2 * 100 + panX) + "%";
+    video.style.top = (-(zoom - 1) / 2 * 100 + panY) + "%";
+  }
   video.style.transform = flip ? "scaleX(-1)" : "none";
   video.style.display = (!jobId || liveVideoHidden) ? "none" : "block";
   greenBox.classList.toggle("selected", liveSelected && !!liveCover && !!jobId);
@@ -451,6 +485,9 @@ async function loadSettings() {
   greenRect = s.green_rect || greenRect;
   adminChannels = Array.isArray(s.youtube_channels) ? s.youtube_channels : [];
   renderAdminChannels();
+  adminPresets = (s.profiles && typeof s.profiles === "object") ? s.profiles : {};
+  renderPresets();
+  showAdminTab("manual");
   updateLivePreview();
 }
 
@@ -879,6 +916,7 @@ document.getElementById("btn-live-hide").addEventListener("click", () => {
   liveVideoHidden = !liveVideoHidden;
   applyLiveVideoLayout();
 });
+document.getElementById("live-video").addEventListener("loadedmetadata", updateLivePreview);
 document.getElementById("btn-live-zoom-in").addEventListener("click", () => setZoomValue(getZoom() + 0.1));
 document.getElementById("btn-live-zoom-out").addEventListener("click", () => setZoomValue(getZoom() - 0.1));
 
@@ -1005,6 +1043,93 @@ document.getElementById("btn-process").addEventListener("click", async () => {
 
 // Same Process action, from below the Live preview video, so the
 // user does not have to scroll back up after checking the preview.
+// Group Auto: build rows from links, one preset + upload choice each.
+let groupRows = [];
+let groupTimer = null;
+async function getPresetNames() {
+  try {
+    const s = await api("/api/settings");
+    return Object.keys(s.profiles || {});
+  } catch { return []; }
+}
+document.getElementById("btn-group-build").addEventListener("click", async () => {
+  const urls = document.getElementById("group-urls").value.split("\n").map((u) => u.trim()).filter(Boolean);
+  if (!urls.length) { document.getElementById("group-result").textContent = "Paste at least one link first."; return; }
+  const presets = await getPresetNames();
+  groupRows = urls.map((url) => ({ url, preset_name: "", upload: "skip" }));
+  const wrap = document.getElementById("group-rows");
+  wrap.innerHTML = "";
+  urls.forEach((url, i) => {
+    const row = document.createElement("div");
+    row.className = "flex flex-col sm:flex-row gap-3 mt-2";
+    const label = document.createElement("span");
+    label.className = "muted flex-1 min-w-0";
+    label.textContent = `${i + 1}. ${url}`;
+    label.title = url;
+    const presetSel = document.createElement("select");
+    presetSel.innerHTML = '<option value="">Admin defaults</option>' + presets.map((p) => `<option value="${p}">${p}</option>`).join("");
+    presetSel.addEventListener("change", () => { groupRows[i].preset_name = presetSel.value || null; });
+    const uploadSel = document.createElement("select");
+    uploadSel.innerHTML = '<option value="skip">Do not upload — save locally</option><option value="public">Upload — Public</option><option value="private">Upload — Private</option><option value="unlisted">Upload — Unlisted (link only, not in search)</option>';
+    uploadSel.addEventListener("change", () => { groupRows[i].upload = uploadSel.value; });
+    row.append(label, presetSel, uploadSel);
+    wrap.appendChild(row);
+  });
+  document.getElementById("btn-group-start").hidden = false;
+  document.getElementById("group-result").textContent = `${urls.length} video(s) ready. Choose a preset and upload choice for each, then start.`;
+});
+document.getElementById("btn-group-start").addEventListener("click", async () => {
+  if (!groupRows.length) return;
+  try {
+    const group = await api("/api/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: document.getElementById("group-name").value.trim() || "Group 1",
+        items: groupRows.map((r) => ({
+          url: r.url,
+          preset_name: r.preset_name || null,
+          cover_id: selectedCoverId || null,
+          upload: r.upload || "skip",
+        })),
+      }),
+    });
+    document.getElementById("group-result").textContent = `Group "${group.name}" started. It will work through all videos by itself.`;
+    if (groupTimer) clearInterval(groupTimer);
+    groupTimer = setInterval(async () => {
+      try {
+        const g = await api("/api/groups/" + group.id);
+        const list = document.getElementById("group-progress-list");
+        list.innerHTML = "";
+        g.items.forEach((it, i) => {
+          const li = document.createElement("li");
+          let text = `${i + 1}. ${it.title || it.url} — ${it.status}`;
+          if (it.status === "processing") text += ` ${it.progress || 0}% ${it.stage || ""}`;
+          if (it.error) text += ` — ${it.error}`;
+          li.textContent = text;
+          if (it.download_url) {
+            const a = document.createElement("a");
+            a.href = it.download_url; a.textContent = " Download final video";
+            li.appendChild(a);
+          }
+          if (it.youtube_url) {
+            const a = document.createElement("a");
+            a.href = it.youtube_url; a.target = "_blank"; a.textContent = " Watch on YouTube";
+            li.appendChild(a);
+          }
+          list.appendChild(li);
+        });
+        if (g.status === "done") {
+          clearInterval(groupTimer);
+          document.getElementById("group-result").textContent = `Group "${g.name}" done.`;
+        }
+      } catch (err) { clearInterval(groupTimer); }
+    }, 2000);
+  } catch (err) {
+    document.getElementById("group-result").textContent = "Group start failed: " + err.message;
+  }
+});
+
 document.getElementById("btn-process-below-preview").addEventListener("click", () => {
   document.getElementById("btn-process").click();
 });
@@ -1065,6 +1190,160 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
     document.getElementById("yt-result").textContent = "";
     setStatus("YouTube upload failed: " + err.message);
   }
+});
+
+// Admin tabs: Manual or Auto, never both scattered at once.
+function showAdminTab(tab) {
+  const manual = tab === "manual";
+  document.getElementById("admin-manual-section").hidden = !manual;
+  document.getElementById("admin-auto-section").hidden = manual;
+  const btnM = document.getElementById("btn-admin-tab-manual");
+  const btnA = document.getElementById("btn-admin-tab-auto");
+  const primary = "btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0";
+  const secondary = "btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0";
+  btnM.className = manual ? primary : secondary;
+  btnA.className = manual ? secondary : primary;
+}
+document.getElementById("btn-admin-tab-manual").addEventListener("click", () => showAdminTab("manual"));
+document.getElementById("btn-admin-tab-auto").addEventListener("click", () => showAdminTab("auto"));
+
+// Presets: a named snapshot of Manual + Auto + shared settings.
+// Save = create or overwrite with that name (that is how you edit a
+// preset: load it, change settings, Save again with the same name).
+let adminPresets = {};
+function readAdminSettings() {
+  return {
+    default_speed: parseFloat(document.getElementById("set-speed").value),
+    default_flip: document.getElementById("set-flip").checked,
+    fit_mode: document.getElementById("set-fit-cover").checked ? "cover" : "full",
+    manual_speed: parseFloat(document.getElementById("set-manual-speed").value),
+    manual_flip: document.getElementById("set-manual-flip").checked,
+    manual_voice_enabled: document.getElementById("set-manual-voice-enabled").checked,
+    manual_voice_pitch_factor: parseFloat(document.getElementById("set-manual-pitch").value),
+    manual_fit_mode: document.getElementById("set-manual-fit-cover").checked ? "cover" : "full",
+    voice_enabled: document.getElementById("set-voice-enabled").checked,
+    voice_pitch_factor: parseFloat(document.getElementById("set-pitch").value),
+    crf: parseInt(document.getElementById("set-crf").value, 10),
+    preset: document.getElementById("set-preset").value,
+    encoder: document.getElementById("set-encoder").value,
+    auto_detect_green: document.getElementById("set-auto-detect").checked,
+    green_rect: {
+      x: parseInt(document.getElementById("set-green-x").value, 10),
+      y: parseInt(document.getElementById("set-green-y").value, 10),
+      w: parseInt(document.getElementById("set-green-w").value, 10),
+      h: parseInt(document.getElementById("set-green-h").value, 10),
+    },
+  };
+}
+function applyAdminSettings(s) {
+  document.getElementById("set-speed").value = s.default_speed;
+  document.getElementById("set-pitch").value = s.voice_pitch_factor;
+  document.getElementById("set-voice-enabled").checked = !!s.voice_enabled;
+  document.getElementById("set-flip").checked = s.default_flip !== false;
+  document.getElementById("set-fit-cover").checked = (s.fit_mode || "cover") === "cover";
+  document.getElementById("set-fit-full").checked = (s.fit_mode || "cover") === "full";
+  document.getElementById("set-manual-speed").value = s.manual_speed !== undefined ? s.manual_speed : s.default_speed;
+  document.getElementById("set-manual-pitch").value = s.manual_voice_pitch_factor !== undefined ? s.manual_voice_pitch_factor : s.voice_pitch_factor;
+  document.getElementById("set-manual-voice-enabled").checked = s.manual_voice_enabled !== undefined ? !!s.manual_voice_enabled : !!s.voice_enabled;
+  document.getElementById("set-manual-flip").checked = s.manual_flip !== undefined ? !!s.manual_flip : (s.default_flip !== false);
+  document.getElementById("set-manual-fit-cover").checked = (s.manual_fit_mode || "cover") === "cover";
+  document.getElementById("set-manual-fit-full").checked = (s.manual_fit_mode || "cover") === "full";
+  document.getElementById("set-crf").value = s.crf;
+  document.getElementById("set-preset").value = s.preset;
+  if (document.getElementById("set-encoder")) document.getElementById("set-encoder").value = s.encoder || "libx265";
+  document.getElementById("set-auto-detect").checked = s.auto_detect_green !== false;
+  if (s.green_rect) {
+    document.getElementById("set-green-x").value = s.green_rect.x;
+    document.getElementById("set-green-y").value = s.green_rect.y;
+    document.getElementById("set-green-w").value = s.green_rect.w;
+    document.getElementById("set-green-h").value = s.green_rect.h;
+    greenRect = s.green_rect;
+  }
+  autoDetectGreen = s.auto_detect_green !== false;
+  // Manual Edit follows Manual defaults, as after Save admin settings.
+  flip = document.getElementById("set-manual-flip").checked;
+  document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
+  document.getElementById("speed").value = document.getElementById("set-manual-speed").value;
+  document.getElementById("speed-value").textContent = document.getElementById("set-manual-speed").value + "x";
+  document.getElementById("voice-enabled").checked = document.getElementById("set-manual-voice-enabled").checked;
+  document.getElementById("voice-pitch").value = document.getElementById("set-manual-pitch").value;
+  document.getElementById("voice-pitch-value").textContent = document.getElementById("set-manual-pitch").value;
+  setFitMode(document.getElementById("set-manual-fit-cover").checked ? "cover" : "full");
+  updateLivePreview();
+}
+function renderPresets() {
+  const select = document.getElementById("preset-select");
+  select.innerHTML = "";
+  const names = Object.keys(adminPresets);
+  if (!names.length) {
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = "-- no presets yet --";
+    select.appendChild(opt);
+    if (!document.getElementById("preset-name").value) document.getElementById("preset-name").value = "Preset 1";
+    return;
+  }
+  for (const name of names) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    select.appendChild(opt);
+  }
+}
+async function savePresetsToBackend() {
+  await api("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...readAdminSettings(), profiles: adminPresets }),
+  });
+}
+document.getElementById("btn-save-preset").addEventListener("click", async () => {
+  const name = document.getElementById("preset-name").value.trim();
+  if (!name) { document.getElementById("preset-result").textContent = "Enter a preset name first."; return; }
+  const existed = !!adminPresets[name];
+  adminPresets[name] = readAdminSettings();
+  try {
+    await savePresetsToBackend();
+    renderPresets();
+    document.getElementById("preset-select").value = name;
+    document.getElementById("preset-result").textContent = existed ? `Preset "${name}" updated.` : `Preset "${name}" saved.`;
+  } catch (err) { document.getElementById("preset-result").textContent = "Save preset failed: " + err.message; }
+});
+document.getElementById("btn-load-preset").addEventListener("click", async () => {
+  const name = document.getElementById("preset-select").value;
+  if (!name || !adminPresets[name]) { document.getElementById("preset-result").textContent = "Choose a preset first."; return; }
+  document.getElementById("preset-name").value = name;
+  applyAdminSettings(adminPresets[name]);
+  try {
+    await savePresetsToBackend();
+    document.getElementById("preset-result").textContent = `Preset "${name}" loaded and applied.`;
+  } catch (err) { document.getElementById("preset-result").textContent = "Load preset failed: " + err.message; }
+});
+document.getElementById("btn-rename-preset").addEventListener("click", async () => {
+  const oldName = document.getElementById("preset-select").value;
+  const newName = document.getElementById("preset-name").value.trim();
+  if (!oldName || !adminPresets[oldName]) { document.getElementById("preset-result").textContent = "Choose a preset first."; return; }
+  if (!newName || newName === oldName) { document.getElementById("preset-result").textContent = "Enter a new name to rename."; return; }
+  adminPresets[newName] = adminPresets[oldName];
+  delete adminPresets[oldName];
+  try {
+    await savePresetsToBackend();
+    renderPresets();
+    document.getElementById("preset-select").value = newName;
+    document.getElementById("preset-result").textContent = `Preset renamed to "${newName}".`;
+  } catch (err) { document.getElementById("preset-result").textContent = "Rename failed: " + err.message; }
+});
+document.getElementById("btn-delete-preset").addEventListener("click", async () => {
+  const name = document.getElementById("preset-select").value;
+  if (!name || !adminPresets[name]) { document.getElementById("preset-result").textContent = "Choose a preset first."; return; }
+  if (!confirm(`Delete preset "${name}"?`)) return;
+  delete adminPresets[name];
+  try {
+    await savePresetsToBackend();
+    renderPresets();
+    document.getElementById("preset-result").textContent = `Preset "${name}" deleted.`;
+  } catch (err) { document.getElementById("preset-result").textContent = "Delete failed: " + err.message; }
+});
+document.getElementById("preset-select").addEventListener("change", (e) => {
+  if (e.target.value) document.getElementById("preset-name").value = e.target.value;
 });
 
 document.getElementById("btn-save-settings").addEventListener("click", async () => {
