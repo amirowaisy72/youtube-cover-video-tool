@@ -62,7 +62,26 @@ function setZoomValue(z) {
   updateLivePreview();
 }
 
+// Stale-final warning (user, 2026-11-01): live and final looked
+// different because live settings can change AFTER a process, and
+// the old final preview stays on screen with no warning. The
+// encode itself matches live (verified with stripe markers for
+// cover/full, zoom 1.0–2.0, pan 0–17.5%, and a circular mask).
+// So track the settings the last successful process used; if live
+// changes afterwards, show a clear warning until Process is
+// pressed again — that press is what makes final match live.
+let lastProcessedKey = null;
+function currentLiveKey() {
+  return [getZoom(), panX.toFixed(1), panY.toFixed(1), fitMode, flip,
+          document.getElementById("speed").value].join("|");
+}
+function updateStaleWarning() {
+  const el = document.getElementById("live-stale-warning");
+  if (!el) return;
+  el.hidden = !(lastProcessedKey && lastProcessedKey !== currentLiveKey());
+}
 function applyLiveVideoLayout() {
+  updateStaleWarning();
   saveState();
   const video = document.getElementById("live-video");
   const greenBox = document.getElementById("live-green-box");
@@ -247,6 +266,7 @@ function saveState() {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({
       jobId, selectedCoverId, flip, fitMode, panX, panY, downloadReady,
+      mode: currentMode,
       url: document.getElementById("yt-url").value,
       speed: document.getElementById("speed").value,
       voiceEnabled: document.getElementById("voice-enabled").checked,
@@ -340,7 +360,7 @@ function renderTimeline(job) {
   list.innerHTML = "";
   for (const t of entries) {
     const li = document.createElement("li");
-    li.innerHTML = `<strong>${t.step}</strong> — ${t.duration_sec}s<br><span class="muted">${t.detail || ""}</span>`;
+    li.innerHTML = `<strong>${t.step}</strong> — ${fmtDuration(t.duration_sec)}<br><span class="muted">${t.detail || ""}</span>`;
     list.appendChild(li);
   }
 }
@@ -421,7 +441,7 @@ async function loadCovers(autoSelectId) {
     del.setAttribute("aria-label", "Delete cover " + (cover.display_name || cover.filename));
     del.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm(`Delete cover "${cover.display_name || cover.filename}"? This cannot be undone.`)) return;
+      if (!(await showConfirm("Delete cover?", `Delete "${cover.display_name || cover.filename}"? This cannot be undone.`))) return;
       try {
         await api("/api/covers/" + cover.id, { method: "DELETE" });
         if (selectedCoverId === cover.id) selectedCoverId = "";
@@ -486,7 +506,12 @@ async function loadSettings() {
   adminChannels = Array.isArray(s.youtube_channels) ? s.youtube_channels : [];
   renderAdminChannels();
   adminPresets = (s.profiles && typeof s.profiles === "object") ? s.profiles : {};
-  renderPresets();
+  activePresetName = s.active_preset || "";
+  // Manual Edit (and Auto, via the backend) use the Active preset,
+  // or the first preset if none is marked Active — not a separate
+  // global default. Apply it here so Tool starts with the right values.
+  if (getActivePresetName()) applyAdminSettings(adminPresets[getActivePresetName()]);
+  renderPresetList();
   showAdminTab("manual");
   updateLivePreview();
 }
@@ -598,9 +623,22 @@ function fmtSpeed(bytesPerSec) {
   if (!bytesPerSec) return "";
   return " • " + (bytesPerSec / 1024 / 1024).toFixed(2) + " MB/s";
 }
+// Time is NEVER shown as seconds-only (user, 2026-11-01):
+// 73 seconds is wrong, "1 minute 13 seconds" is correct.
+// Used for timeline durations, download ETA, process elapsed/ETA.
+function fmtDuration(seconds) {
+  if (seconds === null || seconds === undefined || isNaN(seconds)) return "";
+  const s = Math.round(seconds);
+  if (s < 60) return s + (s === 1 ? " second" : " seconds");
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  const minPart = m + (m === 1 ? " minute" : " minutes");
+  if (r === 0) return minPart;
+  return minPart + " " + r + (r === 1 ? " second" : " seconds");
+}
 function fmtEta(seconds) {
   if (!seconds && seconds !== 0) return "";
-  return " • " + Math.round(seconds) + "s left";
+  return " • " + fmtDuration(seconds) + " left";
 }
 
 function startDownloadPolling(id) {
@@ -626,6 +664,7 @@ function startDownloadPolling(id) {
         clearInterval(downloadTimer);
         bar.style.width = "100%";
         text.textContent = "Downloaded 100%.";
+        lastProcessedKey = null;
         downloadReady = true;
         updateLivePreview();
         document.getElementById("job-info").textContent = "Job: " + id + " — downloaded.";
@@ -773,6 +812,7 @@ function closeAutoPopup() {
 document.getElementById("btn-auto-close").addEventListener("click", closeAutoPopup);
 document.getElementById("btn-auto-goto-final").addEventListener("click", () => {
   closeAutoPopup();
+  showMode("manual");
   showManualStep(4);
   const player = document.getElementById("preview-player");
   if (player) player.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -803,7 +843,7 @@ document.getElementById("btn-auto").addEventListener("click", async () => {
         (job.timeline || []).forEach((t) => {
           const div = document.createElement("div");
           div.className = "auto-step";
-          div.textContent = `✓ ${t.step} — ${t.duration_sec}s — ${t.detail || ""}`;
+          div.textContent = `✓ ${t.step} — ${fmtDuration(t.duration_sec)} — ${t.detail || ""}`;
           tl.appendChild(div);
         });
         // Until the job is actually done, the Download button must
@@ -873,7 +913,7 @@ async function uploadSelectedCover() {
 document.getElementById("btn-delete-selected-cover").addEventListener("click", async () => {
   if (!selectedCoverId) return;
   const name = document.getElementById("cover-selected-name").textContent;
-  if (!confirm(`Delete the selected cover? This cannot be undone.`)) return;
+  if (!(await showConfirm("Delete cover?", "Delete the selected cover? This cannot be undone."))) return;
   try {
     await api("/api/covers/" + selectedCoverId, { method: "DELETE" });
     selectedCoverId = "";
@@ -953,13 +993,11 @@ function showProcessLock() {
   document.getElementById("process-overlay").hidden = false;
   document.getElementById("process-overlay-bar").style.width = "0%";
   document.getElementById("process-overlay-text").textContent = "Processing… 0%";
-  document.getElementById("btn-process").disabled = true;
   document.getElementById("btn-process-below-preview").disabled = true;
 }
 function hideProcessLock() {
   document.body.classList.remove("processing-open");
   document.getElementById("process-overlay").hidden = true;
-  document.getElementById("btn-process").disabled = false;
   document.getElementById("btn-process-below-preview").disabled = false;
 }
 function startProcessPolling(id, previewUrl) {
@@ -979,8 +1017,8 @@ function startProcessPolling(id, previewUrl) {
       const pct = job.process_progress || 0;
       bar.style.width = pct + "%";
       overlayBar.style.width = pct + "%";
-      const elapsed = job.process_elapsed ? ` • ${Math.round(job.process_elapsed)}s elapsed` : "";
-      const eta = job.process_eta ? ` • about ${Math.round(job.process_eta)}s left` : "";
+      const elapsed = job.process_elapsed ? ` • ${fmtDuration(job.process_elapsed)} elapsed` : "";
+      const eta = job.process_eta ? ` • about ${fmtDuration(job.process_eta)} left` : "";
       text.textContent = `${job.process_stage || "Processing…"} ${pct}%${elapsed}${eta}`;
       overlayText.textContent = text.textContent;
       overlayLog.textContent = document.getElementById("process-log").textContent;
@@ -990,6 +1028,8 @@ function startProcessPolling(id, previewUrl) {
         overlayBar.style.width = "100%";
         text.textContent = "Done 100% — preview ready.";
         overlayText.textContent = "Done 100% — preview ready.";
+        lastProcessedKey = currentLiveKey();
+        updateStaleWarning();
         hideProcessLock();
         const player = document.getElementById("preview-player");
         player.src = previewUrl + "?t=" + Date.now();
@@ -1009,7 +1049,7 @@ function startProcessPolling(id, previewUrl) {
   }, 1000);
 }
 
-document.getElementById("btn-process").addEventListener("click", async () => {
+document.getElementById("btn-process-below-preview").addEventListener("click", async () => {
   if (!jobId) { setStatus("Download a video first."); return; }
   if (!downloadReady) { setStatus("Wait — the video is still downloading. Check the progress bar above."); return; }
   const coverId = selectedCoverId || document.getElementById("cover-select").value;
@@ -1043,6 +1083,240 @@ document.getElementById("btn-process").addEventListener("click", async () => {
 
 // Same Process action, from below the Live preview video, so the
 // user does not have to scroll back up after checking the preview.
+// Group Auto upload gating (user, 2026-11-01): upload options
+// must NOT show as if they work when no YouTube channel is
+// configured and Google sign-in is not complete. "Configured
+// channels" alone do NOT enable upload — only a real connection
+// (Client ID/Secret + token + library + at least one channel)
+// does. When not ready, Group shows a clear OFF warning and
+// only offers "save locally"; upload choices appear only when
+// the status check says uploading actually works.
+let groupUploadReady = false;
+async function refreshGroupYoutubeStatus() {
+  const warn = document.getElementById("group-yt-warning");
+  try {
+    const s = await api("/api/youtube/status");
+    groupUploadReady = !!(s.connected && s.channels && s.channels.length);
+    if (warn) {
+      if (groupUploadReady) {
+        warn.hidden = true;
+        warn.textContent = "";
+      } else {
+        warn.hidden = false;
+        let detail;
+        if (!s.channels || !s.channels.length) {
+          detail = "You have not added any YouTube channel yet.";
+        } else if (!s.connected) {
+          detail = `You have added ${s.channels.length} channel(s) to the list, but Google sign-in is not complete.`;
+        } else {
+          detail = "Google sign-in is connected, but no channel was found for that account.";
+        }
+        warn.textContent = `YouTube uploading is OFF — ${detail} Your YouTube video uploading functionality is off because you have not completed the configuration yet (Admin → YouTube channels: Client ID/Secret + Google sign-in). Until then, group videos can only be saved locally, not uploaded.` + (s.message ? ` (${s.message})` : "");
+      }
+    }
+  } catch (err) {
+    groupUploadReady = false;
+    if (warn) {
+      warn.hidden = false;
+      warn.textContent = "YouTube uploading is OFF — YouTube status could not be checked, so upload choices are not available. Group videos can only be saved locally until YouTube is configured (Admin → YouTube channels).";
+    }
+  }
+  return groupUploadReady;
+}
+
+// Group overlay (user, 2026-11-01): while a group runs, the
+// background blurs and only this activity shows. Same pattern
+// as the Auto popup / Processing lock: no close button while
+// running, Close appears when the group is done.
+function showGroupOverlay(name) {
+  document.getElementById("group-overlay-title").textContent = `Group "${name}" — processing`;
+  document.getElementById("group-overlay-text").textContent = "Working through all videos by itself…";
+  document.getElementById("group-overlay-bar").style.width = "0%";
+  document.getElementById("group-overlay-progress-text").textContent = "0%";
+  document.getElementById("group-overlay-list").innerHTML = "";
+  document.getElementById("btn-group-overlay-close").hidden = true;
+  document.getElementById("group-overlay").hidden = false;
+  document.body.classList.add("group-open");
+}
+function hideGroupOverlay() {
+  document.getElementById("group-overlay").hidden = true;
+  document.body.classList.remove("group-open");
+}
+function renderGroupOverlay(items) {
+  const list = document.getElementById("group-overlay-list");
+  list.innerHTML = "";
+  let done = 0;
+  items.forEach((it, i) => {
+    if (it.status === "done_local" || it.status === "uploaded") done += 1;
+    const li = document.createElement("li");
+    let text = `${i + 1}. ${it.title || it.url} — ${it.status}`;
+    if (it.status === "processing") text += ` ${it.progress || 0}% ${it.stage || ""}`;
+    // User, 2026-11-01: NO download link here — a done video is
+    // just saved locally, and is uploaded later from Records.
+    // Showing "Download final video" made it look like the only
+    // next step was downloading to the browser.
+    if (it.status === "done_local" || it.status === "failed_upload") text += " — saved locally";
+    if (it.error) text += ` — ${it.error}`;
+    li.textContent = text;
+    if (it.youtube_url) {
+      const a = document.createElement("a");
+      a.href = it.youtube_url; a.target = "_blank"; a.textContent = " Watch on YouTube";
+      li.appendChild(a);
+    }
+    list.appendChild(li);
+  });
+  const pct = items.length ? Math.round(done / items.length * 100) : 0;
+  document.getElementById("group-overlay-bar").style.width = pct + "%";
+  document.getElementById("group-overlay-progress-text").textContent = `${done} of ${items.length} done — ${pct}%`;
+}
+document.getElementById("btn-group-overlay-close").addEventListener("click", hideGroupOverlay);
+
+// Records (user, 2026-11-01): batch history, shown ONLY after
+// the Records button is clicked, paginated (10 batches per page).
+// Each batch shows its video count, how many are uploaded vs
+// still saved locally, and expanding it shows every video with
+// its saved title, description, tags, and YouTube or download link.
+let recordsPage = 1;
+let recordsTotalPages = 1;
+// Records -> YouTube upload (user, 2026-11-01): locally saved,
+// not-yet-uploaded videos can be selected in Records and taken
+// straight to the YouTube upload step — no Manual wizard needed.
+// Selection persists across Records pages until uploaded.
+let selectedRecords = new Map();
+let recordsItemsByKey = {};
+let recordsUploadReady = false;
+function updateRecordsUploadInfo() {
+  const info = document.getElementById("records-upload-info");
+  if (info) info.textContent = selectedRecords.size
+    ? `${selectedRecords.size} video(s) selected for YouTube upload. Choose privacy and press Upload selected to YouTube.`
+    : "Select locally saved videos above (checkbox on each video), then choose privacy and upload.";
+}
+async function refreshRecordsUploadStatus() {
+  const warn = document.getElementById("records-upload-warning");
+  const btn = document.getElementById("btn-records-upload");
+  try {
+    const s = await api("/api/youtube/status");
+    recordsUploadReady = !!(s.connected && s.channels && s.channels.length);
+    if (warn) {
+      warn.hidden = recordsUploadReady;
+      warn.textContent = recordsUploadReady ? "" : "YouTube uploading is OFF — no channel is configured and Google sign-in is not complete (Admin → YouTube channels). Upload is disabled until then; selected videos stay saved locally.";
+    }
+    if (btn) btn.disabled = !recordsUploadReady;
+  } catch {
+    recordsUploadReady = false;
+    if (warn) { warn.hidden = false; warn.textContent = "YouTube status could not be checked, so upload is disabled. Selected videos stay saved locally."; }
+    if (btn) btn.disabled = true;
+  }
+  return recordsUploadReady;
+}
+function escHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+async function loadRecords(page) {
+  try {
+    const data = await api(`/api/records?page=${page || recordsPage}&per_page=10`);
+    recordsPage = data.page;
+    recordsTotalPages = data.total_pages;
+    document.getElementById("records-summary").textContent = `${data.total} batch(es) in total.`;
+    document.getElementById("records-page-text").textContent = `Page ${data.page} of ${data.total_pages}`;
+    document.getElementById("btn-records-prev").disabled = data.page <= 1;
+    document.getElementById("btn-records-next").disabled = data.page >= data.total_pages;
+    document.getElementById("records-empty").hidden = data.total > 0;
+    const list = document.getElementById("records-list");
+    list.innerHTML = "";
+    recordsItemsByKey = {};
+    data.records.forEach((rec) => {
+      const card = document.createElement("div");
+      card.className = "record-card";
+      const date = rec.created_at ? new Date(rec.created_at).toLocaleString() : "";
+      let html = `<h3>${escHtml(rec.name)}</h3><p class="record-counts">${date ? escHtml(date) + " • " : ""}${rec.total} video(s) • ${rec.uploaded} uploaded to YouTube • ${rec.local} still saved locally • ${rec.failed} failed • Status: ${escHtml(rec.status)}</p><details><summary class="muted">Show ${rec.total} video(s)</summary>`;
+      (rec.items || []).forEach((it, i) => {
+        const statusClass = it.status === "uploaded" ? "record-status-uploaded" : (it.status === "done_local" || it.status === "failed_upload" ? "record-status-local" : "record-status-failed");
+        html += `<div class="record-item"><strong>${i + 1}. ${escHtml(it.title || it.url)}</strong> — <span class="${statusClass}">${escHtml(it.status)}</span>`;
+        if (it.preset_name) html += `<p class="muted">Preset: ${escHtml(it.preset_name)} • Upload choice: ${escHtml(it.upload)}</p>`;
+        if (it.original_title && it.original_title !== it.title) html += `<p class="muted">Original: ${escHtml(it.original_title)}</p>`;
+        if (it.generated_description) html += `<p class="record-desc">${escHtml(it.generated_description)}</p>`;
+        if (it.generated_tags && it.generated_tags.length) html += `<p class="muted">Tags: ${escHtml(it.generated_tags.join(", "))}</p>`;
+        if (it.youtube_url) html += `<p><a href="${escHtml(it.youtube_url)}" target="_blank">Watch on YouTube</a> <span class="muted">(local file deleted after upload — no local space used)</span></p>`;
+        else if (it.status === "done_local" || it.status === "failed_upload") {
+          // No download link (user, 2026-11-01): the video is
+          // just saved locally. Instead, a checkbox takes it
+          // straight to the YouTube upload step below.
+          const key = `${rec.id}:${it.job_id || i}`;
+          recordsItemsByKey[key] = {
+            batch_id: rec.id, job_id: it.job_id || "",
+            title: it.title || it.generated_title || "",
+            description: it.generated_description || "",
+            tags: (it.generated_tags || []).join(", "),
+          };
+          html += `<p class="muted">(saved locally)</p><label class="check"><input type="checkbox" class="record-select" data-key="${escHtml(key)}" ${selectedRecords.has(key) ? "checked" : ""} /> Select for YouTube upload</label>`;
+        }
+        if (it.error) html += `<p class="muted">Error: ${escHtml(it.error)}</p>`;
+        html += `</div>`;
+      });
+      html += `</details>`;
+      card.innerHTML = html;
+      list.appendChild(card);
+    });
+    list.querySelectorAll(".record-select").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const key = cb.dataset.key;
+        if (cb.checked && recordsItemsByKey[key]) selectedRecords.set(key, recordsItemsByKey[key]);
+        else selectedRecords.delete(key);
+        updateRecordsUploadInfo();
+      });
+    });
+    updateRecordsUploadInfo();
+  } catch (err) {
+    document.getElementById("records-summary").textContent = "Records could not be loaded: " + err.message;
+  }
+}
+function showRecords() {
+  document.getElementById("records-overlay").hidden = false;
+  document.body.classList.add("records-open");
+  loadRecords(1);
+  refreshRecordsUploadStatus();
+}
+document.getElementById("btn-records-upload").addEventListener("click", async () => {
+  const resultEl = document.getElementById("records-upload-result");
+  if (!selectedRecords.size) { resultEl.textContent = "Select at least one locally saved video first (checkbox on each video)."; return; }
+  const ready = await refreshRecordsUploadStatus();
+  if (!ready) { resultEl.textContent = "YouTube uploading is OFF — configure a channel and Google sign-in first (Admin → YouTube channels). Selected videos stay saved locally."; return; }
+  resultEl.textContent = `Uploading ${selectedRecords.size} video(s) to YouTube…`;
+  try {
+    const data = await api("/api/records/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [...selectedRecords.values()],
+        privacy_status: document.getElementById("records-upload-privacy").value,
+      }),
+    });
+    // Uploaded videos leave the selection (their local file is
+    // deleted); failed ones stay selected so they can be retried.
+    data.results.forEach((r) => {
+      if (r.status === "uploaded") {
+        for (const key of [...selectedRecords.keys()]) {
+          if (selectedRecords.get(key).job_id === r.job_id) selectedRecords.delete(key);
+        }
+      }
+    });
+    const failed = data.results.filter((r) => r.status !== "uploaded");
+    resultEl.textContent = `Uploaded ${data.uploaded} video(s).` + (failed.length ? ` ${failed.length} failed: ${failed.map((r) => r.error || r.job_id).join(" | ")}` : " Local files for uploaded videos were deleted to save space.");
+    loadRecords(recordsPage);
+  } catch (err) {
+    resultEl.textContent = "Upload failed: " + err.message;
+  }
+});
+function hideRecords() {
+  document.getElementById("records-overlay").hidden = true;
+  document.body.classList.remove("records-open");
+}
+document.getElementById("btn-records").addEventListener("click", showRecords);
+document.getElementById("btn-records-close").addEventListener("click", hideRecords);
+document.getElementById("btn-records-prev").addEventListener("click", () => { if (recordsPage > 1) loadRecords(recordsPage - 1); });
+document.getElementById("btn-records-next").addEventListener("click", () => { if (recordsPage < recordsTotalPages) loadRecords(recordsPage + 1); });
+
 // Group Auto: build rows from links, one preset + upload choice each.
 let groupRows = [];
 let groupTimer = null;
@@ -1056,21 +1330,52 @@ document.getElementById("btn-group-build").addEventListener("click", async () =>
   const urls = document.getElementById("group-urls").value.split("\n").map((u) => u.trim()).filter(Boolean);
   if (!urls.length) { document.getElementById("group-result").textContent = "Paste at least one link first."; return; }
   const presets = await getPresetNames();
+  const ytReady = await refreshGroupYoutubeStatus();
   groupRows = urls.map((url) => ({ url, preset_name: "", upload: "skip" }));
   const wrap = document.getElementById("group-rows");
   wrap.innerHTML = "";
   urls.forEach((url, i) => {
     const row = document.createElement("div");
-    row.className = "flex flex-col sm:flex-row gap-3 mt-2";
+    // UI refresh: one clean grid row per video (see .group-row
+    // in style.css) — URL truncated with ellipsis, dropdowns
+    // aligned, never overlapping like the old flex row did.
+    row.className = "group-row";
     const label = document.createElement("span");
-    label.className = "muted flex-1 min-w-0";
-    label.textContent = `${i + 1}. ${url}`;
+    label.className = "group-row-url";
+    // Group rows show the video TITLE, not just "Video 1" or a
+    // bare URL (user, 2026-11-01): "Video 1: <title> — preset"
+    // is how you tell which video gets which preset. Titles
+    // load in the background, one per link, so Build list never
+    // waits; if a title cannot be fetched, the URL is shown.
+    label.textContent = `Video ${i + 1}: Loading title…`;
     label.title = url;
+    api("/api/video-info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).then((info) => {
+      const t = (info.title || "").trim();
+      label.textContent = t ? `Video ${i + 1}: ${t}` : `Video ${i + 1}: ${url}`;
+      label.title = t ? `${t}\n${url}` : url;
+    }).catch(() => {
+      label.textContent = `Video ${i + 1}: ${url}`;
+    });
     const presetSel = document.createElement("select");
-    presetSel.innerHTML = '<option value="">Admin defaults</option>' + presets.map((p) => `<option value="${p}">${p}</option>`).join("");
+    // No more "Admin defaults" — the Active preset (or first
+    // preset) is the default. Show its name so it is obvious.
+    const activeName = getActivePresetName();
+    presetSel.innerHTML = `<option value="">Active preset${activeName ? " (" + activeName + ")" : ""}</option>` + presets.map((p) => `<option value="${p}">${p}</option>`).join("");
     presetSel.addEventListener("change", () => { groupRows[i].preset_name = presetSel.value || null; });
     const uploadSel = document.createElement("select");
-    uploadSel.innerHTML = '<option value="skip">Do not upload — save locally</option><option value="public">Upload — Public</option><option value="private">Upload — Private</option><option value="unlisted">Upload — Unlisted (link only, not in search)</option>';
+    if (ytReady) {
+      uploadSel.innerHTML = '<option value="skip">Do not upload — save locally</option><option value="public">Upload — Public</option><option value="private">Upload — Private</option><option value="unlisted">Upload — Unlisted (link only, not in search)</option>';
+    } else {
+      // Uploading is OFF: only "save locally" exists, and it is
+      // disabled so it cannot be changed to an upload that would
+      // fail later. See refreshGroupYoutubeStatus().
+      uploadSel.innerHTML = '<option value="skip">Do not upload — save locally</option>';
+      uploadSel.disabled = true;
+    }
     uploadSel.addEventListener("change", () => { groupRows[i].upload = uploadSel.value; });
     row.append(label, presetSel, uploadSel);
     wrap.appendChild(row);
@@ -1080,6 +1385,11 @@ document.getElementById("btn-group-build").addEventListener("click", async () =>
 });
 document.getElementById("btn-group-start").addEventListener("click", async () => {
   if (!groupRows.length) return;
+  // Re-check right before starting: if uploading went OFF since
+  // Build list, force every item to "save locally" instead of
+  // letting uploads fail halfway through the group.
+  const ytReadyAtStart = await refreshGroupYoutubeStatus();
+  if (!ytReadyAtStart) groupRows.forEach((r) => { r.upload = "skip"; });
   try {
     const group = await api("/api/groups", {
       method: "POST",
@@ -1094,7 +1404,8 @@ document.getElementById("btn-group-start").addEventListener("click", async () =>
         })),
       }),
     });
-    document.getElementById("group-result").textContent = `Group "${group.name}" started. It will work through all videos by itself.`;
+    document.getElementById("group-result").textContent = `Group "${group.name}" started. It will work through all videos by itself.` + (ytReadyAtStart ? "" : " YouTube uploading is OFF, so videos will be saved locally only.");
+    showGroupOverlay(group.name);
     if (groupTimer) clearInterval(groupTimer);
     groupTimer = setInterval(async () => {
       try {
@@ -1105,13 +1416,11 @@ document.getElementById("btn-group-start").addEventListener("click", async () =>
           const li = document.createElement("li");
           let text = `${i + 1}. ${it.title || it.url} — ${it.status}`;
           if (it.status === "processing") text += ` ${it.progress || 0}% ${it.stage || ""}`;
+          // Same as the overlay: no download link, just "saved
+          // locally" — upload happens later from Records.
+          if (it.status === "done_local" || it.status === "failed_upload") text += " — saved locally";
           if (it.error) text += ` — ${it.error}`;
           li.textContent = text;
-          if (it.download_url) {
-            const a = document.createElement("a");
-            a.href = it.download_url; a.textContent = " Download final video";
-            li.appendChild(a);
-          }
           if (it.youtube_url) {
             const a = document.createElement("a");
             a.href = it.youtube_url; a.target = "_blank"; a.textContent = " Watch on YouTube";
@@ -1119,19 +1428,18 @@ document.getElementById("btn-group-start").addEventListener("click", async () =>
           }
           list.appendChild(li);
         });
+        renderGroupOverlay(g.items);
         if (g.status === "done") {
           clearInterval(groupTimer);
           document.getElementById("group-result").textContent = `Group "${g.name}" done.`;
+          document.getElementById("group-overlay-text").textContent = `Group "${g.name}" done.`;
+          document.getElementById("btn-group-overlay-close").hidden = false;
         }
-      } catch (err) { clearInterval(groupTimer); }
+      } catch (err) { clearInterval(groupTimer); hideGroupOverlay(); }
     }, 2000);
   } catch (err) {
     document.getElementById("group-result").textContent = "Group start failed: " + err.message;
   }
-});
-
-document.getElementById("btn-process-below-preview").addEventListener("click", () => {
-  document.getElementById("btn-process").click();
 });
 
 document.getElementById("btn-download-final").addEventListener("click", () => {
@@ -1141,7 +1449,7 @@ document.getElementById("btn-download-final").addEventListener("click", () => {
 
 document.getElementById("btn-delete-local-files").addEventListener("click", async () => {
   if (!jobId) { setStatus("No job to delete."); return; }
-  if (!confirm("Delete all local working files for this job (source, final, preview)? Your downloaded copy in Downloads is not affected.")) return;
+  if (!(await showConfirm("Delete local files?", "Delete all local working files for this job (source, final, preview)? Your downloaded copy in Downloads is not affected."))) return;
   try {
     await api("/api/jobs/" + jobId, { method: "DELETE" });
     document.getElementById("local-files-result").textContent = "Local working files deleted. Disk space freed.";
@@ -1154,7 +1462,14 @@ document.getElementById("btn-delete-local-files").addEventListener("click", asyn
   }
 });
 document.getElementById("btn-start-over").addEventListener("click", () => {
+  // Start over (user, 2026-11-01): ALL steps reset and the wizard
+  // goes back to Step 1. It used to only clear the job, leaving
+  // the wizard stuck on Step 4/5 with old progress, timeline and
+  // metadata still showing, so the user could not get back to
+  // Step 1 from here. Cover selection is kept on purpose — a new
+  // video usually reuses the same cover.
   clearSavedState();
+  lastProcessedKey = null;
   jobId = ""; downloadReady = false;
   flip = true;
   document.getElementById("flip-state").textContent = "Flip: on";
@@ -1162,6 +1477,25 @@ document.getElementById("btn-start-over").addEventListener("click", () => {
   document.getElementById("job-info").textContent = "";
   document.getElementById("preview-player").removeAttribute("src");
   document.getElementById("preview-player").load();
+  const dlWrap = document.getElementById("download-progress-wrap");
+  if (dlWrap) dlWrap.hidden = true;
+  const prWrap = document.getElementById("process-progress-wrap");
+  if (prWrap) prWrap.hidden = true;
+  const orig = document.getElementById("original-info");
+  if (orig) orig.hidden = true;
+  const gen = document.getElementById("generated-info");
+  if (gen) gen.hidden = true;
+  document.getElementById("generated-title").value = "";
+  document.getElementById("generated-tags").value = "";
+  document.getElementById("generated-description").value = "";
+  document.getElementById("yt-title").value = "";
+  document.getElementById("yt-description").value = "";
+  document.getElementById("yt-tags").value = "";
+  document.getElementById("local-files-result").textContent = "";
+  document.getElementById("yt-result").textContent = "";
+  document.getElementById("timeline-list").innerHTML = '<li class="muted">No step completed yet.</li>';
+  showMode("manual");
+  showManualStep(1);
   updateLivePreview();
   setStatus("Cleared. Paste a new YouTube link to start over.");
 });
@@ -1271,137 +1605,174 @@ function applyAdminSettings(s) {
   setFitMode(document.getElementById("set-manual-fit-cover").checked ? "cover" : "full");
   updateLivePreview();
 }
-function renderPresets() {
-  const select = document.getElementById("preset-select");
-  select.innerHTML = "";
+// Presets are the ONLY settings system (user, 2026-11-01):
+// no "Save admin settings" button any more. By default Admin
+// shows only preset names. Click a name to open its details,
+// edit it, delete it, or set it as Active. The Active preset
+// (or the first preset, if none is marked Active) is used for
+// Auto, Manual and Group videos. There is nothing else to save.
+
+let activePresetName = "";
+let detailPresetName = null;   // original name of the preset open in detail, null = new preset
+let detailIsNew = false;
+function getActivePresetName() {
+  if (activePresetName && adminPresets[activePresetName]) return activePresetName;
   const names = Object.keys(adminPresets);
-  if (!names.length) {
-    const opt = document.createElement("option");
-    opt.value = ""; opt.textContent = "-- no presets yet --";
-    select.appendChild(opt);
-    if (!document.getElementById("preset-name").value) document.getElementById("preset-name").value = "Preset 1";
-    return;
+  return names.length ? names[0] : "";
+}
+function getPresetSummary(p) {
+  const onOff = (v) => v ? "on" : "off";
+  return `Manual ${p.manual_speed !== undefined ? p.manual_speed : p.default_speed}x, pitch ${p.manual_voice_pitch_factor !== undefined ? p.manual_voice_pitch_factor : p.voice_pitch_factor} • Auto ${p.default_speed}x, pitch ${p.voice_pitch_factor} • ${p.encoder || "libx265"}, CRF ${p.crf}, ${p.preset}`;
+}
+function renderPresetList() {
+  const list = document.getElementById("preset-list");
+  const empty = document.getElementById("preset-list-empty");
+  const names = Object.keys(adminPresets);
+  const active = getActivePresetName();
+  list.innerHTML = "";
+  empty.hidden = names.length > 0;
+  names.forEach((name) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "preset-row" + (name === active ? " preset-row-active" : "") + (name === detailPresetName ? " preset-row-open" : "");
+    const title = document.createElement("span");
+    title.className = "preset-row-name";
+    title.textContent = name;
+    const badge = document.createElement("span");
+    badge.className = "pill";
+    badge.textContent = name === active ? "★ Active" : "Click to open";
+    const summary = document.createElement("span");
+    summary.className = "muted preset-row-summary";
+    summary.textContent = getPresetSummary(adminPresets[name]);
+    row.append(title, badge);
+    row.appendChild(document.createElement("br"));
+    row.appendChild(summary);
+    row.addEventListener("click", () => openPresetDetail(name, false));
+    list.appendChild(row);
+  });
+  updateToolActivePreset();
+}
+function updateToolActivePreset() {
+  const el = document.getElementById("active-preset-note");
+  if (!el) return;
+  const active = getActivePresetName();
+  el.textContent = active ? `Active preset: ${active} — used for Auto, Manual and Group videos. Change it in Admin settings → Presets.` : "No presets yet — create one in Admin settings → Presets.";
+}
+function updatePresetActiveNote() {
+  const note = document.getElementById("preset-active-note");
+  if (!note) return;
+  if (detailIsNew) { note.textContent = "New preset — not saved yet. Give it a name, adjust its settings, then press Create preset."; return; }
+  const active = getActivePresetName();
+  note.textContent = detailPresetName === active
+    ? "★ Active preset — currently used for Auto, Manual and Group videos."
+    : "Not active — press Set as Active to use this preset for Auto, Manual and Group videos.";
+}
+function openPresetDetail(name, isNew) {
+  detailIsNew = !!isNew;
+  detailPresetName = isNew ? null : name;
+  const card = document.getElementById("preset-detail-card");
+  card.hidden = false;
+  const title = document.getElementById("preset-detail-title");
+  const saveBtn = document.getElementById("btn-preset-save");
+  if (isNew) {
+    title.textContent = "New preset";
+    document.getElementById("preset-detail-name").value = "";
+    saveBtn.textContent = "Create preset";
+    // Start from built-in defaults, not from whatever preset was open before.
+    applyAdminSettings({
+      default_speed: 1.0, default_flip: true, fit_mode: "cover",
+      manual_speed: 1.0, manual_flip: true, manual_voice_enabled: true,
+      manual_voice_pitch_factor: 1.05, manual_fit_mode: "cover",
+      voice_enabled: true, voice_pitch_factor: 1.05, crf: 22, preset: "fast",
+      encoder: "libx265", auto_detect_green: true,
+      green_rect: { x: 0, y: 0, w: 640, h: 360 },
+    });
+    showAdminTab("manual");
+  } else {
+    title.textContent = `Preset: ${name}`;
+    document.getElementById("preset-detail-name").value = name;
+    saveBtn.textContent = "Save changes";
+    applyAdminSettings(adminPresets[name]);
   }
-  for (const name of names) {
-    const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
-    select.appendChild(opt);
-  }
+  updatePresetActiveNote();
+  document.getElementById("preset-detail-result").textContent = "";
+  renderPresetList();
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 async function savePresetsToBackend() {
   await api("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...readAdminSettings(), profiles: adminPresets }),
+    body: JSON.stringify({ ...readAdminSettings(), profiles: adminPresets, active_preset: activePresetName }),
   });
 }
-document.getElementById("btn-save-preset").addEventListener("click", async () => {
-  const name = document.getElementById("preset-name").value.trim();
-  if (!name) { document.getElementById("preset-result").textContent = "Enter a preset name first."; return; }
-  const existed = !!adminPresets[name];
+document.getElementById("btn-add-preset").addEventListener("click", () => openPresetDetail(null, true));
+document.getElementById("btn-preset-save").addEventListener("click", async () => {
+  const name = document.getElementById("preset-detail-name").value.trim();
+  const result = document.getElementById("preset-detail-result");
+  if (!name) { result.textContent = "Enter a preset name first."; return; }
+  if (detailIsNew && adminPresets[name]) { result.textContent = `A preset named "${name}" already exists — open that preset to edit it, or choose a different name.`; return; }
+  if (!detailIsNew && detailPresetName && detailPresetName !== name && adminPresets[name]) { result.textContent = `A preset named "${name}" already exists — choose a different name.`; return; }
+  const wasActive = !detailIsNew && detailPresetName && detailPresetName === getActivePresetName();
+  if (!detailIsNew && detailPresetName && detailPresetName !== name) delete adminPresets[detailPresetName];
   adminPresets[name] = readAdminSettings();
+  if (wasActive) activePresetName = name;
   try {
     await savePresetsToBackend();
-    renderPresets();
-    document.getElementById("preset-select").value = name;
-    document.getElementById("preset-result").textContent = existed ? `Preset "${name}" updated.` : `Preset "${name}" saved.`;
-  } catch (err) { document.getElementById("preset-result").textContent = "Save preset failed: " + err.message; }
+    detailIsNew = false;
+    detailPresetName = name;
+    document.getElementById("preset-detail-title").textContent = `Preset: ${name}`;
+    document.getElementById("btn-preset-save").textContent = "Save changes";
+    updatePresetActiveNote();
+    renderPresetList();
+    result.textContent = `Preset "${name}" saved.`;
+    updateToolActivePreset();
+  } catch (err) { result.textContent = "Save failed: " + err.message; }
 });
-document.getElementById("btn-load-preset").addEventListener("click", async () => {
-  const name = document.getElementById("preset-select").value;
-  if (!name || !adminPresets[name]) { document.getElementById("preset-result").textContent = "Choose a preset first."; return; }
-  document.getElementById("preset-name").value = name;
-  applyAdminSettings(adminPresets[name]);
+document.getElementById("btn-preset-active").addEventListener("click", async () => {
+  const result = document.getElementById("preset-detail-result");
+  // For a new, unsaved preset, save it first, then mark it Active.
+  if (detailIsNew) {
+    const name = document.getElementById("preset-detail-name").value.trim();
+    if (!name) { result.textContent = "Enter a preset name first, then press Set as Active."; return; }
+    if (adminPresets[name]) { result.textContent = `A preset named "${name}" already exists — open that preset to edit it.`; return; }
+    adminPresets[name] = readAdminSettings();
+    detailIsNew = false;
+    detailPresetName = name;
+    document.getElementById("preset-detail-title").textContent = `Preset: ${name}`;
+    document.getElementById("btn-preset-save").textContent = "Save changes";
+  }
+  const name = detailPresetName;
+  if (!name || !adminPresets[name]) { result.textContent = "Open a preset first."; return; }
+  activePresetName = name;
   try {
     await savePresetsToBackend();
-    document.getElementById("preset-result").textContent = `Preset "${name}" loaded and applied.`;
-  } catch (err) { document.getElementById("preset-result").textContent = "Load preset failed: " + err.message; }
+    updatePresetActiveNote();
+    renderPresetList();
+    result.textContent = `Preset "${name}" is now Active — it will be used for Auto, Manual and Group videos.`;
+    updateToolActivePreset();
+  } catch (err) { result.textContent = "Set as Active failed: " + err.message; }
 });
-document.getElementById("btn-rename-preset").addEventListener("click", async () => {
-  const oldName = document.getElementById("preset-select").value;
-  const newName = document.getElementById("preset-name").value.trim();
-  if (!oldName || !adminPresets[oldName]) { document.getElementById("preset-result").textContent = "Choose a preset first."; return; }
-  if (!newName || newName === oldName) { document.getElementById("preset-result").textContent = "Enter a new name to rename."; return; }
-  adminPresets[newName] = adminPresets[oldName];
-  delete adminPresets[oldName];
-  try {
-    await savePresetsToBackend();
-    renderPresets();
-    document.getElementById("preset-select").value = newName;
-    document.getElementById("preset-result").textContent = `Preset renamed to "${newName}".`;
-  } catch (err) { document.getElementById("preset-result").textContent = "Rename failed: " + err.message; }
-});
-document.getElementById("btn-delete-preset").addEventListener("click", async () => {
-  const name = document.getElementById("preset-select").value;
-  if (!name || !adminPresets[name]) { document.getElementById("preset-result").textContent = "Choose a preset first."; return; }
-  if (!confirm(`Delete preset "${name}"?`)) return;
+document.getElementById("btn-preset-delete").addEventListener("click", async () => {
+  const result = document.getElementById("preset-detail-result");
+  const name = detailPresetName;
+  if (!name || !adminPresets[name]) { result.textContent = "Open a preset first."; return; }
+  if (!(await showConfirm("Delete preset?", `Delete preset "${name}"? This cannot be undone.`))) return;
+  const wasActive = name === getActivePresetName();
   delete adminPresets[name];
+  if (wasActive) activePresetName = "";
   try {
     await savePresetsToBackend();
-    renderPresets();
-    document.getElementById("preset-result").textContent = `Preset "${name}" deleted.`;
-  } catch (err) { document.getElementById("preset-result").textContent = "Delete failed: " + err.message; }
-});
-document.getElementById("preset-select").addEventListener("change", (e) => {
-  if (e.target.value) document.getElementById("preset-name").value = e.target.value;
+    document.getElementById("preset-detail-card").hidden = true;
+    detailPresetName = null;
+    detailIsNew = false;
+    renderPresetList();
+    document.getElementById("preset-list-result").textContent = `Preset "${name}" deleted.` + (wasActive ? " The first remaining preset is now used automatically." : "");
+  } catch (err) { result.textContent = "Delete failed: " + err.message; }
 });
 
-document.getElementById("btn-save-settings").addEventListener("click", async () => {
-  try {
-    await api("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        default_speed: parseFloat(document.getElementById("set-speed").value),
-        default_flip: document.getElementById("set-flip").checked,
-        fit_mode: document.getElementById("set-fit-cover").checked ? "cover" : "full",
-        manual_speed: parseFloat(document.getElementById("set-manual-speed").value),
-        manual_flip: document.getElementById("set-manual-flip").checked,
-        manual_voice_enabled: document.getElementById("set-manual-voice-enabled").checked,
-        manual_voice_pitch_factor: parseFloat(document.getElementById("set-manual-pitch").value),
-        manual_fit_mode: document.getElementById("set-manual-fit-cover").checked ? "cover" : "full",
-        voice_enabled: document.getElementById("set-voice-enabled").checked,
-        voice_pitch_factor: parseFloat(document.getElementById("set-pitch").value),
-        crf: parseInt(document.getElementById("set-crf").value, 10),
-        preset: document.getElementById("set-preset").value,
-        encoder: document.getElementById("set-encoder").value,
-        auto_detect_green: document.getElementById("set-auto-detect").checked,
-        green_rect: {
-          x: parseInt(document.getElementById("set-green-x").value, 10),
-          y: parseInt(document.getElementById("set-green-y").value, 10),
-          w: parseInt(document.getElementById("set-green-w").value, 10),
-          h: parseInt(document.getElementById("set-green-h").value, 10),
-        },
-      }),
-    });
-    document.getElementById("settings-result").textContent = "Settings saved.";
-    // Manual Edit follows Manual defaults after save, Auto follows Auto defaults.
-    flip = document.getElementById("set-manual-flip").checked;
-    document.getElementById("flip-state").textContent = "Flip: " + (flip ? "on" : "off");
-    document.getElementById("speed").value = document.getElementById("set-manual-speed").value;
-    document.getElementById("speed-value").textContent = document.getElementById("set-manual-speed").value + "x";
-    document.getElementById("voice-enabled").checked = document.getElementById("set-manual-voice-enabled").checked;
-    document.getElementById("voice-pitch").value = document.getElementById("set-manual-pitch").value;
-    document.getElementById("voice-pitch-value").textContent = document.getElementById("set-manual-pitch").value;
-    setFitMode(document.getElementById("set-manual-fit-cover").checked ? "cover" : "full");
-    autoDetectGreen = document.getElementById("set-auto-detect").checked;
-    if (!autoDetectGreen) {
-      greenRect = {
-        x: parseInt(document.getElementById("set-green-x").value, 10),
-        y: parseInt(document.getElementById("set-green-y").value, 10),
-        w: parseInt(document.getElementById("set-green-w").value, 10),
-        h: parseInt(document.getElementById("set-green-h").value, 10),
-      };
-    } else if (liveCover) {
-      // Re-detect for the current cover with the new setting on.
-      await selectCover(liveCover);
-      return;
-    }
-    updateLivePreview();
-  } catch (err) {
-    document.getElementById("settings-result").textContent = "Save failed: " + err.message;
-  }
-});
+
+
 
 // Manual mode, step by step: only one manual step is visible at a
 // time, so the user never sees the whole long form at once.
@@ -1466,6 +1837,59 @@ function buildManualNav() {
 }
 buildManualNav();
 
+// Simple mode picker: only the chosen mode (Auto / Group Auto /
+// Manual) is shown. Remembered in localStorage via saveState().
+let currentMode = "auto";
+function showMode(mode) {
+  currentMode = ["auto", "group", "manual"].includes(mode) ? mode : "auto";
+  const sel = document.getElementById("mode-select");
+  if (sel) sel.value = currentMode;
+  const auto = document.getElementById("mode-auto");
+  const group = document.getElementById("mode-group");
+  const manual = document.getElementById("mode-manual");
+  if (auto) auto.hidden = currentMode !== "auto";
+  if (group) group.hidden = currentMode !== "group";
+  if (manual) manual.hidden = currentMode !== "manual";
+  if (currentMode === "group") refreshGroupYoutubeStatus();
+  saveState();
+}
+document.getElementById("mode-select").addEventListener("change", (e) => showMode(e.target.value));
+
+// Professional confirm popup: replaces every native confirm()
+// ("localhost:8000 says…") with a themed modal card. Returns a
+// Promise<boolean>, so callers await it instead of the blocking
+// confirm(). Cancel, backdrop click and Escape all mean "no".
+function showConfirm(title, message, confirmLabel = "Delete") {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById("confirm-overlay");
+    const okBtn = document.getElementById("btn-confirm-ok");
+    const cancelBtn = document.getElementById("btn-confirm-cancel");
+    document.getElementById("confirm-title").textContent = title;
+    document.getElementById("confirm-message").textContent = message;
+    okBtn.textContent = confirmLabel;
+    overlay.hidden = false;
+    document.body.classList.add("confirm-open");
+    const done = (result) => {
+      overlay.hidden = true;
+      document.body.classList.remove("confirm-open");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey);
+      resolve(result);
+    };
+    const onOk = () => done(true);
+    const onCancel = () => done(false);
+    const onBackdrop = (e) => { if (e.target === overlay) done(false); };
+    const onKey = (e) => { if (e.key === "Escape") done(false); };
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    overlay.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKey);
+    okBtn.focus();
+  });
+}
+
 function showTab(tab) {
   const isAdmin = tab === "admin";
   document.getElementById("tab-tool").hidden = isAdmin;
@@ -1483,5 +1907,9 @@ document.getElementById("tab-btn-admin").addEventListener("click", () => showTab
   // loadCovers auto-selects; restoreState then re-applies the saved
   // job, cover and edits, and restarts any in-progress polling.
   await restoreState();
+  // Mode remembered from last time; a restored manual job opens
+  // in Manual mode so progress is not hidden, otherwise Auto.
+  showMode(saved && saved.mode ? saved.mode : (saved && saved.jobId ? "manual" : "auto"));
   loadYoutubeStatus();
+  refreshGroupYoutubeStatus();
 })();

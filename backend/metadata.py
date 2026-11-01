@@ -132,18 +132,35 @@ def generate_description(original_title: str, tags: list[str] | None, variant: i
     return templates[variant % len(templates)]
 
 
-def generate_tags(original_title: str, tags: list[str] | None) -> list[str]:
+def generate_tags(original_title: str, tags: list[str] | None, variant: int = 0) -> list[str]:
     """Tags from keywords only, plus generic safe tags. YouTube allows
-    500 characters total; we stay well under that."""
-    out: list[str] = []
+    500 characters total; we stay well under that.
+
+    BUG FIX (user, 2026-11-01): this used to ignore `variant`, so
+    Regenerate changed the title and description but NEVER the
+    tags — the user saw the same tags every time. Now each variant
+    rotates the keyword order and uses a different generic set, so
+    Regenerate visibly changes the tags too, while staying on
+    topic (same keyword pool, no copied sentences)."""
+    base: list[str] = []
     seen: set[str] = set()
     for w in extract_keywords(original_title, tags) + list(tags or []):
         t = w.strip().lower()
         if not t or t in _EN_STOP or len(t) > 30 or t in seen:
             continue
         seen.add(t)
-        out.append(t)
-    for generic in ["latest update", "full details", "complete report"]:
+        base.append(t)
+    # Rotate by variant so a different subset/order comes first.
+    if base and variant:
+        shift = variant % len(base)
+        base = base[shift:] + base[:shift]
+    out = list(base)
+    generic_sets = [
+        ["latest update", "full details", "complete report"],
+        ["key moments", "explained", "what happened"],
+        ["full coverage", "breaking update", "must watch"],
+    ]
+    for generic in generic_sets[variant % len(generic_sets)]:
         if generic not in seen:
             out.append(generic)
     # Keep total under 500 chars.
@@ -166,6 +183,6 @@ def generate_metadata(original_title: str, original_description: str,
     return {
         "generated_title": generate_title(original_title, original_tags, variant),
         "generated_description": generate_description(original_title, original_tags, variant),
-        "generated_tags": generate_tags(original_title, original_tags),
+        "generated_tags": generate_tags(original_title, original_tags, variant),
         "generated_note": "Generated locally, free, no AI API. Original text was not copied.",
     }

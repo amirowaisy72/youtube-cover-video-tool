@@ -4,11 +4,17 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Copyright free video generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
       colors: {
         ink: '#0e1a2e',
         ink2: '#132540',
@@ -20,6 +26,7 @@ tailwind.config = {
       },
       boxShadow: {
         soft: '0 10px 30px rgba(0,0,0,0.35)',
+        lift: '0 14px 34px rgba(0,0,0,0.45)',
       }
     }
   }
@@ -28,7 +35,7 @@ tailwind.config = {
 <link rel="stylesheet" href="style.css" />
 </head>
 <body class="min-h-screen">
-<main class="max-w-3xl mx-auto px-4 py-8">
+<main class="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <header class="mb-6">
     <div class="flex items-center gap-3">
       <div class="logo">▶</div>
@@ -43,10 +50,34 @@ tailwind.config = {
   <nav class="tabs">
     <button id="tab-btn-tool" class="tab-btn active px-4 py-3 rounded-xl font-semibold transition-colors" type="button">🎬 Tool</button>
     <button id="tab-btn-admin" class="tab-btn px-4 py-3 rounded-xl font-semibold transition-colors" type="button">⚙️ Admin settings</button>
+    <button id="btn-records" class="tab-btn px-4 py-3 rounded-xl font-semibold transition-colors" type="button">📁 Records</button>
   </nav>
 
   <div id="tab-tool">
+  <!-- How to use, in plain steps (user, 2026-11-01: a new user
+       could not tell what to do first). One card, 3 steps, no
+       jargon. Active preset is shown here so you always know
+       which settings are in use, without opening Admin. -->
   <section class="card">
+    <h2>How to use — 3 steps</h2>
+    <p class="muted">1) Pick a preset in Admin settings → Presets (or use the first one — it is used automatically). 2) Choose a mode below and paste a YouTube link. 3) Process, then either save locally or upload to YouTube from Records.</p>
+    <p id="active-preset-note" class="muted mt-2"></p>
+  </section>
+  <!-- Simple mode picker (user, 2026-11-01): the three modes used
+       to all show at once, making the page long and confusing.
+       Now one dropdown chooses the mode, and only that mode is
+       shown. The choice is remembered across refreshes. -->
+  <section class="card">
+    <label class="field-label">Choose mode</label>
+    <select id="mode-select">
+      <option value="auto">Auto mode — just give the link</option>
+      <option value="group">Group Auto — many videos, one task</option>
+      <option value="manual">Manual mode — step by step</option>
+    </select>
+    <p class="muted mt-2">Only the chosen mode is shown, so the page stays short and simple.</p>
+  </section>
+
+  <section class="card" id="mode-auto">
     <div class="step-head"><span class="step">★</span><h2>Auto mode — just give the link</h2></div>
     <p class="muted">Paste a link, press Start Auto. Rest uses Admin defaults.</p>
     <div class="flex flex-col sm:flex-row gap-3">
@@ -56,9 +87,10 @@ tailwind.config = {
     <p class="muted mt-2">Uses your selected cover, or newest if none.</p>
   </section>
 
-  <section class="card">
+  <section class="card" id="mode-group">
     <div class="step-head"><span class="step">▦</span><h2>Group Auto — many videos, one task</h2></div>
     <p class="muted">Paste one link per line, choose a preset and an upload choice for each video, then create the group task. It then works through all videos by itself: makes each video, and uploads the ones you chose.</p>
+    <div id="group-yt-warning" class="auto-summary" hidden></div>
     <label class="field-label mt-2">Group name</label>
     <input id="group-name" type="text" placeholder="Group name, e.g. Group 1" />
     <label class="field-label mt-3">Video links — one per line</label>
@@ -70,6 +102,7 @@ tailwind.config = {
     <ul id="group-progress-list" class="timeline-list mt-3"></ul>
   </section>
 
+  <div id="mode-manual">
   <div class="manual-wizard-head">
     <h2>Manual mode — step by step</h2>
     <p class="muted">One step at a time.</p>
@@ -139,7 +172,10 @@ tailwind.config = {
     <input id="zoom" type="range" min="0.5" max="2" step="0.05" value="1" />
     <p class="muted">0.5x–2.0x. Below 1.0x the video shrinks inside the box (black around it). In Fit to green screen, 1.0x fills the box exactly, no black area.</p>
     <label class="check"><input id="compress" type="checkbox" checked /> Compress (smaller size, same look)</label>
-    <button id="btn-process" class="btn-primary mt-2 w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-lg rounded-xl shadow transition-colors" type="button">▶ Process video</button>
+    <!-- No Process button here any more (user, 2026-11-01): there
+         used to be two — one here in Edit and one below Live
+         preview. Only the one below Live preview remains, so the
+         user processes after seeing the live preview. -->
     <div id="process-progress-wrap" class="progress-wrap" hidden>
       <div class="progress-track" title="Click to show / hide processing details"><div id="process-progress-bar" class="progress-bar"></div></div>
       <p id="process-progress-text" class="muted mt-2">Processing… 0%</p>
@@ -177,6 +213,7 @@ tailwind.config = {
     </div>
     <p class="muted live-hint">Click to select. Drag to move, drag a corner to zoom.</p>
     <p id="live-note" class="muted mt-2"></p>
+    <p id="live-stale-warning" class="muted mt-2" hidden>⚠️ Final preview is outdated — live settings changed after processing. Press Process video again to make the final video match this live preview.</p>
     <button id="btn-process-below-preview" class="btn-primary w-full mt-3 px-6 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors" type="button">▶ Process video</button>
   </section>
 
@@ -203,7 +240,7 @@ tailwind.config = {
       <label class="field-label mt-2">Tags (editable, comma separated)</label>
       <input id="generated-tags" type="text" />
       <label class="field-label mt-2">Description (editable)</label>
-      <textarea id="generated-description" rows="4"></textarea>
+      <textarea id="generated-description" rows="6"></textarea>
       <div class="flex flex-wrap gap-3 mt-3">
         <button id="btn-use-generated" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Use these for upload</button>
         <button id="btn-regenerate" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Regenerate</button>
@@ -240,26 +277,35 @@ tailwind.config = {
   </section>
   </div>
   </div>
+  </div>
 
   <div id="tab-admin" hidden>
+  <!-- Presets are the ONLY settings system (user, 2026-11-01):
+       no "Save admin settings" button any more. By default this
+       card shows only preset names. Click a name to open its
+       details, edit it, delete it, or set it as Active. -->
   <section class="card">
-    <div class="step-head"><span class="step">⚙</span><h2>Admin settings</h2></div>
-    <p class="muted">Presets save Manual + Auto settings together. Click Manual or Auto to customise that mode only.</p>
-    <fieldset class="fieldset mt-3">
-      <legend>Presets — save a setting, name it, load it, edit it</legend>
-      <p class="muted">Adjust Manual and Auto below, give the combination a name, and press Save preset. To edit a preset: load it, change any setting, then Save preset again with the same name — it overwrites the old one.</p>
-      <div class="flex flex-col sm:flex-row gap-3 mt-3">
-        <select id="preset-select" class="flex-1 min-w-0"></select>
-        <input id="preset-name" type="text" placeholder="Preset name, e.g. Preset 1" class="flex-1 min-w-0" />
-      </div>
-      <div class="flex flex-wrap gap-3 mt-3">
-        <button id="btn-save-preset" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Save preset</button>
-        <button id="btn-load-preset" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Load preset</button>
-        <button id="btn-rename-preset" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Rename preset</button>
-        <button id="btn-delete-preset" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Delete preset</button>
-      </div>
-      <p id="preset-result" class="muted mt-3"></p>
-    </fieldset>
+    <div class="step-head"><span class="step">⚙</span><h2>Presets</h2></div>
+    <p class="muted">Only presets exist — there is no separate admin settings to save. How it works, in 3 steps: 1) Click a preset name below to open it. 2) Change anything in its details. 3) Press Save changes, and press Set as Active to use it for Auto, Manual and Group videos. If no preset is marked Active, the first preset is used automatically.</p>
+    <div id="preset-list" class="preset-list"></div>
+    <p id="preset-list-empty" class="muted" hidden>No presets yet. Press Add new preset below, give it a name, adjust its settings, and press Create preset.</p>
+    <div class="mt-3">
+      <button id="btn-add-preset" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">＋ Add new preset</button>
+    </div>
+    <p id="preset-list-result" class="muted mt-3"></p>
+  </section>
+  <section class="card" id="preset-detail-card" hidden>
+    <div class="step-head"><span class="step">✏️</span><h2 id="preset-detail-title">Preset details</h2></div>
+    <p class="muted">Change anything below, then press Save changes. Press Set as Active to make this preset the one used for Auto, Manual and Group videos.</p>
+    <label class="field-label">Preset name</label>
+    <input id="preset-detail-name" type="text" placeholder="Preset name, e.g. Preset 1" />
+    <p id="preset-active-note" class="muted mt-2"></p>
+    <div class="flex flex-wrap gap-3 mt-3">
+      <button id="btn-preset-save" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Save changes</button>
+      <button id="btn-preset-active" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">★ Set as Active</button>
+      <button id="btn-preset-delete" class="btn-danger px-4 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Delete preset</button>
+    </div>
+    <p id="preset-detail-result" class="muted mt-3"></p>
     <div class="flex flex-wrap gap-3 mt-4">
       <button id="btn-admin-tab-manual" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Manual</button>
       <button id="btn-admin-tab-auto" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Auto</button>
@@ -338,8 +384,6 @@ tailwind.config = {
         <label class="field-label">Height <input id="set-green-h" type="number" value="360" /></label>
       </div>
     </fieldset>
-    <button id="btn-save-settings" class="btn-primary mt-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Save admin settings</button>
-    <p id="settings-result" class="muted mt-3"></p>
   </section>
   <section class="card mt-4">
     <div class="step-head"><span class="step">▶</span><h2>YouTube channels</h2></div>
@@ -414,6 +458,77 @@ tailwind.config = {
     <div class="progress-track"><div id="process-overlay-bar" class="progress-bar"></div></div>
     <p id="process-overlay-text" class="muted mt-2">Processing… 0%</p>
     <pre id="process-overlay-log" class="process-log">Waiting to start…</pre>
+  </div>
+</div>
+<!-- Professional confirm popup (user, 2026-11-01): replaces the
+     browser's basic confirm() dialogs (e.g. "localhost:8000 says…")
+     for every delete action, with a themed card matching the tool. -->
+<div id="confirm-overlay" class="auto-overlay" hidden>
+  <div class="auto-card confirm-card">
+    <h2 id="confirm-title">Are you sure?</h2>
+    <p id="confirm-message" class="muted mt-2"></p>
+    <div class="auto-actions">
+      <button id="btn-confirm-cancel" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Cancel</button>
+      <button id="btn-confirm-ok" class="btn-danger px-6 py-3 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Delete</button>
+    </div>
+  </div>
+</div>
+<!-- Group task overlay (user, 2026-11-01): while a group task
+     runs, the background blurs and ONLY this activity shows,
+     like the Auto popup and the Processing lock. No other
+     controls are clickable until the group is done, then a
+     Close button appears. -->
+<div id="group-overlay" class="auto-overlay" hidden>
+  <div class="auto-card">
+    <h2 id="group-overlay-title">Group processing</h2>
+    <p id="group-overlay-text" class="muted">Working through all videos by itself…</p>
+    <div class="progress-track"><div id="group-overlay-bar" class="progress-bar"></div></div>
+    <p id="group-overlay-progress-text" class="muted mt-2">0%</p>
+    <ul id="group-overlay-list" class="timeline-list"></ul>
+    <div class="auto-actions">
+      <button id="btn-group-overlay-close" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Close — see results</button>
+    </div>
+  </div>
+</div>
+<!-- Records modal (user, 2026-11-01): batch history is shown
+     ONLY after the Records button is clicked — never automatically
+     and never as a random list on the main page. Professional
+     paginated list: each batch shows how many videos it had,
+     how many are uploaded vs still saved locally, and expanding
+     a batch shows every video with its saved title, description,
+     tags, YouTube link or local download link. -->
+<div id="records-overlay" class="auto-overlay" hidden>
+  <div class="auto-card records-card">
+    <h2>📁 Records — batches</h2>
+    <p class="muted">Every batch you processed, newest first. Click a batch to see its videos.</p>
+    <p id="records-summary" class="muted"></p>
+    <div id="records-list"></div>
+    <p id="records-empty" class="muted" hidden>No batches yet. Process a Group Auto batch and it will appear here.</p>
+    <!-- YouTube upload step, directly from Records (user,
+         2026-11-01): select locally saved, not-yet-uploaded
+         videos above, choose privacy, and upload them — no
+         Manual wizard, and no download link in between. -->
+    <div class="record-card">
+      <h3>YouTube upload step — selected videos</h3>
+      <div id="records-upload-warning" class="auto-summary" hidden></div>
+      <p id="records-upload-info" class="muted">Select locally saved videos above, then choose privacy and upload.</p>
+      <label class="field-label">Privacy for selected videos</label>
+      <select id="records-upload-privacy">
+        <option value="private">Private</option>
+        <option value="unlisted">Unlisted (link only, not in search)</option>
+        <option value="public">Public</option>
+      </select>
+      <div class="mt-3">
+        <button id="btn-records-upload" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Upload selected to YouTube</button>
+      </div>
+      <p id="records-upload-result" class="muted mt-3"></p>
+    </div>
+    <div class="auto-actions">
+      <button id="btn-records-prev" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">‹ Previous</button>
+      <span id="records-page-text" class="muted"></span>
+      <button id="btn-records-next" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Next ›</button>
+      <button id="btn-records-close" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Close</button>
+    </div>
   </div>
 </div>
 <script src="app.js"></script>

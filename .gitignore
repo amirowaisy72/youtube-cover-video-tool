@@ -1,5 +1,6 @@
 jobs/
 groups/
+records.json
 uploads/
 *.mp4
 tokens/

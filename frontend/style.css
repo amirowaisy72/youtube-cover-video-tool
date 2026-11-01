@@ -45,14 +45,22 @@ h2 { margin: 0; font-size: 1.25rem; }
   background: rgba(94, 234, 212, 0.12); border: 1px solid rgba(94, 234, 212, 0.35);
   color: #a7f3d0; font-size: 0.85rem; font-weight: 600;
 }
-input[type="url"], input[type="text"], input[type="number"], select {
+input[type="url"], input[type="text"], input[type="number"], select, textarea {
   width: 100%; padding: 11px 12px;
   border-radius: 12px; border: 1px solid rgba(142, 163, 194, 0.35);
   background: #0f1f38; color: #eef3fb; outline: none;
+  box-sizing: border-box; font: inherit; resize: vertical;
 }
-input[type="url"]:focus, input[type="text"]:focus, input[type="number"]:focus, select:focus {
+input[type="url"]:focus, input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
   border-color: #7aa7ff; box-shadow: 0 0 0 3px rgba(122, 167, 255, 0.25);
 }
+/* FIX (user, 2026-11-01): textarea had NO CSS rule at all, so the
+   Group Auto links box fell back to the browser default (~20 cols)
+   — narrow, links wrapped, Build list sat beside it. Now it is
+   full card width like the inputs, and each link stays on one
+   visual line (horizontal scroll if it is very long), so
+   "one link per line" is actually visible. */
+#group-urls { display: block; white-space: nowrap; overflow-x: auto; }
 input[type="file"] { color: #b8c6dd; }
 input[type="range"] { width: 100%; accent-color: #7aa7ff; }
 /* Buttons: Tailwind classes in index.html are the real style
@@ -78,7 +86,7 @@ button:hover, .btn:hover, a.btn-primary:hover { background: #2d4770; }
 button:disabled, .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 /* Process is the main action: same solid primary style, just full
    width and a little larger — prominent by size, not by a gradient. */
-button#btn-process, #btn-process {
+button#btn-process-below-preview, #btn-process-below-preview {
   display: block; width: 100%; padding: 15px 18px; margin-top: 14px;
   font-size: 1.05rem; font-weight: 700;
   color: #ffffff; background: #2563eb;
@@ -86,7 +94,7 @@ button#btn-process, #btn-process {
   text-decoration: none; text-align: center; cursor: pointer;
   white-space: normal;
 }
-button#btn-process:hover, #btn-process:hover { background: #1d4ed8; border-color: #1d4ed8; }
+button#btn-process-below-preview:hover, #btn-process-below-preview:hover { background: #1d4ed8; border-color: #1d4ed8; }
 /* Inputs in a row with a button must shrink, not push the button off. */
 .card input[type="url"], .card input[type="text"] { min-width: 0; }
 .progress-wrap { margin-top: 16px; }
@@ -165,6 +173,11 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 body.auto-open main { filter: blur(6px); pointer-events: none; user-select: none; }
 /* Processing lock: same blur + block, only the processing card shows. */
 body.processing-open main { filter: blur(6px); pointer-events: none; user-select: none; }
+body.confirm-open main { filter: blur(6px); pointer-events: none; user-select: none; }
+body.group-open main { filter: blur(6px); pointer-events: none; user-select: none; }
+.confirm-card { max-width: 420px; }
+.btn-danger { background: #dc2626; border-color: #dc2626; color: #ffffff; }
+.btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
 .auto-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(5, 12, 25, 0.55); padding: 16px; }
 .auto-overlay[hidden] { display: none; }
 .auto-card { background: #1b2f4d; border: 1px solid #2b4a73; border-radius: 16px; padding: 24px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -180,3 +193,164 @@ body.processing-open main { filter: blur(6px); pointer-events: none; user-select
 .live-hint { font-size: 0.85rem; }
 .live-preview-box.has-cover #live-empty { display: none; }
 .footer-note { text-align: center; color: #7d90ad; font-size: 0.85rem; margin-top: 24px; }
+
+/* ============================================================
+   INDUSTRIAL UI REFRESH (user, 2026-11-01): "UI cool hona
+   chahiey, industrial level app". Tailwind CDN is already in
+   use (index.html config now uses Inter + lift shadows); this
+   layer is the design system on top of it. No IDs, no JS logic
+   and no Tailwind button colours are changed here — only
+   spacing, depth, typography, focus and layout polish, so
+   every existing feature keeps working exactly as before.
+   ============================================================ */
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  line-height: 1.55;
+  background:
+    radial-gradient(900px 420px at 85% -80px, rgba(122, 167, 255, 0.16), transparent 60%),
+    radial-gradient(700px 380px at -10% 20%, rgba(94, 234, 212, 0.08), transparent 55%),
+    linear-gradient(180deg, #0e1a2e 0%, #0b1526 45%, #0a1220 100%);
+  background-attachment: fixed;
+}
+main { max-width: 820px; padding: 36px 20px 48px; }
+h1 { font-size: clamp(1.6rem, 4vw, 2rem); letter-spacing: -0.02em; line-height: 1.2; }
+h2 { letter-spacing: -0.01em; }
+.logo { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 16px; box-shadow: 0 10px 28px rgba(122, 167, 255, 0.4); }
+.subtitle { font-size: 0.95rem; }
+/* Cards: deeper, cleaner, with a soft top highlight. */
+.card {
+  border-radius: 20px;
+  padding: 24px;
+  margin: 18px 0;
+  border: 1px solid rgba(148, 178, 220, 0.18);
+  background: linear-gradient(180deg, #1d3252, #162742);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.card:focus-within { border-color: rgba(122, 167, 255, 0.45); }
+.step-head { margin-bottom: 18px; }
+.step {
+  background: linear-gradient(135deg, rgba(122, 167, 255, 0.28), rgba(94, 234, 212, 0.18));
+  border-color: rgba(122, 167, 255, 0.55);
+  box-shadow: 0 4px 14px rgba(122, 167, 255, 0.25);
+}
+.field-label { font-weight: 600; font-size: 0.88rem; letter-spacing: 0.01em; color: #c3d2e8; margin: 12px 0 7px; }
+.muted { color: #93a8c4; line-height: 1.6; }
+/* Inputs: roomier, crisper focus, readable placeholders. */
+input[type="url"], input[type="text"], input[type="number"], select, textarea {
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: #0b182c;
+  border: 1px solid rgba(148, 178, 220, 0.28);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="url"]:focus, input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+  border-color: #7aa7ff;
+  box-shadow: 0 0 0 3px rgba(122, 167, 255, 0.22), 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+input::placeholder, textarea::placeholder { color: #6d84a3; }
+select { appearance: auto; }
+input[type="range"] { accent-color: #5eead4; height: 6px; }
+/* Buttons: lift on hover, press on click, clear focus. */
+button, .btn, a.btn-primary { transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease, filter 0.15s ease; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); }
+button:hover, .btn:hover, a.btn-primary:hover { transform: translateY(-1px); filter: brightness(1.08); }
+button:active, .btn:active, a.btn-primary:active { transform: translateY(0); }
+button:focus-visible, .btn:focus-visible, a.btn-primary:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #7aa7ff; outline-offset: 2px; }
+.btn-primary, a.btn-primary { box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45); }
+/* Tabs: segmented pill bar, active tab is a gradient. */
+.tabs { background: #0b182c; border: 1px solid rgba(148, 178, 220, 0.18); border-radius: 18px; padding: 6px; gap: 6px; }
+.tab-btn { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 12px; }
+.tab-btn.active { background: linear-gradient(135deg, #2563eb, #0ea5e9); border-color: transparent; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.45); }
+/* Status banner: left accent bar, easier to spot. */
+.status { border-left: 4px solid #5eead4; padding: 13px 16px; border-radius: 14px; line-height: 1.55; }
+/* Pills and progress: softer, more industrial. */
+.pill { padding: 5px 12px; font-size: 0.82rem; }
+.progress-track { height: 12px; background: #0b182c; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); }
+.progress-bar { box-shadow: 0 0 12px rgba(94, 234, 212, 0.45); }
+/* Cover grid: hover lift, selected ring is unmistakable. */
+.cover-grid { gap: 14px; }
+.cover-thumb { border-radius: 16px; transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); }
+.cover-thumb:hover { transform: translateY(-2px); border-color: rgba(122, 167, 255, 0.6); }
+.cover-thumb.selected { border-color: #5eead4; box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.4), 0 10px 24px rgba(0, 0, 0, 0.35); }
+.cover-thumb img { height: 96px; }
+/* Timeline: left accent, like a work log. */
+.timeline-list li { border-left: 3px solid #5eead4; padding: 12px 14px; }
+/* Live preview: framed like a monitor, not a bare box. */
+.live-preview-box { border: 1px solid rgba(148, 178, 220, 0.22); border-radius: 18px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4); }
+.live-handle { width: 20px; height: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+/* Group Auto rows (the screenshot's broken layout): one clean
+   row per video — URL truncated with ellipsis (full URL is in
+   the hover title), preset and upload dropdowns aligned. On
+   narrow screens the row stacks, it never overlaps. */
+.group-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px 230px;
+  gap: 10px; align-items: center;
+  background: #0b182c; border: 1px solid rgba(148, 178, 220, 0.2);
+  border-radius: 14px; padding: 12px 14px; margin-top: 10px;
+}
+.group-row-url {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #93a8c4; font-size: 0.85rem; min-width: 0;
+}
+.group-row select { width: 100%; }
+@media (max-width: 640px) {
+  .group-row { grid-template-columns: 1fr; }
+  main { padding: 24px 14px 36px; }
+  .card { padding: 18px; }
+}
+/* Modal cards share the same polish. */
+.auto-card { border-radius: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+
+/* Records (user, 2026-11-01): paginated batch history, shown only
+   from the Records button. Cards, not a raw dump. */
+body.records-open main { filter: blur(6px); pointer-events: none; user-select: none; }
+.records-card { max-width: 720px; }
+.record-card { background: #0b182c; border: 1px solid rgba(148, 178, 220, 0.2); border-radius: 16px; padding: 16px; margin-top: 12px; }
+.record-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.record-counts { font-size: 0.88rem; color: #93a8c4; line-height: 1.6; }
+.record-item { background: #132540; border: 1px solid rgba(148, 178, 220, 0.18); border-radius: 12px; padding: 12px; margin-top: 10px; }
+.record-item strong { color: #eef3fb; }
+.record-item .muted { font-size: 0.85rem; }
+.record-desc { white-space: pre-wrap; word-break: break-word; font-size: 0.88rem; color: #c3d2e8; }
+.record-status-uploaded { color: #5eead4; font-weight: 700; }
+.record-status-local { color: #7aa7ff; font-weight: 700; }
+.record-status-failed { color: #fda4af; font-weight: 700; }
+
+/* FULL-PAGE WORKSPACE (user, 2026-11-01): the page used to be a
+   narrow centre column (~760px) with large empty sides, even on
+   a wide screen. Now the workspace uses the full page width
+   (up to 1440px), so it is handy and easy to manage. Cards stay
+   readable: on wide screens, grids inside cards spread out
+   (preset list, covers, shared settings), while the wizard steps
+   stay in one readable column inside the wider card. */
+main { max-width: 1440px; padding: 36px 24px 48px; }
+@media (max-width: 640px) {
+  main { padding: 24px 14px 36px; }
+}
+/* Preset list: only names by default, click a row to open it. */
+.preset-list { display: grid; gap: 10px; margin-top: 12px; }
+@media (min-width: 900px) {
+  .preset-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .preset-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.preset-row {
+  display: block; width: 100%; text-align: left; padding: 14px 16px;
+  border-radius: 14px; border: 1px solid rgba(148, 178, 220, 0.25);
+  background: #0b182c; color: #eef3fb; cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.preset-row:hover { transform: translateY(-1px); border-color: rgba(122, 167, 255, 0.6); }
+.preset-row-name { font-weight: 700; font-size: 1rem; }
+.preset-row-active { border-color: #5eead4; box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.35); }
+.preset-row-open { border-color: #7aa7ff; box-shadow: 0 0 0 2px rgba(122, 167, 255, 0.35); }
+.preset-row-summary { display: block; margin-top: 6px; font-size: 0.85rem; line-height: 1.5; }
+/* Wider cards: cover grid and shared grids use the extra width. */
+@media (min-width: 900px) {
+  .cover-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .cover-thumb img { height: 110px; }
+}
+.records-card { max-width: 900px; }

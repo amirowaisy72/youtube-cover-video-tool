@@ -249,6 +249,21 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    around it, never green. Verified by real encode: Full 1.0
    bars black, Full 1.5 bars gone (top/bottom red), Full 0.7
    and Cover 0.5 smaller with black bars, no green anywhere.
+   Simple mode picker (2026-11-01, held for push): Tool page
+   used to show Auto, Group Auto and Manual all at once. Now
+   one "Choose mode" dropdown shows only the chosen mode
+   (Auto / Group Auto / Manual); the choice is remembered
+   across refreshes, a restored manual job opens in Manual,
+   and Auto's "Go to Final video" switches to Manual first.
+   Group Auto links box is also full width now (textarea had
+   no CSS rule, so it fell back to a narrow default box).
+   Same full-width fix covers the Step 4 Description box,
+   now with 6 rows instead of 4. Time is never seconds-only
+   anywhere now — Timeline, Auto timeline, download ETA,
+   process elapsed/ETA and the download detail read "1 minute
+   13 seconds" style. Step 3 has only one Process video
+   button, the one below Live preview (upper Edit button
+   removed).
    Group Auto: in the Tool tab, "Group Auto — many videos, one
    task" takes one YouTube link per line, then Build list gives
    each video its own Preset dropdown (or Admin defaults) and its
@@ -355,3 +370,54 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
   missing file or library from the setup steps above.
 - Green area wrong: adjust the admin green rectangle and re-process;
   no re-download is needed.
+
+## Batch 11 — simplicity, UI, Groups and Records (2026-11-01)
+
+- Tool mode picker: one dropdown (Auto / Group Auto / Manual) shows
+  only the chosen mode; the choice is remembered. A restored manual
+  job opens in Manual mode.
+- All textareas are full card width (Group links and Step 4
+  Description), Step 4 Description is 6 rows tall.
+- Only one Process button remains, below Live preview.
+- Times are never seconds-only: "1 minute 13 seconds", not "73 seconds".
+- Stale-final warning: if live settings change after processing,
+  Live preview warns that the final preview is outdated until you
+  process again.
+- Regenerate metadata now changes tags too (title, description and
+  tags all cycle by variant).
+- No native browser confirm dialogs: all deletes use a themed modal.
+- Start over returns to Step 1 and clears progress, metadata,
+  upload fields and timeline (cover selection is kept for reuse).
+- UI refresh: Inter font (Tailwind), deeper cards, segmented tabs,
+  roomier inputs, button lift/press, framed live preview, and Group
+  rows as a clean grid (URL truncated, dropdowns aligned).
+- Group rows show the video title: "Video 1: <title>", fetched in
+  the background from `POST /api/video-info`, falling back to URL.
+- Group YouTube gating: upload choices appear only when YouTube is
+  really ready (Client ID/Secret + token + library + a channel).
+  Otherwise a clear OFF warning shows and only "save locally" is offered.
+- Group running overlay: while a group runs, the background blurs
+  and only the group activity shows; Close appears when it is done.
+- Records (📁 Records button, only on click): paginated batch history
+  (10 per page, newest first) with per-video saved title, description
+  and tags, and how many videos are uploaded vs still saved locally.
+  Locally saved videos are protected from the 24h job cleanup.
+  Uploaded videos keep only the history entry + YouTube link — their
+  local file is deleted at upload time, so they use no local space.
+- Group lists show no download link: a done video is just saved
+  locally. In Records, select locally saved videos (checkbox) and
+  upload them straight from the Records upload step
+  (`POST /api/records/upload`, privacy: Private / Unlisted / Public).
+- Preset editing: choosing a preset shows its full details, Edit
+  preset loads it into the form, Update preset saves changes back
+  over it. Save preset no longer fails when the name box is empty
+  but a preset is selected.
+- Presets-only settings (2026-11-01): there is no "Save admin
+  settings" button any more. Admin shows only preset names — click
+  one to open its details, edit it, delete it, or set it as Active.
+  The Active preset (or the first preset, if none is Active) is
+  used for Auto, Manual and Group videos. The Tool tab shows a
+  3-step How to use card and the current Active preset.
+- Full-page workspace: the page is no longer a narrow centre
+  column — it uses the full page width (up to 1440px), with preset
+  and cover grids spreading out on wide screens.

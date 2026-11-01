@@ -29,6 +29,7 @@ in files the user creates (see README.md).
 
 from __future__ import annotations
 
+import datetime
 import json
 import shutil
 import subprocess
@@ -56,6 +57,7 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 JOBS_DIR = BASE_DIR / "jobs"
 COVERS_DIR = BASE_DIR / "covers"
 GROUPS_DIR = BASE_DIR / "groups"
+RECORDS_FILE = BASE_DIR / "records.json"
 SETTINGS_FILE = BASE_DIR / "backend" / "settings.json"
 
 JOBS_DIR.mkdir(exist_ok=True)
@@ -72,6 +74,14 @@ DEFAULT_SETTINGS = {
     "manual_voice_pitch_factor": 1.05,
     "manual_fit_mode": "cover",
     "profiles": {},
+    # Active preset (user, 2026-11-01): presets are the ONLY
+    # settings system — there is no separate "Save admin settings".
+    # The Active preset's values are the defaults for Auto,
+    # Manual and Group (when a group video has no preset of its
+    # own). If no preset is marked Active, the first preset in
+    # the list is used. Empty = no presets yet, fall back to the
+    # built-in defaults above.
+    "active_preset": "",
     "youtube_channels": [],
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
@@ -138,6 +148,29 @@ def load_settings() -> dict:
     return dict(DEFAULT_SETTINGS)
 
 
+def effective_settings() -> dict:
+    """Defaults actually used by Auto / Manual / Group: the Active
+    preset's values, or the first preset if none is marked Active,
+    or the built-in defaults if there are no presets at all."""
+    settings = load_settings()
+    profiles = settings.get("profiles") or {}
+    if not profiles:
+        return settings
+    active = settings.get("active_preset") or ""
+    if active in profiles:
+        preset = profiles[active]
+        active_name = active
+    else:
+        active_name = next(iter(profiles.keys()))
+        preset = profiles[active_name]
+    merged = dict(settings)
+    for k, v in (preset or {}).items():
+        if k not in ("profiles", "youtube_channels", "active_preset"):
+            merged[k] = v
+    merged["active_preset"] = active_name
+    return merged
+
+
 def save_settings(data: dict) -> dict:
     merged = load_settings()
     merged.update(data)
@@ -187,12 +220,38 @@ app = FastAPI(title="Copyright free video generator")
 
 @app.on_event("startup")
 def cleanup_old_jobs() -> None:
-    """No permanent local library: delete job folders older than 24h
-    on startup, so working files never accumulate and waste disk."""
+    """Delete job folders older than 24h on startup, EXCEPT jobs
+    that are locally saved videos in a batch record (user,
+    2026-11-01: locally saved videos must stay, with their title,
+    tags and description, until they are uploaded — uploaded
+    videos are already deleted at upload time, so they never
+    consume space). Unrecorded test jobs still clean up."""
     import time as _time
     now = _time.time()
+    protected = set()
+    for source in (GROUPS_DIR,):
+        if not source.exists():
+            continue
+        for path in source.glob("*.json"):
+            try:
+                g = json.loads(path.read_text(encoding="utf-8"))
+            except ValueError:
+                continue
+            for it in g.get("items") or []:
+                if it.get("status") in ("done_local", "failed_upload") and it.get("job_id"):
+                    protected.add(it["job_id"])
+    if RECORDS_FILE.exists():
+        try:
+            for rec in json.loads(RECORDS_FILE.read_text(encoding="utf-8")) or []:
+                for it in rec.get("items") or []:
+                    if it.get("status") in ("done_local", "failed_upload") and it.get("job_id"):
+                        protected.add(it["job_id"])
+        except ValueError:
+            pass
     for directory in JOBS_DIR.iterdir():
         if not directory.is_dir():
+            continue
+        if directory.name in protected:
             continue
         try:
             age = now - directory.stat().st_mtime
@@ -307,6 +366,19 @@ def fetch_original_info(url: str) -> dict:
 
 
 # ---------------------------------------------------------------- download
+def _fmt_duration(seconds: float) -> str:
+    """Minutes + seconds, never seconds-only (user, 2026-11-01):
+    73 -> '1 minute 13 seconds', not '73 seconds'."""
+    s = int(round(seconds))
+    if s < 60:
+        return f"{s} second" if s == 1 else f"{s} seconds"
+    m, r = divmod(s, 60)
+    min_part = f"{m} minute" if m == 1 else f"{m} minutes"
+    if r == 0:
+        return min_part
+    return f"{min_part} {r} second" if r == 1 else f"{min_part} {r} seconds"
+
+
 class DownloadRequest(BaseModel):
     url: str = Field(..., min_length=8)
 
@@ -384,7 +456,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
         job["timeline"] = [{
             "step": "YouTube download (yt-dlp, max 720p, 8 fragments)",
             "duration_sec": round(dur, 1),
-            "detail": f"{size_mb:.1f} MB in {dur:.0f}s (avg {avg:.1f} MB/s)",
+            "detail": f"{size_mb:.1f} MB in {_fmt_duration(dur)} (avg {avg:.1f} MB/s)",
         }]
         job.update({"status": "downloaded", "progress": 100})
     else:
@@ -480,7 +552,7 @@ def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: di
                      "detail": f"{downloaded_mb:.1f} MB"})
     # --- Cover + admin defaults (or a preset's Auto + shared settings,
     # when this job is part of a group task with a preset per video)
-    settings = load_settings()
+    settings = effective_settings()
     if settings_override:
         for k in ("default_speed", "default_flip", "fit_mode", "voice_enabled",
                   "voice_pitch_factor", "encoder", "crf", "preset",
@@ -642,6 +714,77 @@ def _write_group(group: dict) -> None:
         json.dumps(group, indent=2), encoding="utf-8")
 
 
+# ---------------------------------------------------------------- records
+# Batch history (user, 2026-11-01): every Group batch is a record
+# with its videos, their saved title/description/tags, and which
+# videos are uploaded vs still saved locally. Uploaded videos keep
+# only the history entry + YouTube link — their local file is
+# deleted at upload time, so they use no local space. Locally
+# saved videos keep their download link and are protected from
+# the 24h cleanup above.
+def _read_records() -> list:
+    if not RECORDS_FILE.exists():
+        return []
+    try:
+        return json.loads(RECORDS_FILE.read_text(encoding="utf-8")) or []
+    except ValueError:
+        return []
+
+
+def _write_records(records: list) -> None:
+    RECORDS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
+
+
+def _group_to_record(group: dict) -> dict:
+    items = []
+    for it in group.get("items") or []:
+        status = it.get("status") or "waiting"
+        local = status in ("done_local", "failed_upload")
+        items.append({
+            "url": it.get("url") or "",
+            "title": it.get("title") or it.get("generated_title") or it.get("original_title") or it.get("url") or "",
+            "original_title": it.get("original_title") or "",
+            "generated_title": it.get("generated_title") or "",
+            "generated_description": it.get("generated_description") or "",
+            "generated_tags": it.get("generated_tags") or [],
+            "preset_name": it.get("preset_name") or "",
+            "upload": it.get("upload") or "skip",
+            "status": status,
+            "youtube_url": it.get("youtube_url") or "",
+            "youtube_video_id": it.get("youtube_video_id") or "",
+            # Uploaded = file deleted, no download link, no space.
+            # Local = download link only while the file still exists.
+            "download_url": (f"/api/download/{it['job_id']}"
+                             if local and it.get("job_id")
+                             and (JOBS_DIR / it["job_id"] / "final.mp4").exists()
+                             else ""),
+            "job_id": it.get("job_id") or "",
+            "error": it.get("error") or "",
+        })
+    return {
+        "id": group.get("id") or "",
+        "name": group.get("name") or "Group 1",
+        "created_at": group.get("created_at") or "",
+        "finished_at": (datetime.datetime.now().isoformat(timespec="seconds")
+                        if group.get("status") == "done" else ""),
+        "status": group.get("status") or "running",
+        "total": len(items),
+        "uploaded": sum(1 for i in items if i["status"] == "uploaded"),
+        "local": sum(1 for i in items if i["status"] in ("done_local", "failed_upload")),
+        "failed": sum(1 for i in items if i["status"] == "failed"),
+        "items": items,
+    }
+
+
+def _upsert_group_record(group: dict) -> None:
+    records = _read_records()
+    record = _group_to_record(group)
+    records = [r for r in records if r.get("id") != record["id"]]
+    records.append(record)
+    records.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    _write_records(records)
+
+
 def _run_group(group_id: str) -> None:
     """Run a group task sequentially, one video at a time.
 
@@ -658,7 +801,7 @@ def _run_group(group_id: str) -> None:
         return
     group["status"] = "running"
     _write_group(group)
-    settings = load_settings()
+    settings = effective_settings()
     profiles = settings.get("profiles") or {}
     for idx, item in enumerate(group["items"]):
         group["current_index"] = idx
@@ -694,8 +837,15 @@ def _run_group(group_id: str) -> None:
             job.update(gen)
             write_job(job)
             item["title"] = gen.get("generated_title") or job.get("original_title") or item["url"]
+            # Saved for Records: locally saved videos keep their
+            # full title, description and tags, not just the title.
+            item["generated_title"] = gen.get("generated_title") or ""
+            item["generated_description"] = gen.get("generated_description") or ""
+            item["generated_tags"] = gen.get("generated_tags") or []
+            item["original_title"] = job.get("original_title") or ""
         except Exception:
             item["title"] = job.get("original_title") or item["url"]
+            item["original_title"] = job.get("original_title") or ""
         upload = item.get("upload") or "skip"
         if upload == "skip":
             item["status"] = "done_local"
@@ -729,6 +879,7 @@ def _run_group(group_id: str) -> None:
     group["status"] = "done"
     group["current_index"] = None
     _write_group(group)
+    _upsert_group_record(group)
 
 
 @app.post("/api/groups")
@@ -739,6 +890,7 @@ def create_group(payload: GroupRequest) -> dict:
     group = {
         "id": group_id,
         "name": payload.name or "Group 1",
+        "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
         "status": "running",
         "current_index": 0,
         "items": [
@@ -764,6 +916,93 @@ def list_groups() -> dict:
     return {"groups": groups}
 
 
+@app.get("/api/records")
+def list_records(page: int = 1, per_page: int = 10) -> dict:
+    """Batch history, paginated, newest first. Only served here —
+    the frontend shows it only after the Records button is clicked,
+    never automatically. Merges records.json with groups on disk,
+    so batches processed before Records existed also appear, and a
+    running group's latest status is shown even before it is done."""
+    by_id = {r["id"]: r for r in _read_records() if r.get("id")}
+    for path in sorted(GROUPS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        g = _read_group(path.stem)
+        if not g:
+            continue
+        if g["id"] not in by_id or by_id[g["id"]].get("status") != g.get("status"):
+            by_id[g["id"]] = _group_to_record(g)
+    records = sorted(by_id.values(), key=lambda r: r.get("created_at") or "", reverse=True)
+    total = len(records)
+    per_page = min(max(per_page, 1), 50)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * per_page
+    return {"total": total, "page": page, "per_page": per_page,
+            "total_pages": total_pages, "records": records[start:start + per_page]}
+
+
+class RecordUploadItem(BaseModel):
+    batch_id: str
+    job_id: str
+    title: str = ""
+    description: str = ""
+    tags: str = ""
+
+
+class RecordUploadRequest(BaseModel):
+    items: list[RecordUploadItem] = Field(..., min_length=1)
+    privacy_status: str = "private"
+
+
+@app.post("/api/records/upload")
+def upload_records(payload: RecordUploadRequest) -> dict:
+    """Upload locally saved batch videos to YouTube, directly from
+    Records (user, 2026-11-01): select videos that are still saved
+    locally and not uploaded yet, and upload them without going
+    through the Manual wizard. Uses each video's saved title,
+    description and tags. Uploaded videos have their local file
+    deleted (space freed) and their group + record updated to
+    'uploaded' with the YouTube link; failed items stay local so
+    they can be retried, and do not stop the rest."""
+    privacy = payload.privacy_status if payload.privacy_status in ("public", "private", "unlisted") else "private"
+    results = []
+    for item in payload.items:
+        final_path = job_dir(item.job_id) / "final.mp4"
+        if not final_path.exists():
+            results.append({"batch_id": item.batch_id, "job_id": item.job_id,
+                            "status": "failed", "error": "Local file not found — it may have been deleted already."})
+            continue
+        try:
+            result = youtube_upload.upload_video(
+                final_path,
+                title=item.title or "Video",
+                description=item.description or "",
+                tags=item.tags or "",
+                privacy_status=privacy,
+            )
+            youtube_url = f"https://www.youtube.com/watch?v={result.get('video_id')}" if result.get("video_id") else ""
+            shutil.rmtree(job_dir(item.job_id), ignore_errors=True)
+            # Update the group file, then the record, so Records
+            # and the group list both show this video as uploaded.
+            group = _read_group(item.batch_id)
+            if group:
+                for it in group.get("items") or []:
+                    if it.get("job_id") == item.job_id:
+                        it["status"] = "uploaded"
+                        it["youtube_video_id"] = result.get("video_id") or ""
+                        it["youtube_url"] = youtube_url
+                        it["error"] = ""
+                _write_group(group)
+                _upsert_group_record(group)
+            results.append({"batch_id": item.batch_id, "job_id": item.job_id,
+                            "status": "uploaded", "youtube_url": youtube_url})
+        except Exception as exc:  # noqa: BLE001
+            results.append({"batch_id": item.batch_id, "job_id": item.job_id,
+                            "status": "failed", "error": str(exc)[-1000:]})
+    return {"results": results,
+            "uploaded": sum(1 for r in results if r["status"] == "uploaded"),
+            "failed": sum(1 for r in results if r["status"] != "uploaded")}
+
+
 @app.get("/api/groups/{group_id}")
 def get_group(group_id: str) -> dict:
     group = _read_group(group_id)
@@ -776,6 +1015,24 @@ def get_group(group_id: str) -> dict:
             item["progress"] = job.get("auto_progress") or job.get("process_progress") or 0
             item["stage"] = job.get("auto_stage") or job.get("process_stage") or ""
     return group
+
+
+class VideoInfoRequest(BaseModel):
+    url: str
+
+
+@app.post("/api/video-info")
+def video_info(payload: VideoInfoRequest) -> dict:
+    """Title (and uploader) for one YouTube link, without downloading.
+
+    Used by Group Auto Build list (user, 2026-11-01): rows must show
+    "Video 1: <title>" — not just "Video 1" or a bare URL, which
+    tells the user nothing about which video gets which preset.
+    Never fails: on any yt-dlp error the title is empty and the
+    frontend falls back to showing the URL."""
+    info = fetch_original_info(payload.url)
+    return {"url": payload.url, "title": info.get("original_title", ""),
+            "uploader": info.get("original_uploader", "")}
 
 
 class GenerateMetadataRequest(BaseModel):
@@ -972,7 +1229,7 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
 
 @app.post("/api/process")
 def process_video(payload: ProcessRequest) -> dict:
-    settings = load_settings()
+    settings = effective_settings()
     directory = job_dir(payload.job_id)
     source = directory / "source.mp4"
     if not source.exists():
