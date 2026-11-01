@@ -563,9 +563,18 @@ tailwind.config = {
     <p id="group-overlay-text" class="muted">Working through all videos by itself…</p>
     <div class="progress-track"><div id="group-overlay-bar" class="progress-bar"></div></div>
     <p id="group-overlay-progress-text" class="muted mt-2">0%</p>
+    <!-- Group ETA (user, 2026-11-02): estimated time left for the
+         whole group, updated on every poll from real completed
+         videos — see renderGroupOverlay in app.js. -->
+    <p id="group-overlay-eta" class="muted mt-2">Calculating estimated time…</p>
     <ul id="group-overlay-list" class="timeline-list"></ul>
     <div class="auto-actions">
       <button id="btn-group-overlay-close" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Close — see results</button>
+      <!-- Group retry (user, 2026-11-02): only failed videos run
+           again, from where the group left off — completed videos
+           are never redone. Shown only when the group is done
+           with failures. -->
+      <button id="btn-group-overlay-retry" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button" hidden>↻ Retry failed videos</button>
     </div>
   </div>
 </div>

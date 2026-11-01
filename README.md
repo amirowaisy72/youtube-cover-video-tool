@@ -443,6 +443,20 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
   Otherwise a clear OFF warning shows and only "save locally" is offered.
 - Group running overlay: while a group runs, the background blurs
   and only the group activity shows; Close appears when it is done.
+  Group ETA (2026-11-02): the overlay also shows "Estimated time
+  left: about X" for the whole group, calculated from completed
+  videos' real durations plus the current video's remaining time
+  (from its own progress); before any data exists it says
+  "Calculating estimated time…" instead of a fake number.
+  Group download retry + Retry failed (2026-11-02): a transient
+  connection reset (e.g. ConnectionResetError 10054) during
+  download no longer fails the video at once — Auto and manual
+  downloads retry up to 3 times, and yt-dlp resumes from its
+  partial files instead of starting over. If a video still
+  fails, the Group overlay shows "Retry failed videos" when the
+  group is done; clicking it runs only the failed videos again,
+  from where the group left off — completed videos are never
+  re-downloaded or re-uploaded.
 - Records (📁 Records button, only on click): paginated batch history
   (10 per page, newest first) with per-video saved title, description
   and tags, and how many videos are uploaded vs still saved locally.

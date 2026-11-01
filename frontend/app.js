@@ -1418,8 +1418,10 @@ function showGroupOverlay(name) {
   document.getElementById("group-overlay-text").textContent = "Working through all videos by itself…";
   document.getElementById("group-overlay-bar").style.width = "0%";
   document.getElementById("group-overlay-progress-text").textContent = "0%";
+  document.getElementById("group-overlay-eta").textContent = "Calculating estimated time…";
   document.getElementById("group-overlay-list").innerHTML = "";
   document.getElementById("btn-group-overlay-close").hidden = true;
+  document.getElementById("btn-group-overlay-retry").hidden = true;
   document.getElementById("group-overlay").hidden = false;
   document.body.classList.add("group-open");
 }
@@ -1427,7 +1429,22 @@ function hideGroupOverlay() {
   document.getElementById("group-overlay").hidden = true;
   document.body.classList.remove("group-open");
 }
-function renderGroupOverlay(items) {
+function renderGroupOverlay(items, group) {
+  // Group ETA (user, 2026-11-02): the backend estimates the
+  // whole group's remaining time from completed videos' real
+  // durations + the current video's own progress, so this line
+  // moves as the group learns — it is an estimate, hence "about".
+  const etaEl = document.getElementById("group-overlay-eta");
+  if (etaEl) {
+    if (group && group.status === "done") {
+      etaEl.textContent = "Group complete.";
+    } else if (group && group.eta_sec !== null && group.eta_sec !== undefined) {
+      const elapsed = group.elapsed_sec ? ` • ${fmtDuration(group.elapsed_sec)} elapsed` : "";
+      etaEl.textContent = `Estimated time left: about ${fmtDuration(group.eta_sec)}${elapsed}`;
+    } else {
+      etaEl.textContent = "Calculating estimated time…";
+    }
+  }
   const list = document.getElementById("group-overlay-list");
   list.innerHTML = "";
   let done = 0;
@@ -1668,6 +1685,61 @@ document.getElementById("btn-group-build").addEventListener("click", async () =>
   document.getElementById("btn-group-start").hidden = false;
   document.getElementById("group-result").textContent = `${urls.length} video(s) ready. Choose a preset and upload choice for each, then start.`;
 });
+// Group polling + retry (user, 2026-11-02): one function used
+// both when a group first starts and when failed videos are
+// retried, so retry resumes the same group with the same overlay
+// and the same 2-second polling. currentGroup tracks the group
+// the overlay belongs to, so Retry knows what to retry.
+let currentGroup = null;
+function startGroupPolling(group) {
+  currentGroup = group;
+  if (groupTimer) clearInterval(groupTimer);
+  groupTimer = setInterval(async () => {
+    try {
+      const g = await api("/api/groups/" + group.id);
+      const list = document.getElementById("group-progress-list");
+      list.innerHTML = "";
+      g.items.forEach((it, i) => {
+        const li = document.createElement("li");
+        let text = `${i + 1}. ${it.title || it.url} — ${it.status}`;
+        if (it.status === "processing") text += ` ${it.progress || 0}% ${it.stage || ""}`;
+        if (it.status === "done_local" || it.status === "failed_upload") text += " — saved locally";
+        if (it.error) text += ` — ${it.error}`;
+        li.textContent = text;
+        if (it.youtube_url) {
+          const a = document.createElement("a");
+          a.href = it.youtube_url; a.target = "_blank"; a.textContent = " Watch on YouTube";
+          li.appendChild(a);
+        }
+        list.appendChild(li);
+      });
+      renderGroupOverlay(g.items, g);
+      if (g.status === "done") {
+        clearInterval(groupTimer);
+        document.getElementById("group-result").textContent = `Group "${g.name}" done.`;
+        document.getElementById("group-overlay-text").textContent = `Group "${g.name}" done.`;
+        document.getElementById("btn-group-overlay-close").hidden = false;
+        const failedCount = g.items.filter((it) => it.status === "failed" || it.status === "failed_upload").length;
+        document.getElementById("btn-group-overlay-retry").hidden = failedCount === 0;
+      }
+    } catch (err) { clearInterval(groupTimer); hideGroupOverlay(); }
+  }, 2000);
+}
+document.getElementById("btn-group-overlay-retry").addEventListener("click", async () => {
+  if (!currentGroup) return;
+  try {
+    const g = await api("/api/groups/" + currentGroup.id + "/retry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    document.getElementById("group-result").textContent = g.message || `Retrying failed videos in group "${g.name}".`;
+    showGroupOverlay(g.name);
+    startGroupPolling(g);
+  } catch (err) {
+    document.getElementById("group-result").textContent = "Retry failed: " + err.message;
+  }
+});
 document.getElementById("btn-group-start").addEventListener("click", async () => {
   if (!groupRows.length) return;
   // Re-check right before starting: if uploading went OFF since
@@ -1691,37 +1763,7 @@ document.getElementById("btn-group-start").addEventListener("click", async () =>
     });
     document.getElementById("group-result").textContent = `Group "${group.name}" started. It will work through all videos by itself.` + (ytReadyAtStart ? "" : " YouTube uploading is OFF, so videos will be saved locally only.");
     showGroupOverlay(group.name);
-    if (groupTimer) clearInterval(groupTimer);
-    groupTimer = setInterval(async () => {
-      try {
-        const g = await api("/api/groups/" + group.id);
-        const list = document.getElementById("group-progress-list");
-        list.innerHTML = "";
-        g.items.forEach((it, i) => {
-          const li = document.createElement("li");
-          let text = `${i + 1}. ${it.title || it.url} — ${it.status}`;
-          if (it.status === "processing") text += ` ${it.progress || 0}% ${it.stage || ""}`;
-          // Same as the overlay: no download link, just "saved
-          // locally" — upload happens later from Records.
-          if (it.status === "done_local" || it.status === "failed_upload") text += " — saved locally";
-          if (it.error) text += ` — ${it.error}`;
-          li.textContent = text;
-          if (it.youtube_url) {
-            const a = document.createElement("a");
-            a.href = it.youtube_url; a.target = "_blank"; a.textContent = " Watch on YouTube";
-            li.appendChild(a);
-          }
-          list.appendChild(li);
-        });
-        renderGroupOverlay(g.items);
-        if (g.status === "done") {
-          clearInterval(groupTimer);
-          document.getElementById("group-result").textContent = `Group "${g.name}" done.`;
-          document.getElementById("group-overlay-text").textContent = `Group "${g.name}" done.`;
-          document.getElementById("btn-group-overlay-close").hidden = false;
-        }
-      } catch (err) { clearInterval(groupTimer); hideGroupOverlay(); }
-    }, 2000);
+    startGroupPolling(group);
   } catch (err) {
     document.getElementById("group-result").textContent = "Group start failed: " + err.message;
   }

@@ -444,44 +444,82 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
         })
         write_job(job)
 
-    try:
-        import yt_dlp
-        opts = {
-            # Speed fix 1: cap at 720p. The old "best video" often
-            # pulled 1080p/4K, but the video is only shown in a
-            # 640x360 green area — the extra pixels only cost
-            # download + merge + encode time. 8 parallel fragments
-            # also speed up DASH downloads on a normal connection.
-            "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
-            "merge_output_format": "mp4",
-            "concurrent_fragment_downloads": 8,
-            "outtmpl": str(target),
-            "progress_hooks": [hook],
-            "quiet": True,
-            "no_warnings": True,
-        }
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
-    except ImportError:
-        cmd = [
-            "yt-dlp",
-            "-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
-            "--merge-output-format", "mp4",
-            "--concurrent-fragments", "8",
-            "-o", str(target),
-            url,
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
+    # Same transient-connection retry as Auto (user, 2026-11-02):
+    # up to 3 attempts, yt-dlp resumes partial files. _dl_error
+    # stays None when yt-dlp is simply not installed (ImportError),
+    # so the CLI fallback below still runs in that case.
+    _dl_done = False
+    _dl_error = None
+    _dl_missing = False
+    for _attempt in range(1, 4):
+        try:
+            import yt_dlp
+            opts = {
+                # Speed fix 1: cap at 720p. The old "best video" often
+                # pulled 1080p/4K, but the video is only shown in a
+                # 640x360 green area — the extra pixels only cost
+                # download + merge + encode time. 8 parallel fragments
+                # also speed up DASH downloads on a normal connection.
+                "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+                "merge_output_format": "mp4",
+                "concurrent_fragment_downloads": 8,
+                "retries": 10,
+                "fragment_retries": 10,
+                "socket_timeout": 30,
+                "outtmpl": str(target),
+                "progress_hooks": [hook],
+                "quiet": True,
+                "no_warnings": True,
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            _dl_done = True
+            break
+        except ImportError:
+            _dl_missing = True
+            break
+        except Exception as exc:  # noqa: BLE001
+            _dl_error = exc
+            if _attempt < 3:
+                _time.sleep(5 * _attempt)
+                continue
+            break
+    if _dl_done:
+        pass
+    elif _dl_error is not None:
+        job["status"] = "failed"
+        job["error"] = str(_dl_error)[-2000:]
+        write_job(job)
+        return
+    elif _dl_missing:
+        # Python module missing: fall back to the yt-dlp binary,
+        # with the same 3-attempt retry (binary resumes .part files).
+        _cli_ok = False
+        for _attempt in range(1, 4):
+            cmd = [
+                "yt-dlp",
+                "-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+                "--merge-output-format", "mp4",
+                "--concurrent-fragments", "8",
+                "-o", str(target),
+                url,
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if proc.returncode == 0:
+                _cli_ok = True
+                break
+            if _attempt < 3:
+                _time.sleep(5 * _attempt)
+                continue
             job["status"] = "failed"
             job["error"] = (proc.stderr or proc.stdout or "yt-dlp failed.")[-2000:]
             write_job(job)
             return
-    except Exception as exc:  # noqa: BLE001 - report it in job.json
-        job["status"] = "failed"
-        job["error"] = str(exc)[-2000:]
-        write_job(job)
-        return
+        if not _cli_ok:
+            job["status"] = "failed"
+            job["error"] = "yt-dlp failed."
+            write_job(job)
+            return
     if target.exists():
         dur = _time.time() - dl_start
         size_mb = target.stat().st_size / 1024 / 1024
@@ -556,26 +594,48 @@ def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: di
     _set("downloading", 0, {"status": "downloading", "url": url, "timeline": timeline,
                             **fetch_original_info(url)})
     # --- Stage 1: download (same yt-dlp settings as manual download)
+    # Download retry (user, 2026-11-02): a Group video failed
+    # mid-download with ConnectionResetError 10054 ("connection
+    # forcibly closed by the remote host") and the whole item was
+    # marked failed. A reset connection is transient — it must
+    # NOT kill the video. Retry up to 3 times with a short wait;
+    # yt-dlp resumes from its partial (.part) files, so a retry
+    # continues where the download left off instead of starting
+    # over. yt-dlp's own fragment retries are also turned on.
     dl_start = _time.time()
-    try:
-        import yt_dlp
-        def hook(d: dict) -> None:
-            total = d.get("total_bytes") or d.get("total_bytes_estimate")
-            downloaded = d.get("downloaded_bytes", 0) or 0
-            pct = round(downloaded * 100 / total, 1) if total else 0
-            _set("downloading", round(pct * 0.25, 1))
-        opts = {
-            "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
-            "merge_output_format": "mp4",
-            "concurrent_fragment_downloads": 8,
-            "outtmpl": str(source),
-            "progress_hooks": [hook],
-            "quiet": True, "no_warnings": True,
-        }
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
-    except Exception as exc:  # noqa: BLE001
-        _set("failed", 0, {"status": "failed", "error": str(exc)[-2000:]})
+    _dl_error = None
+    for _attempt in range(1, 4):
+        try:
+            import yt_dlp
+            def hook(d: dict) -> None:
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                downloaded = d.get("downloaded_bytes", 0) or 0
+                pct = round(downloaded * 100 / total, 1) if total else 0
+                _set("downloading", round(pct * 0.25, 1))
+            opts = {
+                "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+                "merge_output_format": "mp4",
+                "concurrent_fragment_downloads": 8,
+                "retries": 10,
+                "fragment_retries": 10,
+                "socket_timeout": 30,
+                "outtmpl": str(source),
+                "progress_hooks": [hook],
+                "quiet": True, "no_warnings": True,
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            _dl_error = None
+            break
+        except Exception as exc:  # noqa: BLE001
+            _dl_error = exc
+            if _attempt < 3:
+                _set("downloading", 0, {"status": "downloading"})
+                _time.sleep(5 * _attempt)
+                continue
+            break
+    if _dl_error is not None:
+        _set("failed", 0, {"status": "failed", "error": str(_dl_error)[-2000:]})
         return
     if not source.exists():
         _set("failed", 0, {"status": "failed", "error": "Download finished but no file was created."})
@@ -829,16 +889,36 @@ def _run_group(group_id: str) -> None:
     Uploaded videos have their working files deleted, like a normal
     upload; skipped / failed-upload videos keep their final file.
     """
+    import time as _time
     group = _read_group(group_id)
     if not group:
         return
     group["status"] = "running"
+    group["started_at"] = _time.time()
     _write_group(group)
+
+    def _finish_item(it: dict) -> None:
+        # Group ETA (user, 2026-11-02): record when each video
+        # started/finished, so the remaining time can be estimated
+        # from real completed videos, not guessed.
+        now = _time.time()
+        it["finished_at"] = now
+        if it.get("started_at"):
+            it["duration_sec"] = round(now - it["started_at"], 1)
     settings = effective_settings()
     profiles = settings.get("profiles") or {}
     for idx, item in enumerate(group["items"]):
+        # Resume safety (user, 2026-11-02): a retried group must
+        # NOT redo videos that already finished — only failed /
+        # waiting videos run. Done videos keep their title, link
+        # and local file exactly as they were.
+        if item.get("status") in ("done_local", "uploaded"):
+            continue
         group["current_index"] = idx
         item["status"] = "processing"
+        item["started_at"] = _time.time()
+        item.pop("finished_at", None)
+        item.pop("duration_sec", None)
         _write_group(group)
         job_id = uuid.uuid4().hex[:12]
         item["job_id"] = job_id
@@ -854,12 +934,14 @@ def _run_group(group_id: str) -> None:
         except Exception as exc:  # noqa: BLE001
             item["status"] = "failed"
             item["error"] = str(exc)[-1000:]
+            _finish_item(item)
             _write_group(group)
             continue
         job = read_job(job_id)
         if job.get("status") != "processed":
             item["status"] = "failed"
             item["error"] = (job.get("error") or "Processing failed.")[-1000:]
+            _finish_item(item)
             _write_group(group)
             continue
         # Generated metadata, like Auto done in the frontend.
@@ -883,6 +965,7 @@ def _run_group(group_id: str) -> None:
         if upload == "skip":
             item["status"] = "done_local"
             item["download_url"] = f"/api/download/{job_id}"
+            _finish_item(item)
             _write_group(group)
             continue
         # Upload with the chosen privacy: public, private, or unlisted
@@ -901,12 +984,14 @@ def _run_group(group_id: str) -> None:
             item["status"] = "uploaded"
             item["youtube_video_id"] = result.get("video_id")
             item["youtube_url"] = f"https://www.youtube.com/watch?v={result.get('video_id')}" if result.get("video_id") else ""
+            _finish_item(item)
             _write_group(group)
             shutil.rmtree(job_dir(job_id), ignore_errors=True)
         except Exception as exc:  # noqa: BLE001
             item["status"] = "failed_upload"
             item["error"] = str(exc)[-1000:]
             item["download_url"] = f"/api/download/{job_id}"
+            _finish_item(item)
             _write_group(group)
             continue
     group["status"] = "done"
@@ -935,6 +1020,39 @@ def create_group(payload: GroupRequest) -> dict:
     _write_group(group)
     threading.Thread(target=_run_group, args=(group_id,), daemon=True).start()
     return group
+
+
+@app.post("/api/groups/{group_id}/retry")
+def retry_group(group_id: str) -> dict:
+    """Retry only the failed videos of a finished group, from
+    where it left off (user, 2026-11-02).
+
+    Failed / failed_upload items go back to "waiting" and the
+    group runs again; _run_group skips done_local / uploaded
+    items, so completed videos are never re-downloaded or
+    re-uploaded. Returns 400 while a group is still running,
+    and a plain message when nothing failed.
+    """
+    group = _read_group(group_id)
+    if not group:
+        raise HTTPException(404, "Group not found.")
+    if group.get("status") == "running":
+        raise HTTPException(400, "Group is still running. Wait for it to finish, then retry.")
+    failed = [it for it in group["items"] if it.get("status") in ("failed", "failed_upload")]
+    if not failed:
+        return {**group, "retried": 0, "message": "No failed videos to retry."}
+    for it in failed:
+        it["status"] = "waiting"
+        it["error"] = None
+        it["job_id"] = None
+        it.pop("progress", None)
+        it.pop("stage", None)
+    group["status"] = "running"
+    group["current_index"] = None
+    _write_group(group)
+    threading.Thread(target=_run_group, args=(group_id,), daemon=True).start()
+    return {**group, "retried": len(failed),
+            "message": f"Retrying {len(failed)} failed video(s); completed videos will not run again."}
 
 
 @app.get("/api/groups")
@@ -1047,6 +1165,47 @@ def get_group(group_id: str) -> dict:
             job = read_job(item["job_id"])
             item["progress"] = job.get("auto_progress") or job.get("process_progress") or 0
             item["stage"] = job.get("auto_stage") or job.get("process_stage") or ""
+    # Group ETA (user, 2026-11-02): estimated seconds left, from
+    # real data only — average time of completed videos, plus the
+    # current video's remaining time extrapolated from its own
+    # progress. Returns None (frontend shows "Calculating…")
+    # until there is any data to base it on, instead of a fake
+    # number. All values are labelled "about" in the UI, because
+    # videos differ in length and encode speed.
+    import time as _time
+    now = _time.time()
+    started = group.get("started_at")
+    group["elapsed_sec"] = round(now - started, 1) if started else None
+    if group.get("status") == "done":
+        group["eta_sec"] = 0
+        return group
+    done_statuses = ("done_local", "uploaded", "failed", "failed_upload")
+    done_items = [it for it in group["items"] if it["status"] in done_statuses]
+    durations = [it["duration_sec"] for it in done_items if it.get("duration_sec")]
+    avg = sum(durations) / len(durations) if durations else None
+    current = next((it for it in group["items"] if it["status"] == "processing"), None)
+    current_remaining = None
+    current_total = None
+    if current and current.get("started_at"):
+        elapsed = now - current["started_at"]
+        pct = current.get("progress") or 0
+        if pct and pct > 5 and pct < 100:
+            current_total = elapsed / (pct / 100.0)
+            current_remaining = max(0.0, current_total - elapsed)
+        elif avg is not None:
+            current_remaining = avg
+    remaining_items = len(group["items"]) - len(done_items) - (1 if current else 0)
+    if current_remaining is None and avg is None:
+        group["eta_sec"] = None
+    else:
+        # Waiting videos: use the average of finished videos if
+        # any exist; otherwise use the current video's own total
+        # as a rough proxy — better than counting them as zero,
+        # which would claim the group is almost done when a whole
+        # video is still waiting. Still labelled "about" in UI.
+        per_video = avg if avg is not None else current_total
+        eta = (current_remaining or 0) + remaining_items * (per_video or 0)
+        group["eta_sec"] = round(eta, 1)
     return group
 
 
