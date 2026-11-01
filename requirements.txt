@@ -3,3 +3,5 @@ uvicorn
 yt-dlp
 python-multipart
 Pillow
+google-api-python-client
+google-auth-oauthlib

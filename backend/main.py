@@ -1383,13 +1383,38 @@ class YoutubeCredentialsRequest(BaseModel):
     client_secret: str
 
 
+@app.post("/api/youtube/connect-start")
+def start_youtube_connect() -> dict:
+    """One-click YouTube connect (user, 2026-11-01): the tool
+    installs the Google libraries itself and runs the sign-in flow
+    in the background. The frontend opens the returned auth_url in
+    a new tab; the user only signs in with Google — no terminal,
+    no pip, no script, no restart."""
+    try:
+        return youtube_upload.start_connect()
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/youtube/connect-status")
+def get_youtube_connect_status() -> dict:
+    """Polling state for the one-click connect flow."""
+    return youtube_upload.connect_status()
+
+
+@app.post("/api/youtube/disconnect")
+def disconnect_youtube() -> dict:
+    """Remove the saved Google sign-in so another account can connect."""
+    return youtube_upload.disconnect()
+
+
 @app.post("/api/youtube/credentials")
 def save_youtube_credentials(payload: YoutubeCredentialsRequest) -> dict:
     """Save Google OAuth credentials to client_secrets.json (local,
     gitignored, never pushed). The file format is the Desktop-app
     format Google Cloud downloads: {"installed": {client_id,
-    client_secret, ...}}. After saving, install the libraries and
-    run the connect script to create tokens/youtube_token.json."""
+    client_secret, ...}}. After saving, press Connect YouTube
+    account in Admin — the tool does the sign-in itself."""
     if not payload.client_id.strip() or not payload.client_secret.strip():
         raise HTTPException(400, "Client ID and Client Secret are both required.")
     data = {

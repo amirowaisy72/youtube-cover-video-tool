@@ -198,16 +198,18 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    Manual Edit starts with Manual defaults. Encoder, CRF, preset,
    green rectangle and auto-detect are shared.
    YouTube channels in Admin: Admin has a "YouTube channels"
-   section with step-by-step instructions (Google Cloud Console
+   section with button-only setup (Google Cloud Console
    → YouTube Data API v3 → OAuth Desktop app → Client ID/Secret
-   → Save → pip install → python scripts/youtube_connect.py →
-   restart). Client ID/Secret are saved locally to
-   client_secrets.json (gitignored, never pushed). Channels can
-   also be added by name + Channel ID (YouTube Studio → Settings
-   → Channel → Advanced settings) and will show in the Upload
-   step even before Google sign-in; upload itself still needs
-   the sign-in token, because YouTube uploads to the signed-in
-   account's channel.
+   → Save → Connect YouTube account, then sign in with Google).
+   The tool installs the Google libraries itself, runs the
+   sign-in in the background, and saves the token — no terminal,
+   no pip command, no script, no restart. Client ID/Secret are
+   saved locally to client_secrets.json (gitignored, never pushed).
+   Channels can also be added by name + Channel ID (YouTube Studio
+   → Settings → Channel → Advanced settings) and will show in
+   the Upload step even before Google sign-in; upload itself
+   still needs the sign-in token, because YouTube uploads to the
+   signed-in account's channel.
    Processing lock: when Process video is clicked, the whole page
    blurs and nothing else is clickable — only a Processing card
    shows, with the same progress bar, text and log. The lock
@@ -319,25 +321,25 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
 
 Upload needs no paid service, but it does need a Google Cloud project
 you create yourself. No credentials are included in this project.
+No terminal work is needed — just buttons in Admin → YouTube channels.
 
 1. Go to Google Cloud Console, create a project, and enable the
    **YouTube Data API v3**.
-2. Create OAuth 2.0 credentials (Desktop app) and download
-   `client_secrets.json` into the project root.
-3. Install the optional upload libraries:
-   ```bash
-   pip install google-api-python-client google-auth-oauthlib
-   ```
-4. Run a first-time OAuth sign-in (any small script using
-   `google_auth_oauthlib.flow.InstalledAppFlow` with the
-   `https://www.googleapis.com/auth/youtube.upload` scope, or the
-   Google API Python client quickstart) and save the token to
+2. Create OAuth 2.0 credentials (Desktop app) and copy the
+   Client ID and Client Secret.
+3. In the tool, Admin → YouTube channels: paste the Client ID and
+   Client Secret, press **Save YouTube credentials**, then press
+   **Connect YouTube account** and sign in with Google in the tab
+   that opens. The tool installs the Google libraries itself
+   (they are also in requirements.txt), runs the sign-in in the
+   background, and saves the token to `tokens/youtube_token.json`
+   on this computer only. No pip command, no script, no restart.
+   The app reads the token from `YOUTUBE_TOKEN_FILE` if that
+   environment variable is set, otherwise from
    `tokens/youtube_token.json`.
-   The app reads it from `YOUTUBE_TOKEN_FILE` if that environment
-   variable is set, otherwise from `tokens/youtube_token.json`.
-5. Restart the server. The upload section will show “connected” and
-   list your channels. If anything is missing, it shows a clear
-   message instead of failing silently, and `/api/upload-youtube`
+4. The Upload section will then show “connected” and list your
+   channels. If anything is missing, it shows a clear message
+   instead of failing silently, and `/api/upload-youtube`
    returns HTTP 400 explaining the missing step.
 
 Free quota note: the YouTube Data API free quota allows roughly
@@ -439,3 +441,10 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
   shows as a rectangle instead of vanishing. To test: download a
   video, choose a cover, go to Step 3, tick the outline, press
   Detect green area — the video should appear inside the green area.
+- One-click YouTube connect (2026-11-01): a normal user only
+  clicks buttons — no terminal, no pip, no script, no restart.
+  Admin → YouTube channels now has a Connect YouTube account
+  button (plus Disconnect). The tool installs the Google
+  libraries itself if needed, opens Google sign-in in a new tab,
+  and saves the token in the background on a free localhost port.
+  The old pip/script/restart steps are gone from the UI and README.

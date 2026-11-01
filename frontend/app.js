@@ -670,7 +670,7 @@ document.getElementById("btn-save-yt-credentials").addEventListener("click", asy
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
     });
-    document.getElementById("yt-credentials-result").textContent = "Saved to client_secrets.json on this computer. Next: install the libraries and run python scripts/youtube_connect.py, then restart run.bat.";
+    document.getElementById("yt-credentials-result").textContent = "Saved on this computer. Next: press Connect YouTube account below and sign in with Google.";
     document.getElementById("yt-client-secret").value = "";
     await loadYoutubeStatus();
   } catch (err) {
@@ -678,10 +678,68 @@ document.getElementById("btn-save-yt-credentials").addEventListener("click", asy
   }
 });
 
+// One-click YouTube connect (user, 2026-11-01): no terminal, no
+// pip, no script, no restart. The tool installs the libraries,
+// opens Google sign-in, and saves the token itself. This polls
+// until connected, failed, or 5 minutes pass.
+let ytConnectTimer = null;
+function stopYtConnectPolling() {
+  if (ytConnectTimer) { clearInterval(ytConnectTimer); ytConnectTimer = null; }
+}
+document.getElementById("btn-connect-youtube").addEventListener("click", async () => {
+  const result = document.getElementById("yt-connect-result");
+  stopYtConnectPolling();
+  result.textContent = "Starting… the tool is getting what it needs ready (first time can take a minute). Google sign-in will open in a new tab.";
+  try {
+    const data = await api("/api/youtube/connect-start", { method: "POST" });
+    if (data.already_connected) {
+      result.textContent = "YouTube is already connected. Your channels are in the Upload step.";
+      await loadYoutubeStatus();
+      return;
+    }
+    if (data.auth_url) window.open(data.auth_url, "_blank");
+    result.textContent = "Google sign-in opened in a new tab. Sign in with the Google account that owns your channel, then come back here — your channels will appear automatically.";
+    const started = Date.now();
+    ytConnectTimer = setInterval(async () => {
+      try {
+        const st = await api("/api/youtube/connect-status");
+        if (st.connected) {
+          stopYtConnectPolling();
+          result.textContent = "Connected! Your channels are now in the Upload step.";
+          await loadYoutubeStatus();
+        } else if (st.error) {
+          stopYtConnectPolling();
+          result.textContent = "Connect failed: " + st.error;
+          await loadYoutubeStatus();
+        } else if (Date.now() - started > 5 * 60 * 1000) {
+          stopYtConnectPolling();
+          result.textContent = "Sign-in was not completed in time. Press Connect YouTube account again.";
+        }
+      } catch (e) { /* keep polling until timeout */ }
+    }, 3000);
+  } catch (err) {
+    result.textContent = "Connect failed: " + err.message;
+  }
+});
+document.getElementById("btn-disconnect-youtube").addEventListener("click", async () => {
+  const result = document.getElementById("yt-connect-result");
+  try {
+    await api("/api/youtube/disconnect", { method: "POST" });
+    result.textContent = "Disconnected. Press Connect YouTube account to sign in with another account.";
+    await loadYoutubeStatus();
+  } catch (err) {
+    result.textContent = "Disconnect failed: " + err.message;
+  }
+});
+
 async function loadYoutubeStatus() {
   try {
     const s = await api("/api/youtube/status");
     document.getElementById("yt-status").textContent = "YouTube: " + s.message;
+    const connectBtn = document.getElementById("btn-connect-youtube");
+    const disconnectBtn = document.getElementById("btn-disconnect-youtube");
+    if (connectBtn) connectBtn.textContent = s.connected ? "Reconnect YouTube account" : "Connect YouTube account";
+    if (disconnectBtn) disconnectBtn.hidden = !s.connected;
     const adminStatus = document.getElementById("yt-admin-status");
     if (adminStatus) {
       adminStatus.textContent = s.configured_channels && s.configured_channels.length

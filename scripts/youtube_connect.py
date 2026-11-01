@@ -1,18 +1,15 @@
-"""First-time YouTube sign-in: creates tokens/youtube_token.json.
+"""Old manual YouTube sign-in — kept only as a fallback.
 
-Run AFTER you have saved client_secrets.json (via Admin settings,
-or by downloading it from Google Cloud Console into the project root)
-and installed the libraries:
-    pip install google-api-python-client google-auth-oauthlib
+Normal users do NOT need this script any more (user, 2026-11-01):
+in Admin → YouTube channels, press Connect YouTube account and
+sign in with Google — the tool installs the libraries, runs the
+sign-in, and saves the token itself, with no terminal, no pip,
+no script, and no restart.
 
-Then:
-    python scripts/youtube_connect.py
-
-A browser window will open for Google sign-in. Choose the Google
-account that owns your YouTube channel, allow YouTube upload access,
-and the token will be saved locally (tokens/ is gitignored).
-Restart run.bat afterwards — the Upload section will then list
-your channels.
+This script still works the old way if you prefer it: save
+client_secrets.json first, install the libraries, then run it.
+A browser window will open for Google sign-in, and the token
+will be saved locally (tokens/ is gitignored).
 """
 import os
 import sys

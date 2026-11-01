@@ -398,18 +398,16 @@ tailwind.config = {
     <div class="auto-summary">
       <b>⚠️ Important — please read before adding a channel:</b><br />
       Adding a channel name + Channel ID here only adds it to the list in the Upload step. <b>It does NOT enable uploading by itself.</b><br />
-      Uploading needs the Google sign-in steps below (Client ID + Client Secret saved, libraries installed, <b>python scripts/youtube_connect.py</b> run, token created, then restart run.bat).<br />
-      If Google sign-in is complete, your channels appear automatically — manual add is not needed.<br />
+      To enable uploading, just press <b>Connect YouTube account</b> below and sign in with Google — the tool installs what it needs and saves the sign-in itself.<br />
+      After connecting, your channels appear automatically — manual add is not needed.<br />
       Upload always goes to the channel of the Google account you signed in with.
     </div>
     <p id="yt-admin-status" class="muted"></p>
+    <p class="muted mt-2">No technical work needed — just buttons. The only manual part is creating the Google Cloud project once:</p>
     <ol class="muted mt-2" style="list-style:decimal; padding-left:20px;">
-      <li>Go to <b>Google Cloud Console</b> (console.cloud.google.com), create a project, enable <b>YouTube Data API v3</b>.</li>
+      <li>Open <a href="https://console.cloud.google.com" target="_blank" rel="noopener">Google Cloud Console</a>, create a project, enable <b>YouTube Data API v3</b>.</li>
       <li>Go to <b>APIs &amp; Services → Credentials → Create Credentials → OAuth client ID → Desktop app</b>. Copy the <b>Client ID</b> and <b>Client Secret</b> from there.</li>
-      <li>Paste them below and press <b>Save YouTube credentials</b>. They are saved only on this computer, in <b>client_secrets.json</b> (never uploaded to GitHub).</li>
-      <li>Run: <b>pip install google-api-python-client google-auth-oauthlib</b>, then <b>python scripts/youtube_connect.py</b>. Sign in with the Google account that owns your channel. This creates <b>tokens/youtube_token.json</b>.</li>
-      <li>Restart run.bat. Your channels will show in the Upload step.</li>
-      <li>Channel ID (optional, for the list below): YouTube Studio → Settings → Channel → Advanced settings → Channel ID. Or open your channel page — the ID starts with <b>UC</b>.</li>
+      <li>Paste them below, press <b>Save YouTube credentials</b>, then press <b>Connect YouTube account</b> and sign in with Google in the tab that opens. The tool does the rest itself — no terminal, no pip command, no script, no restart.</li>
     </ol>
     <label class="field-label mt-3">Google Client ID</label>
     <input id="yt-client-id" type="text" placeholder="123456789000-abc.apps.googleusercontent.com" />
@@ -419,14 +417,19 @@ tailwind.config = {
       <button id="btn-save-yt-credentials" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Save YouTube credentials</button>
     </div>
     <p id="yt-credentials-result" class="muted mt-3"></p>
-    <label class="field-label mt-4">Add a channel to the list</label>
+    <div class="mt-3 flex flex-wrap gap-3">
+      <button id="btn-connect-youtube" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Connect YouTube account</button>
+      <button id="btn-disconnect-youtube" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Disconnect</button>
+    </div>
+    <p id="yt-connect-result" class="muted mt-3"></p>
+    <label class="field-label mt-4">Add a channel to the list (optional)</label>
     <div class="flex flex-col sm:flex-row gap-3">
       <input id="yt-channel-name" type="text" placeholder="Channel name" class="flex-1 min-w-0" />
       <input id="yt-channel-id" type="text" placeholder="Channel ID (UC...)" class="flex-1 min-w-0" />
       <button id="btn-add-channel" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Add channel</button>
     </div>
     <ul id="yt-channel-list" class="timeline-list mt-3"></ul>
-    <p class="muted mt-2">Note: Adding a channel here only shows it in the Upload list. It does not enable uploading — that needs Google sign-in (steps above).</p>
+    <p class="muted mt-2">Note: Manual add only shows a channel in the Upload list. It does not enable uploading — that needs the Connect button above. Normally you do not need manual add: after Connect, your channels appear automatically.</p>
   </section>
   </div>
 
