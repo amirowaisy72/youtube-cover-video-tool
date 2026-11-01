@@ -184,6 +184,35 @@ def youtube_status() -> dict:
     }
 
 
+# Upload progress (user, 2026-11-02): Step 5 used to show only
+# "Uploading…" with no idea how far it had got. The resumable
+# upload now reports each chunk, and the frontend polls this
+# store while the upload request is still running, so a real
+# progress bar + MB counts show. In-memory only (local tool,
+# one user, one server process) — never pushed, no secrets.
+UPLOAD_PROGRESS: dict[str, dict] = {}
+
+
+def _set_upload_progress(job_id: str, percent: float, uploaded: int,
+                         total: int, status: str) -> None:
+    if not job_id:
+        return
+    UPLOAD_PROGRESS[job_id] = {
+        "percent": round(float(percent), 1),
+        "uploaded_bytes": int(uploaded),
+        "total_bytes": int(total),
+        "status": status,
+    }
+
+
+def get_upload_progress(job_id: str) -> dict:
+    entry = UPLOAD_PROGRESS.get(job_id or "")
+    if not entry:
+        return {"percent": 0, "uploaded_bytes": 0, "total_bytes": 0,
+                "status": "unknown"}
+    return dict(entry)
+
+
 def upload_video(
     video_path: str | Path,
     title: str,
@@ -191,6 +220,7 @@ def upload_video(
     tags: str = "",
     privacy_status: str = "private",
     channel_id: str = "",
+    on_progress=None,
 ) -> dict:
     """Upload a video file. Raises RuntimeError if not configured.
 
@@ -240,11 +270,41 @@ def upload_video(
         "snippet": snippet,
         "status": {"privacyStatus": privacy_status or "private"},
     }
-    media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True)
+    # Resumable upload in 2 MB chunks (user, 2026-11-02): the old
+    # single-chunk execute() gave no progress at all. next_chunk()
+    # reports after every chunk, so the UI bar moves steadily
+    # instead of jumping from 0% to done. A 15 MB final video
+    # therefore shows ~8 steps, not one long silence.
+    total_bytes = 0
+    try:
+        total_bytes = Path(video_path).stat().st_size
+    except Exception:
+        total_bytes = 0
+    if on_progress:
+        try:
+            on_progress(0.0, 0, total_bytes)
+        except Exception:
+            pass
+    media = MediaFileUpload(str(video_path), chunksize=2 * 1024 * 1024,
+                            resumable=True)
     request = youtube.videos().insert(
         part="snippet,status", body=body, media_body=media
     )
-    response = request.execute()
+    response = None
+    while response is None:
+        status, response = request.next_chunk()
+        if status is not None and on_progress:
+            try:
+                uploaded = int(status.resumable_progress or 0)
+                pct = (uploaded / total_bytes * 100) if total_bytes else 0.0
+                on_progress(pct, uploaded, total_bytes)
+            except Exception:
+                pass
+    if on_progress:
+        try:
+            on_progress(100.0, total_bytes, total_bytes)
+        except Exception:
+            pass
     video_id = response.get("id", "")
     return {
         "video_id": video_id,

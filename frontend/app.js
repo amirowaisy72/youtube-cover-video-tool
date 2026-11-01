@@ -45,12 +45,25 @@ bindFitPair("set-manual-fit-cover", "set-manual-fit-full");
 
 function getZoom() { return parseFloat(document.getElementById("zoom").value) || 1; }
 
-function clampPan() {
+function clampPan(wPct, hPct) {
   const zoom = getZoom();
   if (zoom <= 1.01) { panX = 0; panY = 0; return; }
-  const max = (zoom - 1) / 2 * 100;
-  panX = Math.max(-max, Math.min(max, panX));
-  panY = Math.max(-max, Math.min(max, panY));
+  // FIX (user, 2026-11-02): the old clamp allowed pan up to
+  // (zoom-1)/2*100 in BOTH directions, whatever the video's
+  // actual size in the box was. In Full mode that is wrong:
+  // at 1.2x a 16:9 video is 120% wide but only 89% tall in a
+  // 1.32:1 box, so the true vertical room is only (100-89)/2
+  // = 5.5%, not 10%. Live let the user drag to 10% (video
+  // partly outside the box), final could not follow it, and
+  // placement differed. Now the clamp is exact, from the
+  // video's actual size in the box: |pan| <= |100 - size%|/2
+  // in each direction. Callers that know the size pass it;
+  // others fall back to the old zoom-only bound, and the
+  // layout pass below re-clamps exactly anyway.
+  const maxX = wPct === undefined ? (zoom - 1) / 2 * 100 : Math.abs(100 - wPct) / 2;
+  const maxY = hPct === undefined ? (zoom - 1) / 2 * 100 : Math.abs(100 - hPct) / 2;
+  panX = Math.max(-maxX, Math.min(maxX, panX));
+  panY = Math.max(-maxY, Math.min(maxY, panY));
 }
 
 function setZoomValue(z) {
@@ -173,12 +186,14 @@ function applyLiveVideoLayout() {
     }
     const wPct = fitW * zoom;
     const hPct = fitH * zoom;
+    clampPan(wPct, hPct);
     video.style.objectFit = "fill";
     video.style.width = wPct + "%";
     video.style.height = hPct + "%";
     video.style.left = ((100 - wPct) / 2 + panX) + "%";
     video.style.top = ((100 - hPct) / 2 + panY) + "%";
   } else {
+    clampPan(zoom * 100, zoom * 100);
     video.style.objectFit = "cover";
     video.style.width = (zoom * 100) + "%";
     video.style.height = (zoom * 100) + "%";
@@ -208,6 +223,10 @@ function applyLiveVideoLayout() {
   });
   document.getElementById("btn-live-hide").textContent =
     liveVideoHidden ? "Show video" : "Hide video — check cover";
+  // Save again after the exact clamp above, so a clamped pan is
+  // what Process sends and what a refresh restores — not the
+  // pre-clamp drag value saved at the top of this function.
+  saveState();
 }
 
 function updateLivePreview() {
@@ -1786,6 +1805,29 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
   const pickedId = picked ? picked.value : "";
   const pickedName = picked && picked.selectedOptions.length ? picked.selectedOptions[0].textContent : "";
   setStatus(pickedId ? `Uploading to ${pickedName}…` : "Uploading to YouTube…");
+  // Upload progress (user, 2026-11-02): the upload fetch runs
+  // in the background, so poll the backend every second and
+  // move the bar + MB counts while it runs. Polling stops as
+  // soon as the upload fetch itself returns (success or error).
+  const progWrap = document.getElementById("yt-upload-progress");
+  const progBar = document.getElementById("yt-upload-progress-bar");
+  const progText = document.getElementById("yt-upload-progress-text");
+  if (progWrap) progWrap.hidden = false;
+  if (progBar) progBar.style.width = "0%";
+  if (progText) progText.textContent = "Uploading… 0%";
+  const progTimer = setInterval(async () => {
+    try {
+      const p = await api("/api/upload-progress/" + jobId);
+      if (progBar) progBar.style.width = (p.percent || 0) + "%";
+      if (progText) {
+        const up = (p.uploaded_bytes / 1048576).toFixed(1);
+        const tot = (p.total_bytes / 1048576).toFixed(1);
+        progText.textContent = p.total_bytes
+          ? `Uploading… ${p.percent}% (${up} MB of ${tot} MB)`
+          : `Uploading… ${p.percent}%`;
+      }
+    } catch (e) { /* keep the upload itself running; bar just stalls */ }
+  }, 1000);
   try {
     const data = await api("/api/upload-youtube", {
       method: "POST",
@@ -1799,10 +1841,15 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
         channel_id: pickedId,
       }),
     });
+    clearInterval(progTimer);
+    if (progBar) progBar.style.width = "100%";
+    if (progText) progText.textContent = "Upload complete — 100%";
     document.getElementById("yt-result").textContent = "Uploaded: " + (data.url || data.video_id);
     setStatus("Uploaded to YouTube. Local working files for this job were deleted to save space.");
     if (data.local_files_deleted) { clearSavedState(); }
   } catch (err) {
+    clearInterval(progTimer);
+    if (progText) progText.textContent = "Upload failed.";
     document.getElementById("yt-result").textContent = "";
     setStatus("YouTube upload failed: " + err.message);
   }

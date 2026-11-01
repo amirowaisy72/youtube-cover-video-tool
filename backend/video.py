@@ -379,20 +379,37 @@ def build_process_command(
         crop_w, crop_h = min(fit_w, w), min(fit_h, h)
         cx = int(max(0, min(fit_w - crop_w, (fit_w - crop_w) / 2 - pan_px))) if fit_w > crop_w else 0
         cy = int(max(0, min(fit_h - crop_h, (fit_h - crop_h) / 2 - pan_py))) if fit_h > crop_h else 0
+        # FIX (user, 2026-11-02): manual zoom/drag in Full mode
+        # placed the video differently in live vs final. Root
+        # cause: when the video was SMALLER than the box in a
+        # dimension (black bars, e.g. Full 1.2x: height 89% of
+        # the box), live moved the video by pan inside the bars,
+        # but final always centred it with pad and IGNORED pan
+        # for that dimension — up to ~70-130px off for this
+        # user's 1698x1288 box. Now pad also carries pan, clamped
+        # to the bar space, so live and final place it identically.
+        # (The frontend was fixed at the same time to clamp pan
+        # to exactly the bar/crop space, so a clamped pad here
+        # and a clamped live position always agree.)
+        pad_x = int(max(0, min(w - crop_w, (w - crop_w) // 2 + pan_px)))
+        pad_y = int(max(0, min(h - crop_h, (h - crop_h) // 2 + pan_py)))
         video_filters = [f"scale={fit_w}:{fit_h}"]
         if crop_w != fit_w or crop_h != fit_h:
             video_filters.append(f"crop={crop_w}:{crop_h}:{cx}:{cy}")
         if crop_w != w or crop_h != h:
-            video_filters.append(f"pad={w}:{h}:{(w - crop_w) // 2}:{(h - crop_h) // 2}:black")
+            video_filters.append(f"pad={w}:{h}:{pad_x}:{pad_y}:black")
         overlay_x, overlay_y = x, y
         fit_is_padded = False
     else:
         # Unknown source size: cover uses increase+crop, full uses
         # decrease+pad, matching the live preview for each mode.
         if fit_mode == "full":
+            # Same pan-in-pad fix as the known-size branch above,
+            # expressed in FFmpeg's own min/max so the pad offset
+            # can never leave the bar space.
             video_filters = [
                 f"scale={round(w * zoom)}:{round(h * zoom)}:force_original_aspect_ratio=decrease",
-                f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black",
+                f"pad={w}:{h}:min(max((ow-iw)/2+{pan_px:.0f},0),ow-iw):min(max((oh-ih)/2+{pan_py:.0f},0),oh-ih):black",
             ]
         else:
             video_filters = [

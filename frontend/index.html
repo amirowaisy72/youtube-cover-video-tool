@@ -288,6 +288,13 @@ tailwind.config = {
     <div class="mt-3">
       <button id="btn-upload-yt" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Upload to selected channel</button>
     </div>
+    <!-- Upload progress (user, 2026-11-02): while the upload
+         request runs, the frontend polls the backend every second
+         and this bar + MB counts move — no more silent wait. -->
+    <div id="yt-upload-progress" class="mt-3" hidden>
+      <div class="progress-track"><div id="yt-upload-progress-bar" class="progress-bar" style="width:0%"></div></div>
+      <p id="yt-upload-progress-text" class="muted mt-2">Uploading… 0%</p>
+    </div>
     <p id="yt-result" class="muted mt-3"></p>
   </section>
   </div>

@@ -1493,11 +1493,29 @@ class UploadRequest(BaseModel):
     channel_id: str = ""
 
 
+@app.get("/api/upload-progress/{job_id}")
+def get_upload_progress(job_id: str) -> dict:
+    """Upload progress for Step 5 polling (user, 2026-11-02).
+
+    The upload request itself runs synchronously, so the frontend
+    polls this endpoint every second while it waits for that
+    request to return. Returns percent + byte counts, or
+    status 'unknown' before any upload for this job has started.
+    """
+    return {"job_id": job_id, **youtube_upload.get_upload_progress(job_id)}
+
+
 @app.post("/api/upload-youtube")
 def upload_youtube(payload: UploadRequest) -> dict:
     final_path = job_dir(payload.job_id) / "final.mp4"
     if not final_path.exists():
         raise HTTPException(404, "Final video not ready yet. Process a video first.")
+    youtube_upload._set_upload_progress(payload.job_id, 0, 0, 0, "uploading")
+
+    def _progress(pct: float, uploaded: int, total: int) -> None:
+        youtube_upload._set_upload_progress(
+            payload.job_id, pct, uploaded, total, "uploading")
+
     try:
         result = youtube_upload.upload_video(
             final_path,
@@ -1506,11 +1524,15 @@ def upload_youtube(payload: UploadRequest) -> dict:
             tags=payload.tags or "",
             privacy_status=payload.privacy_status or "private",
             channel_id=payload.channel_id or "",
+            on_progress=_progress,
         )
     except RuntimeError as exc:
+        youtube_upload._set_upload_progress(payload.job_id, 0, 0, 0, "error")
         raise HTTPException(400, str(exc))
     except Exception as exc:
+        youtube_upload._set_upload_progress(payload.job_id, 0, 0, 0, "error")
         raise HTTPException(500, f"YouTube upload failed: {exc}")
+    youtube_upload._set_upload_progress(payload.job_id, 100, 0, 0, "done")
     # Uploaded copy is now on YouTube — delete all local files for
     # this job so nothing accumulates on disk.
     shutil.rmtree(job_dir(payload.job_id), ignore_errors=True)

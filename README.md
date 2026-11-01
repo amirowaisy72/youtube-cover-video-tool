@@ -165,14 +165,27 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    video is ready, POST /api/generate-metadata builds a NEW title,
    description and tags from the original keywords — locally in
    backend/metadata.py, with NO AI API, no key, no credits and
-   no limits, offline and unlimited. The original description is
-   never copied, the new title is never identical, only single
-   keywords are carried over, and the new description is written
-   from scratch. The generated version is shown with the final
-   video and prefilled into the Upload step, with Regenerate,
-   "Use these for upload" and "Use original instead" buttons —
-   the user double-checks and edits it before anything is
-   published on YouTube.
+   no limits, offline and unlimited. Keywords are mined by score
+   from title + original tags + original description (words and
+   short phrases only — no original sentence is ever copied), the
+   new title is built from the top keywords with 8 different
+   formulas (never the original, never profanity, never a
+   4-word chunk of the original), the description is structured
+   like a real YouTube description (hook, "In this video" key
+   points, why it matters, hashtags, original-words disclaimer),
+   and tags are tiered for SEO (core phrases, long-tail phrases,
+   related terms, broad terms, junk words filtered, 500-char
+   limit respected). The generated version is shown with the
+   final video and prefilled into the Upload step, with
+   Regenerate, "Use these for upload" and "Use original
+   instead" buttons — the user double-checks and edits it
+   before anything is published on YouTube.
+   Upload progress: when Upload to selected channel is clicked,
+   Step 5 shows a progress bar with % and MB counts. The backend
+   uploads in 2 MB resumable chunks (next_chunk) and the
+   frontend polls GET /api/upload-progress/{job_id} every second
+   while the upload request runs, so the bar moves steadily
+   instead of a silent "Uploading…" wait.
    Admin Flip default: Admin settings now has "Flip video by
    default" (default_flip, default on). It controls manual jobs,
    Auto mode and the Process API when flip is not sent — the
@@ -192,6 +205,15 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    final are identical — verified with a real FFmpeg test
    (cover: box top/bottom red; full: box top/bottom black,
    centre red, cover corner blue, no green in either).
+   Manual zoom/drag fix (2026-11-02): in Full mode with black
+   bars, live used to move the video by pan inside the bars
+   while the final always centred it with pad and ignored pan
+   for that dimension (up to ~130 px off), and live also let
+   pan go further than the final could follow. Now the final
+   pad carries pan (clamped to the bar), and live clamps pan
+   per-dimension to the exact room in that dimension, so
+   manual zoom/drag matches exactly. Verified with a real
+   encode (Full 1.2x, pan 5.5%: pad 0:141 as calculated).
    Separate Admin defaults: Admin has "Auto mode defaults"
    (speed, voice, pitch, flip, fit) and "Manual mode defaults"
    (same controls, separate values). Auto uses Auto defaults,
