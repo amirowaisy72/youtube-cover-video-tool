@@ -448,3 +448,25 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
   libraries itself if needed, opens Google sign-in in a new tab,
   and saves the token in the background on a free localhost port.
   The old pip/script/restart steps are gone from the UI and README.
+- Live vs final diagnosis + upload gating + clean logs
+  (2026-11-02, held locally, not pushed yet): Step 4 now shows
+  exactly which settings the final was processed with, plus the
+  same stale-final warning as Step 3, and a note that the final
+  player starts at 0:00 while Live preview loops — so a different
+  frame of a moving video is not mistaken for a framing bug.
+  Backend zoom clamp fixed to 0.5x–2.0x (it used to force 1.0x
+  minimum, so a 0.7x live preview came out as 1.0x final). Step 5
+  Upload is now disabled until Google sign-in is actually
+  connected (a channel name alone does not enable upload), with
+  a button that jumps to Admin → YouTube channels to connect.
+  Logs are cleaner: /favicon.ico now answers 204 instead of 404,
+  and the harmless Windows ConnectionResetError from a browser
+  closing a video stream early is swallowed (206 Partial Content
+  for video chunks is normal, not an error).
+- Connect popup fix (2026-11-02, held locally, not pushed yet):
+  Connect used to claim "Google sign-in opened in a new tab"
+  when nothing opened, because window.open() ran after awaiting
+  the API and the browser's popup blocker silently blocked it.
+  Now the tab opens synchronously inside the click, its address
+  is set when the sign-in URL arrives, and a clickable "Click
+  here to sign in with Google" link is always shown as a fallback.

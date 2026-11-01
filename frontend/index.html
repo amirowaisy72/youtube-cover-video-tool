@@ -234,6 +234,9 @@ tailwind.config = {
 
   <section class="card">
     <div class="step-head"><span class="step">4</span><h2>Preview &amp; download</h2></div>
+    <p id="final-settings" class="muted mt-2"></p>
+    <p id="final-stale-warning" class="muted mt-2" hidden>⚠️ This final video was made with older settings — live settings changed after processing. Press Process video again in Step 3 to make the final match the live preview.</p>
+    <p class="muted mt-2">Note: the final player starts at 0:00, while Live preview loops — a moving video will look different at different moments even when the settings match. Compare the same moment, not just the first frame.</p>
     <video id="preview-player" controls width="640" class="rounded-xl w-full"></video>
     <div class="mt-3">
       <button id="btn-download-final" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0">Download final video</button>
@@ -266,6 +269,10 @@ tailwind.config = {
   <section class="card">
     <div class="step-head"><span class="step">5</span><h2>Upload to YouTube</h2></div>
     <p id="yt-status" class="muted">YouTube: checking…</p>
+    <p id="yt-upload-warning" class="muted mt-2" hidden>⚠️ Google sign-in is not connected yet, so Upload cannot work — a channel name in the list alone does not enable uploading. Press Connect in Admin → YouTube channels first, then come back here.</p>
+    <div class="mt-3">
+      <button id="btn-goto-yt-connect" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Go to Admin → YouTube channels to connect</button>
+    </div>
     <label class="field-label">Channel</label>
     <select id="channel-select"><option value="">-- not connected --</option></select>
     <input id="yt-title" type="text" placeholder="Video title" class="mt-3" />

@@ -81,6 +81,32 @@ function updateStaleWarning() {
   const el = document.getElementById("live-stale-warning");
   if (!el) return;
   el.hidden = !(lastProcessedKey && lastProcessedKey !== currentLiveKey());
+  updateFinalStaleWarning();
+}
+
+// Final-settings display (user, 2026-11-02): live vs final looked
+// different, and Step 4 showed no clue why. Now Step 4 always
+// shows exactly which settings the final was processed with, and
+// the same stale warning as Step 3, so a difference after changing
+// live settings is explained instead of looking like a bug.
+let processedSettings = null;
+function updateFinalSettings(job) {
+  if (!job || job.zoom === undefined) return;
+  const gr = job.green_rect_used || {};
+  processedSettings = {
+    flip: job.flip, speed: job.speed, zoom: job.zoom,
+    pan_x: job.pan_x, pan_y: job.pan_y, fit_mode: job.fit_mode,
+  };
+  const el = document.getElementById("final-settings");
+  if (el) {
+    el.textContent = `Final was processed with: Flip ${job.flip ? "on" : "off"} | Speed ${job.speed || 1}x | Zoom ${job.zoom}x | Pan ${job.pan_x || 0}%, ${job.pan_y || 0}% | Fit ${job.fit_mode || "cover"} | Green ${gr.x || 0},${gr.y || 0} ${gr.w || 0}x${gr.h || 0}. Compare these with the Live note in Step 3 — if they differ, the final is from older settings.`;
+  }
+  updateFinalStaleWarning();
+}
+function updateFinalStaleWarning() {
+  const el = document.getElementById("final-stale-warning");
+  if (!el) return;
+  el.hidden = !(lastProcessedKey && lastProcessedKey !== currentLiveKey());
 }
 function applyLiveVideoLayout() {
   updateStaleWarning();
@@ -422,6 +448,10 @@ async function restoreState() {
       const player = document.getElementById("preview-player");
       player.src = "/api/preview/" + jobId + "?t=" + Date.now();
       player.load();
+      if (job.zoom !== undefined) {
+        lastProcessedKey = [job.zoom, (job.pan_x || 0).toFixed(1), (job.pan_y || 0).toFixed(1), job.fit_mode, job.flip, job.speed].join("|");
+        updateFinalSettings(job);
+      }
     }
     updateLivePreview();
     setStatus("Restored after refresh: " + job.status + ". Your progress was not lost.");
@@ -689,16 +719,48 @@ function stopYtConnectPolling() {
 document.getElementById("btn-connect-youtube").addEventListener("click", async () => {
   const result = document.getElementById("yt-connect-result");
   stopYtConnectPolling();
-  result.textContent = "Starting… the tool is getting what it needs ready (first time can take a minute). Google sign-in will open in a new tab.";
+  // FIX (user, 2026-11-02): the tab never opened, but the message
+  // claimed it did. Root cause: window.open() was called AFTER
+  // awaiting the API, so the browser no longer counted it as a
+  // click and its popup blocker silently blocked it. Now the tab
+  // is opened synchronously inside the click itself, and its
+  // address is set once the sign-in URL arrives. A clickable
+  // fallback link is always shown too, so even if the tab is
+  // blocked, one more click (a real user gesture) opens it.
+  const popup = window.open("", "_blank");
+  const popupBlocked = !popup;
+  if (popup) {
+    try {
+      popup.document.write("<p>Please wait — Google sign-in is loading…</p>");
+    } catch (e) { /* cross-origin blank tab, ignore */ }
+  }
+  result.textContent = popupBlocked
+    ? "Starting… (your browser blocked the new tab — a clickable sign-in link will appear below, press it.)"
+    : "Starting… the tool is getting what it needs ready (first time can take a minute). Google sign-in will open in a new tab.";
   try {
     const data = await api("/api/youtube/connect-start", { method: "POST" });
     if (data.already_connected) {
+      if (popup) popup.close();
       result.textContent = "YouTube is already connected. Your channels are in the Upload step.";
       await loadYoutubeStatus();
       return;
     }
-    if (data.auth_url) window.open(data.auth_url, "_blank");
-    result.textContent = "Google sign-in opened in a new tab. Sign in with the Google account that owns your channel, then come back here — your channels will appear automatically.";
+    if (data.auth_url) {
+      if (popup) { popup.location.href = data.auth_url; popup.focus(); }
+      result.textContent = popupBlocked
+        ? "Your browser blocked the new tab. Click the link below to sign in with Google, then come back here — your channels will appear automatically. "
+        : "Google sign-in opened in a new tab. Sign in with the Google account that owns your channel, then come back here — your channels will appear automatically. If no tab opened, click the link below. ";
+      const link = document.createElement("a");
+      link.href = data.auth_url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Click here to sign in with Google";
+      result.appendChild(link);
+    } else {
+      if (popup) popup.close();
+      result.textContent = "Could not start Google sign-in. Press Connect again.";
+      return;
+    }
     const started = Date.now();
     ytConnectTimer = setInterval(async () => {
       try {
@@ -718,6 +780,7 @@ document.getElementById("btn-connect-youtube").addEventListener("click", async (
       } catch (e) { /* keep polling until timeout */ }
     }, 3000);
   } catch (err) {
+    if (popup) popup.close();
     result.textContent = "Connect failed: " + err.message;
   }
 });
@@ -732,10 +795,23 @@ document.getElementById("btn-disconnect-youtube").addEventListener("click", asyn
   }
 });
 
+let ytConnected = false;
 async function loadYoutubeStatus() {
   try {
     const s = await api("/api/youtube/status");
+    ytConnected = !!s.connected;
     document.getElementById("yt-status").textContent = "YouTube: " + s.message;
+    // Upload gating (user, 2026-11-02): Step 5 used to let the user
+    // press Upload with only a channel name listed and no Google
+    // sign-in, then fail with a 400. Now the button is disabled
+    // until actually connected, with a clear warning and a button
+    // that jumps straight to Admin → YouTube channels to connect.
+    const uploadBtn = document.getElementById("btn-upload-yt");
+    if (uploadBtn) uploadBtn.disabled = !s.connected;
+    const warn = document.getElementById("yt-upload-warning");
+    if (warn) warn.hidden = !!s.connected;
+    const gotoBtn = document.getElementById("btn-goto-yt-connect");
+    if (gotoBtn) gotoBtn.hidden = !!s.connected;
     const connectBtn = document.getElementById("btn-connect-youtube");
     const disconnectBtn = document.getElementById("btn-disconnect-youtube");
     if (connectBtn) connectBtn.textContent = s.connected ? "Reconnect YouTube account" : "Connect YouTube account";
@@ -1183,6 +1259,7 @@ function startProcessPolling(id, previewUrl) {
         text.textContent = "Done 100% — preview ready.";
         overlayText.textContent = "Done 100% — preview ready.";
         lastProcessedKey = currentLiveKey();
+        updateFinalSettings(job);
         updateStaleWarning();
         hideProcessLock();
         const player = document.getElementById("preview-player");
@@ -1654,8 +1731,16 @@ document.getElementById("btn-start-over").addEventListener("click", () => {
   setStatus("Cleared. Paste a new YouTube link to start over.");
 });
 
+document.getElementById("btn-goto-yt-connect").addEventListener("click", () => {
+  showTab("admin");
+  document.getElementById("tab-admin").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 document.getElementById("btn-upload-yt").addEventListener("click", async () => {
   if (!jobId) { setStatus("Process a video first."); return; }
+  if (!ytConnected) {
+    setStatus("Google sign-in is not connected yet. Press Go to Admin → YouTube channels to connect, then come back here to upload.");
+    return;
+  }
   const title = document.getElementById("yt-title").value.trim();
   if (!title) { setStatus("Enter a video title first."); return; }
   setStatus("Uploading to YouTube…");

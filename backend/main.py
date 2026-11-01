@@ -218,6 +218,15 @@ def yt_dlp_available() -> bool:
 app = FastAPI(title="Copyright free video generator")
 
 
+@app.get("/favicon.ico")
+def favicon() -> "Response":
+    """No favicon file is shipped, so the browser's automatic
+    /favicon.ico request used to log a 404. Answer 204 instead,
+    so the logs stay clean (user, 2026-11-02)."""
+    from fastapi.responses import Response as _Response
+    return _Response(status_code=204)
+
+
 @app.on_event("startup")
 def cleanup_old_jobs() -> None:
     """Delete job folders older than 24h on startup, EXCEPT jobs
@@ -226,6 +235,30 @@ def cleanup_old_jobs() -> None:
     tags and description, until they are uploaded — uploaded
     videos are already deleted at upload time, so they never
     consume space). Unrecorded test jobs still clean up."""
+    # Quiet the scary-looking Windows log noise (user, 2026-11-02):
+    # when the browser closes a video stream early (seek, pause,
+    # switching steps, closing the preview), Windows asyncio logs
+    # ConnectionResetError [WinError 10054] from its own transport
+    # callback. The video file is fine and nothing failed — the
+    # browser just stopped downloading a stream it no longer needs.
+    # Swallow only that error; all other loop errors still surface.
+    try:
+        import asyncio as _asyncio
+        _loop = _asyncio.get_running_loop()
+        _orig_handler = _loop.get_exception_handler()
+
+        def _quiet_reset(loop, context):
+            _exc = context.get("exception")
+            if isinstance(_exc, ConnectionResetError):
+                return
+            if _orig_handler:
+                _orig_handler(loop, context)
+            else:
+                loop.default_exception_handler(context)
+
+        _loop.set_exception_handler(_quiet_reset)
+    except RuntimeError:
+        pass
     import time as _time
     now = _time.time()
     protected = set()
@@ -1265,11 +1298,20 @@ def process_video(payload: ProcessRequest) -> dict:
     pitch = payload.voice_pitch
     if pitch is None:
         pitch = float(settings.get("voice_pitch_factor", 1.05))
+    # FIX (user, 2026-11-02): zoom used to be clamped to a minimum
+    # of 1.0 here, while live preview allows 0.5x–2.0x — so a video
+    # processed at 0.7x came out at 1.0x and looked different from
+    # live. Now the clamp matches live and video.py (0.5x–2.0x),
+    # and pan is forced to 0 at zoom <= 1, exactly like the live
+    # preview's clampPan().
     zoom = payload.zoom if payload.zoom is not None else 1.0
-    zoom = max(1.0, min(2.0, float(zoom)))
-    max_pan = (zoom - 1) / 2 * 100
-    pan_x = max(-max_pan, min(max_pan, float(payload.pan_x or 0)))
-    pan_y = max(-max_pan, min(max_pan, float(payload.pan_y or 0)))
+    zoom = max(0.5, min(2.0, float(zoom)))
+    if zoom <= 1.0:
+        pan_x, pan_y = 0.0, 0.0
+    else:
+        max_pan = (zoom - 1) / 2 * 100
+        pan_x = max(-max_pan, min(max_pan, float(payload.pan_x or 0)))
+        pan_y = max(-max_pan, min(max_pan, float(payload.pan_y or 0)))
     # Green area: the frontend may already have auto-detected it and
     # sent it; otherwise auto-detect here from the cover itself.
     # Manual admin rectangle is the last fallback.
