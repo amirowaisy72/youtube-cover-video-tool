@@ -269,7 +269,8 @@ tailwind.config = {
   <section class="card">
     <div class="step-head"><span class="step">5</span><h2>Upload to YouTube</h2></div>
     <p id="yt-status" class="muted">YouTube: checking…</p>
-    <p id="yt-upload-warning" class="muted mt-2" hidden>⚠️ Google sign-in is not connected yet, so Upload cannot work — a channel name in the list alone does not enable uploading. Press Connect in Admin → YouTube channels first, then come back here.</p>
+    <p id="yt-upload-warning" class="muted mt-2" hidden>⚠️ Google sign-in is not connected yet, so Upload cannot work. Press Connect in Admin → YouTube channels first, then come back here.</p>
+    <p class="muted mt-2">Pick the channel below — the video goes to the channel you picked. Want another channel? Connect it first in Admin → YouTube channels, then pick it here.</p>
     <div class="mt-3">
       <button id="btn-goto-yt-connect" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Go to Admin → YouTube channels to connect</button>
     </div>
@@ -401,21 +402,52 @@ tailwind.config = {
   </section>
   <section class="card mt-4">
     <div class="step-head"><span class="step">▶</span><h2>YouTube channels</h2></div>
-    <p class="muted">Configure channels here. They will show in the Upload step.</p>
-    <div class="auto-summary">
-      <b>⚠️ Important — please read before adding a channel:</b><br />
-      Adding a channel name + Channel ID here only adds it to the list in the Upload step. <b>It does NOT enable uploading by itself.</b><br />
-      To enable uploading, just press <b>Connect YouTube account</b> below and sign in with Google — the tool installs what it needs and saves the sign-in itself.<br />
-      After connecting, your channels appear automatically — manual add is not needed.<br />
-      Upload always goes to the channel of the Google account you signed in with.
-    </div>
-    <p id="yt-admin-status" class="muted"></p>
-    <p class="muted mt-2">No technical work needed — just buttons. The only manual part is creating the Google Cloud project once:</p>
-    <ol class="muted mt-2" style="list-style:decimal; padding-left:20px;">
-      <li>Open <a href="https://console.cloud.google.com" target="_blank" rel="noopener">Google Cloud Console</a>, create a project, enable <b>YouTube Data API v3</b>.</li>
-      <li>Go to <b>APIs &amp; Services → Credentials → Create Credentials → OAuth client ID → Desktop app</b>. Copy the <b>Client ID</b> and <b>Client Secret</b> from there.</li>
-      <li>Paste them below, press <b>Save YouTube credentials</b>, then press <b>Connect YouTube account</b> and sign in with Google in the tab that opens. The tool does the rest itself — no terminal, no pip command, no script, no restart.</li>
-    </ol>
+    <p class="muted">Simple rule: <b>connect each channel once</b> in Step 1, then <b>pick that channel when you upload</b> — the video goes to the channel you picked. No Channel IDs to type, no manual list to manage.</p>
+    <!-- Step 1 — Connect first (user, 2026-11-02): the whole
+         section is now laid out in the order a normal user does
+         it, so the manual-add box can no longer be mistaken for
+         the way to connect. -->
+    <section class="card mt-3">
+      <div class="step-head"><span class="step">1</span><h2>Connect YouTube — once per channel</h2></div>
+      <p class="muted">Paste the Client ID and Client Secret from Google Cloud, press <b>Save YouTube credentials</b>, then press <b>Connect YouTube account</b> and sign in with the channel you want. The tool does everything else itself — no terminal, no commands. To add another channel later, press <b>Connect another channel</b> here and choose that channel in Google sign-in. If you do not have the Client ID and Secret yet, follow the Easy setup guide inside this step.</p>
+      <p id="yt-admin-status" class="muted"></p>
+    <!-- Easy setup guide (user, 2026-11-02): a normal user only
+         clicks — no deep settings hunting, no terminal. Steps 1–4
+         are one-time clicks on Google's website (each button opens
+         the exact page), Step 5 is here in the tool. Tick each step
+         when done; your ticks are remembered on this computer. -->
+    <section class="card mt-3" style="background:rgba(30,64,175,0.15);">
+      <div class="step-head"><span class="step">★</span><h2>Easy setup — just clicks, in order</h2></div>
+      <p class="muted">One time only. Steps 1–4 are on Google's website. Step 5 is here. No terminal, no commands, no deep settings to find — each button opens the exact page.</p>
+      <p id="yt-setup-progress" class="muted mt-2">Setup progress: 0 of 5 steps done.</p>
+      <div class="mt-3">
+        <label class="check"><input id="yt-setup-1" type="checkbox" /> <b>Step 1 — Open Google Cloud.</b> Press the button, sign in with Google, then press <b>Create project</b> and give it any name.</label>
+        <div class="mt-2"><a href="https://console.cloud.google.com/" target="_blank" rel="noopener" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0 inline-block">Open Google Cloud Console</a></div>
+      </div>
+      <div class="mt-4">
+        <label class="check"><input id="yt-setup-2" type="checkbox" /> <b>Step 2 — Turn on YouTube.</b> On the page that opens, press <b>Enable</b> for YouTube Data API v3.</label>
+        <div class="mt-2"><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0 inline-block">Open YouTube API page — press Enable</a></div>
+      </div>
+      <div class="mt-4">
+        <label class="check"><input id="yt-setup-3" type="checkbox" /> <b>Step 3 — Make the login keys.</b> Press <b>Create Credentials → OAuth client ID → Desktop app</b>, then copy the <b>Client ID</b> and <b>Client Secret</b> it shows.</label>
+        <div class="mt-2"><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0 inline-block">Open Credentials page</a></div>
+      </div>
+      <div class="mt-4">
+        <label class="check"><input id="yt-setup-4" type="checkbox" /> <b>Step 4 — Allow your Gmail (very important).</b> Press <b>+ Add users</b> and add the Gmail you will sign in with. If you skip this, Google shows "Access blocked / Error 403" and sign-in fails.</label>
+        <div class="mt-2"><a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0 inline-block">Open Audience (Test users) page</a></div>
+        <p class="muted mt-2">On that page: left sidebar → <b>Audience</b> → scroll to <b>Test users</b> → <b>+ Add users</b> → your Gmail → Save.</p>
+      </div>
+      <div class="mt-4">
+        <label class="check"><input id="yt-setup-5" type="checkbox" disabled /> <b>Step 5 — Connect here in the tool.</b> Paste the Client ID and Client Secret below, press <b>Save YouTube credentials</b>, then press <b>Connect YouTube account</b> and sign in with that same Gmail (not a brand account, first time). The tool does everything else itself. This box ticks itself when you are connected.</label>
+      </div>
+      <div class="auto-summary mt-4">
+        <b>Stuck? Quick fixes:</b><br />
+        • "Access blocked / Error 403" → you skipped Step 4. Add your Gmail as a test user, then Connect again.<br />
+        • No tab opened on Connect → press Connect again, or click the "Click here to sign in with Google" link that appears below it.<br />
+        • Channel name shows but Upload is disabled → that name alone does not enable upload. Finish Step 5 (Connect) first.<br />
+        • Only the signed-in channel appears automatically → to add another brand channel, press Connect another channel above and choose that channel in Google sign-in. If you connected before the latest update, Disconnect and Connect again to allow the new channel-list permission.
+      </div>
+    </section>
     <label class="field-label mt-3">Google Client ID</label>
     <input id="yt-client-id" type="text" placeholder="123456789000-abc.apps.googleusercontent.com" />
     <label class="field-label mt-3">Google Client Secret</label>
@@ -426,17 +458,23 @@ tailwind.config = {
     <p id="yt-credentials-result" class="muted mt-3"></p>
     <div class="mt-3 flex flex-wrap gap-3">
       <button id="btn-connect-youtube" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Connect YouTube account</button>
-      <button id="btn-disconnect-youtube" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Disconnect</button>
+      <button id="btn-disconnect-youtube" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button" hidden>Disconnect all channels</button>
     </div>
     <p id="yt-connect-result" class="muted mt-3"></p>
-    <label class="field-label mt-4">Add a channel to the list (optional)</label>
-    <div class="flex flex-col sm:flex-row gap-3">
-      <input id="yt-channel-name" type="text" placeholder="Channel name" class="flex-1 min-w-0" />
-      <input id="yt-channel-id" type="text" placeholder="Channel ID (UC...)" class="flex-1 min-w-0" />
-      <button id="btn-add-channel" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Add channel</button>
-    </div>
-    <ul id="yt-channel-list" class="timeline-list mt-3"></ul>
-    <p class="muted mt-2">Note: Manual add only shows a channel in the Upload list. It does not enable uploading — that needs the Connect button above. Normally you do not need manual add: after Connect, your channels appear automatically.</p>
+    </section>
+    <!-- Step 2 — connected channels (user, 2026-11-02): this
+         fills itself after Step 1. Nothing to type here. The
+         manual-add box is GONE: it never changed the upload
+         destination (upload always went to the signed-in
+         channel), so it only confused people. A channel only
+         appears here after a real Connect, and then it is a
+         real upload destination you can pick in the Upload step. -->
+    <section class="card mt-3">
+      <div class="step-head"><span class="step">2</span><h2>Your connected channels</h2></div>
+      <p class="muted">Every channel you connect in Step 1 appears here. In the Upload step, pick one from the list — the video goes to the channel you picked, and to no other. To upload to a different channel, connect it first in Step 1 (press Connect another channel, choose it in Google sign-in), then pick it when uploading.</p>
+      <p id="yt-channel-error" class="muted mt-2" hidden></p>
+      <ul id="yt-api-channel-list" class="muted mt-2" style="list-style:disc; padding-left:20px;"><li class="muted">Not connected yet.</li></ul>
+    </section>
   </section>
   </div>
 

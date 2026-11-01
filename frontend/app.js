@@ -629,8 +629,6 @@ async function loadSettings() {
   document.getElementById("speed").value = document.getElementById("set-manual-speed").value;
   document.getElementById("speed-value").textContent = document.getElementById("set-manual-speed").value + "x";
   greenRect = s.green_rect || greenRect;
-  adminChannels = Array.isArray(s.youtube_channels) ? s.youtube_channels : [];
-  renderAdminChannels();
   adminPresets = (s.profiles && typeof s.profiles === "object") ? s.profiles : {};
   activePresetName = s.active_preset || "";
   // Manual Edit (and Auto, via the backend) use the Active preset,
@@ -642,51 +640,11 @@ async function loadSettings() {
   updateLivePreview();
 }
 
-// Admin YouTube channels: configured in Admin, shown in Upload.
-let adminChannels = [];
-function renderAdminChannels() {
-  const list = document.getElementById("yt-channel-list");
-  if (!list) return;
-  list.innerHTML = "";
-  if (!adminChannels.length) {
-    list.innerHTML = '<li class="muted">No channels configured yet.</li>';
-    return;
-  }
-  adminChannels.forEach((ch, i) => {
-    const li = document.createElement("li");
-    li.textContent = `${ch.title} (${ch.id}) `;
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0";
-    del.textContent = "Delete";
-    del.addEventListener("click", async () => {
-      adminChannels.splice(i, 1);
-      await saveAdminChannels();
-    });
-    li.appendChild(del);
-    list.appendChild(li);
-  });
-}
-async function saveAdminChannels() {
-  const s = await api("/api/settings");
-  await api("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...s, youtube_channels: adminChannels }),
-  });
-  renderAdminChannels();
-  await loadYoutubeStatus();
-}
-document.getElementById("btn-add-channel").addEventListener("click", async () => {
-  const name = document.getElementById("yt-channel-name").value.trim();
-  const id = document.getElementById("yt-channel-id").value.trim();
-  if (!name || !id) { setStatus("Enter both a channel name and a Channel ID."); return; }
-  adminChannels.push({ title: name, id });
-  document.getElementById("yt-channel-name").value = "";
-  document.getElementById("yt-channel-id").value = "";
-  await saveAdminChannels();
-  setStatus("Channel added. It now shows in the Upload step.");
-});
+// Admin YouTube channels (multi-channel, user 2026-11-02):
+// NO manual add any more. A channel only appears after a real
+// Connect (it then has its own token), and picking it at upload
+// time really uploads to it. The old manual list never changed
+// the upload destination, so it was removed, not redesigned.
 document.getElementById("btn-save-yt-credentials").addEventListener("click", async () => {
   const clientId = document.getElementById("yt-client-id").value.trim();
   const clientSecret = document.getElementById("yt-client-secret").value.trim();
@@ -788,7 +746,7 @@ document.getElementById("btn-disconnect-youtube").addEventListener("click", asyn
   const result = document.getElementById("yt-connect-result");
   try {
     await api("/api/youtube/disconnect", { method: "POST" });
-    result.textContent = "Disconnected. Press Connect YouTube account to sign in with another account.";
+    result.textContent = "All channels disconnected. Press Connect YouTube account to sign in again.";
     await loadYoutubeStatus();
   } catch (err) {
     result.textContent = "Disconnect failed: " + err.message;
@@ -796,6 +754,38 @@ document.getElementById("btn-disconnect-youtube").addEventListener("click", asyn
 });
 
 let ytConnected = false;
+// Easy setup checklist (user, 2026-11-02): ticks for Steps 1–4
+// are remembered on this computer (localStorage); Step 5 ticks
+// itself when the tool is actually connected.
+const YT_SETUP_KEY = "yt-setup-checklist";
+function updateYtSetupProgress() {
+  const boxes = [1, 2, 3, 4, 5].map((n) => document.getElementById("yt-setup-" + n));
+  if (boxes.some((b) => !b)) return;
+  const done = boxes.filter((b) => b.checked).length;
+  const el = document.getElementById("yt-setup-progress");
+  if (el) el.textContent = `Setup progress: ${done} of 5 steps done.` + (done === 5 ? " You are fully connected." : "");
+}
+function loadYtSetupChecklist() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(YT_SETUP_KEY) || "{}");
+    [1, 2, 3, 4].forEach((n) => {
+      const box = document.getElementById("yt-setup-" + n);
+      if (box && saved[n]) box.checked = true;
+    });
+  } catch (e) { /* ignore bad saved data */ }
+  updateYtSetupProgress();
+}
+[1, 2, 3, 4].forEach((n) => {
+  const box = document.getElementById("yt-setup-" + n);
+  if (box) box.addEventListener("change", () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(YT_SETUP_KEY) || "{}");
+      saved[n] = box.checked;
+      localStorage.setItem(YT_SETUP_KEY, JSON.stringify(saved));
+    } catch (e) { /* private mode etc. */ }
+    updateYtSetupProgress();
+  });
+});
 async function loadYoutubeStatus() {
   try {
     const s = await api("/api/youtube/status");
@@ -814,20 +804,65 @@ async function loadYoutubeStatus() {
     if (gotoBtn) gotoBtn.hidden = !!s.connected;
     const connectBtn = document.getElementById("btn-connect-youtube");
     const disconnectBtn = document.getElementById("btn-disconnect-youtube");
-    if (connectBtn) connectBtn.textContent = s.connected ? "Reconnect YouTube account" : "Connect YouTube account";
+    if (connectBtn) connectBtn.textContent = s.connected ? "Connect another channel" : "Connect YouTube account";
     if (disconnectBtn) disconnectBtn.hidden = !s.connected;
+    const setup5 = document.getElementById("yt-setup-5");
+    if (setup5) setup5.checked = !!s.connected;
+    updateYtSetupProgress();
+    // Connected channels (multi-channel, user 2026-11-02): ONLY
+    // channels with a real token are listed here and in the
+    // Upload dropdown. Each row can be removed on its own.
+    const apiList = document.getElementById("yt-api-channel-list");
+    if (apiList) {
+      apiList.innerHTML = "";
+      if (!s.connected) {
+        apiList.innerHTML = '<li class="muted">Not connected yet. Do Step 1 above.</li>';
+      } else if ((s.channels || []).length) {
+        for (const ch of s.channels) {
+          const li = document.createElement("li");
+          li.textContent = `${ch.title} (${ch.id}) `;
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0";
+          del.textContent = "Remove";
+          del.addEventListener("click", async () => {
+            await api("/api/youtube/disconnect-channel", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ channel_id: ch.id }),
+            });
+            await loadYoutubeStatus();
+          });
+          li.appendChild(del);
+          apiList.appendChild(li);
+        }
+      } else {
+        apiList.innerHTML = '<li class="muted">Connected, but no channel could be listed yet. Disconnect and Connect again and allow the new permission (see the note below).</li>';
+      }
+    }
+    const chanErr = document.getElementById("yt-channel-error");
+    if (chanErr) {
+      if (s.channel_list_error) {
+        chanErr.hidden = false;
+        chanErr.textContent = s.channel_list_error;
+      } else {
+        chanErr.hidden = true;
+      }
+    }
     const adminStatus = document.getElementById("yt-admin-status");
     if (adminStatus) {
-      adminStatus.textContent = s.configured_channels && s.configured_channels.length
-        ? `Configured channels: ${s.configured_channels.length}. ${s.connected ? "Google sign-in is also connected." : "Google sign-in is not connected yet — upload needs the sign-in step above."}`
-        : "No channels configured yet.";
+      adminStatus.textContent = !s.connected
+        ? "Not connected yet — start with Step 1 below."
+        : ((s.channels || []).length
+          ? `Connected: ${(s.channels || []).length} channel(s) ready. Pick one when you upload.`
+          : "Connected, but no channel is listed yet — see the note in Step 2.");
     }
     const select = document.getElementById("channel-select");
     select.innerHTML = "";
-    if (!s.channels.length) {
+    if (!(s.channels || []).length) {
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = s.connected ? "-- no channels found --" : "-- not connected --";
+      opt.textContent = s.connected ? "Signed-in channel (default)" : "-- not connected --";
       select.appendChild(opt);
       return;
     }
@@ -1743,7 +1778,14 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
   }
   const title = document.getElementById("yt-title").value.trim();
   if (!title) { setStatus("Enter a video title first."); return; }
-  setStatus("Uploading to YouTube…");
+  // Multi-channel (user, 2026-11-02): the picked channel is
+  // actually sent now — previously the dropdown was filled but
+  // never read, so every upload silently went to the default
+  // token's channel no matter what was picked.
+  const picked = document.getElementById("channel-select");
+  const pickedId = picked ? picked.value : "";
+  const pickedName = picked && picked.selectedOptions.length ? picked.selectedOptions[0].textContent : "";
+  setStatus(pickedId ? `Uploading to ${pickedName}…` : "Uploading to YouTube…");
   try {
     const data = await api("/api/upload-youtube", {
       method: "POST",
@@ -1754,6 +1796,7 @@ document.getElementById("btn-upload-yt").addEventListener("click", async () => {
         description: document.getElementById("yt-description").value,
         tags: document.getElementById("yt-tags").value,
         privacy_status: document.getElementById("yt-privacy").value,
+        channel_id: pickedId,
       }),
     });
     document.getElementById("yt-result").textContent = "Uploaded: " + (data.url || data.video_id);
@@ -2157,6 +2200,7 @@ document.getElementById("tab-btn-admin").addEventListener("click", () => showTab
   // so its progress is not hidden. A previously remembered mode
   // is deliberately NOT auto-applied any more.
   showMode(saved && saved.jobId ? "manual" : "");
+  loadYtSetupChecklist();
   loadYoutubeStatus();
   refreshGroupYoutubeStatus();
 })();

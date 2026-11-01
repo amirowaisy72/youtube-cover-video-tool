@@ -321,26 +321,39 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
 
 Upload needs no paid service, but it does need a Google Cloud project
 you create yourself. No credentials are included in this project.
-No terminal work is needed — just buttons in Admin → YouTube channels.
+No terminal work is needed — just clicks in Admin → YouTube channels,
+where an Easy setup guide (5 steps, each with a button that opens
+the exact Google page, plus tick boxes that remember your progress)
+walks a normal user through it.
 
-1. Go to Google Cloud Console, create a project, and enable the
-   **YouTube Data API v3**.
-2. Create OAuth 2.0 credentials (Desktop app) and copy the
-   Client ID and Client Secret.
-3. In the tool, Admin → YouTube channels: paste the Client ID and
+1. Open Google Cloud Console, create a project.
+2. Open the YouTube Data API v3 page and press **Enable**.
+3. Open Credentials, create OAuth 2.0 credentials (Desktop app),
+   and copy the Client ID and Client Secret.
+4. Open Audience (Test users) and add the Gmail you will sign in
+   with — while the app is in Testing mode, Google blocks any
+   Gmail not listed there ("Access blocked / Error 403"). On the
+   "Google hasn't verified this app" warning that follows, press
+   **Continue** (you are the developer of your own app), then
+   allow the YouTube upload permission.
+5. In the tool, Admin → YouTube channels: paste the Client ID and
    Client Secret, press **Save YouTube credentials**, then press
-   **Connect YouTube account** and sign in with Google in the tab
-   that opens. The tool installs the Google libraries itself
-   (they are also in requirements.txt), runs the sign-in in the
-   background, and saves the token to `tokens/youtube_token.json`
-   on this computer only. No pip command, no script, no restart.
-   The app reads the token from `YOUTUBE_TOKEN_FILE` if that
-   environment variable is set, otherwise from
-   `tokens/youtube_token.json`.
-4. The Upload section will then show “connected” and list your
-   channels. If anything is missing, it shows a clear message
-   instead of failing silently, and `/api/upload-youtube`
-   returns HTTP 400 explaining the missing step.
+   **Connect YouTube account** and sign in with that same Gmail
+   (not a brand account, first time). The tool installs the Google
+   libraries itself (they are also in requirements.txt), runs the
+   sign-in in the background, and saves the token to
+   `tokens/youtube_token.json` on this computer only. No pip
+   command, no script, no restart. The app reads the token from
+   `YOUTUBE_TOKEN_FILE` if that environment variable is set,
+   otherwise from `tokens/youtube_token.json`.
+6. The Upload section will then show “connected” and list your
+   connected channels. To upload to another channel, connect
+   it the same way (Connect another channel, choose it in
+   Google sign-in), then pick it in the Upload step — the
+   video goes to the channel you picked. If anything is
+   missing, it shows a clear message instead of failing
+   silently, and `/api/upload-youtube` returns HTTP 400
+   explaining the missing step.
 
 Free quota note: the YouTube Data API free quota allows roughly
 6 video uploads per day (each upload costs about 1,600 quota units
@@ -470,3 +483,45 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
   Now the tab opens synchronously inside the click, its address
   is set when the sign-in URL arrives, and a clickable "Click
   here to sign in with Google" link is always shown as a fallback.
+- Multi-channel upload (2026-11-02, held locally, not pushed yet):
+  End goal (user, 2026-11-02): when uploading, the user can
+  upload to ANY channel they want, easily. How it works now:
+  connect each channel once in Admin → YouTube channels (the
+  Connect button becomes "Connect another channel" after the
+  first connect — no Disconnect needed to add one), each channel
+  keeps its own token file plus a small registry in tokens/
+  (gitignored), and the Upload step dropdown lists only those
+  real connected channels. Picking one really uploads to it:
+  the chosen channel's token is used, and picking a channel
+  that was never connected fails with a clear error instead
+  of silently uploading to a different channel. The old manual
+  channel list is REMOVED (it never changed the upload
+  destination — upload always went to the signed-in channel —
+  so it only confused people), and the Upload dropdown, which
+  used to be filled but never read, is now actually sent with
+  every upload. Group/Records uploads still use the last
+  connected (default) channel. NOTE: users connected before
+  this change must Disconnect and Connect again once, so each
+  channel gets its own token with the new scope.
+- Channel auto-list fix (2026-11-02, held locally, not pushed yet):
+  Connected users saw no Google channels in Admin because (1)
+  the Admin list only showed manually added channels, (2) the
+  OAuth scope was youtube.upload only, which does not allow
+  channels().list (that needs youtube.readonly), and (3) a failed
+  channel list was hidden from the Admin card. Now the scope
+  includes youtube.readonly, Admin shows a separate "Channels
+  from Google sign-in" list plus the failure reason in plain
+  words, and the misleading "your channels appear automatically"
+  text is corrected: only the signed-in channel auto-appears;
+  other brand channels need manual add or sign-in as that
+  channel. NOTE: users connected before this change must
+  Disconnect and Connect again, because refreshing an old token
+  does not add the new scope.
+- Easy setup guide (2026-11-02, held locally, not pushed yet):
+  Admin → YouTube channels now has a 5-step click-only guide
+  instead of a long technical list: each of Steps 1–4 has a button
+  that opens the exact Google page (Console, YouTube API Enable,
+  Credentials, Audience/Test users), tick boxes remember progress
+  on this computer, Step 5 ticks itself when connected, and a
+  "Stuck? Quick fixes" box covers the 403 test-user block, the
+  popup block, and the disabled-Upload case in one line each.

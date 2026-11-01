@@ -1396,27 +1396,27 @@ def get_final(job_id: str) -> FileResponse:
 @app.get("/api/youtube/status")
 def get_youtube_status() -> dict:
     status = youtube_upload.youtube_status()
-    # Configured channels (Admin) always show, even before Google
-    # sign-in, merged with API channels when connected.
-    configured = []
-    for ch in load_settings().get("youtube_channels") or []:
-        if isinstance(ch, dict) and ch.get("id"):
-            configured.append({"id": ch["id"], "title": ch.get("title") or ch["id"],
-                               "configured": True})
+    # Multi-channel (user, 2026-11-02): channels here are ONLY
+    # channels with a real saved token — real upload destinations.
+    # Manually typed channels are deliberately NOT merged in any
+    # more: they never changed the upload destination (upload
+    # always went to the signed-in channel), so listing them here
+    # was misleading. Old manual entries in settings are ignored.
     api_channels = []
     if status["connected"]:
-        try:
-            api_channels = youtube_upload.list_channels()
-        except Exception as exc:  # keep the page usable on API errors
-            status["message"] = f"Connected, but channel list failed: {exc}"
-    seen = set()
-    merged = []
-    for ch in configured + api_channels:
-        if ch["id"] not in seen:
-            seen.add(ch["id"])
-            merged.append(ch)
-    status["channels"] = merged
-    status["configured_channels"] = configured
+        api_channels = youtube_upload.list_channels()
+        if not api_channels:
+            # Connected (a token exists) but no channel could be
+            # identified — usually an old token without the
+            # readonly scope. Upload with the default token still
+            # works, but picking a channel needs a reconnect.
+            status["channel_list_error"] = (
+                "Connected, but no channel could be listed for this "
+                "sign-in. Disconnect and Connect again and allow the "
+                "new 'view your YouTube account' permission."
+            )
+    status["channels"] = api_channels
+    status["configured_channels"] = []
     return status
 
 
@@ -1446,8 +1446,18 @@ def get_youtube_connect_status() -> dict:
 
 @app.post("/api/youtube/disconnect")
 def disconnect_youtube() -> dict:
-    """Remove the saved Google sign-in so another account can connect."""
+    """Remove ALL saved Google sign-ins."""
     return youtube_upload.disconnect()
+
+
+class YoutubeDisconnectChannelRequest(BaseModel):
+    channel_id: str
+
+
+@app.post("/api/youtube/disconnect-channel")
+def disconnect_youtube_channel(payload: YoutubeDisconnectChannelRequest) -> dict:
+    """Remove one connected channel (its token only, secrets kept)."""
+    return youtube_upload.disconnect_channel(payload.channel_id)
 
 
 @app.post("/api/youtube/credentials")
@@ -1480,6 +1490,7 @@ class UploadRequest(BaseModel):
     description: str = ""
     tags: str = ""
     privacy_status: str = "private"
+    channel_id: str = ""
 
 
 @app.post("/api/upload-youtube")
@@ -1494,6 +1505,7 @@ def upload_youtube(payload: UploadRequest) -> dict:
             description=payload.description,
             tags=payload.tags or "",
             privacy_status=payload.privacy_status or "private",
+            channel_id=payload.channel_id or "",
         )
     except RuntimeError as exc:
         raise HTTPException(400, str(exc))
