@@ -451,12 +451,20 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
   Group download retry + Retry failed (2026-11-02): a transient
   connection reset (e.g. ConnectionResetError 10054) during
   download no longer fails the video at once — Auto and manual
-  downloads retry up to 3 times, and yt-dlp resumes from its
-  partial files instead of starting over. If a video still
-  fails, the Group overlay shows "Retry failed videos" when the
-  group is done; clicking it runs only the failed videos again,
-  from where the group left off — completed videos are never
+  downloads retry, and yt-dlp resumes from its partial files
+  instead of starting over. If a video still fails, the Group
+  overlay shows "Retry failed videos" when the group is done;
+  clicking it runs only the failed videos again, from where
+  the group left off — completed videos are never
   re-downloaded or re-uploaded.
+  Download prevention, not just retry (user, 2026-11-02): the
+  Retry button is only a fallback — the reset must not
+  interrupt the work in the first place. Downloads now try up
+  to 5 times with longer waits, and each later attempt is more
+  stable: attempt 1 fast (8 fragments), attempt 2 fewer
+  fragments (4), attempts 3+ a single progressive file (one
+  connection, no fragment merge). A single reset, or several,
+  therefore resumes instead of failing the video.
 - Records (📁 Records button, only on click): paginated batch history
   (10 per page, newest first) with per-video saved title, description
   and tags, and how many videos are uploaded vs still saved locally.

@@ -205,6 +205,45 @@ def write_job(job: dict) -> None:
     )
 
 
+def _yt_dlp_download_opts(outtmpl: str, hook, attempt: int = 1) -> dict:
+    """yt-dlp options for one download attempt.
+
+    Prevention (user, 2026-11-02): the purpose is NOT just a
+    Retry button — the ConnectionResetError must not interrupt
+    the work in the first place. A reset usually comes from
+    YouTube closing one of many parallel DASH fragment
+    connections, so later attempts deliberately get MORE
+    stable, not just repeated: attempt 1 is fast (8 fragments),
+    attempt 2 halves parallel fragments, attempts 3+ switch to
+    a single progressive file (one connection, no fragment
+    merge at all). Combined with yt-dlp's own 10 fragment
+    retries and the caller's outer retries, a single reset —
+    or even several — resumes instead of failing the video.
+    """
+    if attempt <= 1:
+        fmt = "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b"
+        fragments = 8
+    elif attempt == 2:
+        fmt = "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b"
+        fragments = 4
+    else:
+        fmt = "b[height<=720][ext=mp4]/b[height<=720]"
+        fragments = 1
+    return {
+        "format": fmt,
+        "merge_output_format": "mp4",
+        "concurrent_fragment_downloads": fragments,
+        "retries": 10,
+        "fragment_retries": 10,
+        "extractor_retries": 3,
+        "socket_timeout": 60,
+        "outtmpl": outtmpl,
+        "progress_hooks": [hook],
+        "quiet": True,
+        "no_warnings": True,
+    }
+
+
 def yt_dlp_available() -> bool:
     if shutil.which("yt-dlp"):
         return True
@@ -444,33 +483,18 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
         })
         write_job(job)
 
-    # Same transient-connection retry as Auto (user, 2026-11-02):
-    # up to 3 attempts, yt-dlp resumes partial files. _dl_error
-    # stays None when yt-dlp is simply not installed (ImportError),
-    # so the CLI fallback below still runs in that case.
+    # Same prevention as Auto (user, 2026-11-02): up to 5
+    # attempts, each later one more stable (see
+    # _yt_dlp_download_opts), yt-dlp resumes partial files.
+    # _dl_error stays None when yt-dlp is simply not installed
+    # (ImportError), so the CLI fallback below still runs.
     _dl_done = False
     _dl_error = None
     _dl_missing = False
-    for _attempt in range(1, 4):
+    for _attempt in range(1, 6):
         try:
             import yt_dlp
-            opts = {
-                # Speed fix 1: cap at 720p. The old "best video" often
-                # pulled 1080p/4K, but the video is only shown in a
-                # 640x360 green area — the extra pixels only cost
-                # download + merge + encode time. 8 parallel fragments
-                # also speed up DASH downloads on a normal connection.
-                "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
-                "merge_output_format": "mp4",
-                "concurrent_fragment_downloads": 8,
-                "retries": 10,
-                "fragment_retries": 10,
-                "socket_timeout": 30,
-                "outtmpl": str(target),
-                "progress_hooks": [hook],
-                "quiet": True,
-                "no_warnings": True,
-            }
+            opts = _yt_dlp_download_opts(str(target), hook, _attempt)
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             _dl_done = True
@@ -480,8 +504,8 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
             break
         except Exception as exc:  # noqa: BLE001
             _dl_error = exc
-            if _attempt < 3:
-                _time.sleep(5 * _attempt)
+            if _attempt < 5:
+                _time.sleep(10 * _attempt)
                 continue
             break
     if _dl_done:
@@ -594,17 +618,20 @@ def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: di
     _set("downloading", 0, {"status": "downloading", "url": url, "timeline": timeline,
                             **fetch_original_info(url)})
     # --- Stage 1: download (same yt-dlp settings as manual download)
-    # Download retry (user, 2026-11-02): a Group video failed
+    # Download prevention (user, 2026-11-02): a Group video failed
     # mid-download with ConnectionResetError 10054 ("connection
     # forcibly closed by the remote host") and the whole item was
-    # marked failed. A reset connection is transient — it must
-    # NOT kill the video. Retry up to 3 times with a short wait;
-    # yt-dlp resumes from its partial (.part) files, so a retry
-    # continues where the download left off instead of starting
-    # over. yt-dlp's own fragment retries are also turned on.
+    # marked failed. The Retry button is only a fallback — the
+    # download itself must not be interrupted by a reset. So:
+    # up to 5 attempts, longer waits between them, and each later
+    # attempt uses a MORE stable download method (see
+    # _yt_dlp_download_opts: fewer fragments, then a single
+    # file). yt-dlp resumes from its partial (.part) files, so
+    # a retry continues where the download left off instead of
+    # starting over.
     dl_start = _time.time()
     _dl_error = None
-    for _attempt in range(1, 4):
+    for _attempt in range(1, 6):
         try:
             import yt_dlp
             def hook(d: dict) -> None:
@@ -612,26 +639,16 @@ def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: di
                 downloaded = d.get("downloaded_bytes", 0) or 0
                 pct = round(downloaded * 100 / total, 1) if total else 0
                 _set("downloading", round(pct * 0.25, 1))
-            opts = {
-                "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
-                "merge_output_format": "mp4",
-                "concurrent_fragment_downloads": 8,
-                "retries": 10,
-                "fragment_retries": 10,
-                "socket_timeout": 30,
-                "outtmpl": str(source),
-                "progress_hooks": [hook],
-                "quiet": True, "no_warnings": True,
-            }
+            opts = _yt_dlp_download_opts(str(source), hook, _attempt)
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             _dl_error = None
             break
         except Exception as exc:  # noqa: BLE001
             _dl_error = exc
-            if _attempt < 3:
-                _set("downloading", 0, {"status": "downloading"})
-                _time.sleep(5 * _attempt)
+            if _attempt < 5:
+                _set("downloading (connection retry…)", 0, {"status": "downloading"})
+                _time.sleep(10 * _attempt)
                 continue
             break
     if _dl_error is not None:
