@@ -136,7 +136,24 @@ tailwind.config = {
     <div class="step-head"><span class="step">2</span><h2>Cover</h2></div>
     <p class="muted">Click a cover to select it. Uploads automatically.</p>
     <label class="field-label">Upload a new cover (with a green-screen area)</label>
-    <div class="flex flex-col sm:flex-row gap-3 items-start">
+    <!-- Best-cover guide (user, 2026-11-02): covers with an odd
+         green height (e.g. 990x661) used to fail Process instantly,
+         so the guide below tells the user exactly what kind of
+         cover performs best, with a working example. -->
+    <div class="card mt-3" style="background:#0f2440">
+      <h3 style="margin:0 0 8px">What makes a cover work best</h3>
+      <ul class="muted" style="margin:0; padding-left:20px; line-height:1.6">
+        <li><strong>Size:</strong> 1920x1280 is ideal (at least 1280x720), landscape, sharp — not blurry or stretched.</li>
+        <li><strong>Green screen:</strong> one large, flat, solid pure-green rectangle with sharp straight edges, facing the camera straight on — not angled, not curved.</li>
+        <li><strong>Nothing on the green:</strong> no text, picture, shadow, gradient or object overlapping the green area. Put name plates and text outside the green.</li>
+        <li><strong>Even green size:</strong> the green width and height should both be even numbers (for example 1164x662). Odd sizes can fail the video encode.</li>
+        <li><strong>Green must be the biggest green thing:</strong> small plants are fine, but no other large green area, or the tool may pick the wrong one.</li>
+        <li><strong>Format:</strong> PNG works best; JPG and WebP also work.</li>
+        <li><strong>After upload:</strong> click the cover, press “Detect green area”, and check the outline — the video will fill exactly that area.</li>
+      </ul>
+      <p class="muted mt-2" style="margin-bottom:0"><strong>Working example:</strong> 1920x1280 image, green screen 1164x662 at position (420, 360) — the “Learn With Amir” office cover.</p>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 items-start mt-3">
       <input id="cover-file" type="file" accept="image/png,image/jpeg,image/webp" class="flex-1 min-w-0" />
       <button id="btn-cover-upload" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0">Upload cover</button>
     </div>
