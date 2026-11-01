@@ -158,6 +158,14 @@ video { max-width: 100%; background: #000; border-radius: 12px; }
 .live-preview-box.has-cover .live-video { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; touch-action: none; background: #000; }
 .live-preview-box.has-cover .live-video:active { cursor: grabbing; }
 .live-green-box.selected { border: none; box-shadow: none; }
+/* Green-area outline (user, 2026-11-01): a separate, unmasked
+   overlay that shows exactly where the green box is, even when
+   the video itself is hidden by a wrong mask. It is NOT masked
+   like the green box, so it stays visible when the video does not. */
+#live-green-outline {
+  position: absolute; border: 2px dashed #5eead4; box-sizing: border-box;
+  pointer-events: none; z-index: 5; background: transparent;
+}
 
 /* hidden must actually hide: button/a display rules (inline-block)
    otherwise beat the browser's [hidden] rule, so the Auto popup's

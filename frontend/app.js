@@ -11,6 +11,8 @@ let autoDetectGreen = true;
 let panX = 0, panY = 0;
 let liveVideoHidden = false;
 let liveSelected = false;
+let liveOutline = false;
+let liveVideoError = false;
 // Fit mode, mutually exclusive checkboxes in Live preview:
 // "cover" = Fit to green screen (default, fills box, no black area)
 // "full" = Display full video (no crop, leftover area is black)
@@ -159,6 +161,21 @@ function applyLiveVideoLayout() {
   }
   video.style.transform = flip ? "scaleX(-1)" : "none";
   video.style.display = (!jobId || liveVideoHidden) ? "none" : "block";
+  // Green-area outline: same position/size as the green box, but
+  // unmasked, so it stays visible even when a wrong mask hides
+  // the video (the user's 2026-11-01 bug: video downloaded but
+  // nothing showed on the green screen, with no clue where it went).
+  const outline = document.getElementById("live-green-outline");
+  if (outline) {
+    outline.hidden = !(liveOutline && !!liveCover);
+    if (liveCover) {
+      outline.style.left = greenBox.style.left;
+      outline.style.top = greenBox.style.top;
+      outline.style.width = greenBox.style.width;
+      outline.style.height = greenBox.style.height;
+    }
+  }
+  updateLiveVideoStatus();
   greenBox.classList.toggle("selected", liveSelected && !!liveCover && !!jobId);
   document.querySelectorAll(".live-handle").forEach((h) => {
     h.hidden = !(liveSelected && !!liveCover && !!jobId);
@@ -211,6 +228,73 @@ function updateLivePreview() {
   const pitch = document.getElementById("voice-pitch").value;
   document.getElementById("live-note").textContent =
     `Live: Flip ${flip ? "on" : "off"} | Speed ${document.getElementById("speed").value}x | Zoom ${zoom}x | Pan ${panX.toFixed(0)}%, ${panY.toFixed(0)}% | Green ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} | Voice ${voiceOn ? "on (pitch " + pitch + ", heard in the final preview)" : "off"}`;
+}
+
+// Live video status (user, 2026-11-01): the video used to fail
+// silently — downloaded, but nothing showed on the green screen
+// and no message said why. Now the reason is always written here.
+function updateLiveVideoStatus() {
+  const el = document.getElementById("live-video-status");
+  if (!el) return;
+  if (!jobId) {
+    el.textContent = "No video downloaded yet — download a video in Step 1 first.";
+  } else if (!liveCover) {
+    el.textContent = "Video downloaded, but no cover selected — choose a cover in Step 2.";
+  } else if (liveVideoError) {
+    el.textContent = "Video file could not be loaded — try downloading the video again in Step 1.";
+  } else if (liveVideoHidden) {
+    el.textContent = "Video is hidden (Hide video — check cover). Press Show video to see it again.";
+  } else if (greenRect.x === 0 && greenRect.y === 0 && greenRect.w === 640 && greenRect.h === 360) {
+    el.textContent = "Warning: green area is still the default 0,0 640x360 — it may not match this cover, so the video can be hidden by the mask. Press Detect green area below.";
+  } else {
+    el.textContent = `Video should appear inside the green area (${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h}). If you cannot see it, tick Show green area outline and press Detect green area.`;
+  }
+}
+
+document.getElementById("live-video").addEventListener("error", () => {
+  liveVideoError = true;
+  updateLiveVideoStatus();
+});
+document.getElementById("live-video").addEventListener("loadeddata", () => {
+  liveVideoError = false;
+  updateLiveVideoStatus();
+});
+
+document.getElementById("live-outline").addEventListener("change", (e) => {
+  liveOutline = e.target.checked;
+  applyLiveVideoLayout();
+});
+
+document.getElementById("btn-detect-green").addEventListener("click", async () => {
+  const status = document.getElementById("live-video-status");
+  if (!liveCover) {
+    if (status) status.textContent = "Choose a cover in Step 2 first, then press Detect green area.";
+    return;
+  }
+  try {
+    const data = await api("/api/detect-green/" + liveCover.id);
+    greenRect = data.green_rect;
+    syncAdminGreenInputs();
+    updateLivePreview();
+    setStatus(`Green area detected: ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} — video should now appear in the green area.`);
+    if (status) status.textContent = `Green area detected: ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h}. Video should now appear in the green area.`;
+  } catch (err) {
+    if (status) status.textContent = "Green area detection failed: " + err.message + " — check the cover image, then try again.";
+    setStatus("Green area detection failed: " + err.message);
+  }
+});
+
+// Keep the Admin green-rectangle inputs in sync with the live
+// green rectangle, so the preset shows the area that is actually used.
+function syncAdminGreenInputs() {
+  const x = document.getElementById("set-green-x");
+  const y = document.getElementById("set-green-y");
+  const w = document.getElementById("set-green-w");
+  const h = document.getElementById("set-green-h");
+  if (x) x.value = greenRect.x;
+  if (y) y.value = greenRect.y;
+  if (w) w.value = greenRect.w;
+  if (h) h.value = greenRect.h;
 }
 
 // Direct manipulation: drag the video to move it, click to select,
@@ -378,13 +462,23 @@ let selectedCoverId = "";
 
 async function selectCover(cover) {
   liveCover = cover || null;
-  if (cover && autoDetectGreen) {
+  // FIX (user, 2026-11-01): green area belongs to the cover, not
+  // to the preset. Previously detection ran only when auto-detect
+  // was on, so a new cover could keep an old cover's rectangle
+  // (or the 0,0 640x360 default). That rectangle's mask is mostly
+  // black over the new cover, so the downloaded video was hidden
+  // completely — with no message. Now detection always runs on
+  // cover select, and a failure is shown in the live status too.
+  if (cover) {
     try {
       const data = await api("/api/detect-green/" + cover.id);
       greenRect = data.green_rect;
+      syncAdminGreenInputs();
       setStatus(`Green area auto-detected: ${greenRect.x},${greenRect.y} ${greenRect.w}x${greenRect.h} — video will fill exactly this area.`);
     } catch (err) {
       setStatus("Green area auto-detection failed, using the manual rectangle: " + err.message);
+      const status = document.getElementById("live-video-status");
+      if (status) status.textContent = "Green area detection failed: " + err.message + " — video may not appear. Press Detect green area in Live preview to retry.";
     }
   }
   updateLivePreview();
@@ -459,7 +553,9 @@ async function loadCovers(autoSelectId) {
   const toSelect = data.covers.find((c) => c.id === (autoSelectId || selectedCoverId)) || data.covers[0];
   // Auto-select the newest cover on first load, so Process works
   // without the user having to guess which dropdown entry to pick.
-  selectCover(toSelect);
+  // Awaited (2026-11-01 fix): previously the first paint could
+  // show the old/default green rectangle before detection finished.
+  await selectCover(toSelect);
 }
 
 document.getElementById("cover-select").addEventListener("change", async (e) => {
@@ -1841,7 +1937,12 @@ buildManualNav();
 // Manual) is shown. Remembered in localStorage via saveState().
 let currentMode = "auto";
 function showMode(mode) {
-  currentMode = ["auto", "group", "manual"].includes(mode) ? mode : "auto";
+  // By default NO mode is selected (user, 2026-11-01): a mode
+  // appears only after the user chooses it. "" (the "Choose a
+  // mode" placeholder) hides all three mode sections. The only
+  // exception is a restored in-progress manual job, which still
+  // opens in Manual so its progress is not hidden.
+  currentMode = ["auto", "group", "manual"].includes(mode) ? mode : "";
   const sel = document.getElementById("mode-select");
   if (sel) sel.value = currentMode;
   const auto = document.getElementById("mode-auto");
@@ -1907,9 +2008,12 @@ document.getElementById("tab-btn-admin").addEventListener("click", () => showTab
   // loadCovers auto-selects; restoreState then re-applies the saved
   // job, cover and edits, and restarts any in-progress polling.
   await restoreState();
-  // Mode remembered from last time; a restored manual job opens
-  // in Manual mode so progress is not hidden, otherwise Auto.
-  showMode(saved && saved.mode ? saved.mode : (saved && saved.jobId ? "manual" : "auto"));
+  // By default no mode is selected (user, 2026-11-01) — the user
+  // chooses a mode and only then does it appear. A restored
+  // manual job is the only exception: it opens in Manual mode
+  // so its progress is not hidden. A previously remembered mode
+  // is deliberately NOT auto-applied any more.
+  showMode(saved && saved.jobId ? "manual" : "");
   loadYoutubeStatus();
   refreshGroupYoutubeStatus();
 })();

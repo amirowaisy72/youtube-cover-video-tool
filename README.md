@@ -421,3 +421,21 @@ requirements.txt          fastapi, uvicorn, yt-dlp, python-multipart
 - Full-page workspace: the page is no longer a narrow centre
   column — it uses the full page width (up to 1440px), with preset
   and cover grids spreading out on wide screens.
+- No mode by default: the mode dropdown starts on "Choose a
+  mode" and no mode card is shown until you pick one (except a
+  restored in-progress manual job, which still opens in Manual).
+- Live video fix (2026-11-01): a downloaded video could be
+  completely invisible in Live preview when the green rectangle
+  did not match the cover (stale/default 0,0 640x360), because
+  the mask over that rectangle is mostly black — with no message
+  saying why. Fixed: green area is now always auto-detected on
+  cover select, Live preview shows a clear status line (no video
+  / no cover / video failed / default green area warning), a
+  "Detect green area" button re-detects for the selected cover,
+  "Show green area outline" draws an unmasked dashed outline
+  around the green box so you can see where it is even when the
+  video is hidden, and the live mask falls back to a white
+  rectangle when the cropped mask is under 5% white, so the video
+  shows as a rectangle instead of vanishing. To test: download a
+  video, choose a cover, go to Step 3, tick the outline, press
+  Detect green area — the video should appear inside the green area.

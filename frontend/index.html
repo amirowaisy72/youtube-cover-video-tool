@@ -70,14 +70,15 @@ tailwind.config = {
   <section class="card">
     <label class="field-label">Choose mode</label>
     <select id="mode-select">
+      <option value="" selected>Choose a mode</option>
       <option value="auto">Auto mode — just give the link</option>
       <option value="group">Group Auto — many videos, one task</option>
       <option value="manual">Manual mode — step by step</option>
     </select>
-    <p class="muted mt-2">Only the chosen mode is shown, so the page stays short and simple.</p>
+    <p class="muted mt-2">No mode is shown until you choose one above — pick a mode and only that mode appears, so the page stays short and simple.</p>
   </section>
 
-  <section class="card" id="mode-auto">
+  <section class="card" id="mode-auto" hidden>
     <div class="step-head"><span class="step">★</span><h2>Auto mode — just give the link</h2></div>
     <p class="muted">Paste a link, press Start Auto. Rest uses Admin defaults.</p>
     <div class="flex flex-col sm:flex-row gap-3">
@@ -87,7 +88,7 @@ tailwind.config = {
     <p class="muted mt-2">Uses your selected cover, or newest if none.</p>
   </section>
 
-  <section class="card" id="mode-group">
+  <section class="card" id="mode-group" hidden>
     <div class="step-head"><span class="step">▦</span><h2>Group Auto — many videos, one task</h2></div>
     <p class="muted">Paste one link per line, choose a preset and an upload choice for each video, then create the group task. It then works through all videos by itself: makes each video, and uploads the ones you chose.</p>
     <div id="group-yt-warning" class="auto-summary" hidden></div>
@@ -102,7 +103,7 @@ tailwind.config = {
     <ul id="group-progress-list" class="timeline-list mt-3"></ul>
   </section>
 
-  <div id="mode-manual">
+  <div id="mode-manual" hidden>
   <div class="manual-wizard-head">
     <h2>Manual mode — step by step</h2>
     <p class="muted">One step at a time.</p>
@@ -200,8 +201,13 @@ tailwind.config = {
       <label class="check"><input id="fit-cover" type="checkbox" checked /> Fit to green screen</label>
       <label class="check"><input id="fit-full" type="checkbox" /> Display full width / height video</label>
     </div>
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <button id="btn-detect-green" class="btn px-4 py-2.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-slate-100 font-semibold rounded-xl border border-slate-500 transition-colors whitespace-nowrap shrink-0" type="button">Detect green area</button>
+      <label class="check"><input id="live-outline" type="checkbox" /> Show green area outline</label>
+    </div>
     <div id="live-preview-box" class="live-preview-box">
       <img id="live-cover-img" alt="" class="live-cover-img" hidden />
+      <div id="live-green-outline" hidden></div>
       <div id="live-green-box" class="live-green-box">
         <video id="live-video" autoplay loop muted playsinline class="live-video"></video>
         <div class="live-handle tl" data-handle="tl" hidden></div>
@@ -213,6 +219,7 @@ tailwind.config = {
     </div>
     <p class="muted live-hint">Click to select. Drag to move, drag a corner to zoom.</p>
     <p id="live-note" class="muted mt-2"></p>
+    <p id="live-video-status" class="muted mt-2"></p>
     <p id="live-stale-warning" class="muted mt-2" hidden>⚠️ Final preview is outdated — live settings changed after processing. Press Process video again to make the final video match this live preview.</p>
     <button id="btn-process-below-preview" class="btn-primary w-full mt-3 px-6 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors" type="button">▶ Process video</button>
   </section>

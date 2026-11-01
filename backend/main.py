@@ -1107,6 +1107,22 @@ def green_mask_endpoint(cover_id: str, x: int | None = None, y: int | None = Non
     if rect:
         mask = mask.crop((rect["x"], rect["y"],
                           rect["x"] + rect["w"], rect["y"] + rect["h"]))
+    # FIX (user, 2026-11-01): if the rectangle does not actually
+    # contain green — e.g. a stale/default 0,0 640x360 rectangle on
+    # a cover whose green area is on the right — the cropped mask
+    # is almost all black, so the live video is hidden completely
+    # and the user cannot test anything. In that case fall back to
+    # a plain white rectangle: the video shows as a rectangle in
+    # the green box (testable), instead of vanishing silently.
+    # The final encode still uses the real green mask, so this
+    # fallback only affects the live preview.
+    if mask.size[0] and mask.size[1]:
+        _hist = mask.histogram()
+        _white = _hist[255] if len(_hist) > 255 else 0
+        _total = mask.size[0] * mask.size[1]
+        if _total and _white / _total < 0.05:
+            from PIL import Image as _WhiteImage
+            mask = _WhiteImage.new("L", mask.size, 255)
     # BUG FIX (2026-11-01, live video still looked rectangular):
     # the old endpoint returned a grayscale (L) PNG. Browsers' CSS
     # mask-image defaults to alpha, not luminance, so a grayscale
