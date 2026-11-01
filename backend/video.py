@@ -54,6 +54,45 @@ def get_media_size(path: str | Path) -> tuple[int, int] | None:
         return None
 
 
+def snap_rect_even(rect: dict, cover_w: int | None = None,
+                   cover_h: int | None = None) -> dict:
+    """Snap a green rectangle to even x, y, w, h.
+
+    BUG (user, 2026-11-02): the new "Learn With Amir" cover's green
+    area is 990x661 — an ODD height. FFmpeg crops yuv420p video to
+    even dimensions, so the video came out 990x660 while the PNG
+    mask stayed 990x661, and alphamerge failed instantly with
+    "Input frame sizes do not match (990x660 vs 990x661)". The
+    Process popup therefore vanished ~1 second after starting,
+    with "Processing failed: FFmpeg failed…". Snapping to even
+    (w/h rounded to nearest even that still fits the cover, x/y
+    rounded down) fixes it for any cover, at most 1 px of shift —
+    invisible on screen, and it also keeps crop/overlay aligned
+    for subsampled video. Applied in detection AND in process_job,
+    so a rect already saved from an earlier detect is fixed too.
+    """
+    try:
+        x = int(rect.get("x", 0)); y = int(rect.get("y", 0))
+        w = int(rect.get("w", 0)); h = int(rect.get("h", 0))
+    except Exception:
+        return rect
+    x -= x % 2
+    y -= y % 2
+    # Round w/h to nearest even; if that would run past the cover
+    # edge, round down instead so the box stays inside the cover.
+    for _ in range(2):
+        w_even = w + (w % 2)
+        h_even = h + (h % 2)
+        if cover_w and x + w_even > cover_w:
+            w_even -= 2
+        if cover_h and y + h_even > cover_h:
+            h_even -= 2
+        w, h = w_even, h_even
+        break
+    return {"x": max(0, x), "y": max(0, y),
+            "w": max(2, w), "h": max(2, h)}
+
+
 def detect_green_rect(cover: str | Path) -> dict | None:
     """Auto-detect the green-screen rectangle in a cover image.
 
@@ -129,10 +168,10 @@ def detect_green_rect(cover: str | Path) -> dict | None:
     while _col_green(minx - 1):
         minx -= 1
     fx, fy = orig_w / sw, orig_h / sh
-    return {
+    return snap_rect_even({
         "x": int(minx * fx), "y": int(miny * fy),
         "w": int((maxx - minx + 1) * fx), "h": int((maxy - miny + 1) * fy),
-    }
+    }, cover_w=orig_w, cover_h=orig_h)
 
 
 def green_mask(cover: str | Path) -> "object | None":
@@ -577,6 +616,20 @@ def process_job(
     missing = check_ffmpeg()
     if missing:
         return False, missing
+    # Snap the green rect to even dimensions here too (not just in
+    # detection): a job may already carry an odd rect saved before
+    # this fix, and process_job is called by Manual, Auto and Group
+    # alike, so this one place covers every path.
+    _cover_size = get_media_size(cover)
+    _snapped = snap_rect_even(
+        green_rect,
+        cover_w=_cover_size[0] if _cover_size else None,
+        cover_h=_cover_size[1] if _cover_size else None)
+    if _snapped != green_rect:
+        if on_log:
+            on_log(f"Green area snapped to even pixels for FFmpeg: "
+                   f"{green_rect} -> {_snapped} (odd sizes break alphamerge).")
+        green_rect = _snapped
     if not compress:
         # Without compression, use a near-lossless quality setting.
         crf = 18

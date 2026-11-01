@@ -214,6 +214,14 @@ Check the server is healthy at http://127.0.0.1:8000/api/health
    per-dimension to the exact room in that dimension, so
    manual zoom/drag matches exactly. Verified with a real
    encode (Full 1.2x, pan 5.5%: pad 0:141 as calculated).
+   Even-pixel green rect (2026-11-02): green rectangles are
+   snapped to even x/y/w/h in detection and in process (and in
+   process_job, so old saved rects are fixed too). An odd height
+   (990x661 on the new office cover) made FFmpeg crop yuv420p
+   video to 990x660 while the mask stayed 990x661, so
+   alphamerge failed in under a second and the Process popup
+   vanished with "Processing failed: FFmpeg failed…". Snapping
+   shifts the box by at most 1 px, invisible on screen.
    Separate Admin defaults: Admin has "Auto mode defaults"
    (speed, voice, pitch, flip, fit) and "Manual mode defaults"
    (same controls, separate values). Auto uses Auto defaults,

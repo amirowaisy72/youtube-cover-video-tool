@@ -1315,7 +1315,16 @@ def process_video(payload: ProcessRequest) -> dict:
     # Green area: the frontend may already have auto-detected it and
     # sent it; otherwise auto-detect here from the cover itself.
     # Manual admin rectangle is the last fallback.
+    # Snap to even pixels (see video.snap_rect_even): an odd green
+    # height (e.g. 661 on the new office cover) made FFmpeg fail
+    # instantly with an alphamerge size mismatch, so the Process
+    # popup vanished ~1 second after starting.
     green_rect = payload.green_rect or settings["green_rect"]
+    _cover_size = video.get_media_size(cover)
+    green_rect = video.snap_rect_even(
+        green_rect,
+        cover_w=_cover_size[0] if _cover_size else None,
+        cover_h=_cover_size[1] if _cover_size else None)
     green_source = "manual"
     if payload.green_rect is None and settings.get("auto_detect_green", True):
         detected = video.detect_green_rect(cover)
