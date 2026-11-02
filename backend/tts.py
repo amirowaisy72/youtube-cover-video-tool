@@ -102,9 +102,13 @@ def _merge_mp3(parts: list[Path], final_path: Path) -> None:
     if len(parts) == 1:
         parts[0].rename(final_path)
         return
+    # Absolute paths: the concat list lives in the parent dir while
+    # the parts live in a work subdir, so bare filenames would not
+    # resolve (this broke multi-chunk voiceovers — a short test
+    # with one chunk never hit the merge path).
     list_file = final_path.parent / "concat.txt"
     list_file.write_text(
-        "".join(f"file '{part.name}'\n" for part in parts), encoding="utf-8"
+        "".join(f"file '{part.resolve()}'\n" for part in parts), encoding="utf-8"
     )
     proc = subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0",

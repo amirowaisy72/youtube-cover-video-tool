@@ -2304,36 +2304,43 @@ function showTool(tool) {
   document.getElementById("tool-home").hidden = tool !== "home";
   document.getElementById("tool-video").hidden = tool !== "video";
   document.getElementById("tool-tts").hidden = tool !== "tts";
-  if (tool === "tts") loadTtsVoices();
+  document.getElementById("tool-autovideo").hidden = tool !== "autovideo";
+  if (tool === "tts" || tool === "autovideo") loadTtsVoices();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 document.getElementById("btn-open-video-tool").addEventListener("click", () => showTool("video"));
 document.getElementById("btn-open-tts-tool").addEventListener("click", () => showTool("tts"));
+document.getElementById("btn-open-av-tool").addEventListener("click", () => showTool("autovideo"));
 document.getElementById("btn-back-tools").addEventListener("click", () => showTool("home"));
 document.getElementById("btn-back-tools-tts").addEventListener("click", () => showTool("home"));
+document.getElementById("btn-back-tools-av").addEventListener("click", () => showTool("home"));
 
 // ------------------------------------------------------------ Text to Voice
 let ttsVoicesLoaded = false;
 async function loadTtsVoices() {
   if (ttsVoicesLoaded) return;
-  const select = document.getElementById("tts-voice");
+  const selects = ["tts-voice", "av-voice"].map((id) => document.getElementById(id)).filter(Boolean);
   try {
     const res = await fetch("/api/tts/voices");
     const data = await res.json();
-    select.innerHTML = "";
-    for (const voice of data.voices || []) {
-      const option = document.createElement("option");
-      option.value = voice.id;
-      option.textContent = voice.label;
-      select.appendChild(option);
+    for (const select of selects) {
+      select.innerHTML = "";
+      for (const voice of data.voices || []) {
+        const option = document.createElement("option");
+        option.value = voice.id;
+        option.textContent = voice.label;
+        select.appendChild(option);
+      }
     }
     ttsVoicesLoaded = true;
   } catch {
-    select.innerHTML = "";
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Could not load voices — check the server is running.";
-    select.appendChild(option);
+    for (const select of selects) {
+      select.innerHTML = "";
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "Could not load voices — check the server is running.";
+      select.appendChild(option);
+    }
   }
 }
 document.getElementById("tts-text").addEventListener("input", (event) => {
@@ -2374,5 +2381,71 @@ document.getElementById("btn-tts-generate").addEventListener("click", async () =
     status.textContent = `Failed: ${err.message}`;
   } finally {
     button.disabled = false;
+  }
+});
+
+// ------------------------------------------------------- Auto Video (Tool 3)
+let avPollTimer = null;
+document.getElementById("btn-av-generate").addEventListener("click", async () => {
+  const title = document.getElementById("av-title").value.trim();
+  const minutes = parseInt(document.getElementById("av-minutes").value, 10);
+  const visuals = document.getElementById("av-visuals").value;
+  const voice = document.getElementById("av-voice").value;
+  const status = document.getElementById("av-status");
+  const button = document.getElementById("btn-av-generate");
+  const wrap = document.getElementById("av-progress-wrap");
+  const bar = document.getElementById("av-progress-bar");
+  const progressText = document.getElementById("av-progress-text");
+  const result = document.getElementById("av-result");
+  if (!title || title.length < 3) { status.textContent = "Please give a video title first."; return; }
+  if (!minutes || minutes < 1 || minutes > 30) { status.textContent = "Minutes must be between 1 and 30."; return; }
+  if (!voice) { status.textContent = "Please pick a voice first."; return; }
+  if (avPollTimer) clearInterval(avPollTimer);
+  button.disabled = true;
+  result.hidden = true;
+  wrap.hidden = false;
+  status.textContent = "Starting… script, voiceover, visuals, then assembly. This can take a few minutes for a long video.";
+  try {
+    const res = await fetch("/api/autovideo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, minutes, visuals, voice }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Could not start the video.");
+    const jobId = data.job_id;
+    avPollTimer = setInterval(async () => {
+      try {
+        const jobRes = await fetch(`/api/autovideo/${jobId}`);
+        const job = await jobRes.json();
+        bar.style.width = `${job.progress || 0}%`;
+        progressText.textContent = `${job.stage || ""} ${job.progress || 0}%`;
+        if (job.status === "done") {
+          clearInterval(avPollTimer);
+          avPollTimer = null;
+          button.disabled = false;
+          const player = document.getElementById("av-player");
+          player.src = job.download_url;
+          const download = document.getElementById("av-download");
+          download.href = job.download_url;
+          download.setAttribute("download", `autovideo-${jobId}.mp4`);
+          document.getElementById("av-info").textContent =
+            `Finished in about ${job.final_minutes} minutes · Script: ${job.script_words} words (${job.script_source}) · Images: ${job.images_found}, Clips: ${job.clips_found}`;
+          document.getElementById("av-script").textContent = job.script || "";
+          result.hidden = false;
+          status.textContent = "Done — watch above, or download the video.";
+        } else if (job.status === "failed") {
+          clearInterval(avPollTimer);
+          avPollTimer = null;
+          button.disabled = false;
+          status.textContent = `Failed: ${job.error || "Unknown error."}`;
+        }
+      } catch {
+        /* Keep polling on a transient error. */
+      }
+    }, 3000);
+  } catch (err) {
+    button.disabled = false;
+    status.textContent = `Failed: ${err.message}`;
   }
 });

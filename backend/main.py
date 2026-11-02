@@ -52,6 +52,7 @@ import video  # noqa: E402
 import youtube_upload  # noqa: E402
 import metadata as local_metadata  # noqa: E402
 import tts as tts_module  # noqa: E402
+import autovideo  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -59,6 +60,7 @@ JOBS_DIR = BASE_DIR / "jobs"
 COVERS_DIR = BASE_DIR / "covers"
 GROUPS_DIR = BASE_DIR / "groups"
 TTS_DIR = BASE_DIR / "tts"
+AV_DIR = BASE_DIR / "autovideos"
 RECORDS_FILE = BASE_DIR / "records.json"
 SETTINGS_FILE = BASE_DIR / "backend" / "settings.json"
 
@@ -66,6 +68,7 @@ JOBS_DIR.mkdir(exist_ok=True)
 COVERS_DIR.mkdir(exist_ok=True)
 GROUPS_DIR.mkdir(exist_ok=True)
 TTS_DIR.mkdir(exist_ok=True)
+AV_DIR.mkdir(exist_ok=True)
 
 DEFAULT_SETTINGS = {
     "default_speed": 1.0,
@@ -1789,6 +1792,121 @@ def tts_download(tts_id: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(404, "Voiceover not found.")
     return FileResponse(path, media_type="audio/mpeg", filename=f"voiceover-{tts_id}.mp3")
+
+
+# --------------------------------------------------- auto video from title
+# YT Guru Tool 3 (free): title + minutes -> script -> voiceover
+# -> Commons visuals -> finished video. Runs in a background
+# thread; the frontend polls the job below, because scripting
+# + voiceover + assembly can take minutes for a long video.
+class AutoVideoRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=200)
+    minutes: int = Field(..., ge=1, le=30)
+    visuals: str = "both"  # images | videos | both
+    voice: str = "en-US-ChristopherNeural"
+
+
+def _av_job_dir(job_id: str) -> Path:
+    path = AV_DIR / job_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _av_read(job_id: str) -> dict:
+    meta = _av_job_dir(job_id) / "job.json"
+    if meta.exists():
+        try:
+            return json.loads(meta.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    return {"id": job_id, "status": "unknown"}
+
+
+def _av_write(job: dict) -> None:
+    (_av_job_dir(job["id"]) / "job.json").write_text(
+        json.dumps(job, indent=2), encoding="utf-8")
+
+
+def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: str) -> None:
+    directory = _av_job_dir(job_id)
+
+    def _set(stage: str, progress: float, extra: dict | None = None) -> None:
+        job = _av_read(job_id)
+        job.update({"stage": stage, "progress": progress})
+        if extra:
+            job.update(extra)
+        _av_write(job)
+
+    try:
+        _set("Writing script…", 5, {"status": "running"})
+        script, source = autovideo.generate_script(title, minutes)
+        words = len(script.split())
+        _av_write({**_av_read(job_id), "script": script, "script_source": source,
+                   "script_words": words})
+        _set("Making voiceover…", 25, {"status": "running"})
+        voice_path, engine = tts_module.synthesize(
+            script, voice, "+0%", directory)
+        voice_duration = video.get_duration(voice_path)
+        if not voice_duration:
+            raise RuntimeError("Could not measure the voiceover length.")
+        _set("Finding visuals…", 50, {
+            "status": "running", "voice_duration_sec": round(voice_duration, 1),
+            "voice_engine": engine})
+        found = autovideo.fetch_visuals(title, visuals)
+        image_paths: list[Path] = []
+        clip_paths: list[Path] = []
+        for index, item in enumerate(found["images"]):
+            dest = directory / f"img-{index:02d}.jpg"
+            if autovideo._download(item["url"], dest):
+                image_paths.append(dest)
+        for index, item in enumerate(found["videos"]):
+            suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
+            dest = directory / f"clip-{index:02d}{suffix}"
+            if autovideo._download(item["url"], dest):
+                clip_paths.append(dest)
+        _set("Assembling video…", 75, {
+            "status": "running",
+            "images_found": len(image_paths), "clips_found": len(clip_paths)})
+        final_path = autovideo.assemble(
+            voice_path, image_paths, clip_paths, directory, voice_duration)
+        _set("done", 100, {
+            "status": "done",
+            "download_url": f"/api/autovideo/download/{job_id}",
+            "final_minutes": round(voice_duration / 60, 1),
+            "images_found": len(image_paths), "clips_found": len(clip_paths)})
+    except Exception as exc:  # noqa: BLE001
+        _set("failed", 0, {"status": "failed", "error": str(exc)[-2000:]})
+
+
+@app.post("/api/autovideo")
+def autovideo_create(payload: AutoVideoRequest) -> dict:
+    if payload.visuals not in ("images", "videos", "both"):
+        raise HTTPException(400, "Visuals must be images, videos, or both.")
+    if payload.voice not in tts_module.VOICE_IDS:
+        raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
+    job_id = uuid.uuid4().hex[:12]
+    _av_write({"id": job_id, "status": "running", "stage": "Starting…",
+               "progress": 0, "title": payload.title,
+               "minutes": payload.minutes, "visuals": payload.visuals,
+               "voice": payload.voice})
+    threading.Thread(
+        target=_run_autovideo,
+        args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice),
+        daemon=True).start()
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/api/autovideo/{job_id}")
+def autovideo_job(job_id: str) -> dict:
+    return _av_read(job_id)
+
+
+@app.get("/api/autovideo/download/{job_id}")
+def autovideo_download(job_id: str) -> FileResponse:
+    path = _av_job_dir(job_id) / "final.mp4"
+    if not path.exists():
+        raise HTTPException(404, "Video not ready yet.")
+    return FileResponse(path, media_type="video/mp4", filename=f"autovideo-{job_id}.mp4")
 
 
 @app.get("/api/health")
