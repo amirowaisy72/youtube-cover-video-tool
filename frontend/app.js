@@ -2293,3 +2293,86 @@ document.getElementById("tab-btn-admin").addEventListener("click", () => showTab
   loadYoutubeStatus();
   refreshGroupYoutubeStatus();
 })();
+
+// ------------------------------------------------------------------ YT Guru
+// Tool chooser (user, 2026-11-03): the app starts on the home
+// screen. Picking a tool shows ONLY that tool's full use case;
+// the other tool stays hidden. "All tools" goes back home.
+// The video tool's own tabs (Tool / Admin settings) are untouched
+// inside #tool-video.
+function showTool(tool) {
+  document.getElementById("tool-home").hidden = tool !== "home";
+  document.getElementById("tool-video").hidden = tool !== "video";
+  document.getElementById("tool-tts").hidden = tool !== "tts";
+  if (tool === "tts") loadTtsVoices();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.getElementById("btn-open-video-tool").addEventListener("click", () => showTool("video"));
+document.getElementById("btn-open-tts-tool").addEventListener("click", () => showTool("tts"));
+document.getElementById("btn-back-tools").addEventListener("click", () => showTool("home"));
+document.getElementById("btn-back-tools-tts").addEventListener("click", () => showTool("home"));
+
+// ------------------------------------------------------------ Text to Voice
+let ttsVoicesLoaded = false;
+async function loadTtsVoices() {
+  if (ttsVoicesLoaded) return;
+  const select = document.getElementById("tts-voice");
+  try {
+    const res = await fetch("/api/tts/voices");
+    const data = await res.json();
+    select.innerHTML = "";
+    for (const voice of data.voices || []) {
+      const option = document.createElement("option");
+      option.value = voice.id;
+      option.textContent = voice.label;
+      select.appendChild(option);
+    }
+    ttsVoicesLoaded = true;
+  } catch {
+    select.innerHTML = "";
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Could not load voices — check the server is running.";
+    select.appendChild(option);
+  }
+}
+document.getElementById("tts-text").addEventListener("input", (event) => {
+  document.getElementById("tts-count").textContent =
+    `${event.target.value.length} characters (max 10,000)`;
+});
+document.getElementById("btn-tts-generate").addEventListener("click", async () => {
+  const text = document.getElementById("tts-text").value.trim();
+  const voice = document.getElementById("tts-voice").value;
+  const rate = document.getElementById("tts-rate").value;
+  const status = document.getElementById("tts-status");
+  const result = document.getElementById("tts-result");
+  const button = document.getElementById("btn-tts-generate");
+  if (!text) { status.textContent = "Please type some text first."; return; }
+  if (text.length > 10000) { status.textContent = "Text is too long — keep it under 10,000 characters."; return; }
+  if (!voice) { status.textContent = "Please pick a voice first."; return; }
+  button.disabled = true;
+  result.hidden = true;
+  status.textContent = "Generating voiceover… please wait (long scripts take longer).";
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice, rate }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Voice generation failed.");
+    const player = document.getElementById("tts-player");
+    player.src = data.download_url;
+    const download = document.getElementById("tts-download");
+    download.href = data.download_url;
+    download.setAttribute("download", `voiceover-${data.tts_id}.mp3`);
+    document.getElementById("tts-info").textContent =
+      `${data.voice_label} · ${data.chars} characters · ${(data.size_bytes / 1024).toFixed(0)} KB MP3 · ${data.engine_note || ""}`;
+    result.hidden = false;
+    status.textContent = "Done — listen above, or download the MP3.";
+  } catch (err) {
+    status.textContent = `Failed: ${err.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});

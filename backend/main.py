@@ -51,18 +51,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import video  # noqa: E402
 import youtube_upload  # noqa: E402
 import metadata as local_metadata  # noqa: E402
+import tts as tts_module  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 JOBS_DIR = BASE_DIR / "jobs"
 COVERS_DIR = BASE_DIR / "covers"
 GROUPS_DIR = BASE_DIR / "groups"
+TTS_DIR = BASE_DIR / "tts"
 RECORDS_FILE = BASE_DIR / "records.json"
 SETTINGS_FILE = BASE_DIR / "backend" / "settings.json"
 
 JOBS_DIR.mkdir(exist_ok=True)
 COVERS_DIR.mkdir(exist_ok=True)
 GROUPS_DIR.mkdir(exist_ok=True)
+TTS_DIR.mkdir(exist_ok=True)
 
 DEFAULT_SETTINGS = {
     "default_speed": 1.0,
@@ -1723,6 +1726,69 @@ def upload_youtube(payload: UploadRequest) -> dict:
     shutil.rmtree(job_dir(payload.job_id), ignore_errors=True)
     return {"job_id": payload.job_id, "status": "uploaded",
             "local_files_deleted": True, **result}
+
+
+# ------------------------------------------------------- text to voice
+# YT Guru Tool 2 (free): text -> MP3 voiceover. No API key, no
+# payment — edge-tts voices. Long text is chunked in tts.py and
+# merged with FFmpeg, so a full script works, not just a sentence.
+class TtsRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=tts_module.MAX_TEXT_CHARS)
+    voice: str = "en-US-ChristopherNeural"
+    # edge-tts rate: "-20%", "+0%", "+20%" etc.
+    rate: str = "+0%"
+
+
+@app.get("/api/tts/voices")
+def tts_voices() -> dict:
+    return {
+        "voices": [
+            {"id": voice, "label": label} for voice, label in tts_module.VOICES
+        ],
+        "max_text_chars": tts_module.MAX_TEXT_CHARS,
+    }
+
+
+@app.post("/api/tts")
+def tts_generate(payload: TtsRequest) -> dict:
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(400, "Text is empty.")
+    if payload.voice not in tts_module.VOICE_IDS:
+        raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
+    if payload.rate not in {"-20%", "-10%", "+0%", "+10%", "+20%"}:
+        raise HTTPException(400, "Unknown speed. Pick Slow, Normal, or Fast.")
+    try:
+        final_path, engine = tts_module.synthesize(text, payload.voice, payload.rate, TTS_DIR)
+    except ImportError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"Voice generation failed: {str(exc)[-1000:]}") from exc
+    return {
+        "tts_id": final_path.stem,
+        "voice": payload.voice,
+        "voice_label": tts_module.voice_label(payload.voice),
+        "engine": engine,
+        "engine_note": (
+            "Generated with the voice you picked."
+            if engine == "edge-tts"
+            else "Edge voices could not be reached, so this was generated with Google's free voice in the same language (not the male/female voice you picked)."
+        ),
+        "chars": len(text),
+        "size_bytes": final_path.stat().st_size,
+        "download_url": f"/api/tts/download/{final_path.stem}",
+    }
+
+
+@app.get("/api/tts/download/{tts_id}")
+def tts_download(tts_id: str) -> FileResponse:
+    # Only ids this tool created (12 hex chars) — no path traversal.
+    if len(tts_id) != 12 or not all(c in "0123456789abcdef" for c in tts_id):
+        raise HTTPException(404, "Voiceover not found.")
+    path = TTS_DIR / f"{tts_id}.mp3"
+    if not path.exists():
+        raise HTTPException(404, "Voiceover not found.")
+    return FileResponse(path, media_type="audio/mpeg", filename=f"voiceover-{tts_id}.mp3")
 
 
 @app.get("/api/health")
