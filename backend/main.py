@@ -1868,14 +1868,39 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
             dest = directory / f"clip-{index:02d}{suffix}"
             if autovideo._download(item["url"], dest):
                 clip_paths.append((dest, item["title"]))
-        # Honest warning, not silent images-only: if the user asked
-        # for clips and none could be downloaded, say so.
+        # Reliability chain — every video must complete, never a
+        # black video and never a failed job for visuals:
+        # 1. Commons (real photos/clips) first.
+        # 2. If Commons coverage is shorter than the voiceover,
+        #    generate one AI image per spoken paragraph (prompt
+        #    from that paragraph, so the picture matches what
+        #    is being said at that moment).
+        # 3. If even generation fails, a local title card is
+        #    generated per paragraph — no network, no model,
+        #    so it cannot fail. The video always completes.
+        import math as _math
+        coverage = (len(image_paths) * autovideo.IMAGE_SEGMENT_SEC
+                    + len(clip_paths) * autovideo.CLIP_SEGMENT_SEC)
+        ai_images = 0
+        title_cards = 0
+        if coverage < voice_duration:
+            needed = _math.ceil((voice_duration - coverage)
+                                / autovideo.IMAGE_SEGMENT_SEC)
+            generated = autovideo.generate_fallback_visuals(
+                title, paragraphs, directory, min(max(needed, 1), 12))
+            for gen_path, gen_title, is_ai in generated:
+                image_paths.append((gen_path, gen_title))
+                if is_ai:
+                    ai_images += 1
+                else:
+                    title_cards += 1
         visual_warning = ""
-        if not clip_paths and not image_paths:
-            visual_warning = ("No visuals found at all for this title — "
-                              "the video uses a plain background. Try a "
-                              "simpler title, or check the internet connection.")
-        elif visuals in ("videos", "both") and not clip_paths:
+        if ai_images or title_cards:
+            visual_warning = (
+                f"Commons visuals were short, so {ai_images} AI-generated "
+                f"image(s) and {title_cards} title card(s) were added for "
+                f"the spoken paragraphs, so the video still completes.")
+        elif visuals in ("videos", "both") and not clip_paths and image_paths:
             visual_warning = ("No video clips could be found/downloaded for "
                               "this title, so images were used instead.")
         _set("Assembling video…", 75, {
@@ -1897,6 +1922,7 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
             "final_minutes": round(voice_duration / 60, 1),
             "images_found": len(image_paths), "clips_found": len(clip_paths),
             "images_used": images_used, "clips_used": clips_used,
+            "ai_images": ai_images, "title_cards": title_cards,
             "visual_warning": visual_warning})
     except Exception as exc:  # noqa: BLE001
         _set("failed", 0, {"status": "failed", "error": str(exc)[-2000:]})

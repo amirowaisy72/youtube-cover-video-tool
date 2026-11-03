@@ -356,6 +356,138 @@ def fetch_visuals(title: str, visuals: str) -> dict:
     return {"images": images, "videos": videos}
 
 
+def _valid_image(path: Path) -> bool:
+    """True only for a complete, decodable image. Pollinations
+    sometimes closes a connection early (urllib IncompleteRead),
+    leaving a truncated file — that must be retried, never used,
+    or the video would show a broken frame."""
+    try:
+        if not path.exists() or path.stat().st_size < 1000:
+            return False
+        from PIL import Image
+        with Image.open(path) as image:
+            image.load()
+            return image.size[0] > 0 and image.size[1] > 0
+    except Exception:
+        return False
+
+
+def _prompt_for_paragraph(title: str, paragraph: str) -> str:
+    """The visual prompt is the paragraph's first sentence plus
+    the title — not the whole paragraph. A long prompt gets
+    truncated by the image model and drifts off-topic; one
+    sentence keeps the picture about what is being said."""
+    first = re.split(r"(?<=[.!?])\s+", (paragraph or "").strip())
+    sentence = first[0] if first else ""
+    if len(sentence) > 200:
+        sentence = sentence[:200].rsplit(" ", 1)[0]
+    return (f"Cinematic documentary photograph, {title}: {sentence}, "
+            f"photorealistic, detailed, no text, no watermark")
+
+
+def generate_ai_image(title: str, paragraph: str, dest: Path) -> bool:
+    """Generate one topic image with Pollinations' free image
+    API (no key). Tries 3 seeds: curl first (urllib truncated
+    Pollinations responses in testing, curl completed them),
+    then urllib as a fallback. Returns False only if every
+    attempt produced an invalid image — the caller then uses
+    a local title card, so the job never fails for visuals."""
+    prompt = _prompt_for_paragraph(title, paragraph)
+    for seed in (42, 7, 123):
+        url = ("https://image.pollinations.ai/prompt/"
+               + urllib.parse.quote(prompt)
+               + f"?width=1280&height=720&model=flux&nologo=true&seed={seed}")
+        try:
+            proc = subprocess.run(
+                ["curl", "-sL", "--max-time", "120", "-A", "YT-Guru/1.0",
+                 url, "-o", str(dest)],
+                capture_output=True, text=True, timeout=150)
+            if proc.returncode == 0 and _valid_image(dest):
+                return True
+        except Exception:
+            pass
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                dest.write_bytes(resp.read())
+            if _valid_image(dest):
+                return True
+        except Exception:
+            pass
+        if dest.exists():
+            dest.unlink(missing_ok=True)
+    return False
+
+
+def _title_card_image(title: str, paragraph: str, dest: Path) -> bool:
+    """Guaranteed local visual: a dark card with the title and
+    the paragraph's first sentence. No network, no model, so
+    it can never fail — it is the last resort that guarantees
+    every video completes with readable, on-topic visuals
+    instead of a black screen."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import textwrap
+        image = Image.new("RGB", (1280, 720), (14, 26, 46))
+        draw = ImageDraw.Draw(image)
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            r"C:\Windows\Fonts\arialbd.ttf",
+            r"C:\Windows\Fonts\arial.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        ]
+        title_font = None
+        body_font = None
+        for font_path in font_paths:
+            try:
+                title_font = ImageFont.truetype(font_path, 64)
+                body_font = ImageFont.truetype(font_path, 32)
+                break
+            except Exception:
+                continue
+        if title_font is None:
+            title_font = ImageFont.load_default()
+            body_font = ImageFont.load_default()
+        y = 220
+        for line in textwrap.wrap(title, width=28)[:3]:
+            draw.text((640, y), line, fill=(255, 255, 255),
+                      font=title_font, anchor="ma")
+            y += 80
+        first = re.split(r"(?<=[.!?])\s+", (paragraph or "").strip())
+        sentence = first[0] if first else ""
+        y += 30
+        for line in textwrap.wrap(sentence, width=55)[:4]:
+            draw.text((640, y), line, fill=(163, 214, 92),
+                      font=body_font, anchor="ma")
+            y += 42
+        image.save(dest, "JPEG", quality=90)
+        return _valid_image(dest)
+    except Exception:
+        return False
+
+
+def generate_fallback_visuals(title: str, paragraphs: list[str],
+                              work_dir: Path, count: int
+                              ) -> list[tuple[Path, str]]:
+    """One generated visual per paragraph, up to `count`. AI
+    image first (topic-relevant photograph); title card if
+    generation fails. The returned title for each visual IS
+    its paragraph, so paragraph-matched assembly scores it
+    as a perfect match for the moment it is spoken — the
+    picture on screen is always about what is being said.
+    Returns (path, paragraph, is_ai_image) triples."""
+    visuals: list[tuple[Path, str, bool]] = []
+    for index, paragraph in enumerate(paragraphs[:count]):
+        if not paragraph.strip():
+            continue
+        dest = work_dir / f"ai-{index:02d}.jpg"
+        if generate_ai_image(title, paragraph, dest):
+            visuals.append((dest, paragraph, True))
+        elif _title_card_image(title, paragraph, dest):
+            visuals.append((dest, paragraph, False))
+    return visuals
+
+
 def split_paragraphs(script: str) -> list[str]:
     """Paragraphs from the script; if it is one long paragraph,
     group its sentences three at a time so visuals can still

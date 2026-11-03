@@ -2435,7 +2435,7 @@ document.getElementById("btn-av-generate").addEventListener("click", async () =>
           download.href = job.download_url;
           download.setAttribute("download", `autovideo-${jobId}.mp4`);
           document.getElementById("av-info").textContent =
-            `Finished in about ${job.final_minutes} minutes · Script: ${job.script_words} words (${job.script_source}) · Images used: ${job.images_used}, Clips used: ${job.clips_used} (found: ${job.images_found} images, ${job.clips_found} clips) · Voice: ${job.voice_engine || ""}${job.visual_warning ? " · " + job.visual_warning : ""}`;
+            `Finished in about ${job.final_minutes} minutes · Script: ${job.script_words} words (${job.script_source}) · Images used: ${job.images_used}, Clips used: ${job.clips_used} (found: ${job.images_found} images, ${job.clips_found} clips)${job.ai_images ? ` · AI images: ${job.ai_images}` : ""}${job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: ${job.voice_engine || ""}${job.visual_warning ? " · " + job.visual_warning : ""}`;
           document.getElementById("av-script").textContent = job.script || "";
           result.hidden = false;
           status.textContent = "Done — watch above, or download the video.";
