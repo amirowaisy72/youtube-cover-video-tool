@@ -382,7 +382,9 @@ def _prompt_for_paragraph(title: str, paragraph: str) -> str:
     if len(sentence) > 200:
         sentence = sentence[:200].rsplit(" ", 1)[0]
     return (f"Cinematic documentary photograph, {title}: {sentence}, "
-            f"photorealistic, detailed, no text, no watermark")
+            f"photorealistic real photograph, realistic lighting, "
+            f"clear and easily understandable subject, detailed, "
+            f"no text, no watermark, no abstract patterns")
 
 
 def generate_ai_image(title: str, paragraph: str, dest: Path) -> bool:

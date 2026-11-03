@@ -1840,6 +1840,43 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
         _av_write(job)
 
     try:
+        # MASTER pipeline first: scene-based video (hook +
+        # scenes, per-scene visuals, pan motion, captions,
+        # quality gates). If it fails for any reason, the old
+        # paragraph pipeline below runs instead, so the job
+        # still completes — never a failed job for a pipeline
+        # upgrade.
+        try:
+            import autovideo2
+            _set("Building scenes…", 10, {"status": "running"})
+            report = autovideo2.run_master(
+                title, minutes, visuals, voice, directory,
+                expressive=expressive)
+            kinds = report["kinds"]
+            _set("done", 100, {
+                "status": "done",
+                "download_url": f"/api/autovideo/download/{job_id}",
+                "script": report["script"],
+                "script_source": report["script_source"],
+                "script_words": report["script_words"],
+                "voice_duration_sec": report["voice_duration_sec"],
+                "voice_engine": report["voice_engine"],
+                "final_minutes": round(report["voice_duration_sec"] / 60, 1),
+                "scenes": report["scenes"],
+                "distinct_commons_visuals": report["distinct_commons_visuals"],
+                "images_found": kinds["image"] + kinds["ai"] + kinds["card"],
+                "clips_found": kinds["clip"],
+                "images_used": kinds["image"] + kinds["ai"] + kinds["card"],
+                "clips_used": kinds["clip"],
+                "ai_images": kinds["ai"],
+                "title_cards": kinds["card"],
+                "visual_warning": "",
+                "pipeline": "master-scenes"})
+            return
+        except Exception as master_exc:  # noqa: BLE001
+            _set("Master pipeline fell back…", 5, {
+                "status": "running",
+                "master_fallback": str(master_exc)[-500:]})
         _set("Writing script…", 5, {"status": "running"})
         script, source = autovideo.generate_script(title, minutes)
         words = len(script.split())

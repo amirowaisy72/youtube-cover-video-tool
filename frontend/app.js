@@ -2437,6 +2437,12 @@ document.getElementById("btn-av-generate").addEventListener("click", async () =>
           document.getElementById("av-info").textContent =
             `Finished in about ${job.final_minutes} minutes · Script: ${job.script_words} words (${job.script_source}) · Images used: ${job.images_used}, Clips used: ${job.clips_used} (found: ${job.images_found} images, ${job.clips_found} clips)${job.ai_images ? ` · AI images: ${job.ai_images}` : ""}${job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: ${job.voice_engine || ""}${job.visual_warning ? " · " + job.visual_warning : ""}`;
           document.getElementById("av-script").textContent = job.script || "";
+          const scenesEl = document.getElementById("av-scenes");
+          if (scenesEl) {
+            scenesEl.textContent = (job.scenes || []).map((s, i) =>
+              `Scene ${i + 1} (${s.kind}, ${s.duration_sec}s): ${s.caption || ""} — Visual: ${s.visual || ""}`
+            ).join("\n") || "Scene list not available for this video.";
+          }
           result.hidden = false;
           status.textContent = "Done — watch above, or download the video.";
         } else if (job.status === "failed") {
