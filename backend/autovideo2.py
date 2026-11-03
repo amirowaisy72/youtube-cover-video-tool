@@ -277,26 +277,61 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
     return ok
 
 
-def _segment_scene_clip(clip_path: Path, duration: float, dest: Path) -> bool:
-    """Clip -> scene segment. CRITICAL: if the source clip is
-    shorter than the scene (e.g. a 14.7s clip for a 20.6s
-    scene), loop it — otherwise the segment comes out short,
-    the whole video comes out short, and -shortest cuts the
-    last seconds of narration off. That exact bug cut 6
-    seconds off the first passing master test."""
-    vf = (
+def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
+                        dest: Path) -> bool:
+    """Clip -> scene segment, with the scene's caption burned
+    in as a bottom bar (same first-sentence caption as image
+    scenes, via drawtext + a text file so punctuation in the
+    sentence cannot break the filter graph).
+    CRITICAL: if the source clip is shorter than the scene
+    (e.g. a 14.7s clip for a 20.6s scene), loop it — otherwise
+    the segment comes out short, the whole video comes out
+    short, and -shortest cuts the last seconds of narration
+    off. That exact bug cut 6 seconds off the first passing
+    master test.
+    A caption failure must never break the scene: if the
+    captioned encode fails, the plain (uncaptioned) segment
+    is built instead."""
+    base_vf = (
         "scale=1280:720:force_original_aspect_ratio=decrease,"
-        "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,"
-        f"fade=t=in:st=0:d=0.5,fade=t=out:st={max(duration - 0.5, 0)}:d=0.5"
+        "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p"
     )
     clip_dur = autovideo._ffprobe_duration(clip_path) or duration
     loop_args: list[str] = []
     if clip_dur < duration:
         loop_args = ["-stream_loop", str(math.ceil(duration / clip_dur))]
-    cmd = ["ffmpeg", "-y"] + loop_args + ["-i", str(clip_path),
-           "-vf", vf, "-r", "30", "-t", str(duration), "-an",
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)]
-    return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+
+    def _encode(vf: str) -> bool:
+        cmd = ["ffmpeg", "-y"] + loop_args + ["-i", str(clip_path),
+               "-vf", vf, "-r", "30", "-t", str(duration), "-an",
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)]
+        return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+
+    fade = (f"fade=t=in:st=0:d=0.5,"
+            f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
+    caption_file = None
+    font = _find_font()
+    if caption and font:
+        import textwrap
+        lines = textwrap.wrap(caption, width=52)[:2]
+        if lines:
+            caption_file = dest.with_suffix(".cap.txt")
+            caption_file.write_text("\n".join(lines), encoding="utf-8")
+            captioned_vf = (
+                f"{base_vf},"
+                f"drawtext=fontfile={font}:textfile={caption_file}:"
+                "fontsize=28:fontcolor=white:box=1:boxcolor=black@0.75:"
+                "boxborderw=18:x=(w-text_w)/2:y=h-90,"
+                f"{fade}"
+            )
+            if _encode(captioned_vf):
+                caption_file.unlink(missing_ok=True)
+                return True
+            # Captioned encode failed: fall through to the
+            # plain segment below rather than losing the scene.
+    if caption_file is not None:
+        caption_file.unlink(missing_ok=True)
+    return _encode(f"{base_vf},{fade}")
 
 
 def run_master(title: str, minutes: int, visuals: str, voice: str,
@@ -340,7 +375,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         caption = _caption_text(scene)
         dest = work_dir / f"master-seg-{index:02d}.mp4"
         if kind == "clip":
-            ok = _segment_scene_clip(visual_path, duration, dest)
+            ok = _segment_scene_clip(visual_path, caption, duration, dest)
         else:
             ok = _segment_scene_image(visual_path, caption, duration,
                                       dest, pan_right=(index % 2 == 0))
@@ -413,3 +448,4 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         "distinct_commons_visuals": len(used_urls),
         "voice_engine": engine,
     }
+
