@@ -1803,7 +1803,8 @@ class AutoVideoRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
     minutes: int = Field(..., ge=1, le=30)
     visuals: str = "both"  # images | videos | both
-    voice: str = "en-US-ChristopherNeural"
+    voice: str = "en-US-AriaNeural"
+    expressive: bool = True
 
 
 def _av_job_dir(job_id: str) -> Path:
@@ -1827,7 +1828,8 @@ def _av_write(job: dict) -> None:
         json.dumps(job, indent=2), encoding="utf-8")
 
 
-def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: str) -> None:
+def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: str,
+                   expressive: bool = True) -> None:
     directory = _av_job_dir(job_id)
 
     def _set(stage: str, progress: float, extra: dict | None = None) -> None:
@@ -1844,36 +1846,56 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
         _av_write({**_av_read(job_id), "script": script, "script_source": source,
                    "script_words": words})
         _set("Making voiceover…", 25, {"status": "running"})
-        voice_path, engine = tts_module.synthesize(
-            script, voice, "+0%", directory)
-        voice_duration = video.get_duration(voice_path)
+        paragraphs = autovideo.split_paragraphs(script)
+        voice_path, engine, durations, fallback_used = tts_module.synthesize_paragraphs(
+            paragraphs, voice, "+0%", directory, expressive=expressive)
+        voice_duration = video.get_duration(voice_path) or sum(durations)
         if not voice_duration:
             raise RuntimeError("Could not measure the voiceover length.")
         _set("Finding visuals…", 50, {
             "status": "running", "voice_duration_sec": round(voice_duration, 1),
-            "voice_engine": engine})
+            "voice_engine": engine,
+            "voice_fallback_used": fallback_used})
         found = autovideo.fetch_visuals(title, visuals)
-        image_paths: list[Path] = []
-        clip_paths: list[Path] = []
+        image_paths: list[tuple[Path, str]] = []
+        clip_paths: list[tuple[Path, str]] = []
         for index, item in enumerate(found["images"]):
             dest = directory / f"img-{index:02d}.jpg"
             if autovideo._download(item["url"], dest):
-                image_paths.append(dest)
+                image_paths.append((dest, item["title"]))
         for index, item in enumerate(found["videos"]):
             suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
             dest = directory / f"clip-{index:02d}{suffix}"
             if autovideo._download(item["url"], dest):
-                clip_paths.append(dest)
+                clip_paths.append((dest, item["title"]))
+        # Honest warning, not silent images-only: if the user asked
+        # for clips and none could be downloaded, say so.
+        visual_warning = ""
+        if visuals in ("videos", "both") and not clip_paths:
+            visual_warning = ("No video clips could be found/downloaded for "
+                              "this title, so images were used instead.")
+        if visuals == "videos" and not clip_paths and not image_paths:
+            visual_warning = "No visuals found at all — a plain background was used."
         _set("Assembling video…", 75, {
-            "status": "running",
+            "status": "running", "visual_warning": visual_warning,
             "images_found": len(image_paths), "clips_found": len(clip_paths)})
-        final_path = autovideo.assemble(
-            voice_path, image_paths, clip_paths, directory, voice_duration)
+        para_plan = [(para, dur) for para, dur in zip(paragraphs, durations)
+                     if dur and dur > 0]
+        if not para_plan:
+            para_plan = [(script, voice_duration)]
+        final_path, images_used, clips_used = autovideo.assemble_by_paragraphs(
+            voice_path, para_plan, image_paths, clip_paths, directory, voice_duration)
+        # The download endpoint serves final.mp4 in the job dir.
+        if final_path.name != "final.mp4":
+            import shutil as _shutil
+            _shutil.copyfile(final_path, directory / "final.mp4")
         _set("done", 100, {
             "status": "done",
             "download_url": f"/api/autovideo/download/{job_id}",
             "final_minutes": round(voice_duration / 60, 1),
-            "images_found": len(image_paths), "clips_found": len(clip_paths)})
+            "images_found": len(image_paths), "clips_found": len(clip_paths),
+            "images_used": images_used, "clips_used": clips_used,
+            "visual_warning": visual_warning})
     except Exception as exc:  # noqa: BLE001
         _set("failed", 0, {"status": "failed", "error": str(exc)[-2000:]})
 
@@ -1891,7 +1913,8 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
                "voice": payload.voice})
     threading.Thread(
         target=_run_autovideo,
-        args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice),
+        args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice,
+              payload.expressive),
         daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 

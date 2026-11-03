@@ -82,18 +82,40 @@ def split_text(text: str) -> list[str]:
     return chunks
 
 
-async def _save_chunk(text: str, voice: str, rate: str, dest: Path) -> None:
+def _escape_xml(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _expressive_ssml(text: str, voice: str) -> str | None:
+    """DISABLED 2026-11-03: SSML narration-professional made Aria
+    3x slower (52 words: 51 sec SSML vs 16 sec plain) — that was
+    the dragging, unnatural voice in the Great Wall test, and it
+    also broke the minutes target (193 sec voiceover for a
+    1-minute video). Plain voices are natural at normal speed;
+    expressiveness now comes from the script's punctuation and
+    varied sentences, not SSML. Kept as a no-op so callers do
+    not need to change, and so this lesson is not reintroduced."""
+    return None
+
+
+async def _save_chunk(text: str, voice: str, rate: str, dest: Path,
+                      expressive: bool = False) -> None:
     import edge_tts
 
-    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    spoken = text
+    if expressive:
+        spoken = _expressive_ssml(text, voice) or text
+    communicate = edge_tts.Communicate(spoken, voice, rate=rate)
     await communicate.save(str(dest))
 
 
-async def _synthesize_all(chunks: list[str], voice: str, rate: str, out_dir: Path) -> list[Path]:
+async def _synthesize_all(chunks: list[str], voice: str, rate: str, out_dir: Path,
+                          expressive: bool = False) -> list[Path]:
     parts = []
     for index, chunk in enumerate(chunks):
         part = out_dir / f"part-{index:03d}.mp3"
-        await _save_chunk(chunk, voice, rate, part)
+        await _save_chunk(chunk, voice, rate, part, expressive=expressive)
         parts.append(part)
     return parts
 
@@ -131,7 +153,50 @@ def _synthesize_gtts(chunks: list[str], voice: str, work_dir: Path) -> list[Path
     return parts
 
 
-def synthesize(text: str, voice: str, rate: str, out_dir: Path) -> tuple[Path, str]:
+def _ffprobe_duration(path: Path) -> float | None:
+    try:
+        import json as _json
+        proc = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "json", str(path)],
+            capture_output=True, text=True, timeout=30)
+        return float(_json.loads(proc.stdout or "{}")["format"]["duration"])
+    except Exception:
+        return None
+
+
+def synthesize_paragraphs(paragraphs: list[str], voice: str, rate: str,
+                          out_dir: Path, expressive: bool = False
+                          ) -> tuple[Path, str, list[float], bool]:
+    """One MP3 per paragraph, then merged, with each paragraph's
+    duration. Paragraph MP3s are what let Tool 3 match visuals
+    to the paragraph being spoken, instead of random visuals.
+    Returns (final MP3, engine, durations, fallback_used)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    para_paths: list[Path] = []
+    fallback_used = False
+    engine = "edge-tts"
+    for paragraph in paragraphs:
+        if not paragraph.strip():
+            continue
+        para_path, para_engine = synthesize(
+            paragraph, voice, rate, out_dir, expressive=expressive)
+        para_paths.append(para_path)
+        if para_engine != "edge-tts":
+            fallback_used = True
+            engine = para_engine
+    if not para_paths:
+        raise ValueError("No paragraphs to voice.")
+    durations = [_ffprobe_duration(path) or 0.0 for path in para_paths]
+    final_path = out_dir / f"{uuid.uuid4().hex[:12]}-full.mp3"
+    _merge_mp3(para_paths, final_path)
+    for path in para_paths:
+        path.unlink(missing_ok=True)
+    return final_path, engine, durations, fallback_used
+
+
+def synthesize(text: str, voice: str, rate: str, out_dir: Path,
+               expressive: bool = False) -> tuple[Path, str]:
     """Generate one MP3 from text. Returns (final MP3 path, engine).
 
     Engine is "edge-tts" normally, or "gtts-fallback" when Edge
@@ -158,7 +223,8 @@ def synthesize(text: str, voice: str, rate: str, out_dir: Path) -> tuple[Path, s
                 "edge-tts is not installed. Install it with "
                 "'pip install edge-tts' and try again."
             ) from exc
-        parts = asyncio.run(_synthesize_all(chunks, voice, rate, work_dir))
+        parts = asyncio.run(_synthesize_all(chunks, voice, rate, work_dir,
+                                            expressive=expressive))
         _merge_mp3(parts, final_path)
         engine = "edge-tts"
     except Exception as exc:  # noqa: BLE001

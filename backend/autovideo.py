@@ -38,13 +38,25 @@ from pathlib import Path
 WORDS_PER_MINUTE = 150
 IMAGE_SEGMENT_SEC = 6.0
 CLIP_SEGMENT_SEC = 15.0
-MAX_VIDEO_BYTES = 80 * 1024 * 1024
+MAX_VIDEO_BYTES = 50 * 1024 * 1024
 
 STOPWORDS = {
     "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with",
     "how", "why", "what", "is", "are", "was", "were", "be", "by", "at",
     "from", "into", "about", "best", "top", "new", "amazing", "secret",
     "secrets", "guide", "explained", "everything", "you", "need", "know",
+}
+
+# Filler words that say nothing about the topic itself. Removing
+# them leaves the core phrase ("The Hidden History of the Great
+# Wall of China" -> "Great Wall China"). Searching single filler
+# words used to be the bug: "hidden" or "great" alone returns
+# random patterns and walls of every kind, not the Great Wall.
+FILLER_WORDS = {
+    "hidden", "secret", "secrets", "amazing", "incredible", "shocking",
+    "ultimate", "complete", "full", "explained", "guide", "story",
+    "history", "mysterious", "untold", "real", "true", "surprising",
+    "fascinating", "mind", "blowing", "things", "facts", "reasons",
 }
 
 HEADERS = {"User-Agent": "YT-Guru/1.0 (free local tool)"}
@@ -72,6 +84,23 @@ def keywords(title: str) -> list[str]:
     return seen[:4]
 
 
+def core_words(title: str) -> list[str]:
+    """Topic words only, in order, no filler. These are what
+    visuals are searched and scored against — never single
+    generic words on their own."""
+    words = re.findall(r"[A-Za-z0-9]+", title.lower())
+    seen: list[str] = []
+    for word in words:
+        if (word not in STOPWORDS and word not in FILLER_WORDS
+                and len(word) > 2 and word not in seen):
+            seen.append(word)
+    return seen
+
+
+def _title_words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
+
+
 def target_words(minutes: int) -> int:
     return max(150, minutes * WORDS_PER_MINUTE)
 
@@ -82,6 +111,17 @@ def _clean_script(text: str) -> str:
     text = re.sub(r"\*([^*]+)\*", r"\1", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.MULTILINE)
+    # NEVER read links aloud: a script that contains a URL makes
+    # the voice read "h t t p s colon slash slash..." — exactly
+    # the complaint on the Great Wall test video. Strip every
+    # URL, email, and citation marker before voiceover, and drop
+    # whole Source/References lines, which are not spoken script.
+    text = re.sub(r"https?://\S+|www\.\S+|\S+@\S+", "", text)
+    text = re.sub(r"\[[0-9]+\]|\[citation needed\]", "", text, flags=re.IGNORECASE)
+    lines = [line for line in text.splitlines()
+             if not re.match(r"\s*(sources?|references?)\s*:", line, re.IGNORECASE)]
+    text = "\n".join(lines)
+    text = re.sub(r"\s*(Sources?|References?)\s*:.*$", "", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text
 
@@ -91,19 +131,43 @@ def generate_script(title: str, minutes: int) -> tuple[str, str]:
     or template — recorded so the UI can say honestly where the
     script came from."""
     words = target_words(minutes)
+    # Prompt wording matters: the clause "Do not include stage
+    # directions..." makes Pollinations return HTTP 400 for this
+    # title (bisect-tested 2026-11-03: that clause alone fails,
+    # while the other clauses pass). So it is deliberately left
+    # out; the script is cleaned of headings/markdown in code
+    # instead (_clean_script).
     prompt = (
-        f"Write a YouTube video script in English, in a natural spoken "
-        f"style, about: {title}. Length: about {words} words. "
-        f"Start with an engaging hook, then explain the topic in clear "
-        f"sections, and end with a short conclusion. Write only the "
-        f"spoken script, in paragraphs. Do not include stage directions, "
-        f"timestamps, headings, or bracketed notes."
+        f"Write a YouTube video script in English, in a warm, expressive, "
+        f"storytelling spoken style, like a passionate narrator, about: "
+        f"{title}. Length: about {words} words. Vary your sentence "
+        f"lengths, use rhetorical questions and exclamations where "
+        f"natural, and let the emotion of the story come through in "
+        f"the words. Start with an engaging hook, then explain the "
+        f"topic in clear sections, and end with a short conclusion. "
+        f"Write only the spoken script, in paragraphs."
     )
     try:
         url = "https://text.pollinations.ai/" + urllib.parse.quote(prompt)
         raw = _http_get(url, timeout=180).decode("utf-8", "ignore")
         script = _clean_script(raw)
         if len(script.split()) >= words * 0.4:
+            # Pollinations often overshoots the word target (269
+            # words for a 150-word request), which would make a
+            # 1-minute video nearly 2 minutes. Trim to the last
+            # sentence boundary at or below 115% of target, so
+            # the voiceover stays about the requested minutes.
+            if len(script.split()) > words * 1.15:
+                sentences = re.split(r"(?<=[.!?])\s+", script)
+                trimmed, count = [], 0
+                for sentence in sentences:
+                    sentence_words = len(sentence.split())
+                    if count + sentence_words > words * 1.15 and trimmed:
+                        break
+                    trimmed.append(sentence)
+                    count += sentence_words
+                if trimmed:
+                    script = " ".join(trimmed)
             return script, "pollinations"
     except Exception:
         pass
@@ -172,7 +236,16 @@ def _commons_search(query: str, filetype: str, limit: int = 20) -> list[dict]:
     items = []
     for page in (data.get("query", {}).get("pages", {}) or {}).values():
         info = (page.get("imageinfo") or [{}])[0]
-        url = info.get("thumburl") or info.get("url")
+        # CRITICAL: for videos, thumburl is a JPG poster thumbnail,
+        # not the video — using it downloaded posters as "clips"
+        # (1-frame segments). Videos must use the original url;
+        # images use the 1280px thumburl. Only webm/mp4 videos.
+        if filetype == "video":
+            if (info.get("mime") or "") not in ("video/webm", "video/mp4"):
+                continue
+            url = info.get("url")
+        else:
+            url = info.get("thumburl") or info.get("url")
         if not url:
             continue
         size = info.get("size") or 0
@@ -188,15 +261,46 @@ def _commons_search(query: str, filetype: str, limit: int = 20) -> list[dict]:
 
 
 def fetch_visuals(title: str, visuals: str) -> dict:
-    """Search Commons for images and/or videos. Returns
-    {"images": [...], "videos": [...]} with duplicates removed."""
-    queries = [title] + keywords(title)
+    """Search Commons for images and/or videos, phrase-first.
+
+    Queries are ONLY phrases: the full title, then the core
+    phrase ("Great Wall China"), then 2-3 word core combos.
+    Single generic words are never searched — that was the
+    bug that returned pattern images for "hidden" and "great".
+    Every candidate is then scored by how many core words
+    appear in its FILE TITLE, and only scored candidates are
+    kept, best first. A file whose title says nothing about
+    the topic cannot rank, however well its description matches.
+    Returns {"images": [...], "videos": [...]}."""
+    core = core_words(title)
+    core_phrase = " ".join(core)
+    queries: list[str] = []
+    for query in [title, core_phrase]:
+        if query and query not in queries:
+            queries.append(query)
+    if len(core) >= 3:
+        for combo in (core[:3], core[-3:], core[:2]):
+            query = " ".join(combo)
+            if query not in queries:
+                queries.append(query)
+    if len(core) == 1:
+        queries.append(core[0])
     images: list[dict] = []
     videos: list[dict] = []
     seen_urls: set[str] = set()
 
     def _add(target: list[dict], candidates: list[dict], cap: int) -> None:
+        scored = []
         for item in candidates:
+            title_words = _title_words(item["title"])
+            score = sum(1 for word in core if word in title_words)
+            if core_phrase and core_phrase in item["title"].lower():
+                score += 2
+            if score < 1:
+                continue
+            scored.append((score, item))
+        scored.sort(key=lambda pair: -pair[0])
+        for _, item in scored:
             if len(target) >= cap:
                 return
             if item["url"] in seen_urls:
@@ -207,17 +311,31 @@ def fetch_visuals(title: str, visuals: str) -> dict:
     for query in queries:
         if visuals in ("images", "both") and len(images) < 20:
             try:
-                _add(images, _commons_search(query, "bitmap", 20), 20)
+                _add(images, _commons_search(query, "bitmap", 30), 20)
             except Exception:
                 pass
         if visuals in ("videos", "both") and len(videos) < 10:
             try:
-                _add(videos, _commons_search(query, "video", 20), 10)
+                _add(videos, _commons_search(query, "video", 30), 10)
             except Exception:
                 pass
         if len(images) >= 12 and len(videos) >= 5:
             break
     return {"images": images, "videos": videos}
+
+
+def split_paragraphs(script: str) -> list[str]:
+    """Paragraphs from the script; if it is one long paragraph,
+    group its sentences three at a time so visuals can still
+    change with the narration."""
+    paragraphs = [para.strip() for para in re.split(r"\n\s*\n", script) if para.strip()]
+    if len(paragraphs) > 1:
+        return paragraphs
+    sentences = re.split(r"(?<=[.!?])\s+", script.strip())
+    grouped: list[str] = []
+    for i in range(0, len(sentences), 3):
+        grouped.append(" ".join(sentences[i:i + 3]).strip())
+    return [group for group in grouped if group]
 
 
 def _download(url: str, dest: Path, timeout: int = 120) -> bool:
@@ -326,3 +444,119 @@ def assemble(voice_path: Path, images: list[Path], clips: list[Path],
     if proc.returncode != 0 or not final_path.exists():
         raise RuntimeError(f"Audio mux failed: {proc.stderr[-1000:]}")
     return final_path
+
+
+def _score_visual(title: str, paragraph: str) -> int:
+    """How well a visual's file title matches a paragraph:
+    shared words, weighted toward the paragraph's own words."""
+    title_words = _title_words(title)
+    para_words = [w for w in re.findall(r"[a-z0-9]+", paragraph.lower())
+                  if w not in STOPWORDS and len(w) > 2]
+    return sum(1 for word in set(para_words) if word in title_words)
+
+
+def assemble_by_paragraphs(voice_path: Path,
+                           paragraphs: list[tuple[str, float]],
+                           images: list[tuple[Path, str]],
+                           clips: list[tuple[Path, str]],
+                           work_dir: Path, voice_duration: float
+                           ) -> tuple[Path, int, int]:
+    """Assemble with visuals matched to the paragraph being spoken.
+
+    For each paragraph, visuals are picked by file-title overlap
+    with that paragraph's words, so the picture on screen is
+    about what is being said at that moment — not a random
+    image from the whole topic. If visuals=both and any clip
+    was downloaded, the first paragraph uses a clip, so "both"
+    can never silently become images-only. Returns
+    (final_path, distinct_images_used, distinct_clips_used)."""
+    segments: list[Path] = []
+    used_images: set[str] = set()
+    used_clips: set[str] = set()
+    seg_no = 0
+    image_used_order: list[int] = []
+    clip_used_order: list[int] = []
+
+    def _best(pool: list[tuple[Path, str]], paragraph: str,
+              used_order: list[int]) -> int | None:
+        if not pool:
+            return None
+        best_idx, best_score = None, -1
+        for idx, (_, title) in enumerate(pool):
+            if idx in used_order:
+                continue
+            score = _score_visual(title, paragraph)
+            if score > best_score:
+                best_idx, best_score = idx, score
+        if best_idx is None:
+            # All used once: reuse the best match.
+            used_order.clear()
+            return _best(pool, paragraph, used_order)
+        return best_idx
+
+    for para_idx, (paragraph, para_duration) in enumerate(paragraphs):
+        if para_duration <= 0:
+            continue
+        remaining = para_duration
+        # First paragraph: force a clip when clips exist and the
+        # user asked for both/video, so "both" is visible.
+        force_clip = para_idx == 0 and bool(clips)
+        while remaining > 0.5:
+            if (force_clip or remaining >= CLIP_SEGMENT_SEC) and clips:
+                idx = _best(clips, paragraph, clip_used_order)
+                if idx is not None:
+                    clip_path, clip_title = clips[idx]
+                    clip_dur = _ffprobe_duration(clip_path) or CLIP_SEGMENT_SEC
+                    seg_dur = min(CLIP_SEGMENT_SEC, clip_dur, remaining)
+                    dest = work_dir / f"pseg-{seg_no:03d}.mp4"
+                    if _segment_clip(clip_path, dest, seg_dur):
+                        segments.append(dest)
+                        used_clips.add(str(clip_path))
+                        clip_used_order.append(idx)
+                        remaining -= seg_dur
+                        seg_no += 1
+                        force_clip = False
+                        continue
+                    # This clip failed to encode: drop it and try
+                    # the next clip, instead of silently falling
+                    # back to images for the whole video.
+                    clips.pop(idx)
+                    continue
+            if images:
+                idx = _best(images, paragraph, image_used_order)
+                if idx is not None:
+                    image_path, _ = images[idx]
+                    seg_dur = min(IMAGE_SEGMENT_SEC, remaining)
+                    dest = work_dir / f"pseg-{seg_no:03d}.mp4"
+                    if _segment_image(image_path, dest, seg_dur):
+                        segments.append(dest)
+                        used_images.add(str(image_path))
+                        image_used_order.append(idx)
+                        remaining -= seg_dur
+                        seg_no += 1
+                        force_clip = False
+                        continue
+            break
+        if seg_no > 600:
+            break
+    if not segments:
+        return assemble(voice_path, [p for p, _ in images],
+                        [p for p, _ in clips], work_dir, voice_duration), 0, 0
+    list_file = work_dir / "pconcat.txt"
+    list_file.write_text(
+        "".join(f"file '{seg.resolve()}'\n" for seg in segments), encoding="utf-8")
+    video_only = work_dir / "pvideo_only.mp4"
+    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+           "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
+           "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0 or not video_only.exists():
+        raise RuntimeError(f"Video assembly failed: {proc.stderr[-1000:]}")
+    final_path = work_dir / "pfinal.mp4"
+    cmd = ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_path),
+           "-t", str(voice_duration), "-c:v", "copy", "-c:a", "aac",
+           "-shortest", str(final_path)]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0 or not final_path.exists():
+        raise RuntimeError(f"Audio mux failed: {proc.stderr[-1000:]}")
+    return final_path, len(used_images), len(used_clips)

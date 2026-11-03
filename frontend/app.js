@@ -2332,6 +2332,10 @@ async function loadTtsVoices() {
         select.appendChild(option);
       }
     }
+    // Auto Video default: Aria, the most expressive voice, so the
+    // narration does not sound flat by default.
+    const avSelect = document.getElementById("av-voice");
+    if (avSelect) avSelect.value = "en-US-AriaNeural";
     ttsVoicesLoaded = true;
   } catch {
     for (const select of selects) {
@@ -2391,6 +2395,7 @@ document.getElementById("btn-av-generate").addEventListener("click", async () =>
   const minutes = parseInt(document.getElementById("av-minutes").value, 10);
   const visuals = document.getElementById("av-visuals").value;
   const voice = document.getElementById("av-voice").value;
+  const expressive = document.getElementById("av-expressive").checked;
   const status = document.getElementById("av-status");
   const button = document.getElementById("btn-av-generate");
   const wrap = document.getElementById("av-progress-wrap");
@@ -2409,7 +2414,7 @@ document.getElementById("btn-av-generate").addEventListener("click", async () =>
     const res = await fetch("/api/autovideo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, minutes, visuals, voice }),
+      body: JSON.stringify({ title, minutes, visuals, voice, expressive }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Could not start the video.");
@@ -2430,7 +2435,7 @@ document.getElementById("btn-av-generate").addEventListener("click", async () =>
           download.href = job.download_url;
           download.setAttribute("download", `autovideo-${jobId}.mp4`);
           document.getElementById("av-info").textContent =
-            `Finished in about ${job.final_minutes} minutes · Script: ${job.script_words} words (${job.script_source}) · Images: ${job.images_found}, Clips: ${job.clips_found}`;
+            `Finished in about ${job.final_minutes} minutes · Script: ${job.script_words} words (${job.script_source}) · Images used: ${job.images_used}, Clips used: ${job.clips_used} (found: ${job.images_found} images, ${job.clips_found} clips) · Voice: ${job.voice_engine || ""}${job.visual_warning ? " · " + job.visual_warning : ""}`;
           document.getElementById("av-script").textContent = job.script || "";
           result.hidden = false;
           status.textContent = "Done — watch above, or download the video.";
