@@ -1871,11 +1871,13 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
         # Honest warning, not silent images-only: if the user asked
         # for clips and none could be downloaded, say so.
         visual_warning = ""
-        if visuals in ("videos", "both") and not clip_paths:
+        if not clip_paths and not image_paths:
+            visual_warning = ("No visuals found at all for this title — "
+                              "the video uses a plain background. Try a "
+                              "simpler title, or check the internet connection.")
+        elif visuals in ("videos", "both") and not clip_paths:
             visual_warning = ("No video clips could be found/downloaded for "
                               "this title, so images were used instead.")
-        if visuals == "videos" and not clip_paths and not image_paths:
-            visual_warning = "No visuals found at all — a plain background was used."
         _set("Assembling video…", 75, {
             "status": "running", "visual_warning": visual_warning,
             "images_found": len(image_paths), "clips_found": len(clip_paths)})

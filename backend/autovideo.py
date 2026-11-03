@@ -97,8 +97,20 @@ def core_words(title: str) -> list[str]:
     return seen
 
 
+def _norm_word(word: str) -> str:
+    """Singularise for matching: 'pyramids' must match a file
+    titled 'Pyramid of Giza'. Without this, exact-word scoring
+    dropped every Pyramids clip (titles use the singular)."""
+    word = word.lower()
+    if word.endswith("ies") and len(word) > 4:
+        return word[:-3] + "y"
+    if word.endswith("s") and len(word) > 3 and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
 def _title_words(text: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
+    return {_norm_word(w) for w in re.findall(r"[a-z0-9]+", (text or "").lower())}
 
 
 def target_words(minutes: int) -> int:
@@ -291,9 +303,10 @@ def fetch_visuals(title: str, visuals: str) -> dict:
 
     def _add(target: list[dict], candidates: list[dict], cap: int) -> None:
         scored = []
+        norm_core = [_norm_word(w) for w in core]
         for item in candidates:
             title_words = _title_words(item["title"])
-            score = sum(1 for word in core if word in title_words)
+            score = sum(1 for word in norm_core if word in title_words)
             if core_phrase and core_phrase in item["title"].lower():
                 score += 2
             if score < 1:
@@ -321,6 +334,25 @@ def fetch_visuals(title: str, visuals: str) -> dict:
                 pass
         if len(images) >= 12 and len(videos) >= 5:
             break
+    # Fallback: if phrase searches still left us short, try single
+    # core words ("pyramids" alone). Single words are banned as
+    # the FIRST search because they return irrelevant results,
+    # but as a fallback they beat a black video — and scoring
+    # still ranks the best-matching files first.
+    if len(images) < 12 or (visuals in ("videos", "both") and len(videos) < 3):
+        for word in core:
+            if visuals in ("images", "both") and len(images) < 20:
+                try:
+                    _add(images, _commons_search(word, "bitmap", 30), 20)
+                except Exception:
+                    pass
+            if visuals in ("videos", "both") and len(videos) < 10:
+                try:
+                    _add(videos, _commons_search(word, "video", 30), 10)
+                except Exception:
+                    pass
+            if len(images) >= 12 and len(videos) >= 5:
+                break
     return {"images": images, "videos": videos}
 
 
@@ -450,7 +482,7 @@ def _score_visual(title: str, paragraph: str) -> int:
     """How well a visual's file title matches a paragraph:
     shared words, weighted toward the paragraph's own words."""
     title_words = _title_words(title)
-    para_words = [w for w in re.findall(r"[a-z0-9]+", paragraph.lower())
+    para_words = [_norm_word(w) for w in re.findall(r"[a-z0-9]+", paragraph.lower())
                   if w not in STOPWORDS and len(w) > 2]
     return sum(1 for word in set(para_words) if word in title_words)
 
