@@ -8,30 +8,27 @@ for the installed build:
   * Data dirs (jobs, covers, groups, tts, autovideos, tokens) live
     next to the install folder so the customer sees "the project"
     where they installed it.
-  * Starts uvicorn on 127.0.0.1:8000, waits for /api/health, opens
-    the browser — exactly like start.py, but with no Python install
-    and no console window for the customer.
-  * License hook: before serving, checks the stored license key
-    against the license server (client/licensing.py). If the server
-    cannot be reached, credit-consuming endpoints refuse new jobs
-    (strict offline mode — see DESIGN.md section 6.3).
+  * Runs uvicorn IN-PROCESS (import uvicorn, uvicorn.run) — a
+    frozen --windowed exe has no `python -m` to spawn, so the old
+    subprocess call could never work. The server runs on the main
+    thread; a background thread waits for /api/health and opens
+    the browser.
+  * License hook: before serving, the backend checks the stored
+    license key against the license server (backend/licensing.py).
+    If the server cannot be reached, credit-consuming endpoints
+    refuse new jobs (strict offline mode — see DESIGN.md §6.3);
+    already-made files still work.
 
-Errors go to launcher-error.log next to the exe (there is no console
-in --windowed mode, so a silent failure must still leave a trace).
-
-TODO (Phase 2, on the Windows build machine):
-- Test that `backend.main:app` imports cleanly from the frozen
-  bundle (uvicorn + FastAPI + yt_dlp + PIL inside PyInstaller).
-- Decide data-dir location: install folder (simple) vs %APPDATA%
-  (survives reinstall). Install folder is drafted here.
-- Wire the real license-server URL (env at build time).
+Errors go to launcher-error.log next to the exe (there is no
+console in --windowed mode, so a silent failure must still
+leave a trace).
 """
 
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import webbrowser
@@ -42,9 +39,28 @@ if getattr(sys, "frozen", False):
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
+# The backend package (bundled as data by PyInstaller) and the
+# frontend live next to this launcher; make them importable.
+sys.path.insert(0, str(BASE_DIR))
+
 LOG_FILE = BASE_DIR / "launcher-error.log"
 URL = "http://127.0.0.1:8000"
 HEALTH_URL = "http://127.0.0.1:8000/api/health"
+
+if getattr(sys, "frozen", False):
+    # --windowed mode has no console: send stdout/stderr to the
+    # log file so uvicorn/FastAPI errors still leave a trace.
+    try:
+        _log_stream = open(LOG_FILE, "a", encoding="utf-8")
+        sys.stdout = _log_stream
+        sys.stderr = _log_stream
+    except OSError:
+        pass
+
+try:
+    import uvicorn
+except ImportError:  # pragma: no cover - only on a broken bundle
+    uvicorn = None  # type: ignore[assignment]
 
 
 def _log(message: str) -> None:
@@ -77,45 +93,39 @@ def _wait_for_server(timeout: int = 60) -> bool:
     return False
 
 
+def _open_when_ready() -> None:
+    if _wait_for_server():
+        webbrowser.open(URL)
+    else:
+        _log("WARNING: server did not answer /api/health in 60s.")
+        webbrowser.open(URL)
+
+
+def _serve() -> None:
+    """Run the FastAPI app in-process (no subprocess: a frozen
+    --windowed exe cannot spawn `python -m uvicorn`)."""
+    if uvicorn is None:
+        _log("ERROR: uvicorn is not bundled — the installer is broken.")
+        raise SystemExit(1)
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000,
+                log_level="warning")
+
+
 def main() -> int:
     _ensure_ffmpeg_on_path()
     # Data dirs next to the install, like the source layout.
     for name in ("jobs", "covers", "groups", "tts", "autovideos", "tokens"):
         (BASE_DIR / name).mkdir(exist_ok=True)
 
-    # TODO: license check on startup (client/licensing.py):
-    #   - no stored key -> the home page shows the activation box
-    #     (the backend still refuses credit endpoints without a
-    #     job token, so activation is enforced server-side too).
-    #   - key present -> POST /v1/activate to bind this device.
-    # Never block the tool from opening on a license-server outage
-    # for already-made files; only new jobs are gated.
-
-    env = dict(os.environ)
-    env["PYTHONPATH"] = str(BASE_DIR)
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "backend.main:app",
-         "--host", "127.0.0.1", "--port", "8000"],
-        cwd=str(BASE_DIR),
-        env=env,
-    )
+    # The server runs on the main thread (uvicorn needs it for
+    # signal handling); the browser opens from a helper thread
+    # once /api/health answers.
+    threading.Thread(target=_open_when_ready, daemon=True).start()
     try:
-        if _wait_for_server():
-            webbrowser.open(URL)
-        else:
-            _log("WARNING: server did not answer /api/health in 60s.")
-            webbrowser.open(URL)
-        proc.wait()
+        _serve()
     except KeyboardInterrupt:
         pass
-    finally:
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-    return proc.returncode or 0
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,27 +1,29 @@
-; YT Guru installer — Inno Setup draft (Phase 1).
+; YT Guru installer — Inno Setup (v1.0.0).
 ; Compile on the Windows build machine / GitHub Actions
-; windows-latest runner:  iscc ytguru.iss
-; Produces YT-Guru-Setup-<version>.exe.
+; windows-latest runner from the REPO ROOT:
+;   iscc /DMyAppVersion=1.0.0 /DAppSrc="<repo root>" ytguru-commercial/installer/ytguru.iss
+; Produces YT-Guru-Setup-<version>.exe in installer-output/
+; (next to this script).
 ;
-; TODO (Phase 2, first real build):
-; - Decide PrivilegesRequired: "lowest" (per-user, no UAC prompt,
-;   friendlier) vs admin. Lowest is drafted here; the app only
-;   binds localhost, so admin is not needed.
-; - Decide default folder: {autopf}\YT Guru (Program Files) vs
-;   {localappdata}\YT Guru. Program Files needs admin to write
-;   jobs/covers next to the install; per-user %LOCALAPPDATA%
-;   avoids that entirely. If PrivilegesRequired stays lowest,
-;   switch DefaultDirName to {localappdata}\YT Guru.
-; - Version comes from the build (define MyAppVersion on the
-;   command line: iscc /DMyAppVersion=1.0.0 ytguru.iss).
-; - Unsigned builds trigger Windows SmartScreen ("Windows protected
-;   your PC" -> More info -> Run anyway). A code-signing
-;   certificate costs money; Phase 1 ships unsigned with that note
+; Notes:
+; - PrivilegesRequired=lowest (per-user, no UAC prompt) with
+;   DefaultDirName={localappdata}\YT Guru: the app writes its
+;   jobs/covers/license.json next to the install, which Program
+;   Files would not allow without admin. The customer still
+;   picks the folder in the wizard (directory page on).
+; - AppSrc is the repo root (passed on the command line): the
+;   PyInstaller output lives at <root>\dist\YT-Guru.
+; - Unsigned builds trigger Windows SmartScreen ("Windows
+;   protected your PC" -> More info -> Run anyway). A code-signing
+;   certificate costs money; v1.0.0 ships unsigned with that note
 ;   in the customer instructions.
 
 #define MyAppName "YT Guru"
 #ifndef MyAppVersion
   #define MyAppVersion "1.0.0"
+#endif
+#ifndef AppSrc
+  #define AppSrc "."
 #endif
 #define MyAppPublisher "YT Guru"
 #define MyAppURL "https://github.com/amirowaisy72/youtube-cover-video-tool"
@@ -33,7 +35,7 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 ; The customer picks the folder in the wizard (directory page on).
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={localappdata}\{#MyAppName}
 DisableDirPage=no
 ; Per-user install: no UAC prompt, friendlier for customers.
 PrivilegesRequired=lowest
@@ -54,9 +56,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; PyInstaller --onedir output (dist\YT-Guru\*) + bundled FFmpeg.
-; The workflow copies ffmpeg.exe / ffprobe.exe into dist\YT-Guru
-; before compiling this script.
-Source: "dist\YT-Guru\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; AppSrc is the repo root (see top of this file); the workflow
+; copies ffmpeg.exe / ffprobe.exe into dist\YT-Guru first.
+Source: "{#AppSrc}\dist\YT-Guru\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Run-Setup: the file Master asked for — double-click opens the tool.
 Source: "Run-Setup.bat"; DestDir: "{app}"; Flags: ignoreversion
 
