@@ -53,6 +53,7 @@ import youtube_upload  # noqa: E402
 import metadata as local_metadata  # noqa: E402
 import tts as tts_module  # noqa: E402
 import autovideo  # noqa: E402
+import licensing  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -69,6 +70,15 @@ COVERS_DIR.mkdir(exist_ok=True)
 GROUPS_DIR.mkdir(exist_ok=True)
 TTS_DIR.mkdir(exist_ok=True)
 AV_DIR.mkdir(exist_ok=True)
+
+# License/credit system (YT Guru commercial, v1.0.0): the installed
+# tool charges 1 credit per video/voiceover through the license
+# server. CLIENT_VERSION is sent with every license call so the
+# server can refuse old builds.
+CLIENT_VERSION = "1.0.0"
+
+# Retry any license reports/refunds that failed while offline.
+threading.Thread(target=licensing.flush_outbox, daemon=True).start()
 
 DEFAULT_SETTINGS = {
     "default_speed": 1.0,
@@ -209,6 +219,44 @@ def write_job(job: dict) -> None:
     (JOBS_DIR / job["id"] / "job.json").write_text(
         json.dumps(job, indent=2), encoding="utf-8"
     )
+
+
+# ---------------------------------------------------------- licensing
+def _license_error_to_http(exc: licensing.LicenseError) -> HTTPException:
+    """Map a license error to the HTTP status the server reported
+    (401 bad key, 402 no credits / not activated, 403 device limit)."""
+    msg = str(exc)
+    code = 402
+    for prefix, status in (("401:", 401), ("402:", 402), ("403:", 403)):
+        if msg.startswith(prefix):
+            code = status
+            msg = msg[len(prefix):].strip()
+            break
+    return HTTPException(code, msg or "License check failed.")
+
+
+def _consume_or_402(action: str, job_ref: str) -> str:
+    """Reserve credits for one job BEFORE any FFmpeg/yt-dlp work.
+    Raises 402 (with the server's message) when the job must not
+    start — no key, no credits, or the server is unreachable."""
+    try:
+        return licensing.consume(action, job_ref, CLIENT_VERSION)
+    except licensing.LicenseError as exc:
+        raise _license_error_to_http(exc) from exc
+
+
+def _close_job_token(token: str | None, job: dict, tool: str) -> None:
+    """Report a finished job or refund a failed one (best-effort:
+    a failed report/refund is queued and retried on next startup).
+    The customer is never charged for a video that was not made."""
+    if not token:
+        return
+    title = job.get("original_title") or job.get("title") or ""
+    if job.get("status") in ("processed", "done"):
+        licensing.report(token, "completed", tool=tool, title=title,
+                         topic=title, minutes=job.get("final_minutes"))
+    else:
+        licensing.refund(token)
 
 
 def _yt_dlp_download_opts(outtmpl: str, hook, attempt: int = 1) -> dict:
@@ -589,7 +637,7 @@ class AutoRequest(BaseModel):
     cover_id: str | None = None
 
 
-def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: dict | None = None) -> None:
+def _run_auto_impl(job_id: str, url: str, cover_id: str | None, settings_override: dict | None = None) -> None:
     """Auto mode: download -> apply admin defaults -> compress -> preview.
 
     The user only gives a download link. Everything else comes from
@@ -785,14 +833,31 @@ def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: di
                        "process_progress": 100, "process_stage": "Done"})
 
 
+def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: dict | None = None,
+              job_token: str | None = None) -> None:
+    """Auto worker with license accounting: the job token is
+    reported completed when the video was produced, refunded
+    otherwise — the customer never pays for a failed video."""
+    try:
+        _run_auto_impl(job_id, url, cover_id, settings_override)
+    except Exception:
+        if job_token:
+            licensing.refund(job_token)
+        raise
+    if job_token:
+        _close_job_token(job_token, read_job(job_id), "cover_video")
+
+
 @app.post("/api/auto")
 def auto_video(payload: AutoRequest) -> dict:
     if not yt_dlp_available():
         raise HTTPException(400, "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.")
     job_id = uuid.uuid4().hex[:12]
+    # Credit check: reserve 1 credit BEFORE any download/FFmpeg work.
+    token = _consume_or_402("cover_video", job_id)
     directory = job_dir(job_id)
     threading.Thread(target=_run_auto, args=(job_id, payload.url, payload.cover_id),
-                     daemon=True).start()
+                     kwargs={"job_token": token}, daemon=True).start()
     return {"job_id": job_id, "status": "downloading", "auto": True}
 
 
@@ -953,7 +1018,8 @@ def _run_group(group_id: str) -> None:
         if item.get("preset_name") and item["preset_name"] in profiles:
             preset = profiles[item["preset_name"]]
         try:
-            _run_auto(job_id, item["url"], item.get("cover_id"), settings_override=preset)
+            _run_auto(job_id, item["url"], item.get("cover_id"), settings_override=preset,
+                      job_token=item.get("job_token"))
         except Exception as exc:  # noqa: BLE001
             item["status"] = "failed"
             item["error"] = str(exc)[-1000:]
@@ -1028,6 +1094,19 @@ def create_group(payload: GroupRequest) -> dict:
     if not yt_dlp_available():
         raise HTTPException(400, "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.")
     group_id = uuid.uuid4().hex[:12]
+    # Credit check: reserve 1 credit per video, up front, before
+    # any work starts. If a later item cannot be reserved, refund
+    # the tokens already taken so a group that never starts costs
+    # nothing.
+    tokens: list[str] = []
+    try:
+        for index in range(len(payload.items)):
+            tokens.append(_consume_or_402(
+                "cover_video", f"group-{group_id}-{index}"))
+    except HTTPException:
+        for tok in tokens:
+            licensing.refund(tok)
+        raise
     group = {
         "id": group_id,
         "name": payload.name or "Group 1",
@@ -1036,8 +1115,9 @@ def create_group(payload: GroupRequest) -> dict:
         "current_index": 0,
         "items": [
             {"url": it.url, "preset_name": it.preset_name, "cover_id": it.cover_id,
-             "upload": it.upload or "skip", "status": "waiting", "job_id": None}
-            for it in payload.items
+             "upload": it.upload or "skip", "status": "waiting", "job_id": None,
+             "job_token": tok}
+            for it, tok in zip(payload.items, tokens)
         ],
     }
     _write_group(group)
@@ -1064,7 +1144,20 @@ def retry_group(group_id: str) -> dict:
     failed = [it for it in group["items"] if it.get("status") in ("failed", "failed_upload")]
     if not failed:
         return {**group, "retried": 0, "message": "No failed videos to retry."}
-    for it in failed:
+    # Credit check: reserve 1 credit per failed video being retried
+    # only — completed videos are never charged again. A failed
+    # reservation refunds the tokens already taken for this retry.
+    tokens: list[str] = []
+    try:
+        for index in range(len(failed)):
+            tokens.append(_consume_or_402(
+                "cover_video", f"group-{group_id}-retry-{index}"))
+    except HTTPException:
+        for tok in tokens:
+            licensing.refund(tok)
+        raise
+    for it, tok in zip(failed, tokens):
+        it["job_token"] = tok
         it["status"] = "waiting"
         it["error"] = None
         it["job_id"] = None
@@ -1369,7 +1462,8 @@ class ProcessRequest(BaseModel):
 
 def _run_process(payload: ProcessRequest, settings: dict, directory,
                  source, cover, final_path, preview_path,
-                 speed, voice_enabled, pitch, green_rect, zoom, pan_x, pan_y) -> None:
+                 speed, voice_enabled, pitch, green_rect, zoom, pan_x, pan_y,
+                 job_token: str | None = None) -> None:
     import time as _time
     started = _time.time()
     preview_started = [None]
@@ -1456,6 +1550,9 @@ def _run_process(payload: ProcessRequest, settings: dict, directory,
         "error": None if ok else message,
     })
     write_job(job)
+    # License accounting: completed video is reported, a failed
+    # encode is refunded — the customer never pays for a failure.
+    _close_job_token(job_token, job, "cover_video")
 
 
 @app.post("/api/process")
@@ -1516,6 +1613,11 @@ def process_video(payload: ProcessRequest) -> dict:
     final_path = directory / "final.mp4"
     preview_path = directory / "preview.mp4"
 
+    # Credit check: reserve 1 credit BEFORE any FFmpeg work.
+    # (Validation above already passed, so a 402 here means the
+    # job genuinely cannot start — no charge for a bad request.)
+    token = _consume_or_402("cover_video", payload.job_id)
+
     # Return immediately; the frontend polls /api/jobs/{job_id} and
     # shows the progress bar right in the Edit section itself.
     job = read_job(payload.job_id)
@@ -1531,7 +1633,7 @@ def process_video(payload: ProcessRequest) -> dict:
     write_job(job)
     threading.Thread(target=_run_process, args=(
         payload, settings, directory, source, cover, final_path, preview_path,
-        speed, voice_enabled, pitch, green_rect, zoom, pan_x, pan_y), daemon=True).start()
+        speed, voice_enabled, pitch, green_rect, zoom, pan_x, pan_y, token), daemon=True).start()
     return {
         "job_id": payload.job_id,
         "status": "processing",
@@ -1761,12 +1863,18 @@ def tts_generate(payload: TtsRequest) -> dict:
         raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
     if payload.rate not in {"-20%", "-10%", "+0%", "+10%", "+20%"}:
         raise HTTPException(400, "Unknown speed. Pick Slow, Normal, or Fast.")
+    # Credit check: reserve 1 credit BEFORE synthesis. A failed
+    # voiceover is refunded; a finished one is reported.
+    token = _consume_or_402("tts", uuid.uuid4().hex[:12])
     try:
         final_path, engine = tts_module.synthesize(text, payload.voice, payload.rate, TTS_DIR)
     except ImportError as exc:
+        licensing.refund(token)
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
+        licensing.refund(token)
         raise HTTPException(500, f"Voice generation failed: {str(exc)[-1000:]}") from exc
+    licensing.report(token, "completed", tool="tts", chars=len(text))
     return {
         "tts_id": final_path.stem,
         "voice": payload.voice,
@@ -1828,7 +1936,7 @@ def _av_write(job: dict) -> None:
         json.dumps(job, indent=2), encoding="utf-8")
 
 
-def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: str,
+def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voice: str,
                    expressive: bool = True) -> None:
     directory = _av_job_dir(job_id)
 
@@ -1965,6 +2073,27 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
         _set("failed", 0, {"status": "failed", "error": str(exc)[-2000:]})
 
 
+def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: str,
+                   expressive: bool = True, job_token: str | None = None) -> None:
+    """Auto-video worker with license accounting: the job token is
+    reported completed when the video was produced, refunded
+    otherwise — the customer never pays for a failed video."""
+    try:
+        _run_autovideo_impl(job_id, title, minutes, visuals, voice, expressive)
+    except Exception:
+        if job_token:
+            licensing.refund(job_token)
+        raise
+    if job_token:
+        job = _av_read(job_id)
+        if job.get("status") == "done":
+            licensing.report(job_token, "completed", tool="autovideo",
+                             title=title, topic=title,
+                             minutes=job.get("final_minutes"))
+        else:
+            licensing.refund(job_token)
+
+
 @app.post("/api/autovideo")
 def autovideo_create(payload: AutoVideoRequest) -> dict:
     if payload.visuals not in ("images", "videos", "both"):
@@ -1972,6 +2101,8 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
     if payload.voice not in tts_module.VOICE_IDS:
         raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
     job_id = uuid.uuid4().hex[:12]
+    # Credit check: reserve 1 credit BEFORE any scripting/voice work.
+    token = _consume_or_402("autovideo", job_id)
     _av_write({"id": job_id, "status": "running", "stage": "Starting…",
                "progress": 0, "title": payload.title,
                "minutes": payload.minutes, "visuals": payload.visuals,
@@ -1979,7 +2110,7 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
     threading.Thread(
         target=_run_autovideo,
         args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice,
-              payload.expressive),
+              payload.expressive, token),
         daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 
@@ -2004,6 +2135,38 @@ def health() -> dict:
         "ffmpeg": video.check_ffmpeg() is None,
         "yt_dlp": yt_dlp_available(),
     }
+
+
+# --------------------------------------------------- license activation
+class LicenseActivateRequest(BaseModel):
+    license_key: str
+
+
+@app.post("/api/license/activate")
+def license_activate(payload: LicenseActivateRequest) -> dict:
+    """Activate the installed tool with a license key (first run).
+    Binds the key to this PC and returns the balance + costs."""
+    key = (payload.license_key or "").strip()
+    if not key:
+        raise HTTPException(400, "Paste your license key first.")
+    try:
+        data = licensing.activate(key, CLIENT_VERSION)
+    except licensing.LicenseError as exc:
+        raise _license_error_to_http(exc) from exc
+    return {"activated": True, **data}
+
+
+@app.get("/api/license/status")
+def license_status() -> dict:
+    """Balance + costs from the license server, or activated=False
+    when no key is stored yet (the home page shows the box)."""
+    try:
+        data = licensing.balance()
+    except licensing.LicenseError as exc:
+        if str(exc).startswith("No license key"):
+            return {"activated": False, "balance": None, "costs": None}
+        raise HTTPException(503, str(exc)) from exc
+    return {"activated": True, **data}
 
 
 # Frontend must be mounted last so /api/* routes win.

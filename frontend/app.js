@@ -2311,6 +2311,49 @@ function showTool(tool) {
 document.getElementById("btn-open-video-tool").addEventListener("click", () => showTool("video"));
 document.getElementById("btn-open-tts-tool").addEventListener("click", () => showTool("tts"));
 document.getElementById("btn-open-av-tool").addEventListener("click", () => showTool("autovideo"));
+
+// License (YT Guru commercial): activation box on the home page.
+// Shows the balance when activated, the key form when not.
+async function loadLicenseStatus() {
+  const text = document.getElementById("license-text");
+  const balanceEl = document.getElementById("license-balance");
+  const form = document.getElementById("license-form");
+  if (!text) return;
+  try {
+    const data = await api("/api/license/status");
+    if (data.activated) {
+      form.hidden = true;
+      text.textContent = "Activated — you can make videos and voiceovers.";
+      const costs = data.costs || {};
+      balanceEl.textContent = `Balance: ${data.balance} credit(s) · 1 cover video = ${costs.cover_video ?? 1} credit · 1 voiceover = ${costs.tts ?? 1} · 1 auto video = ${costs.autovideo ?? 1}`;
+    } else {
+      form.hidden = false;
+      text.textContent = "Activate the tool with your license key to make videos and voiceovers.";
+      balanceEl.textContent = "";
+    }
+  } catch (err) {
+    text.textContent = "Could not reach the license server — check your internet connection. Already-made files still work.";
+  }
+}
+document.getElementById("btn-license-activate").addEventListener("click", async () => {
+  const key = document.getElementById("license-key").value.trim();
+  const statusEl = document.getElementById("license-balance");
+  if (!key) { statusEl.textContent = "Paste your license key first."; return; }
+  statusEl.textContent = "Activating…";
+  try {
+    const data = await api("/api/license/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ license_key: key }),
+    });
+    document.getElementById("license-key").value = "";
+    await loadLicenseStatus();
+    setStatus(`Activated — balance: ${data.balance} credit(s).`);
+  } catch (err) {
+    statusEl.textContent = `Activation failed: ${err.message}`;
+  }
+});
+loadLicenseStatus();
 document.getElementById("btn-back-tools").addEventListener("click", () => showTool("home"));
 document.getElementById("btn-back-tools-tts").addEventListener("click", () => showTool("home"));
 document.getElementById("btn-back-tools-av").addEventListener("click", () => showTool("home"));

@@ -73,6 +73,20 @@ tailwind.config = {
         </div>
       </div>
     </section>
+    <!-- License (YT Guru commercial): the installed tool needs a
+         license key before it makes videos or voiceovers. Activate
+         once; the balance shows here. Buy credits on WhatsApp
+         03100668952 — 1 credit = 1 video or voiceover. -->
+    <section class="card" id="license-box">
+      <h2>🔑 License</h2>
+      <p class="muted" id="license-text">Activate the tool with your license key to make videos and voiceovers.</p>
+      <div id="license-form" class="flex flex-col sm:flex-row gap-3 mt-3">
+        <input id="license-key" type="text" placeholder="Paste your license key (YTG-XXXX-XXXX-XXXX-XXXX)" class="flex-1 min-w-0" autocomplete="off" />
+        <button id="btn-license-activate" class="btn-primary px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap shrink-0" type="button">Activate</button>
+      </div>
+      <p id="license-balance" class="muted mt-3"></p>
+      <p class="muted mt-2">Need more credits? WhatsApp Master on <b>03100668952</b> to buy credits — 1 credit = 1 video or voiceover.</p>
+    </section>
   </div>
 
   <!-- Tool 1 — the original video tool, unchanged inside. -->
