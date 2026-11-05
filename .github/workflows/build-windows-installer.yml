@@ -1,0 +1,120 @@
+# YT Guru — build the Windows installer (v1.0.0).
+#
+# PyInstaller on Linux CANNOT build a Windows .exe, so the build
+# runs on a free GitHub Actions windows-latest runner and produces
+# YT-Guru-Setup-<version>.exe as a build artifact.
+#
+# Layout (repo amirowaisy72/youtube-cover-video-tool):
+#   - this file lives at the repo root: .github/workflows/
+#   - the app lives at the repo root: backend/, frontend/,
+#     requirements.txt (root file: fastapi, uvicorn, yt-dlp...)
+#   - the installer bits live in ytguru-commercial/installer/
+#     (launcher.py, ytguru.iss, Run-Setup.bat)
+#
+# The workflow smoke-tests the frozen exe for real: it starts
+# dist\YT-Guru\YT-Guru.exe and waits for /api/health — the build
+# FAILS if the app does not answer, so a broken bundle can never
+# reach the installer step.
+
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Installer version (e.g. 1.0.0)"
+        required: true
+        default: "1.0.0"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies + PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download FFmpeg (static Windows build)
+        run: |
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dl
+          Copy-Item ffmpeg-dl\ffmpeg-*-essentials_build\bin\ffmpeg.exe -Destination .
+          Copy-Item ffmpeg-dl\ffmpeg-*-essentials_build\bin\ffprobe.exe -Destination .
+          if (-not (Test-Path ffmpeg.exe) -or -not (Test-Path ffprobe.exe)) { throw "ffmpeg.exe/ffprobe.exe missing after download" }
+
+      - name: Build frozen app with PyInstaller
+        # backend/ and frontend/ are bundled as DATA (the launcher
+        # imports backend.main at runtime), so every third-party
+        # module they use must be collected explicitly — PyInstaller
+        # cannot see them by analysing launcher.py alone.
+        run: |
+          pyinstaller --onedir --windowed --name "YT-Guru" `
+            --add-data "frontend;frontend" `
+            --add-data "backend;backend" `
+            --collect-all fastapi `
+            --collect-all starlette `
+            --collect-all pydantic `
+            --collect-all uvicorn `
+            --collect-all yt_dlp `
+            --collect-all PIL `
+            --collect-all edge_tts `
+            --collect-all gtts `
+            --collect-all googleapiclient `
+            --collect-all google_auth_oauthlib `
+            --collect-all multipart `
+            --collect-all websockets `
+            --collect-all wsproto `
+            --collect-all certifi `
+            --collect-all brotli `
+            --collect-all mutagen `
+            --collect-all pycryptodomex `
+            --collect-all urllib3 `
+            --collect-all requests `
+            --hidden-import google.auth `
+            --hidden-import google.auth.transport.requests `
+            --hidden-import google.oauth2.credentials `
+            ytguru-commercial/installer/launcher.py
+          Copy-Item ffmpeg.exe -Destination dist\YT-Guru\
+          Copy-Item ffprobe.exe -Destination dist\YT-Guru\
+          Copy-Item ytguru-commercial\installer\Run-Setup.bat -Destination dist\YT-Guru\
+          if (-not (Test-Path dist\YT-Guru\YT-Guru.exe)) { throw "PyInstaller did not produce dist\YT-Guru\YT-Guru.exe" }
+
+      - name: Smoke test the frozen app
+        run: |
+          $proc = Start-Process -FilePath "dist\YT-Guru\YT-Guru.exe" -WorkingDirectory "dist\YT-Guru" -PassThru
+          try {
+            $ok = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              Start-Sleep -Seconds 2
+              try {
+                $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/health" -UseBasicParsing -TimeoutSec 5
+                if ($resp.StatusCode -eq 200) { $ok = $true; break }
+              } catch { }
+              if ($proc.HasExited) { break }
+            }
+            if ($proc.HasExited) { throw "Frozen app exited during smoke test (exit code $($proc.ExitCode)). Check launcher-error.log." }
+            if (-not $ok) { throw "Frozen app did not answer /api/health within 120s." }
+            Write-Host "Smoke test passed: /api/health answered 200."
+          } finally {
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          }
+
+      - name: Install Inno Setup and compile the installer
+        run: |
+          choco install innosetup -y
+          iscc /DMyAppVersion="${{ inputs.version }}" /DAppSrc="${{ github.workspace }}" ytguru-commercial/installer/ytguru.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YT-Guru-Setup-${{ inputs.version }}
+          path: ytguru-commercial/installer/installer-output/YT-Guru-Setup-*.exe
