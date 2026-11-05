@@ -65,6 +65,7 @@ DB_PATH = BASE_DIR / "license.db"
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 IS_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 IS_VERCEL = os.environ.get("VERCEL") == "1"
+IS_RENDER = os.environ.get("RENDER") == "true"
 
 # Match "INSERT OR IGNORE INTO <table> (<cols>) VALUES (<vals>)"
 # and rewrite it for Postgres. The table must have a unique
@@ -142,7 +143,7 @@ class Connection:
 
 
 def connect() -> Connection:
-    """Open one short-lived connection. On Vercel without
+    """Open one short-lived connection. On Vercel/Render without
     DATABASE_URL this raises loudly instead of silently using a
     throwaway SQLite file that would lose all customer data."""
     if IS_POSTGRES:
@@ -151,11 +152,11 @@ def connect() -> Connection:
 
         raw = psycopg.connect(DATABASE_URL, row_factory=dict_row)
         return Connection(raw, pg=True)
-    if IS_VERCEL:
+    if IS_VERCEL or IS_RENDER:
         raise RuntimeError(
-            "DATABASE_URL is not set. On Vercel the license server "
-            "must use Postgres (e.g. Supabase free tier): SQLite "
-            "files are wiped on every serverless recycle and all "
+            "DATABASE_URL is not set. On Vercel/Render the license server "
+            "must use Postgres (Render free Postgres or Supabase free tier): "
+            "SQLite files are wiped on redeploy/restart and all "
             "customers/credits would be lost. See DESIGN.md §4.4."
         )
     raw = sqlite3.connect(str(DB_PATH))

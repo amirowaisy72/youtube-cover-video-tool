@@ -1,0 +1,24 @@
+# YT Guru license server — Render Blueprint
+# Deploy: Render dashboard → New → Blueprint → repo amirowaisy72/youtube-cover-video-tool,
+# Blueprint file: ytguru-commercial/render.yaml
+# (Vercel files stay in place; this is an alternative host.)
+services:
+  - type: web
+    name: ytguru-license-server
+    runtime: python
+    rootDir: ytguru-commercial
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ytguru-db
+          property: connectionString
+      - key: JOB_TOKEN_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD_HASH
+        sync: false # Master sets this after deploy (bcrypt hash, never plaintext)
+databases:
+  - name: ytguru-db
+    plan: free # NOTE: Render free Postgres expires after 90 days — move to Supabase before that
