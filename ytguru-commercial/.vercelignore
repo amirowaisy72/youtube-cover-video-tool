@@ -1,0 +1,14 @@
+# Files NOT needed for the Vercel deployment (license server +
+# Master Dashboard only). The Windows installer, desktop client and
+# build workflow live here for reference but are never deployed.
+.github/
+installer/
+client/
+DESIGN.md
+README.md
+*.md
+__pycache__/
+*.pyc
+license.db
+api/license.db
+.git/
