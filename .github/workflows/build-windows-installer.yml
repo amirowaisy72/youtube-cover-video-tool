@@ -6,10 +6,19 @@
 #
 # Layout (repo amirowaisy72/youtube-cover-video-tool):
 #   - this file lives at the repo root: .github/workflows/
-#   - the app lives at the repo root: backend/, frontend/,
+#   - the app lives at the repo root: backend/, frontend-react/,
 #     requirements.txt (root file: fastapi, uvicorn, yt-dlp...)
 #   - the installer bits live in ytguru-commercial/installer/
 #     (launcher.py, ytguru.iss, Run-Setup.bat)
+#
+# Frontend: the interface is the React SPA in frontend-react/
+# (Lovable design, ported to the real backend). It is built here
+# with Bun — npm install fails on this dependency tree with npm's
+# arborist bug ("Cannot read properties of null (reading
+# 'edgesOut')"), so Bun is the installer for this step.
+# The built output (frontend-react/dist) is bundled by PyInstaller
+# as "frontend", which backend/main.py serves (with the old
+# vanilla frontend/ as a fallback when no build exists).
 #
 # The workflow smoke-tests the frozen exe for real: it starts
 # dist\YT-Guru\YT-Guru.exe and waits for /api/health — the build
@@ -37,6 +46,18 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build React frontend
+        working-directory: frontend-react
+        run: |
+          bun install
+          bun run build
+          if (-not (Test-Path dist/index.html)) { throw "React build did not produce dist/index.html" }
+
       - name: Install dependencies + PyInstaller
         run: |
           python -m pip install --upgrade pip
@@ -52,13 +73,14 @@ jobs:
           if (-not (Test-Path ffmpeg.exe) -or -not (Test-Path ffprobe.exe)) { throw "ffmpeg.exe/ffprobe.exe missing after download" }
 
       - name: Build frozen app with PyInstaller
-        # backend/ and frontend/ are bundled as DATA (the launcher
-        # imports backend.main at runtime), so every third-party
-        # module they use must be collected explicitly — PyInstaller
-        # cannot see them by analysing launcher.py alone.
+        # backend/ and the React build output (frontend-react/dist,
+        # bundled as "frontend") are DATA (the launcher imports
+        # backend.main at runtime), so every third-party module they
+        # use must be collected explicitly — PyInstaller cannot see
+        # them by analysing launcher.py alone.
         run: |
           pyinstaller --onedir --windowed --name "YT-Guru" `
-            --add-data "frontend;frontend" `
+            --add-data "frontend-react/dist;frontend" `
             --add-data "backend;backend" `
             --collect-all fastapi `
             --collect-all starlette `
@@ -79,6 +101,11 @@ jobs:
             --collect-all pycryptodomex `
             --collect-all urllib3 `
             --collect-all requests `
+            --collect-all faster_whisper `
+            --collect-all ctranslate2 `
+            --collect-all av `
+            --collect-all tokenizers `
+            --collect-all huggingface_hub `
             --hidden-import google.auth `
             --hidden-import google.auth.transport.requests `
             --hidden-import google.oauth2.credentials `
@@ -104,6 +131,9 @@ jobs:
             if ($proc.HasExited) { throw "Frozen app exited during smoke test (exit code $($proc.ExitCode)). Check launcher-error.log." }
             if (-not $ok) { throw "Frozen app did not answer /api/health within 120s." }
             Write-Host "Smoke test passed: /api/health answered 200."
+            $page = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 10
+            if ($page.Content -notmatch "YT Guru") { throw "Home page did not serve the React app." }
+            Write-Host "Smoke test passed: home page serves the React app."
           } finally {
             if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
           }
