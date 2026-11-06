@@ -36,9 +36,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # NOTE: an old token granted before this change only has the
 # upload scope — refreshing it does not add the new scope, so
 # those users must Disconnect and Connect again once.
+# Same rule for the youtube scope (added 2026-11-07 for the
+# Channel Setup Wizard): channels.update (About description +
+# keywords) needs the full youtube scope, so Apply fails with
+# 403 insufficientPermissions until the user reconnects once.
 YOUTUBE_SCOPE = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube",
 ]
 
 # One-click connect state (user, 2026-11-01): a normal user only
