@@ -51,6 +51,13 @@ function Trimmer() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Timeline (draggable handles) — filled by /api/trimmer/info.
+  const [videoTitle, setVideoTitle] = useState("");
+  const [durationSec, setDurationSec] = useState<number | null>(null);
+  const [infoLoading, setInfoLoading] = useState(false);
+  const [infoError, setInfoError] = useState("");
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const dragTarget = useRef<"start" | "end" | null>(null);
 
   useEffect(
     () => () => {
@@ -65,6 +72,96 @@ function Trimmer() {
     startSec !== null && endSec !== null && endSec > startSec ? endSec - startSec : null;
   const sectionValid =
     sectionLen !== null && sectionLen > 0 && sectionLen <= MAX_SECTION_SECONDS;
+
+  /** Fetch title + duration so the timeline bar can be drawn. */
+  const loadVideoInfo = async () => {
+    if (!url.trim()) {
+      setInfoError("Paste a YouTube link first.");
+      return;
+    }
+    setInfoError("");
+    setInfoLoading(true);
+    try {
+      const info = await api<{ title: string; duration_sec: number | null }>(
+        "/api/trimmer/info",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url.trim() }),
+        },
+      );
+      setVideoTitle(info.title);
+      if (typeof info.duration_sec === "number" && info.duration_sec > 0) {
+        const dur = info.duration_sec;
+        setDurationSec(dur);
+        // Keep the current times, but clamp them inside the video.
+        if (startSec !== null && startSec >= dur) setStart("0:00");
+        if (endSec !== null && endSec > dur) setEnd(fmtClock(dur));
+      } else {
+        setDurationSec(null);
+        setInfoError("This video has no duration (live stream?) — type the times manually.");
+      }
+    } catch (e) {
+      setDurationSec(null);
+      setVideoTitle("");
+      setInfoError(e instanceof Error ? e.message : "Could not load the video.");
+    } finally {
+      setInfoLoading(false);
+    }
+  };
+
+  /** Seconds under the pointer on the timeline track, or null. */
+  const timeFromClientX = (clientX: number): number | null => {
+    const track = trackRef.current;
+    if (!track || durationSec === null) return null;
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return null;
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return pct * durationSec;
+  };
+
+  /** Move one handle to a time, keeping start < end and section <= 10 min. */
+  const moveHandle = (which: "start" | "end", t: number) => {
+    const s = startSec ?? 0;
+    const e = endSec ?? 0;
+    if (which === "start") {
+      const next = Math.min(Math.max(0, t), Math.max(0, e - 1), e - 1);
+      const clamped = Math.max(next, e - MAX_SECTION_SECONDS);
+      setStart(fmtClock(Math.floor(Math.max(0, clamped))));
+    } else {
+      const next = Math.max(Math.min(durationSec ?? t, t), s + 1);
+      const clamped = Math.min(next, s + MAX_SECTION_SECONDS);
+      setEnd(fmtClock(Math.floor(clamped)));
+    }
+  };
+
+  const onTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (durationSec === null) return;
+    const t = timeFromClientX(e.clientX);
+    if (t === null) return;
+    // Grab the nearest handle (a handle's own pointerdown sets it directly).
+    const handle = (e.target as HTMLElement).closest("[data-handle]")?.getAttribute("data-handle");
+    const which: "start" | "end" =
+      handle === "end" || handle === "start"
+        ? handle
+        : Math.abs(t - (startSec ?? 0)) <= Math.abs(t - (endSec ?? 0))
+          ? "start"
+          : "end";
+    dragTarget.current = which;
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    moveHandle(which, t);
+  };
+
+  const onTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragTarget.current) return;
+    const t = timeFromClientX(e.clientX);
+    if (t === null) return;
+    moveHandle(dragTarget.current, t);
+  };
+
+  const onTrackPointerUp = () => {
+    dragTarget.current = null;
+  };
 
   const startTrim = async () => {
     if (!url.trim()) {
@@ -149,9 +246,23 @@ function Trimmer() {
           <input
             className="field text-lg"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              // The loaded video no longer matches this link.
+              setDurationSec(null);
+              setVideoTitle("");
+              setInfoError("");
+            }}
             placeholder="https://youtube.com/watch?v=…"
           />
+          <button
+            className="btn btn-ghost mt-3"
+            disabled={!url.trim() || infoLoading}
+            onClick={() => void loadVideoInfo()}
+          >
+            {infoLoading ? "Loading video…" : "📺 Load video (shows the timeline)"}
+          </button>
+          {infoError && <p className="mt-2 text-sm text-destructive">{infoError}</p>}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -176,6 +287,75 @@ function Trimmer() {
         <p className="text-sm text-muted-foreground">
           Times as m:ss (1:30), h:mm:ss, or plain seconds (90). Max section: 10:00.
         </p>
+        {durationSec !== null && startSec !== null && endSec !== null && (
+          <div>
+            {videoTitle && (
+              <p className="mb-2 truncate text-sm font-semibold" title={videoTitle}>
+                {videoTitle} · {fmtClock(durationSec)}
+              </p>
+            )}
+            <div
+              ref={trackRef}
+              className="relative h-12 cursor-pointer select-none"
+              style={{ touchAction: "none" }}
+              onPointerDown={onTrackPointerDown}
+              onPointerMove={onTrackPointerMove}
+              onPointerUp={onTrackPointerUp}
+              onPointerCancel={onTrackPointerUp}
+              role="slider"
+              aria-label="Video timeline — drag the handles to pick your section"
+            >
+              {/* full track */}
+              <div
+                className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full"
+                style={{ background: "var(--secondary)" }}
+              />
+              {/* selected section */}
+              <div
+                className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full"
+                style={{
+                  left: `${(startSec / durationSec) * 100}%`,
+                  width: `${Math.max(0, ((endSec - startSec) / durationSec) * 100)}%`,
+                  background: "var(--gradient-brand)",
+                }}
+              />
+              {/* start handle */}
+              <div
+                data-handle="start"
+                className="absolute top-1/2 z-10 flex h-9 w-5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border-2 border-white bg-primary shadow-lg"
+                style={{ left: `${(startSec / durationSec) * 100}%`, touchAction: "none" }}
+              >
+                <span className="text-[10px] font-bold text-white">◂</span>
+              </div>
+              {/* end handle */}
+              <div
+                data-handle="end"
+                className="absolute top-1/2 z-10 flex h-9 w-5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border-2 border-white bg-primary shadow-lg"
+                style={{ left: `${(endSec / durationSec) * 100}%`, touchAction: "none" }}
+              >
+                <span className="text-[10px] font-bold text-white">▸</span>
+              </div>
+              {/* handle time bubbles */}
+              <span
+                className="absolute -top-1 z-10 -translate-x-1/2 rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white"
+                style={{ left: `${(startSec / durationSec) * 100}%` }}
+              >
+                {fmtClock(startSec)}
+              </span>
+              <span
+                className="absolute -top-1 z-10 -translate-x-1/2 rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white"
+                style={{ left: `${(endSec / durationSec) * 100}%` }}
+              >
+                {fmtClock(endSec)}
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+              <span>0:00</span>
+              <span>Drag the handles — or tap the bar to move the nearest one</span>
+              <span>{fmtClock(durationSec)}</span>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           {sectionLen !== null && sectionLen > 0 && (
             <span className="chip">
