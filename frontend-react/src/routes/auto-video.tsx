@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+// Note (2026-11-07): this route's chunk hash is content-based;
+// a comment-only edit does not change the built bundle.
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene } from "@/lib/api";

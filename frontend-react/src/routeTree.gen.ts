@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AudioRouteImport } from './routes/audio'
 import { Route as AutoVideoRouteImport } from './routes/auto-video'
+import { Route as ChannelRouteImport } from './routes/channel'
 import { Route as CoverRouteImport } from './routes/cover'
 import { Route as DownloaderRouteImport } from './routes/downloader'
 import { Route as InspectorRouteImport } from './routes/inspector'
@@ -41,6 +42,11 @@ const AudioRoute = AudioRouteImport.update({
 const AutoVideoRoute = AutoVideoRouteImport.update({
   id: '/auto-video',
   path: '/auto-video',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChannelRoute = ChannelRouteImport.update({
+  id: '/channel',
+  path: '/channel',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CoverRoute = CoverRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audio': typeof AudioRoute
   '/auto-video': typeof AutoVideoRoute
+  '/channel': typeof ChannelRoute
   '/cover': typeof CoverRoute
   '/downloader': typeof DownloaderRoute
   '/inspector': typeof InspectorRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audio': typeof AudioRoute
   '/auto-video': typeof AutoVideoRoute
+  '/channel': typeof ChannelRoute
   '/cover': typeof CoverRoute
   '/downloader': typeof DownloaderRoute
   '/inspector': typeof InspectorRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/audio': typeof AudioRoute
   '/auto-video': typeof AutoVideoRoute
+  '/channel': typeof ChannelRoute
   '/cover': typeof CoverRoute
   '/downloader': typeof DownloaderRoute
   '/inspector': typeof InspectorRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audio'
     | '/auto-video'
+    | '/channel'
     | '/cover'
     | '/downloader'
     | '/inspector'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audio'
     | '/auto-video'
+    | '/channel'
     | '/cover'
     | '/downloader'
     | '/inspector'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audio'
     | '/auto-video'
+    | '/channel'
     | '/cover'
     | '/downloader'
     | '/inspector'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AudioRoute: typeof AudioRoute
   AutoVideoRoute: typeof AutoVideoRoute
+  ChannelRoute: typeof ChannelRoute
   CoverRoute: typeof CoverRoute
   DownloaderRoute: typeof DownloaderRoute
   InspectorRoute: typeof InspectorRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/auto-video'
       fullPath: '/auto-video'
       preLoaderRoute: typeof AutoVideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/channel': {
+      id: '/channel'
+      path: '/channel'
+      fullPath: '/channel'
+      preLoaderRoute: typeof ChannelRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cover': {
@@ -399,6 +419,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AudioRoute: AudioRoute,
   AutoVideoRoute: AutoVideoRoute,
+  ChannelRoute: ChannelRoute,
   CoverRoute: CoverRoute,
   DownloaderRoute: DownloaderRoute,
   InspectorRoute: InspectorRoute,
