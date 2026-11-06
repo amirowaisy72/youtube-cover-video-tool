@@ -7,6 +7,11 @@ Upload a video/audio file, or paste a YouTube link (its audio is
 downloaded with yt-dlp first). Transcription runs in a background
 thread; the frontend polls GET /api/subtitles/{job_id}.
 
+Caption burn-in: after a job finishes, POST /api/subtitles/burn
+renders the captions onto the uploaded VIDEO file with FFmpeg's
+libass `ass` filter (3 styles). Burn-in needs an uploaded video —
+audio-only and YouTube-link jobs have no local video to burn into.
+
 Mount in backend/main.py (one line each, parent wiring):
     import tools_subtitles  # noqa: E402
     app.include_router(tools_subtitles.router)
@@ -40,7 +45,30 @@ _MEDIA_SUFFIXES = {
     ".mp4", ".webm", ".mov", ".mkv", ".avi",
     ".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".wma",
 }
+# Only these can be burned into — audio files have no picture.
+_VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".mkv", ".avi"}
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
+
+# Caption burn-in styles. Colours are ASS &HAABBGGRR& (alpha, blue,
+# green, red). PlayRes is 1280x720, so Fontsize is in video pixels.
+# Alignment 2 = bottom-centre.
+_BURN_STYLES = {
+    "tiktok": {
+        "label": "TikTok Bold",
+        "fontsize": 40, "primary": "&H00FFFFFF", "outline": "&H00000000",
+        "bold": -1, "border": 3, "shadow": 1, "margin_v": 70,
+    },
+    "yellow": {
+        "label": "Classic Yellow",
+        "fontsize": 30, "primary": "&H0000FFFF", "outline": "&H00000000",
+        "bold": -1, "border": 2, "shadow": 1, "margin_v": 50,
+    },
+    "minimal": {
+        "label": "Minimal White",
+        "fontsize": 24, "primary": "&H00FFFFFF", "outline": "&H00000000",
+        "bold": 0, "border": 1, "shadow": 0, "margin_v": 40,
+    },
+}
 
 # Hosts yt-dlp accepts as YouTube (incl. Shorts / Music / mobile).
 _YT_HOSTS = {
@@ -148,6 +176,201 @@ def _segments_to_srt(segments: list[dict]) -> str:
         lines.append(seg["text"].strip())
         lines.append("")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Caption burn-in (FFmpeg libass `ass` filter, styled .ass generated here)
+# ---------------------------------------------------------------------------
+
+def _ass_timestamp(seconds: float) -> str:
+    """123.456 -> '0:02:03.45' (ASS wants H:MM:SS.cc)."""
+    total_cs = max(0, int(round(seconds * 100)))
+    h, rem = divmod(total_cs, 360_000)
+    m, rem = divmod(rem, 6_000)
+    s, cs = divmod(rem, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def _segments_to_ass(segments: list[dict], style: str) -> str:
+    """[{start, end, text}] -> a styled .ass document for one burn style."""
+    cfg = _BURN_STYLES[style]
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        "PlayResX: 1280\n"
+        "PlayResY: 720\n"
+        "ScaledBorderAndShadow: yes\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,Arial,{cfg['fontsize']},{cfg['primary']},"
+        f"&H000000FF,{cfg['outline']},&H00000000,{cfg['bold']},0,0,0,"
+        f"100,100,0,0,1,{cfg['border']},{cfg['shadow']},2,20,20,"
+        f"{cfg['margin_v']},1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
+        "Effect, Text\n"
+    )
+    lines = [header]
+    for seg in segments:
+        # Braces would be read as ASS override tags; drop them. Newlines
+        # inside a caption become \N (ASS line break).
+        text = seg["text"].strip().replace("{", "").replace("}", "")
+        text = text.replace("\n", "\\N")
+        if not text:
+            continue
+        lines.append(
+            f"Dialogue: 0,{_ass_timestamp(seg['start'])},"
+            f"{_ass_timestamp(seg['end'])},Default,,0,0,0,,{text}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _srt_to_segments(srt_path: Path) -> list[dict]:
+    """Parse our own subtitles.srt back into [{start, end, text}]."""
+    raw = srt_path.read_text(encoding="utf-8")
+    blocks = re.split(r"\n\s*\n", raw.strip())
+    segments: list[dict] = []
+    stamp = re.compile(
+        r"(\d+):(\d+):(\d+),(\d+)\s*-->\s*(\d+):(\d+):(\d+),(\d+)"
+    )
+
+    def _to_sec(h: str, m: str, s: str, ms: str) -> float:
+        return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
+
+    for block in blocks:
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        if len(lines) < 3:
+            continue
+        match = stamp.match(lines[1])
+        if not match:
+            continue
+        segments.append({
+            "start": _to_sec(*match.groups()[:4]),
+            "end": _to_sec(*match.groups()[4:]),
+            "text": " ".join(lines[2:]),
+        })
+    return segments
+
+
+def _find_source_video(directory: Path, job: dict) -> Path | None:
+    """The uploaded video file of a job, or None (audio / YouTube job).
+
+    Prefers the recorded source_file (jobs created after burn-in was
+    added); falls back to scanning the job dir so older jobs work too.
+    """
+    recorded = job.get("source_file")
+    if recorded:
+        candidate = directory / recorded
+        if candidate.is_file() and candidate.suffix.lower() in _VIDEO_SUFFIXES:
+            return candidate
+    for candidate in sorted(directory.glob("source.*")):
+        if candidate.is_file() and candidate.suffix.lower() in _VIDEO_SUFFIXES:
+            return candidate
+    return None
+
+
+def _burn_state_path(job_id: str, suffix: str) -> Path:
+    return _job_dir(job_id) / f"burn-{suffix}.json"
+
+
+def _read_burn(job_id: str, suffix: str) -> dict:
+    path = _burn_state_path(job_id, suffix)
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    return {}
+
+
+def _write_burn(state: dict) -> None:
+    _burn_state_path(state["job_id"], state["suffix"]).write_text(
+        json.dumps(state, indent=2), encoding="utf-8"
+    )
+
+
+def _set_burn(burn_id: str, **fields) -> dict:
+    job_id, suffix = burn_id.split("-", 1)
+    state = _read_burn(job_id, suffix)
+    state.update({"burn_id": burn_id, "job_id": job_id, "suffix": suffix})
+    state.update(fields)
+    _write_burn(state)
+    return state
+
+
+def _filter_path(path: Path) -> str:
+    r"""Escape a file path for use inside an FFmpeg filter argument.
+
+    Filter parsing splits on ':' — a Windows drive letter (C:\...)
+    would break it. Forward slashes + escaped colons keep the path
+    intact; on Linux this is a no-op.
+    """
+    return str(path).replace("\\", "/").replace(":", "\\:")
+
+
+def _run_burn(burn_id: str, job_id: str, style: str) -> None:
+    """Render captions onto the job's source video (background thread)."""
+    directory = _job_dir(job_id)
+    job = _read_job(job_id)
+    suffix = burn_id.split("-", 1)[1]
+    output = directory / f"burned-{suffix}.mp4"
+    try:
+        _set_burn(burn_id, status="preparing", progress=5,
+                   stage="Preparing captions…")
+        srt_path = directory / "subtitles.srt"
+        segments = _srt_to_segments(srt_path)
+        if not segments:
+            raise RuntimeError("No subtitle lines found to burn in.")
+        ass_path = directory / f"captions-{suffix}.ass"
+        ass_path.write_text(_segments_to_ass(segments, style), encoding="utf-8")
+        source = _find_source_video(directory, job)
+        if source is None:
+            raise RuntimeError("Source video not found.")
+        duration = job.get("duration_sec") or _media_duration(source)
+
+        _set_burn(burn_id, status="burning", progress=10,
+                   stage="Burning captions into the video…")
+        try:
+            import video as _video_mod  # noqa: F401  (backend/ on path via main.py)
+            window_kwargs = _video_mod.no_window_kwargs()
+        except Exception:
+            window_kwargs = {}
+        cmd = [
+            "ffmpeg", "-y", "-i", str(source),
+            "-vf", f"ass='{_filter_path(ass_path)}'",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "copy", "-movflags", "+faststart", str(output),
+        ]
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            text=True, **window_kwargs,
+        )
+        time_re = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+        assert proc.stderr is not None
+        for line in proc.stderr:
+            match = time_re.search(line)
+            if match and duration:
+                h, m, s = match.groups()
+                done = int(h) * 3600 + int(m) * 60 + float(s)
+                pct = 10 + 85 * min(1.0, done / duration)
+                _set_burn(burn_id, progress=round(pct, 1))
+        rc = proc.wait()
+        if rc != 0 or not output.is_file():
+            raise RuntimeError(
+                f"FFmpeg failed while burning captions (exit code {rc}). "
+                "Your FFmpeg build may lack the libass 'ass' filter."
+            )
+        _set_burn(burn_id, status="done", progress=100,
+                   stage="Done — captions are burned into the video.",
+                   download_url=f"/api/subtitles/burn/file/{burn_id}")
+    except Exception as exc:  # noqa: BLE001
+        _set_burn(burn_id, status="failed", progress=0,
+                   stage="Failed.", error=str(exc)[-2000:])
 
 
 def _get_model():
@@ -313,7 +536,9 @@ async def create_subtitles(request: Request, file: UploadFile | None = File(None
                     raise HTTPException(400, "File is too large (max 2 GB).")
                 out.write(chunk)
         _set(job_id, status="queued", progress=0, stage="Starting…",
-             source=file.filename)
+             source=file.filename,
+             source_file=f"source{suffix}",
+             source_is_video=suffix in _VIDEO_SUFFIXES)
         threading.Thread(
             target=_run_transcribe, args=(job_id, target, language),
             daemon=True).start()
@@ -327,7 +552,8 @@ async def create_subtitles(request: Request, file: UploadFile | None = File(None
                 400,
                 "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.",
             )
-        _set(job_id, status="queued", progress=0, stage="Starting…", source=url)
+        _set(job_id, status="queued", progress=0, stage="Starting…", source=url,
+             source_file=None, source_is_video=False)
         threading.Thread(
             target=_run_url, args=(job_id, url, language),
             daemon=True).start()
@@ -336,12 +562,105 @@ async def create_subtitles(request: Request, file: UploadFile | None = File(None
     raise HTTPException(400, "Upload a video/audio file or paste a YouTube link.")
 
 
+@router.post("/burn")
+async def create_burn(request: Request) -> dict:
+    """Burn captions into the job's uploaded video (background thread).
+
+    Body: {"job_id": "<12-hex>", "style": "tiktok"|"yellow"|"minimal"}.
+    Returns immediately; poll GET /api/subtitles/burn/{burn_id}.
+    Burn-in needs an uploaded VIDEO file — audio-only and YouTube-link
+    jobs have no local video, so they get a clear 400.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON body.") from None
+    if not isinstance(body, dict):
+        raise HTTPException(400, "JSON body must be an object.") from None
+    job_id = (body.get("job_id") or "").strip()
+    style = (body.get("style") or "").strip()
+    if style not in _BURN_STYLES:
+        raise HTTPException(
+            400,
+            "Style must be one of: tiktok, yellow, minimal.",
+        )
+    job = _read_job(job_id)
+    if job.get("status") == "unknown":
+        raise HTTPException(404, "Subtitle job not found.")
+    if job.get("status") != "done":
+        raise HTTPException(
+            400, "Subtitles are not ready yet — wait for the job to finish first.")
+    if not (_job_dir(job_id) / "subtitles.srt").is_file():
+        raise HTTPException(400, "Subtitles are not ready yet.")
+    if _find_source_video(_job_dir(job_id), job) is None:
+        raise HTTPException(
+            400,
+            "Caption burn-in needs an uploaded video file. This job came "
+            "from audio or a YouTube link, so there is no video to burn "
+            "the captions into — use an uploaded video instead.",
+        )
+    if not shutil.which("ffmpeg"):
+        raise HTTPException(
+            400, "FFmpeg was not found. Install FFmpeg and restart the tool.")
+    suffix = uuid.uuid4().hex[:6]
+    burn_id = f"{job_id}-{suffix}"
+    _set_burn(burn_id, status="queued", progress=0, stage="Starting…",
+              style=style)
+    threading.Thread(
+        target=_run_burn, args=(burn_id, job_id, style), daemon=True).start()
+    return {"burn_id": burn_id, "status": "queued"}
+
+
+@router.get("/burn/{burn_id}")
+def get_burn(burn_id: str) -> dict:
+    """Poll a burn job: status, progress, download link when done."""
+    if "-" not in burn_id:
+        raise HTTPException(404, "Burn job not found.")
+    job_id, suffix = burn_id.split("-", 1)
+    state = _read_burn(job_id, suffix)
+    if not state:
+        raise HTTPException(404, "Burn job not found.")
+    return {
+        "burn_id": state["burn_id"],
+        "job_id": state["job_id"],
+        "status": state.get("status"),
+        "progress": state.get("progress", 0),
+        "stage": state.get("stage", ""),
+        "style": state.get("style"),
+        "download_url": state.get("download_url"),
+        "error": state.get("error"),
+    }
+
+
+@router.get("/burn/file/{burn_id}")
+def download_burned(burn_id: str) -> FileResponse:
+    """The finished video with captions burned in."""
+    if "-" not in burn_id:
+        raise HTTPException(404, "Burn job not found.")
+    job_id, suffix = burn_id.split("-", 1)
+    state = _read_burn(job_id, suffix)
+    if not state:
+        raise HTTPException(404, "Burn job not found.")
+    path = _job_dir(job_id) / f"burned-{suffix}.mp4"
+    if not path.is_file():
+        raise HTTPException(404, "Burned video is not ready yet.")
+    return FileResponse(
+        path, media_type="video/mp4",
+        filename=f"captioned-{job_id}.mp4",
+    )
+
+
 @router.get("/{job_id}")
 def get_subtitles(job_id: str) -> dict:
     """Poll a subtitle job: status, progress, language, transcript."""
     job = _read_job(job_id)
     if job.get("status") == "unknown":
         raise HTTPException(404, "Subtitle job not found.")
+    can_burn = (
+        job.get("status") == "done"
+        and (_job_dir(job_id) / "subtitles.srt").is_file()
+        and _find_source_video(_job_dir(job_id), job) is not None
+    )
     return {
         "job_id": job["id"],
         "status": job.get("status"),
@@ -353,6 +672,7 @@ def get_subtitles(job_id: str) -> dict:
         "segments": job.get("segments", 0),
         "duration_sec": job.get("duration_sec"),
         "download_url": job.get("download_url"),
+        "can_burn": can_burn,
         "error": job.get("error"),
     }
 

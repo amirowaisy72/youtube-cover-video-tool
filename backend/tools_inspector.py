@@ -10,6 +10,7 @@ Mount in backend/main.py (one line each, parent wiring):
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import subprocess
 from urllib.parse import urlparse
@@ -29,6 +30,11 @@ _YT_HOSTS = {
 
 class InspectorRequest(BaseModel):
     url: str
+
+
+class TopRequest(BaseModel):
+    query: str | None = None
+    channel_url: str | None = None
 
 
 def _looks_like_youtube(url: str) -> bool:
@@ -213,3 +219,121 @@ def inspect_video(payload: InspectorRequest) -> dict:
             "age-restricted, or the link may be wrong. Check the link and try again.",
         )
     return _summarize(info)
+
+
+def _flat_entries(target: str) -> list[dict]:
+    """Flat (metadata-only, no download) entries for a search or a
+    channel's /videos page, or [] on any failure. Same two-step
+    pattern as _extract_info: Python API first, CLI fallback."""
+    try:
+        import yt_dlp
+
+        with yt_dlp.YoutubeDL({
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "skip_download": True,
+            "socket_timeout": 20,
+        }) as ydl:
+            info = ydl.extract_info(target, download=False) or {}
+        entries = info.get("entries") or []
+        return [e for e in entries if isinstance(e, dict) and e.get("id")]
+    except Exception:
+        pass
+    try:
+        kwargs: dict = {}
+        try:
+            import video as _video
+
+            kwargs = _video.no_window_kwargs()
+        except Exception:
+            kwargs = {}
+        proc = subprocess.run(
+            ["yt-dlp", "-J", "--flat-playlist", "--no-warnings", target],
+            capture_output=True, text=True, timeout=60, **kwargs,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            info = json.loads(proc.stdout)
+            entries = info.get("entries") or []
+            return [e for e in entries if isinstance(e, dict) and e.get("id")]
+    except Exception:
+        pass
+    return []
+
+
+def _enrich_one(entry: dict) -> dict:
+    """Full metadata for one flat entry; falls back to the flat
+    fields when the per-video fetch fails (flat results often
+    lack view/like counts). Never raises."""
+    vid = str(entry.get("id") or "")
+    url = f"https://www.youtube.com/watch?v={vid}"
+    info = _extract_info(url)
+    duration = None
+    if info:
+        duration = info.get("duration")
+        return {
+            "video_id": vid,
+            "title": str(info.get("title") or entry.get("title") or ""),
+            "thumbnail": _best_thumbnail(info) or _best_thumbnail(entry),
+            "view_count": info.get("view_count"),
+            "like_count": info.get("like_count"),
+            "duration": _fmt_duration(duration if isinstance(duration, (int, float)) else None),
+            "duration_sec": int(duration) if isinstance(duration, (int, float)) else None,
+            "upload_date": _fmt_upload_date(info.get("upload_date")),
+            "channel": str(info.get("channel") or info.get("uploader") or entry.get("uploader") or ""),
+            "webpage_url": url,
+        }
+    duration = entry.get("duration")
+    return {
+        "video_id": vid,
+        "title": str(entry.get("title") or ""),
+        "thumbnail": _best_thumbnail(entry),
+        "view_count": entry.get("view_count"),
+        "like_count": entry.get("like_count"),
+        "duration": _fmt_duration(duration if isinstance(duration, (int, float)) else None),
+        "duration_sec": int(duration) if isinstance(duration, (int, float)) else None,
+        "upload_date": _fmt_upload_date(entry.get("upload_date")),
+        "channel": str(entry.get("channel") or entry.get("uploader") or ""),
+        "webpage_url": url,
+    }
+
+
+@router.post("/top")
+def top_videos(payload: TopRequest) -> dict:
+    """POST /api/inspector/top {query} OR {channel_url} -> top 10
+    videos in one view, sorted by view count (desc).
+
+    Search uses yt-dlp `ytsearch10:`; a channel URL uses its
+    /videos page. Flat results are enriched per video (small
+    thread pool, failures tolerated). Errors are explicit: 400
+    for empty / both inputs / a non-YouTube channel link, 404
+    when nothing is found."""
+    query = (payload.query or "").strip()
+    channel_url = (payload.channel_url or "").strip()
+    if query and channel_url:
+        raise HTTPException(400, "Give a search query or a channel link — not both.")
+    if channel_url:
+        if not _looks_like_youtube(channel_url):
+            raise HTTPException(400, "That does not look like a YouTube channel link.")
+        target = channel_url.rstrip("/")
+        if not target.endswith("/videos"):
+            target = target + "/videos"
+        source = "channel"
+    elif query:
+        target = f"ytsearch10:{query}"
+        source = "search"
+    else:
+        raise HTTPException(400, "Type a search query or paste a channel link first.")
+    entries = _flat_entries(target)[:10]
+    if not entries:
+        raise HTTPException(
+            404,
+            "No videos found — check the search query or channel link and try again.",
+        )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        videos = list(pool.map(_enrich_one, entries))
+    videos.sort(
+        key=lambda v: v.get("view_count") if isinstance(v.get("view_count"), int) else -1,
+        reverse=True,
+    )
+    return {"source": source, "videos": videos[:10]}
