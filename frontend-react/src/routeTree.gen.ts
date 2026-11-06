@@ -18,8 +18,10 @@ import { Route as InspectorRouteImport } from './routes/inspector'
 import { Route as KeywordsRouteImport } from './routes/keywords'
 import { Route as MusicRouteImport } from './routes/music'
 import { Route as PresetsRouteImport } from './routes/presets'
+import { Route as ScriptRouteImport } from './routes/script'
 import { Route as SeoRouteImport } from './routes/seo'
 import { Route as ShortsRouteImport } from './routes/shorts'
+import { Route as StockRouteImport } from './routes/stock'
 import { Route as SubtitlesRouteImport } from './routes/subtitles'
 import { Route as ThumbnailRouteImport } from './routes/thumbnail'
 import { Route as TitlesRouteImport } from './routes/titles'
@@ -71,6 +73,11 @@ const PresetsRoute = PresetsRouteImport.update({
   path: '/presets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ScriptRoute = ScriptRouteImport.update({
+  id: '/script',
+  path: '/script',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SeoRoute = SeoRouteImport.update({
   id: '/seo',
   path: '/seo',
@@ -79,6 +86,11 @@ const SeoRoute = SeoRouteImport.update({
 const ShortsRoute = ShortsRouteImport.update({
   id: '/shorts',
   path: '/shorts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubtitlesRoute = SubtitlesRouteImport.update({
@@ -117,8 +129,10 @@ export interface FileRoutesByFullPath {
   '/keywords': typeof KeywordsRoute
   '/music': typeof MusicRoute
   '/presets': typeof PresetsRoute
+  '/script': typeof ScriptRoute
   '/seo': typeof SeoRoute
   '/shorts': typeof ShortsRoute
+  '/stock': typeof StockRoute
   '/subtitles': typeof SubtitlesRoute
   '/thumbnail': typeof ThumbnailRoute
   '/titles': typeof TitlesRoute
@@ -135,8 +149,10 @@ export interface FileRoutesByTo {
   '/keywords': typeof KeywordsRoute
   '/music': typeof MusicRoute
   '/presets': typeof PresetsRoute
+  '/script': typeof ScriptRoute
   '/seo': typeof SeoRoute
   '/shorts': typeof ShortsRoute
+  '/stock': typeof StockRoute
   '/subtitles': typeof SubtitlesRoute
   '/thumbnail': typeof ThumbnailRoute
   '/titles': typeof TitlesRoute
@@ -154,8 +170,10 @@ export interface FileRoutesById {
   '/keywords': typeof KeywordsRoute
   '/music': typeof MusicRoute
   '/presets': typeof PresetsRoute
+  '/script': typeof ScriptRoute
   '/seo': typeof SeoRoute
   '/shorts': typeof ShortsRoute
+  '/stock': typeof StockRoute
   '/subtitles': typeof SubtitlesRoute
   '/thumbnail': typeof ThumbnailRoute
   '/titles': typeof TitlesRoute
@@ -174,8 +192,10 @@ export interface FileRouteTypes {
     | '/keywords'
     | '/music'
     | '/presets'
+    | '/script'
     | '/seo'
     | '/shorts'
+    | '/stock'
     | '/subtitles'
     | '/thumbnail'
     | '/titles'
@@ -192,8 +212,10 @@ export interface FileRouteTypes {
     | '/keywords'
     | '/music'
     | '/presets'
+    | '/script'
     | '/seo'
     | '/shorts'
+    | '/stock'
     | '/subtitles'
     | '/thumbnail'
     | '/titles'
@@ -210,8 +232,10 @@ export interface FileRouteTypes {
     | '/keywords'
     | '/music'
     | '/presets'
+    | '/script'
     | '/seo'
     | '/shorts'
+    | '/stock'
     | '/subtitles'
     | '/thumbnail'
     | '/titles'
@@ -229,8 +253,10 @@ export interface RootRouteChildren {
   KeywordsRoute: typeof KeywordsRoute
   MusicRoute: typeof MusicRoute
   PresetsRoute: typeof PresetsRoute
+  ScriptRoute: typeof ScriptRoute
   SeoRoute: typeof SeoRoute
   ShortsRoute: typeof ShortsRoute
+  StockRoute: typeof StockRoute
   SubtitlesRoute: typeof SubtitlesRoute
   ThumbnailRoute: typeof ThumbnailRoute
   TitlesRoute: typeof TitlesRoute
@@ -303,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PresetsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/script': {
+      id: '/script'
+      path: '/script'
+      fullPath: '/script'
+      preLoaderRoute: typeof ScriptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/seo': {
       id: '/seo'
       path: '/seo'
@@ -315,6 +348,13 @@ declare module '@tanstack/react-router' {
       path: '/shorts'
       fullPath: '/shorts'
       preLoaderRoute: typeof ShortsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subtitles': {
@@ -365,8 +405,10 @@ const rootRouteChildren: RootRouteChildren = {
   KeywordsRoute: KeywordsRoute,
   MusicRoute: MusicRoute,
   PresetsRoute: PresetsRoute,
+  ScriptRoute: ScriptRoute,
   SeoRoute: SeoRoute,
   ShortsRoute: ShortsRoute,
+  StockRoute: StockRoute,
   SubtitlesRoute: SubtitlesRoute,
   ThumbnailRoute: ThumbnailRoute,
   TitlesRoute: TitlesRoute,

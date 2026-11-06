@@ -44,6 +44,24 @@ type InspectorData = {
   };
 };
 
+type TopVideo = {
+  video_id: string;
+  title: string;
+  thumbnail: string;
+  view_count: number | null;
+  like_count: number | null;
+  duration: string;
+  duration_sec: number | null;
+  upload_date: string;
+  channel: string;
+  webpage_url: string;
+};
+
+type TopResult = {
+  source: "search" | "channel";
+  videos: TopVideo[];
+};
+
 function fmtNum(n: number | null): string {
   if (n === null || n === undefined) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -57,11 +75,16 @@ function fmtFull(n: number | null): string {
 }
 
 function Inspector() {
+  const [mode, setMode] = useState<"single" | "top">("single");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState<InspectorData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [topInput, setTopInput] = useState("");
+  const [topLoading, setTopLoading] = useState(false);
+  const [topError, setTopError] = useState("");
+  const [topResult, setTopResult] = useState<TopResult | null>(null);
 
   const inspect = async () => {
     if (!url.trim()) {
@@ -87,6 +110,37 @@ function Inspector() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTop = async () => {
+    const input = topInput.trim();
+    if (!input) {
+      setTopError("Type a search query or paste a channel link first.");
+      return;
+    }
+    setTopError("");
+    setTopResult(null);
+    setTopLoading(true);
+    try {
+      // A link is a channel; anything else is a search query.
+      const body = input.startsWith("http")
+        ? { channel_url: input }
+        : { query: input };
+      const result = await api<TopResult>("/api/inspector/top", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      setTopResult(result);
+    } catch (e) {
+      setTopError(
+        e instanceof ApiError
+          ? e.message
+          : "Could not load the top videos: " + (e instanceof Error ? e.message : "unknown error"),
+      );
+    } finally {
+      setTopLoading(false);
     }
   };
 
@@ -153,6 +207,15 @@ function Inspector() {
     <div>
       <PageHeader icon="🔍" title="Competitor Inspector" sub="Paste any YouTube link — see every detail: tags, views, likes and more." />
 
+      <div className="mb-6 flex justify-center">
+        <div className="seg">
+          <button type="button" data-on={mode === "single"} onClick={() => setMode("single")}>Single video</button>
+          <button type="button" data-on={mode === "top"} onClick={() => setMode("top")}>Top 10</button>
+        </div>
+      </div>
+
+      {mode === "single" && (
+      <>
       <div className="glass mx-auto max-w-2xl space-y-5 p-8">
         <h2 className="text-2xl font-bold">Inspect a video</h2>
         <input
@@ -246,6 +309,72 @@ function Inspector() {
             )}
           </div>
         </div>
+      )}
+      </>
+      )}
+
+      {mode === "top" && (
+      <div>
+        <div className="glass mx-auto max-w-2xl space-y-5 p-8">
+          <h2 className="text-2xl font-bold">Top 10 videos</h2>
+          <input
+            className="field text-lg"
+            value={topInput}
+            onChange={(e) => { setTopInput(e.target.value); setTopError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") void fetchTop(); }}
+            placeholder="Search query or channel link — e.g. home workout, or https://youtube.com/@channel"
+          />
+          <button className="btn btn-primary w-full py-4 text-lg" disabled={!topInput.trim() || topLoading} onClick={() => void fetchTop()}>
+            {topLoading ? "Loading top 10…" : "🏆 Show top 10"}
+          </button>
+          {topLoading && <div className="bar"><div style={{ width: "60%" }} /></div>}
+          {topError && <p className="text-sm text-destructive">{topError}</p>}
+          <p className="text-sm text-muted-foreground">Type a topic to see its most-viewed videos — or paste a channel link to see that channel&apos;s top 10. Free — no download, no credits.</p>
+        </div>
+
+        {topResult && (
+          <div className="mt-8">
+            <h3 className="mb-4 text-xl font-bold">
+              Top {topResult.videos.length} {topResult.source === "channel" ? "videos on this channel" : "videos for this search"} — by views
+            </h3>
+            {topResult.videos.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {topResult.videos.map((v, i) => (
+                  <div key={v.video_id || i} className="glass overflow-hidden">
+                    <div className="relative aspect-video overflow-hidden">
+                      {v.thumbnail ? (
+                        <img src={v.thumbnail} alt={v.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-secondary text-4xl">🎬</div>
+                      )}
+                      <span className="absolute left-3 top-3 font-display text-2xl font-bold text-gradient">#{i + 1}</span>
+                      {v.duration && (
+                        <span className="absolute bottom-3 right-3 rounded-md bg-black/80 px-2 py-1 text-xs font-semibold text-white">⏱ {v.duration}</span>
+                      )}
+                    </div>
+                    <div className="p-5">
+                      <h4 className="line-clamp-2 font-bold leading-snug">{v.title || "Untitled video"}</h4>
+                      <p className="mt-2 text-sm text-muted-foreground">{v.channel || "—"}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="chip">👁 {fmtNum(v.view_count)} views</span>
+                        {v.like_count !== null && <span className="chip">👍 {fmtNum(v.like_count)}</span>}
+                        {v.upload_date && <span className="chip">📅 {v.upload_date}</span>}
+                      </div>
+                      {v.webpage_url && (
+                        <a className="btn btn-ghost btn-sm mt-4" href={v.webpage_url} target="_blank" rel="noreferrer">
+                          Open on YouTube ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No videos found.</p>
+            )}
+          </div>
+        )}
+      </div>
       )}
     </div>
   );

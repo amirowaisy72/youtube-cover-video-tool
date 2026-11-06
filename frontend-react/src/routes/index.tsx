@@ -23,13 +23,15 @@ const tools = [
   { to: "/seo", n: "12", title: "SEO Score Checker", desc: "Score your title, description and tags before you publish — and fix what is weak.", img: scene1, cta: "Check my SEO" },
   { to: "/audio", n: "13", title: "Audio Extractor", desc: "Turn any video — or a YouTube link — into a clean MP3.", img: scene2, cta: "Extract audio" },
   { to: "/music", n: "14", title: "Royalty-Free Music", desc: "Free music and sound effects for your YouTube videos — preview, then download.", img: scene3, cta: "Find music" },
+  { to: "/script", n: "15", title: "Script Generator", desc: "Type a topic — get a full ready-to-record script, hooks and description.", img: scene1, cta: "Write a script" },
+  { to: "/stock", n: "16", title: "Stock Video & B-Roll", desc: "Free stock footage for your YouTube videos — preview, then download.", img: scene2, cta: "Find B-roll" },
 ] as const;
 
 function Home() {
   return (
     <div>
       <section className="mb-12 text-center">
-        <span className="chip mb-5">✦ 14 tools · zero learning curve</span>
+        <span className="chip mb-5">✦ 16 tools · zero learning curve</span>
         <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-tight md:text-6xl">
           Make YouTube magic in <span className="text-gradient">a few clicks</span>
         </h1>
