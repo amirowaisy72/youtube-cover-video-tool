@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YT Guru — Master Dashboard (scaffold)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+  header { background: #1e293b; padding: 14px 20px; display: flex; gap: 16px; align-items: center; }
+  header b { font-size: 18px; }
+  nav button { background: #334155; color: #e2e8f0; border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  nav button.active { background: #2563eb; }
+  main { padding: 20px; max-width: 1100px; margin: auto; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .card { background: #1e293b; border-radius: 12px; padding: 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; color: #94a3b8; }
+  .card p { margin: 0; font-size: 28px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #1e293b; border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #334155; font-size: 14px; }
+  input, select, textarea { background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; padding: 8px; }
+  .btn { background: #2563eb; color: #fff; border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  .btn.danger { background: #dc2626; }
+  .muted { color: #94a3b8; font-size: 13px; }
+  .form-box { background: #1e293b; border-radius: 12px; padding: 16px; margin-top: 12px; max-width: 520px; }
+  .form-box label { display: block; margin-bottom: 10px; font-size: 14px; }
+  .form-box input { width: 100%; box-sizing: border-box; margin-top: 4px; }
+  .key-box { background: #1e293b; border: 2px solid #22c55e; border-radius: 12px; padding: 16px; margin-top: 12px; max-width: 640px; }
+  .key-box code { font-size: 18px; font-weight: 700; color: #4ade80; word-break: break-all; }
+  section { display: none; } section.active { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <b>YT Guru — Master Dashboard</b>
+  <nav>
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="customers">Customers</button>
+    <button data-tab="credits">Credit Settings</button>
+    <button data-tab="ledger">Ledger</button>
+  </nav>
+  <span class="muted" style="margin-left:auto">Master only — Phase 2: values are read from the license server.</span>
+</header>
+<main>
+  <!-- Login: shown until the admin session token exists. -->
+  <section id="login" class="active">
+    <h2>Master login</h2>
+    <p class="muted">Username <b>master</b> + the password set as
+    ADMIN_PASSWORD_HASH on the server. The session token is kept in
+    memory for this tab only (never localStorage).</p>
+    <input id="admin-user" placeholder="Username (master)" value="master">
+    <input id="admin-pass" type="password" placeholder="Password">
+    <button class="btn" id="btn-login">Log in</button>
+    <p class="muted" id="login-msg"></p>
+  </section>
+
+  <section id="overview">
+    <h2>Overview</h2>
+    <div class="cards">
+      <div class="card"><h3>Total customers</h3><p id="stat-customers">–</p></div>
+      <div class="card"><h3>Credits issued</h3><p id="stat-issued">–</p></div>
+      <div class="card"><h3>Credits spent</h3><p id="stat-spent">–</p></div>
+      <div class="card"><h3>Credits outstanding</h3><p id="stat-out">–</p></div>
+      <div class="card"><h3>Videos completed</h3><p id="stat-videos">–</p></div>
+    </div>
+    <h3>Recent videos</h3>
+    <table><thead><tr><th>Customer</th><th>Tool</th><th>Title / topic</th><th>Credits</th><th>When</th></tr></thead>
+    <tbody id="recent-jobs"><tr><td colspan="5" class="muted">No data yet — connects to GET /admin/overview.</td></tr></tbody></table>
+  </section>
+
+  <section id="customers">
+    <h2>Customers</h2>
+    <button class="btn" id="btn-new-customer">+ New customer (issues license key)</button>
+    <div id="new-customer-form" class="form-box" style="display:none">
+      <h3 style="margin-top:0">New customer</h3>
+      <label>Name <input id="nc-name" placeholder="Customer name"></label>
+      <label>Email <input id="nc-email" placeholder="Email (optional)"></label>
+      <label>Notes <input id="nc-notes" placeholder="Notes (optional)"></label>
+      <button class="btn" id="btn-create-customer">Create + issue license key</button>
+      <button class="btn" id="btn-cancel-customer" style="background:#334155">Cancel</button>
+      <p class="muted" id="new-customer-msg"></p>
+    </div>
+    <div id="new-key-box" class="key-box" style="display:none">
+      <h3 style="margin-top:0">License key — copy it now, it is shown only once</h3>
+      <p><code id="new-key-value"></code> <button class="btn" id="btn-copy-key">Copy key</button></p>
+      <p class="muted" id="new-key-meta"></p>
+    </div>
+    <table><thead><tr><th>Name</th><th>Email</th><th>Balance</th><th>Videos</th><th></th></tr></thead>
+    <tbody id="customer-rows"><tr><td colspan="5" class="muted">No data yet — connects to GET /admin/customers.</td></tr></tbody></table>
+    <div id="customer-detail"></div>
+  </section>
+
+  <section id="credits">
+    <h2>Credit settings — the values every customer tool uses</h2>
+    <p class="muted">Saving here changes the costs the customer tool fetches
+    on its next license check. Nothing is hardcoded in the tool.</p>
+    <label>Credits per cover video <input id="set-cover" type="number" min="1" value="1"></label><br><br>
+    <label>Credits per Text-to-Voice <input id="set-tts" type="number" min="1" value="1"></label><br><br>
+    <label>Credits per auto-video <input id="set-av" type="number" min="1" value="1"></label><br><br>
+    <label>Free trial credits <input id="set-trial" type="number" min="0" value="3"></label><br><br>
+    <label>Price per credit (PKR) <input id="set-price" type="number" min="0" value="50"></label><br><br>
+    <h3>Packs</h3>
+    <p class="muted">One pack per line: <code>credits, price in PKR</code> —
+    e.g. <code>10, 500</code>. Saved via PUT /admin/settings.</p>
+    <textarea id="set-packs" rows="4" cols="30">10, 500
+30, 1200
+100, 3000</textarea><br><br>
+    <button class="btn" id="btn-save-settings">Save settings</button>
+    <p class="muted" id="settings-msg"></p>
+  </section>
+
+  <section id="ledger">
+    <h2>Credit ledger</h2>
+    <p class="muted">Every credit movement, with reason and time. Connects to GET /admin/ledger.</p>
+    <table><thead><tr><th>When</th><th>Customer</th><th>Change</th><th>Reason</th></tr></thead>
+    <tbody id="ledger-rows"><tr><td colspan="4" class="muted">No data yet.</td></tr></tbody></table>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
