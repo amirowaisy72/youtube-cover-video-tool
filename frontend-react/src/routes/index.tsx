@@ -1,0 +1,56 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import coverImg from "@/assets/cover-template.jpg";
+import scene1 from "@/assets/scene-1.jpg";
+import scene2 from "@/assets/scene-2.jpg";
+import scene3 from "@/assets/scene-3.jpg";
+
+export const Route = createFileRoute("/")({
+  component: Home,
+});
+
+const tools = [
+  { to: "/cover", n: "01", title: "Cover Video Generator", desc: "Paste a link, drop a cover, get a finished video inside your green-screen frame.", img: coverImg, cta: "Make a cover video" },
+  { to: "/voice", n: "02", title: "Text to Voice", desc: "Turn up to 10,000 characters into natural English or Urdu voiceovers.", img: scene2, cta: "Create a voice" },
+  { to: "/auto-video", n: "03", title: "Auto Video from Title", desc: "Type a title, pick a length — we build every scene for you.", img: scene3, cta: "Build a video" },
+  { to: "/thumbnail", n: "04", title: "Thumbnail Maker", desc: "Upload a background, pick a template, type a headline — get a 1280×720 thumbnail.", img: coverImg, cta: "Make a thumbnail" },
+  { to: "/shorts", n: "05", title: "Shorts Maker", desc: "Cut your long video into a vertical 9:16 Short — blurred background, 1080x1920.", img: scene1, cta: "Make a Short" },
+  { to: "/downloader", n: "06", title: "Video / MP3 Downloader", desc: "Paste a YouTube link and get the video as MP4 or just the audio as MP3.", img: scene2, cta: "Download a video" },
+  { to: "/titles", n: "07", title: "Title + Tags Generator", desc: "Type a topic — get 10 clickable titles, a ready description, and tags.", img: scene3, cta: "Generate titles" },
+  { to: "/trimmer", n: "08", title: "Video Trimmer", desc: "Paste a YouTube link, pick start and end — download only that section, nothing else.", img: scene1, cta: "Trim a video" },
+  { to: "/subtitles", n: "09", title: "Subtitle Generator", desc: "Turn any video or audio into accurate subtitles — free, on your computer.", img: scene2, cta: "Make subtitles" },
+  { to: "/keywords", n: "10", title: "Keyword Research", desc: "Find what people actually search for on YouTube — real autocomplete suggestions for any seed keyword.", img: scene3, cta: "Research keywords" },
+  { to: "/inspector", n: "11", title: "Competitor Inspector", desc: "Paste any video link — see every detail: title, tags, views, likes, comments and more.", img: coverImg, cta: "Inspect a video" },
+  { to: "/seo", n: "12", title: "SEO Score Checker", desc: "Score your title, description and tags before you publish — and fix what is weak.", img: scene1, cta: "Check my SEO" },
+  { to: "/audio", n: "13", title: "Audio Extractor", desc: "Turn any video — or a YouTube link — into a clean MP3.", img: scene2, cta: "Extract audio" },
+  { to: "/music", n: "14", title: "Royalty-Free Music", desc: "Free music and sound effects for your YouTube videos — preview, then download.", img: scene3, cta: "Find music" },
+] as const;
+
+function Home() {
+  return (
+    <div>
+      <section className="mb-12 text-center">
+        <span className="chip mb-5">✦ 14 tools · zero learning curve</span>
+        <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-tight md:text-6xl">
+          Make YouTube magic in <span className="text-gradient">a few clicks</span>
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">Pick a tool below. Each one walks you through, one simple step at a time.</p>
+      </section>
+      <div className="grid gap-6 md:grid-cols-3">
+        {tools.map((t) => (
+          <Link key={t.to} to={t.to} className="glass group overflow-hidden transition hover:-translate-y-1 hover:shadow-[var(--shadow-glow)]">
+            <div className="relative aspect-video overflow-hidden">
+              <img src={t.img} alt="" width={1280} height={720} className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+              <span className="absolute left-4 top-4 font-display text-4xl font-bold text-gradient">{t.n}</span>
+            </div>
+            <div className="p-6">
+              <h2 className="text-2xl font-bold">{t.title}</h2>
+              <p className="mt-2 text-muted-foreground">{t.desc}</p>
+              <span className="btn btn-primary mt-6 w-full">{t.cta} →</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
