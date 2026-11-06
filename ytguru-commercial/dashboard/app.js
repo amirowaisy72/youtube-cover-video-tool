@@ -79,15 +79,36 @@ async function loadCustomers() {
 }
 
 async function openCustomer(id) {
-  // TODO: render full detail — history table (title/topic, tool,
-  // date, credits), devices, ledger, and the Add/Remove credits,
-  // Revoke key, Reset devices buttons calling the matching
-  // /admin/customers/{id}/* endpoints.
   const d = await api("/admin/customers/" + id);
-  document.getElementById("customer-detail").innerHTML =
+  const el = document.getElementById("customer-detail");
+  el.innerHTML =
     "<h3>" + escapeHtml(d.name) + " — balance " + d.balance + "</h3>" +
-    "<p class='muted'>History rows: " + d.history.length +
-    " (render the full table here in Phase 2).</p>";
+    "<p class='muted'>Email: " + escapeHtml(d.email || "—") +
+    " · Videos: " + d.history.length + "</p>" +
+    "<div class='form-box'>" +
+    "<h3 style='margin-top:0'>Add / remove credits</h3>" +
+    "<label>Credits <input id='cc-delta' type='number' placeholder='+10 to add, -5 to remove'></label>" +
+    "<label>Reason <input id='cc-reason' placeholder='e.g. bought 10 credits'></label>" +
+    "<button class='btn' id='btn-change-credits'>Update credits</button>" +
+    "<p class='muted' id='credits-msg'></p></div>";
+  document.getElementById("btn-change-credits").addEventListener("click", async () => {
+    const msg = document.getElementById("credits-msg");
+    const delta = +document.getElementById("cc-delta").value;
+    if (!delta) { msg.textContent = "Enter a non-zero number: +10 to add, -5 to remove."; return; }
+    msg.textContent = "Updating…";
+    try {
+      const r = await api("/admin/customers/" + id + "/credits", {
+        method: "POST",
+        body: JSON.stringify({
+          delta,
+          reason: document.getElementById("cc-reason").value.trim() || "manual adjustment",
+        }),
+      });
+      loadCustomers();
+      await openCustomer(id);
+      document.getElementById("credits-msg").textContent = "Done — new balance: " + r.balance + ".";
+    } catch (e) { msg.textContent = "Update failed: " + e.message; }
+  });
 }
 
 async function loadSettings() {
