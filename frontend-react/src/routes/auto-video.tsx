@@ -90,7 +90,7 @@ function AutoVideo() {
   };
 
   return (
-    <div>
+    <div data-tool="auto-video">
       <PageHeader icon="🎬" title="Auto Video from Title" sub="One title in, one finished video out." />
 
       {phase === "form" && (
