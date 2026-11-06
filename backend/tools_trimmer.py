@@ -208,6 +208,43 @@ class TrimmerRequest(BaseModel):
     end: str | int | float = Field(...)
 
 
+class TrimmerInfoRequest(BaseModel):
+    url: str = Field(..., min_length=8)
+
+
+@router.post("/info")
+def get_trimmer_info(payload: TrimmerInfoRequest) -> dict:
+    """Video title + duration for the timeline slider. No download."""
+    if not _yt_dlp_available():
+        raise HTTPException(
+            400,
+            "yt-dlp was not found. Install it with 'pip install yt-dlp' "
+            "(or install the yt-dlp binary) and retry.",
+        )
+    url = payload.url.strip()
+    if not _YOUTUBE_RE.match(url):
+        raise HTTPException(400, "That does not look like a YouTube link.")
+    try:
+        import yt_dlp
+    except ImportError:
+        raise HTTPException(400, "yt-dlp is not installed.") from None
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+            info = ydl.extract_info(url, download=False) or {}
+    except Exception as exc:  # noqa: BLE001 - surface yt-dlp's message
+        raise HTTPException(
+            404,
+            "Could not read that video — it may be private, deleted, "
+            "age-restricted, or the link may be wrong. "
+            "You can still trim by typing the times manually.",
+        ) from exc
+    duration = info.get("duration")
+    return {
+        "title": str(info.get("title") or "YouTube video"),
+        "duration_sec": float(duration) if isinstance(duration, (int, float)) else None,
+    }
+
+
 @router.post("")
 def create_trimmer_job(payload: TrimmerRequest) -> dict:
     """Start a section download. Returns immediately; poll the job."""
