@@ -21,6 +21,11 @@
   .btn { background: #2563eb; color: #fff; border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
   .btn.danger { background: #dc2626; }
   .muted { color: #94a3b8; font-size: 13px; }
+  .form-box { background: #1e293b; border-radius: 12px; padding: 16px; margin-top: 12px; max-width: 520px; }
+  .form-box label { display: block; margin-bottom: 10px; font-size: 14px; }
+  .form-box input { width: 100%; box-sizing: border-box; margin-top: 4px; }
+  .key-box { background: #1e293b; border: 2px solid #22c55e; border-radius: 12px; padding: 16px; margin-top: 12px; max-width: 640px; }
+  .key-box code { font-size: 18px; font-weight: 700; color: #4ade80; word-break: break-all; }
   section { display: none; } section.active { display: block; }
 </style>
 </head>
@@ -65,6 +70,20 @@
   <section id="customers">
     <h2>Customers</h2>
     <button class="btn" id="btn-new-customer">+ New customer (issues license key)</button>
+    <div id="new-customer-form" class="form-box" style="display:none">
+      <h3 style="margin-top:0">New customer</h3>
+      <label>Name <input id="nc-name" placeholder="Customer name"></label>
+      <label>Email <input id="nc-email" placeholder="Email (optional)"></label>
+      <label>Notes <input id="nc-notes" placeholder="Notes (optional)"></label>
+      <button class="btn" id="btn-create-customer">Create + issue license key</button>
+      <button class="btn" id="btn-cancel-customer" style="background:#334155">Cancel</button>
+      <p class="muted" id="new-customer-msg"></p>
+    </div>
+    <div id="new-key-box" class="key-box" style="display:none">
+      <h3 style="margin-top:0">License key — copy it now, it is shown only once</h3>
+      <p><code id="new-key-value"></code> <button class="btn" id="btn-copy-key">Copy key</button></p>
+      <p class="muted" id="new-key-meta"></p>
+    </div>
     <table><thead><tr><th>Name</th><th>Email</th><th>Balance</th><th>Videos</th><th></th></tr></thead>
     <tbody id="customer-rows"><tr><td colspan="5" class="muted">No data yet — connects to GET /admin/customers.</td></tr></tbody></table>
     <div id="customer-detail"></div>

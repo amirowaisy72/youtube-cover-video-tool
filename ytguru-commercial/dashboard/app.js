@@ -143,11 +143,61 @@ async function loadLedger() {
   } catch (e) { /* TODO: show error banner */ }
 }
 
-document.getElementById("btn-new-customer").addEventListener("click", async () => {
-  // TODO: small form (name/email/notes) -> POST /admin/customers.
-  // The returned license_key is shown ONCE for Master to copy to
-  // the customer — it is never stored raw on the server.
-  alert("TODO (Phase 2): new-customer form -> POST /admin/customers, show the license key once.");
+document.getElementById("btn-new-customer").addEventListener("click", () => {
+  document.getElementById("new-customer-form").style.display = "block";
+  document.getElementById("new-key-box").style.display = "none";
+  document.getElementById("new-customer-msg").textContent = "";
+  document.getElementById("nc-name").focus();
+});
+
+document.getElementById("btn-cancel-customer").addEventListener("click", () => {
+  document.getElementById("new-customer-form").style.display = "none";
+  document.getElementById("new-customer-msg").textContent = "";
+});
+
+document.getElementById("btn-create-customer").addEventListener("click", async () => {
+  const msg = document.getElementById("new-customer-msg");
+  const name = document.getElementById("nc-name").value.trim();
+  if (!name) { msg.textContent = "Name is required."; return; }
+  msg.textContent = "Creating…";
+  try {
+    const d = await api("/admin/customers", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        email: document.getElementById("nc-email").value.trim(),
+        notes: document.getElementById("nc-notes").value.trim(),
+      }),
+    });
+    // The raw key is shown ONCE — the server stores only its hash.
+    document.getElementById("new-key-value").textContent = d.license_key;
+    document.getElementById("new-key-meta").textContent =
+      "Customer: " + name + " — trial credits: " + d.trial_credits +
+      ". Send this key to the customer; it will not be shown again.";
+    document.getElementById("new-key-box").style.display = "block";
+    document.getElementById("new-customer-form").style.display = "none";
+    msg.textContent = "";
+    document.getElementById("nc-name").value = "";
+    document.getElementById("nc-email").value = "";
+    document.getElementById("nc-notes").value = "";
+    loadCustomers();
+  } catch (e) { msg.textContent = "Create failed: " + e.message; }
+});
+
+document.getElementById("btn-copy-key").addEventListener("click", async () => {
+  const key = document.getElementById("new-key-value").textContent;
+  const meta = document.getElementById("new-key-meta");
+  try {
+    await navigator.clipboard.writeText(key);
+    meta.textContent = "Copied — send this key to the customer.";
+  } catch (e) {
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById("new-key-value"));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    meta.textContent = "Copy failed — the key is selected, press Ctrl+C.";
+  }
 });
 
 function escapeHtml(s) {
