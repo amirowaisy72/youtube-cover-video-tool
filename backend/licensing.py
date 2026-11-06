@@ -101,12 +101,25 @@ def _sha(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8", "ignore")).hexdigest()[:32]
 
 
+def _no_window_kwargs() -> dict:
+    """kwargs that keep a child console window hidden on Windows.
+
+    Same rule as video.no_window_kwargs (this module stays
+    standalone, so it keeps its own copy): the shipped .exe is
+    --windowed, so a spawned wmic/powershell console flashes
+    on screen without CREATE_NO_WINDOW (user, 2026-11-07)."""
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 def _wmic_value(section: str, key: str) -> str:
     """One value out of `wmic <section> get <key> /value`."""
     try:
         out = subprocess.run(
             ["wmic", section, "get", key, "/value"],
-            capture_output=True, text=True, timeout=10).stdout
+            capture_output=True, text=True, timeout=10,
+            **_no_window_kwargs()).stdout
         for line in out.splitlines():
             if line.strip().lower().startswith(key.lower() + "="):
                 return line.split("=", 1)[1].strip()
@@ -120,19 +133,30 @@ def _powershell_value(query: str) -> str:
     try:
         out = subprocess.run(
             ["powershell", "-NoProfile", "-Command", query],
-            capture_output=True, text=True, timeout=15).stdout
+            capture_output=True, text=True, timeout=15,
+            **_no_window_kwargs()).stdout
         return out.strip().splitlines()[0].strip() if out.strip() else ""
     except Exception:
         return ""
 
 
+_FINGERPRINT_CACHE: dict | None = None
+
+
 def device_fingerprint() -> dict:
     """Real per-machine fingerprint, hashed on this machine.
+
+    Computed once per process and cached: the wmic/powershell
+    calls behind it each open a console window on Windows, so
+    they must never run more than once per app start.
 
     MachineGuid (registry) is the primary id; CPU id + disk
     serial add stability across reinstalls. Empty values are
     fine — the server binds on whatever is present.
     """
+    global _FINGERPRINT_CACHE
+    if _FINGERPRINT_CACHE is not None:
+        return _FINGERPRINT_CACHE
     machine_guid = ""
     cpu_id = ""
     disk_serial = ""
@@ -153,12 +177,13 @@ def device_fingerprint() -> dict:
             "-ExpandProperty SerialNumber)")
     else:  # dev only — the shipped .exe is Windows-only
         machine_guid = format(uuid.getnode(), "012x")
-    return {
+    _FINGERPRINT_CACHE = {
         "machine_guid": _sha(machine_guid) if machine_guid else "unknown",
         "cpu_id": _sha(cpu_id) if cpu_id else "unknown",
         "disk_serial": _sha(disk_serial) if disk_serial else "unknown",
         "os": platform.system(),
     }
+    return _FINGERPRINT_CACHE
 
 
 def load_key() -> str | None:

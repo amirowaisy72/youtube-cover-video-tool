@@ -413,8 +413,13 @@ def _cover_display_name(filename: str) -> str:
 @app.post("/api/covers")
 async def upload_cover(file: UploadFile = File(...)) -> dict:
     suffix = Path(file.filename or "cover.png").suffix.lower() or ".png"
-    if suffix not in {".png", ".jpg", ".jpeg", ".webp"}:
-        raise HTTPException(400, "Cover must be a PNG, JPG, or WebP image.")
+    # A cover can be a still image OR a video (user, 2026-11-07):
+    # the secondary (cover) video plays behind the primary video,
+    # looped to the primary's length, with the primary video in
+    # its green area.
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp",
+                      ".mp4", ".mov", ".webm"}:
+        raise HTTPException(400, "Cover must be a PNG, JPG, WebP image or an MP4, MOV, WebM video.")
     # Keep the original name (sanitised) so the user recognises their
     # own cover later, instead of only seeing a hash like bc59f1….jpg.
     original = "".join(c for c in (file.filename or "cover.png")
@@ -431,12 +436,28 @@ async def upload_cover(file: UploadFile = File(...)) -> dict:
 def list_covers() -> dict:
     covers = []
     for path in sorted(COVERS_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
-        if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+        if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp",
+                                                      ".mp4", ".mov", ".webm"}:
             covers.append({"id": path.stem.split("_", 1)[0] if "_" in path.stem else path.stem,
                            "filename": path.name,
                            "display_name": _cover_display_name(path.name),
+                           "is_video": video.is_video_cover(path),
                            "path": f"/api/covers/{path.name}"})
     return {"covers": covers}
+
+
+def _cover_frame_for_detect(cover: Path) -> Path:
+    """Still image for green detection / mask building.
+
+    Image covers are used as-is. For a video cover the first
+    frame is extracted to the system temp dir (NOT the covers
+    dir, so it never shows up as a cover itself) and detection
+    runs on that frame — the green area is assumed fixed in
+    place across the cover video."""
+    import tempfile
+    if video.is_video_cover(cover):
+        return video.cover_first_frame(cover, Path(tempfile.gettempdir()))
+    return cover
 
 
 @app.get("/api/covers/{filename}")
@@ -476,7 +497,8 @@ def fetch_original_info(url: str) -> dict:
         pass
     try:
         proc = subprocess.run(["yt-dlp", "-J", "--no-warnings", url],
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, timeout=60,
+                              **video.no_window_kwargs())
         if proc.returncode == 0:
             info = json.loads(proc.stdout or "{}")
             return {
@@ -582,7 +604,8 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
                 "-o", str(target),
                 url,
             ]
-            proc = subprocess.run(cmd, capture_output=True, text=True)
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  **video.no_window_kwargs())
             if proc.returncode == 0:
                 _cli_ok = True
                 break
@@ -728,7 +751,7 @@ def _run_auto_impl(job_id: str, url: str, cover_id: str | None, settings_overrid
         matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
         cover = matches[0] if matches else None
     if cover is None:
-        covers = sorted([p for p in COVERS_DIR.iterdir() if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}],
+        covers = sorted([p for p in COVERS_DIR.iterdir() if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm"}],
                         key=lambda p: p.stat().st_mtime, reverse=True)
         cover = covers[0] if covers else None
     if cover is None:
@@ -736,7 +759,7 @@ def _run_auto_impl(job_id: str, url: str, cover_id: str | None, settings_overrid
         return
     green_rect = settings.get("green_rect") or {"x": 0, "y": 0, "w": 640, "h": 360}
     if settings.get("auto_detect_green", True):
-        detected = video.detect_green_rect(cover)
+        detected = video.detect_green_rect(_cover_frame_for_detect(cover))
         if detected:
             green_rect = detected
     speed = float(settings.get("default_speed", 1.0))
@@ -752,11 +775,12 @@ def _run_auto_impl(job_id: str, url: str, cover_id: str | None, settings_overrid
         output_width=settings.get("output_width"),
         output_height=settings.get("output_height"),
         zoom=1.0, pan_x=0.0, pan_y=0.0,
-        mask_path=None,
+        mask_path=None, cover_is_video=video.is_video_cover(cover),
     )
-    # Mask for shape accuracy, built from the cover itself.
+    # Mask for shape accuracy, built from the cover itself
+    # (first frame, for a video cover).
     try:
-        mask_img = video.green_mask(cover)
+        mask_img = video.green_mask(_cover_frame_for_detect(cover))
         if mask_img is not None:
             mask_path = directory / "green_mask.png"
             mask_img.save(mask_path)
@@ -768,6 +792,7 @@ def _run_auto_impl(job_id: str, url: str, cover_id: str | None, settings_overrid
                 output_height=settings.get("output_height"),
                 zoom=1.0, pan_x=0.0, pan_y=0.0,
                 mask_path=mask_path, output_duration=None,
+                cover_is_video=video.is_video_cover(cover),
             )
             # Masked encode needs -t (see video.py): duration / speed.
             dur = video.get_duration(source)
@@ -1382,7 +1407,7 @@ def detect_green(cover_id: str) -> dict:
     matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
     if not matches:
         raise HTTPException(404, "Cover not found.")
-    rect = video.detect_green_rect(matches[0])
+    rect = video.detect_green_rect(_cover_frame_for_detect(matches[0]))
     if not rect:
         raise HTTPException(404, "No green area found in this cover. Use the manual rectangle in Admin settings.")
     return {"cover_id": cover_id, "green_rect": rect, "source": "auto-detected"}
@@ -1404,14 +1429,15 @@ def green_mask_endpoint(cover_id: str, x: int | None = None, y: int | None = Non
     matches = list(COVERS_DIR.glob(f"{cover_id}_*.*")) or list(COVERS_DIR.glob(f"{cover_id}.*"))
     if not matches:
         raise HTTPException(404, "Cover not found.")
-    mask = video.green_mask(matches[0])
+    frame = _cover_frame_for_detect(matches[0])
+    mask = video.green_mask(frame)
     if mask is None:
         raise HTTPException(404, "Mask could not be built.")
     rect = None
     if x is not None and y is not None and w and h:
         rect = {"x": x, "y": y, "w": w, "h": h}
     else:
-        rect = video.detect_green_rect(matches[0])
+        rect = video.detect_green_rect(frame)
     if rect:
         mask = mask.crop((rect["x"], rect["y"],
                           rect["x"] + rect["w"], rect["y"] + rect["h"]))
@@ -1606,7 +1632,7 @@ def process_video(payload: ProcessRequest) -> dict:
         cover_h=_cover_size[1] if _cover_size else None)
     green_source = "manual"
     if payload.green_rect is None and settings.get("auto_detect_green", True):
-        detected = video.detect_green_rect(cover)
+        detected = video.detect_green_rect(_cover_frame_for_detect(cover))
         if detected:
             green_rect = detected
             green_source = "auto-detected"

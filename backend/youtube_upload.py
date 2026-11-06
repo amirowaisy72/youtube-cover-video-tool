@@ -25,6 +25,8 @@ import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from video import no_window_kwargs
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # youtube.upload alone is NOT enough for channels().list():
@@ -354,6 +356,7 @@ def ensure_google_libraries() -> None:
         [sys.executable, "-m", "pip", "install",
          "google-api-python-client", "google-auth-oauthlib"],
         capture_output=True, text=True, timeout=180,
+        **no_window_kwargs(),
     )
     if proc.returncode != 0:
         raise RuntimeError(

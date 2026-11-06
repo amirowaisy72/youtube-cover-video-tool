@@ -30,6 +30,8 @@ import subprocess
 import uuid
 from pathlib import Path
 
+from video import no_window_kwargs
+
 # (voice id, label) — label is what the user sees.
 VOICES = [
     ("en-US-ChristopherNeural", "English (US) — Male, Christopher"),
@@ -135,7 +137,7 @@ def _merge_mp3(parts: list[Path], final_path: Path) -> None:
     proc = subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
          "-i", str(list_file), "-c", "copy", str(final_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, **no_window_kwargs(),
     )
     if proc.returncode != 0:
         raise RuntimeError(f"FFmpeg merge failed: {proc.stderr[-1000:]}")
@@ -159,7 +161,8 @@ def _ffprobe_duration(path: Path) -> float | None:
         proc = subprocess.run(
             ["ffprobe", "-v", "error", "-show_entries", "format=duration",
              "-of", "json", str(path)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30,
+            **no_window_kwargs())
         return float(_json.loads(proc.stdout or "{}")["format"]["duration"])
     except Exception:
         return None

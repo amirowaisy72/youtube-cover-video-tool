@@ -271,7 +271,7 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
     cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(shown),
            "-vf", vf, "-r", "30", "-t", str(duration),
            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)]
-    ok = subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+    ok = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
     if captioned.exists():
         captioned.unlink(missing_ok=True)
     return ok
@@ -305,7 +305,7 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
         cmd = ["ffmpeg", "-y"] + loop_args + ["-i", str(clip_path),
                "-vf", vf, "-r", "30", "-t", str(duration), "-an",
                "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)]
-        return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+        return subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
 
     fade = (f"fade=t=in:st=0:d=0.5,"
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
@@ -409,7 +409,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
          "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
          "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)],
-        capture_output=True, text=True)
+        capture_output=True, text=True, **video_module.no_window_kwargs())
     if proc.returncode != 0 or not video_only.exists():
         raise RuntimeError(f"Master video assembly failed: {proc.stderr[-1000:]}")
     audio_list = work_dir / "master-audio.txt"
@@ -420,7 +420,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     proc = subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list),
          "-c:a", "libmp3lame", str(voice_joined)],
-        capture_output=True, text=True)
+        capture_output=True, text=True, **video_module.no_window_kwargs())
     if proc.returncode != 0 or not voice_joined.exists():
         raise RuntimeError(f"Master audio assembly failed: {proc.stderr[-1000:]}")
     final_path = work_dir / "final.mp4"
@@ -428,7 +428,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_joined),
          "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
          "-shortest", str(final_path)],
-        capture_output=True, text=True)
+        capture_output=True, text=True, **video_module.no_window_kwargs())
     if proc.returncode != 0 or not final_path.exists():
         raise RuntimeError(f"Master audio mux failed: {proc.stderr[-1000:]}")
     # Final quality gate: duration and size must be sane.

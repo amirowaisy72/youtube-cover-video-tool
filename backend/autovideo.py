@@ -34,6 +34,7 @@ import subprocess
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from video import no_window_kwargs
 
 WORDS_PER_MINUTE = 150
 IMAGE_SEGMENT_SEC = 6.0
@@ -403,7 +404,7 @@ def generate_ai_image(title: str, paragraph: str, dest: Path) -> bool:
             proc = subprocess.run(
                 ["curl", "-sL", "--max-time", "120", "-A", "YT-Guru/1.0",
                  url, "-o", str(dest)],
-                capture_output=True, text=True, timeout=150)
+                capture_output=True, text=True, timeout=150, **no_window_kwargs())
             if proc.returncode == 0 and _valid_image(dest):
                 return True
         except Exception:
@@ -523,7 +524,7 @@ def _ffprobe_duration(path: Path) -> float | None:
         proc = subprocess.run(
             ["ffprobe", "-v", "error", "-show_entries", "format=duration",
              "-of", "json", str(path)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30, **no_window_kwargs())
         return float(json.loads(proc.stdout or "{}")["format"]["duration"])
     except Exception:
         return None
@@ -535,7 +536,7 @@ def _segment_image(image: Path, dest: Path, duration: float) -> bool:
                   "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
            "-r", "30", "-t", str(duration), "-c:v", "libx264",
            "-pix_fmt", "yuv420p", str(dest)]
-    return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+    return subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
 
 
 def _segment_clip(clip: Path, dest: Path, duration: float) -> bool:
@@ -544,7 +545,7 @@ def _segment_clip(clip: Path, dest: Path, duration: float) -> bool:
                   "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
            "-r", "30", "-t", str(duration), "-an", "-c:v", "libx264",
            "-pix_fmt", "yuv420p", str(dest)]
-    return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+    return subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
 
 
 def assemble(voice_path: Path, images: list[Path], clips: list[Path],
@@ -588,7 +589,7 @@ def assemble(voice_path: Path, images: list[Path], clips: list[Path],
         cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i",
                f"color=c=0x0e1a2e:s=1280x720:r=30:d={voice_duration}",
                "-c:v", "libx264", "-pix_fmt", "yuv420p", str(bg)]
-        if subprocess.run(cmd, capture_output=True, text=True).returncode == 0:
+        if subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0:
             segments.append(bg)
         else:
             raise RuntimeError("Could not build even a background video.")
@@ -599,14 +600,14 @@ def assemble(voice_path: Path, images: list[Path], clips: list[Path],
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
            "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs())
     if proc.returncode != 0 or not video_only.exists():
         raise RuntimeError(f"Video assembly failed: {proc.stderr[-1000:]}")
     final_path = work_dir / "final.mp4"
     cmd = ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_path),
            "-t", str(voice_duration), "-c:v", "copy", "-c:a", "aac",
            "-shortest", str(final_path)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs())
     if proc.returncode != 0 or not final_path.exists():
         raise RuntimeError(f"Audio mux failed: {proc.stderr[-1000:]}")
     return final_path
@@ -715,14 +716,14 @@ def assemble_by_paragraphs(voice_path: Path,
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
            "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs())
     if proc.returncode != 0 or not video_only.exists():
         raise RuntimeError(f"Video assembly failed: {proc.stderr[-1000:]}")
     final_path = work_dir / "pfinal.mp4"
     cmd = ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_path),
            "-t", str(voice_duration), "-c:v", "copy", "-c:a", "aac",
            "-shortest", str(final_path)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs())
     if proc.returncode != 0 or not final_path.exists():
         raise RuntimeError(f"Audio mux failed: {proc.stderr[-1000:]}")
     return final_path, len(used_images), len(used_clips)

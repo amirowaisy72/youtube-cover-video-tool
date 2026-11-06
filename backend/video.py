@@ -16,8 +16,61 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+
+def no_window_kwargs() -> dict:
+    """kwargs that keep a child console window hidden on Windows.
+
+    The shipped .exe is --windowed (no console of its own), so
+    every console program it spawns — ffmpeg, ffprobe, yt-dlp,
+    wmic, powershell — pops a visible console window without
+    this. That is the PowerShell window flashing on and off
+    during video processing (user, 2026-11-07): each ffmpeg /
+    ffprobe / fingerprint call opened one. CREATE_NO_WINDOW
+    hides it; on Linux/macOS there is nothing to hide.
+    Imported by main/tts/autovideo/youtube_upload too, so the
+    rule is in exactly one place (licensing.py keeps its own
+    copy — it is standalone by design)."""
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
+# A cover can be a still image OR a video (user, 2026-11-07):
+# the secondary (cover) video plays behind the primary video,
+# looped to the primary's length. These are the video suffixes
+# the cover upload accepts.
+VIDEO_COVER_SUFFIXES = {".mp4", ".mov", ".webm"}
+
+
+def is_video_cover(path: str | Path) -> bool:
+    """True when the cover file is a video, not a still image."""
+    return Path(path).suffix.lower() in VIDEO_COVER_SUFFIXES
+
+
+def cover_first_frame(cover: str | Path, dest_dir: str | Path) -> Path:
+    """First frame of a cover as a still image path.
+
+    Image covers are returned as-is. For a video cover, frame 0
+    is extracted to <dest_dir>/cover_first_frame.png — the green
+    rectangle and the shape mask are detected from that frame
+    (the green area is assumed fixed in place across the cover
+    video, which is how cover videos are made)."""
+    cover = Path(cover)
+    if not is_video_cover(cover):
+        return cover
+    dest = Path(dest_dir) / "cover_first_frame.png"
+    if dest.exists():
+        return dest
+    ok, _ = run_command([
+        "ffmpeg", "-y", "-i", str(cover),
+        "-vframes", "1", "-q:v", "2", str(dest)])
+    if not ok or not dest.exists():
+        raise RuntimeError("Could not read the first frame of the cover video.")
+    return dest
 
 
 def check_ffmpeg() -> str | None:
@@ -32,7 +85,8 @@ def check_ffmpeg() -> str | None:
 
 def run_command(cmd: list[str]) -> tuple[bool, str]:
     """Run a command, returning (ok, combined output tail)."""
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True,
+                          **no_window_kwargs())
     output = (proc.stdout or "") + (proc.stderr or "")
     if proc.returncode != 0:
         return False, output[-4000:]
@@ -47,7 +101,8 @@ def get_media_size(path: str | Path) -> tuple[int, int] | None:
         proc = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height", "-of", "json", str(path)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30,
+            **no_window_kwargs())
         stream = json.loads(proc.stdout or "{}")["streams"][0]
         return int(stream["width"]), int(stream["height"])
     except Exception:
@@ -217,7 +272,8 @@ def get_duration(path: str | Path) -> float | None:
         proc = subprocess.run(
             ["ffprobe", "-v", "error", "-show_entries", "format=duration",
              "-of", "json", str(path)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30,
+            **no_window_kwargs())
         return float(json.loads(proc.stdout or "{}")["format"]["duration"])
     except Exception:
         return None
@@ -243,7 +299,8 @@ def run_with_progress(cmd: list[str], duration: float | None,
     """
     start = time.time()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, errors="replace", bufsize=1)
+                            text=True, errors="replace", bufsize=1,
+                            **no_window_kwargs())
     tail: list[str] = []
     last_log_bucket = [-1]
     last_time_update = [0.0]
@@ -323,6 +380,7 @@ def build_process_command(
     encoder: str = "libx265",
     output_duration: float | None = None,
     fit_mode: str = "cover",
+    cover_is_video: bool = False,
 ) -> list[str]:
     """Build the FFmpeg command that composites a video onto a cover.
 
@@ -336,6 +394,13 @@ def build_process_command(
          the video shows only inside the green area's actual shape,
          not its rectangle — outside the shape the cover shows.
       6. Overlay the result onto the (looped) cover image at (x, y).
+         When the cover is a VIDEO (cover_is_video), the cover input
+         is looped with -stream_loop instead of -loop: it restarts
+         from the beginning whenever it ends, and the output still
+         stops at the primary video's length (overlay shortest=1
+         + -shortest, or -t when a mask is used) — so the finished
+         video is exactly as long as the primary video, however
+         short the cover video is.
       7. Encode with the admin encoder/CRF/preset. Default is HEVC
          (libx265): at the same visible quality it makes a much
          smaller file than H.264 (libx264) — that is how size goes
@@ -505,10 +570,16 @@ def build_process_command(
             f"[base][vid]overlay={overlay_x}:{overlay_y}:shortest=1[outv]"
         )
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-loop", "1",
+    # Cover input: a still image is looped as one frame; a cover
+    # VIDEO is looped with -stream_loop so it restarts from the
+    # beginning when it ends. Either way the output length is the
+    # primary video's length (see step 6 above).
+    cmd = ["ffmpeg", "-y"]
+    if cover_is_video:
+        cmd += ["-stream_loop", "-1"]
+    else:
+        cmd += ["-loop", "1"]
+    cmd += [
         "-i", str(cover),
         "-i", str(source),
     ]
@@ -551,7 +622,8 @@ def encoder_available(name: str) -> bool:
         return False
     try:
         proc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
-                              capture_output=True, text=True, timeout=30)
+                              capture_output=True, text=True, timeout=30,
+                              **no_window_kwargs())
         return name in (proc.stdout or "")
     except Exception:
         return False
@@ -649,9 +721,11 @@ def process_job(
     # green, black = rest) and pass it to FFmpeg, so the video is
     # clipped to the green shape, not to its rectangle. The mask is
     # a job working file, deleted with the job's other temp files.
+    # For a video cover the mask comes from its first frame.
     mask_path = None
     try:
-        mask_img = green_mask(cover)
+        mask_source = cover_first_frame(cover, Path(output).parent)
+        mask_img = green_mask(mask_source)
         if mask_img is not None:
             mask_path = Path(output).parent / "green_mask.png"
             mask_img.save(mask_path)
@@ -673,6 +747,7 @@ def process_job(
         zoom=zoom, pan_x=pan_x, pan_y=pan_y,
         mask_path=mask_path, encoder=encoder,
         output_duration=duration, fit_mode=fit_mode,
+        cover_is_video=is_video_cover(cover),
     )
     source_size = Path(source).stat().st_size if Path(source).exists() else 0
     if on_log:

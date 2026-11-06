@@ -109,6 +109,8 @@ function updateFinalSettings(job) {
   processedSettings = {
     flip: job.flip, speed: job.speed, zoom: job.zoom,
     pan_x: job.pan_x, pan_y: job.pan_y, fit_mode: job.fit_mode,
+    green_rect: job.green_rect_used || null,
+    voice_pitch: job.voice_pitch,
   };
   const el = document.getElementById("final-settings");
   if (el) {
@@ -121,6 +123,50 @@ function updateFinalStaleWarning() {
   if (!el) return;
   el.hidden = !(lastProcessedKey && lastProcessedKey !== currentLiveKey());
 }
+
+// Save a finished video's effects as a named preset (user,
+// 2026-11-07): the effects this final was processed with —
+// flip, speed, zoom, pan, fit, green area, voice pitch, plus
+// the current encoder/CRF/ffmpeg preset — become a preset
+// under the name typed here, so the same look can be reused
+// on the next video. Profiles are re-fetched first, so saving
+// here can never wipe presets the Admin page has not loaded.
+document.getElementById("btn-save-job-preset").addEventListener("click", async () => {
+  const result = document.getElementById("save-preset-result");
+  const name = document.getElementById("save-preset-name").value.trim();
+  if (!name) { result.textContent = "Enter a preset name first."; return; }
+  if (!processedSettings) { result.textContent = "Process a video first — there are no finished-video effects to save yet."; return; }
+  try {
+    const s = await api("/api/settings");
+    adminPresets = (s.profiles && typeof s.profiles === "object") ? s.profiles : {};
+    const wasExisting = !!adminPresets[name];
+    const base = readAdminSettings();
+    const preset = {
+      ...base,
+      default_speed: processedSettings.speed,
+      manual_speed: processedSettings.speed,
+      default_flip: processedSettings.flip,
+      manual_flip: processedSettings.flip,
+      fit_mode: processedSettings.fit_mode,
+      manual_fit_mode: processedSettings.fit_mode,
+      // The saved green area is used as-is: auto-detect off, or
+      // the next video would re-detect and ignore this rectangle.
+      green_rect: processedSettings.green_rect || base.green_rect,
+      auto_detect_green: false,
+      manual_zoom: processedSettings.zoom,
+      manual_pan_x: processedSettings.pan_x,
+      manual_pan_y: processedSettings.pan_y,
+    };
+    if (processedSettings.voice_pitch !== undefined && processedSettings.voice_pitch !== null) {
+      preset.voice_pitch_factor = processedSettings.voice_pitch;
+      preset.manual_voice_pitch_factor = processedSettings.voice_pitch;
+    }
+    adminPresets[name] = preset;
+    await savePresetsToBackend();
+    renderPresetList();
+    result.textContent = `Preset "${name}" saved${wasExisting ? " (overwrote the old one)" : ""} — open it in Admin settings to set it as Active.`;
+  } catch (err) { result.textContent = "Save failed: " + err.message; }
+});
 function applyLiveVideoLayout() {
   updateStaleWarning();
   saveState();
@@ -132,8 +178,15 @@ function applyLiveVideoLayout() {
     // Percentages are relative to the cover display size, which has
     // the same aspect as the original — no onload wait needed, so a
     // changed green rectangle moves the box immediately.
-    const nw = document.getElementById("live-cover-img").naturalWidth || 1280;
-    const nh = document.getElementById("live-cover-img").naturalHeight || 720;
+    // A video cover reports its size from videoWidth/Height (once
+    // its metadata is loaded); an image cover from naturalWidth/Height.
+    const coverVid = document.getElementById("live-cover-video");
+    const nw = liveCover.is_video
+      ? (coverVid.videoWidth || 1280)
+      : (document.getElementById("live-cover-img").naturalWidth || 1280);
+    const nh = liveCover.is_video
+      ? (coverVid.videoHeight || 720)
+      : (document.getElementById("live-cover-img").naturalHeight || 720);
     greenBox.style.left = (greenRect.x / nw * 100) + "%";
     greenBox.style.top = (greenRect.y / nh * 100) + "%";
     greenBox.style.width = (greenRect.w / nw * 100) + "%";
@@ -234,22 +287,38 @@ function updateLivePreview() {
   const video = document.getElementById("live-video");
   const greenBox = document.getElementById("live-green-box");
   const img = document.getElementById("live-cover-img");
+  const coverVid = document.getElementById("live-cover-video");
   const empty = document.getElementById("live-empty");
   // Cover shows immediately, even before any video is downloaded:
   // any asset you choose appears on the screen right away.
+  // A video cover plays (muted, looped) in place of the image.
   if (liveCover) {
     empty.hidden = true;
     box.classList.add("has-cover");
-    img.hidden = false;
     const src = liveCover.path || ("/api/covers/" + liveCover.filename);
-    if (img.src !== src && !img.src.endsWith(src)) {
-      img.src = src;
-      img.onload = () => applyLiveVideoLayout();
+    if (liveCover.is_video) {
+      img.hidden = true;
+      coverVid.hidden = false;
+      if (coverVid.src !== src && !coverVid.src.endsWith(src)) {
+        coverVid.src = src;
+        coverVid.onloadedmetadata = () => applyLiveVideoLayout();
+      }
+      coverVid.play().catch(() => {});
+    } else {
+      coverVid.hidden = true;
+      coverVid.pause();
+      img.hidden = false;
+      if (img.src !== src && !img.src.endsWith(src)) {
+        img.src = src;
+        img.onload = () => applyLiveVideoLayout();
+      }
     }
   } else {
     empty.hidden = !jobId;
     box.classList.remove("has-cover");
     img.hidden = true;
+    coverVid.hidden = true;
+    coverVid.pause();
     greenBox.style.left = ""; greenBox.style.top = ""; greenBox.style.width = ""; greenBox.style.height = "";
   }
   if (jobId) {
@@ -535,12 +604,27 @@ async function selectCover(cover) {
   const select = document.getElementById("cover-select");
   select.value = selectedCoverId;
   const wrap = document.getElementById("cover-preview-wrap");
+  const pvImg = document.getElementById("cover-preview");
+  const pvVid = document.getElementById("cover-preview-video");
   if (cover) {
     wrap.hidden = false;
-    document.getElementById("cover-preview").src = cover.path || ("/api/covers/" + cover.filename);
-    document.getElementById("cover-selected-name").textContent = "Selected: " + (cover.display_name || cover.filename);
+    const src = cover.path || ("/api/covers/" + cover.filename);
+    if (cover.is_video) {
+      pvImg.hidden = true;
+      pvVid.hidden = false;
+      if (pvVid.src !== src && !pvVid.src.endsWith(src)) pvVid.src = src;
+      pvVid.play().catch(() => {});
+    } else {
+      pvVid.hidden = true;
+      pvVid.pause();
+      pvImg.hidden = false;
+      pvImg.src = src;
+    }
+    document.getElementById("cover-selected-name").textContent = "Selected: " + (cover.display_name || cover.filename) + (cover.is_video ? " (video cover — loops to your video's length)" : "");
   } else {
     wrap.hidden = true;
+    pvVid.pause();
+    pvVid.removeAttribute("src");
   }
   document.querySelectorAll(".cover-thumb").forEach((el) => {
     el.classList.toggle("selected", el.dataset.coverId === selectedCoverId);
@@ -571,11 +655,13 @@ async function loadCovers(autoSelectId) {
     btn.type = "button";
     btn.className = "cover-thumb";
     btn.dataset.coverId = cover.id;
-    const img = document.createElement("img");
-    img.src = cover.path || ("/api/covers/" + cover.filename);
-    img.alt = cover.display_name || cover.filename;
+    // Video covers get a moving thumbnail; image covers a still one.
+    const thumb = cover.is_video ? document.createElement("video") : document.createElement("img");
+    thumb.src = cover.path || ("/api/covers/" + cover.filename);
+    if (cover.is_video) { thumb.muted = true; thumb.preload = "metadata"; thumb.playsInline = true; }
+    thumb.alt = cover.display_name || cover.filename;
     const span = document.createElement("span");
-    span.textContent = cover.display_name || cover.filename;
+    span.textContent = (cover.display_name || cover.filename) + (cover.is_video ? " (video)" : "");
     const del = document.createElement("button");
     del.type = "button";
     del.className = "cover-delete";
@@ -595,7 +681,7 @@ async function loadCovers(autoSelectId) {
         setStatus("Cover delete failed: " + err.message);
       }
     });
-    btn.append(img, span, del);
+    btn.append(thumb, span, del);
     btn.addEventListener("click", () => selectCover(cover));
     grid.appendChild(btn);
   }
@@ -1181,7 +1267,7 @@ document.getElementById("btn-auto").addEventListener("click", async () => {
 
 async function uploadSelectedCover() {
   const file = document.getElementById("cover-file").files[0];
-  if (!file) { setStatus("Choose a cover image first."); return; }
+  if (!file) { setStatus("Choose a cover image or video first."); return; }
   const form = new FormData();
   form.append("file", file);
   setStatus("Uploading cover…");
@@ -1938,6 +2024,13 @@ function readAdminSettings() {
       w: parseInt(document.getElementById("set-green-w").value, 10),
       h: parseInt(document.getElementById("set-green-h").value, 10),
     },
+    // Zoom/pan are live Manual values, not Admin form fields —
+    // but a preset must round-trip them, or a saved preset
+    // cannot reproduce the look of the video it came from
+    // (user, 2026-11-07: save a finished video's effects).
+    manual_zoom: getZoom(),
+    manual_pan_x: panX,
+    manual_pan_y: panY,
   };
 }
 function applyAdminSettings(s) {
@@ -1974,6 +2067,11 @@ function applyAdminSettings(s) {
   document.getElementById("voice-pitch").value = document.getElementById("set-manual-pitch").value;
   document.getElementById("voice-pitch-value").textContent = document.getElementById("set-manual-pitch").value;
   setFitMode(document.getElementById("set-manual-fit-cover").checked ? "cover" : "full");
+  // Zoom/pan from the preset, when it has them (older presets
+  // don't): the live preview then matches the saved look.
+  if (s.manual_zoom !== undefined) setZoomValue(parseFloat(s.manual_zoom) || 1);
+  if (s.manual_pan_x !== undefined) panX = parseFloat(s.manual_pan_x) || 0;
+  if (s.manual_pan_y !== undefined) panY = parseFloat(s.manual_pan_y) || 0;
   updateLivePreview();
 }
 // Presets are the ONLY settings system (user, 2026-11-01):
