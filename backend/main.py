@@ -524,10 +524,27 @@ def delete_cover(cover_id: str) -> dict:
     return {"deleted": cover_id, "filename": matches[0].name}
 
 
+def _pick_thumbnail(info: dict) -> str:
+    """Best thumbnail URL from a yt-dlp info dict (user, 2026-11-07):
+    Step 1 must show the video's REAL thumbnail, not a demo picture.
+    Prefer the widest entry of the `thumbnails` list, fall back to
+    the single `thumbnail` URL, else empty (frontend hides the image
+    instead of showing a wrong one)."""
+    try:
+        thumbs = [t for t in (info.get("thumbnails") or [])
+                  if isinstance(t, dict) and t.get("url")]
+        if thumbs:
+            best = max(thumbs, key=lambda t: t.get("width") or 0)
+            return best.get("url") or ""
+    except Exception:
+        pass
+    return info.get("thumbnail") or ""
+
+
 def fetch_original_info(url: str) -> dict:
-    """Return the source video's original title, description, tags
-    and uploader via yt-dlp, without downloading. Never fails the
-    download: on any error it returns empty fields, and the caller
+    """Return the source video's original title, description, tags,
+    thumbnail and uploader via yt-dlp, without downloading. Never fails
+    the download: on any error it returns empty fields, and the caller
     just shows nothing instead of blocking the video."""
     try:
         import yt_dlp
@@ -538,6 +555,7 @@ def fetch_original_info(url: str) -> dict:
             "original_description": info.get("description") or "",
             "original_tags": list(info.get("tags") or []),
             "original_uploader": info.get("uploader") or "",
+            "original_thumbnail": _pick_thumbnail(info),
         }
     except Exception:
         pass
@@ -552,11 +570,13 @@ def fetch_original_info(url: str) -> dict:
                 "original_description": info.get("description") or "",
                 "original_tags": list(info.get("tags") or []),
                 "original_uploader": info.get("uploader") or "",
+                "original_thumbnail": _pick_thumbnail(info),
             }
     except Exception:
         pass
     return {"original_title": "", "original_description": "",
-            "original_tags": [], "original_uploader": ""}
+            "original_tags": [], "original_uploader": "",
+            "original_thumbnail": ""}
 
 
 # ---------------------------------------------------------------- download
@@ -1411,7 +1431,8 @@ def video_info(payload: VideoInfoRequest) -> dict:
     frontend falls back to showing the URL."""
     info = fetch_original_info(payload.url)
     return {"url": payload.url, "title": info.get("original_title", ""),
-            "uploader": info.get("original_uploader", "")}
+            "uploader": info.get("original_uploader", ""),
+            "thumbnail": info.get("original_thumbnail", "")}
 
 
 class GenerateMetadataRequest(BaseModel):

@@ -26,6 +26,7 @@ export type Job = {
   original_description?: string;
   original_tags?: string[];
   original_uploader?: string;
+  original_thumbnail?: string;
   timeline?: TimelineStep[];
   // Auto mode
   auto_stage?: string;

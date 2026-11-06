@@ -22,7 +22,6 @@ import {
   type Cover,
   type Job,
 } from "@/lib/api";
-import s3 from "@/assets/scene-3.jpg";
 
 export const Route = createFileRoute("/cover")({
   component: Cover,
@@ -52,7 +51,7 @@ function Cover() {
   const [dl, setDl] = useState<number | null>(null);
   const [dlError, setDlError] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
-  const [video, setVideo] = useState<null | { title: string; dur: string; size: string }>(null);
+  const [video, setVideo] = useState<null | { title: string; dur: string; size: string; thumb?: string }>(null);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [coversError, setCoversError] = useState("");
   const [coverObj, setCoverObj] = useState<Cover | null>(null);
@@ -192,7 +191,7 @@ function Cover() {
           if (job.status === "downloaded") {
             if (dlTimer.current) clearInterval(dlTimer.current);
             setDl(null);
-            setVideo({ title: job.original_title || "Downloaded video", dur: "", size: "" });
+            setVideo({ title: job.original_title || "Downloaded video", dur: "", size: "", thumb: job.original_thumbnail || "" });
             loadVideoMeta(data.job_id);
           } else if (job.status === "failed") {
             if (dlTimer.current) clearInterval(dlTimer.current);
@@ -430,7 +429,9 @@ function Cover() {
               {video && (
                 <>
                   <div className="flex gap-4 rounded-xl border border-border p-4">
-                    <img src={s3} alt="" className="h-20 w-36 rounded-lg object-cover" />
+                    {video.thumb ? (
+                      <img src={video.thumb} alt="" className="h-20 w-36 rounded-lg object-cover" />
+                    ) : null}
                     <div>
                       <div className="font-semibold">{video.title}</div>
                       <div className="mt-2 flex gap-2">

@@ -242,9 +242,20 @@ def green_mask(cover: str | Path) -> "object | None":
     lets FFmpeg (alphamerge) and the live preview (CSS mask-image)
     clip the video to exactly the green shape. Returns None if
     Pillow is missing or the cover cannot be read.
+
+    FRAME RULE (user, 2026-11-07): some covers have a green FRAME
+    (border) around a non-green centre — e.g. a TV whose screen is
+    black with a green border. The shape mask would then show the
+    video only as thin strips, which reads as "wrong green detect".
+    For a frame the video must fill the WHOLE screen (the frame's
+    bounding box, centre included). A frame is recognised by its
+    footprint: the box border is mostly green while the interior
+    is mostly not green. A solid green screen (interior green) and
+    a circle/rounded screen (border mostly empty) keep the shape
+    mask unchanged.
     """
     try:
-        from PIL import Image, ImageChops
+        from PIL import Image, ImageChops, ImageDraw
     except ImportError:
         return None
     try:
@@ -261,7 +272,40 @@ def green_mask(cover: str | Path) -> "object | None":
     mask = ImageChops.logical_and(_thresh(gr, 25).convert("1"),
                                   _thresh(gb, 25).convert("1"))
     mask = ImageChops.logical_and(mask, _thresh(g, 90).convert("1"))
-    return mask.convert("L")
+    mask = mask.convert("L")
+    bbox = mask.getbbox()
+    if bbox:
+        # Analyse on a small copy for speed; the frame test only
+        # needs border vs interior coverage, not exact pixels.
+        scale = min(1.0, 320 / max(mask.size))
+        small = mask.resize((max(1, int(mask.size[0] * scale)),
+                             max(1, int(mask.size[1] * scale))))
+        sx0 = int(bbox[0] * scale); sy0 = int(bbox[1] * scale)
+        sx1 = int(bbox[2] * scale); sy1 = int(bbox[3] * scale)
+        spx = small.load()
+        sw, sh = small.size
+        sx1 = min(sx1, sw - 1); sy1 = min(sy1, sh - 1)
+        border_hit = border_n = 0
+        for xx in range(sx0, sx1 + 1):
+            for yy in (sy0, sy1):
+                border_hit += 1 if spx[xx, yy] > 0 else 0
+                border_n += 1
+        for yy in range(sy0, sy1 + 1):
+            for xx in (sx0, sx1):
+                border_hit += 1 if spx[xx, yy] > 0 else 0
+                border_n += 1
+        interior_hit = interior_n = 0
+        for yy in range(sy0, sy1 + 1, 2):
+            for xx in range(sx0, sx1 + 1, 2):
+                interior_hit += 1 if spx[xx, yy] > 0 else 0
+                interior_n += 1
+        border_cov = border_hit / border_n if border_n else 0
+        interior_cov = interior_hit / interior_n if interior_n else 0
+        if border_cov >= 0.5 and interior_cov < 0.5:
+            filled = Image.new("L", mask.size, 0)
+            ImageDraw.Draw(filled).rectangle(bbox, fill=255)
+            return filled
+    return mask
 
 
 def get_duration(path: str | Path) -> float | None:
