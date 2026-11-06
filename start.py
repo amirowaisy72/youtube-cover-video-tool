@@ -127,6 +127,56 @@ def ensure_dependencies() -> str:
     raise AssertionError("unreachable")
 
 
+def _frontend_needs_build() -> bool:
+    """True when the React app (frontend-react/) has no build yet,
+    or its sources are newer than the last build."""
+    react_dir = ROOT / "frontend-react"
+    if not react_dir.is_dir():
+        return False
+    dist_index = react_dir / "dist" / "index.html"
+    if not dist_index.exists():
+        return True
+    built_at = dist_index.stat().st_mtime
+    src_dir = react_dir / "src"
+    return any(
+        p.is_file() and p.stat().st_mtime > built_at
+        for p in src_dir.rglob("*")
+    )
+
+
+def ensure_frontend() -> None:
+    """Build the React interface (frontend-react/) when needed.
+
+    Only runs when the build is missing or its sources changed, so
+    a normal double-click stays fast. If no JavaScript tool is
+    installed (or the build fails), the server falls back to the
+    old vanilla frontend/ and the tool still starts — the message
+    below says how to get the new interface.
+    """
+    if not _frontend_needs_build():
+        return
+    for tool in ("npm", "bun"):
+        exe = shutil.which(tool)
+        if exe is None:
+            continue
+        print(f"Building the new interface with {tool} (first run takes a while)…")
+        install_cmd = ([exe, "install", "--no-audit", "--no-fund"] if tool == "npm"
+                       else [exe, "install"])
+        install = subprocess.run(install_cmd, cwd=str(ROOT / "frontend-react"))
+        if install.returncode != 0:
+            print(f"{tool} install failed — trying the next tool…")
+            continue
+        build = subprocess.run([exe, "run", "build"], cwd=str(ROOT / "frontend-react"))
+        if build.returncode == 0 and (ROOT / "frontend-react" / "dist" / "index.html").exists():
+            print("Interface built.")
+            return
+        print(f"{tool} build failed.")
+    print("Note: the new interface could not be built on this computer,")
+    print("so the tool will open with the previous design.")
+    print("To get the new design, install Node.js from https://nodejs.org")
+    print("(or Bun from https://bun.sh) and double-click again.")
+
+
 def wait_for_server(timeout: int = 60) -> bool:
     for _ in range(timeout * 2):
         try:
@@ -144,6 +194,7 @@ def main() -> int:
     check_ffmpeg()
     server_python = ensure_dependencies()
     check_yt_dlp(server_python)
+    ensure_frontend()
 
     print(f"\nStarting the tool locally at {URL} …")
     print("Nothing is hosted live — this runs only on your computer.")
