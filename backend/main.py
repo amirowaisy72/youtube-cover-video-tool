@@ -40,7 +40,6 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
@@ -54,9 +53,32 @@ import metadata as local_metadata  # noqa: E402
 import tts as tts_module  # noqa: E402
 import autovideo  # noqa: E402
 import licensing  # noqa: E402
+import tools_thumbnail  # noqa: E402
+import tools_shorts  # noqa: E402
+import tools_downloader  # noqa: E402
+import tools_titles  # noqa: E402
+import tools_trimmer  # noqa: E402
+import tools_subtitles  # noqa: E402
+import tools_keywords  # noqa: E402
+import tools_inspector  # noqa: E402
+import tools_seo  # noqa: E402
+import tools_audio  # noqa: E402
+import tools_music  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
+# React SPA build (frontend-react/dist). The frontend is the Lovable
+# design ported to React; the old vanilla frontend/ above is kept
+# only as a fallback until the React app is built (npm run build
+# in frontend-react, or `bun run build`).
+REACT_BUILD_DIR = BASE_DIR / "frontend-react" / "dist"
+
+
+def _frontend_dir() -> Path:
+    """React SPA build when present, else the old vanilla frontend."""
+    if (REACT_BUILD_DIR / "index.html").is_file():
+        return REACT_BUILD_DIR
+    return FRONTEND_DIR
 JOBS_DIR = BASE_DIR / "jobs"
 COVERS_DIR = BASE_DIR / "covers"
 GROUPS_DIR = BASE_DIR / "groups"
@@ -310,13 +332,31 @@ def yt_dlp_available() -> bool:
 
 app = FastAPI(title="Copyright free video generator")
 
+# New free tools (YT Guru all-in-one, 2026-11-07): each router is
+# self-contained in backend/tools_*.py. Mounted here, BEFORE the
+# SPA catch-all at the bottom, or /api/* would be swallowed by it.
+app.include_router(tools_thumbnail.router)
+app.include_router(tools_shorts.router)
+app.include_router(tools_downloader.router)
+app.include_router(tools_titles.router)
+app.include_router(tools_trimmer.router)
+app.include_router(tools_subtitles.router)
+app.include_router(tools_keywords.router)
+app.include_router(tools_inspector.router)
+app.include_router(tools_seo.router)
+app.include_router(tools_audio.router)
+app.include_router(tools_music.router)
+
 
 @app.get("/favicon.ico")
 def favicon() -> "Response":
-    """No favicon file is shipped, so the browser's automatic
-    /favicon.ico request used to log a 404. Answer 204 instead,
-    so the logs stay clean (user, 2026-11-02)."""
+    """Serve the React app's favicon when built; otherwise answer
+    204, so the browser's automatic /favicon.ico request does not
+    log a 404 (user, 2026-11-02)."""
     from fastapi.responses import Response as _Response
+    icon = _frontend_dir() / "favicon.ico"
+    if icon.is_file():
+        return FileResponse(icon)
     return _Response(status_code=204)
 
 
@@ -2195,5 +2235,14 @@ def license_status() -> dict:
     return {"activated": True, **data}
 
 
-# Frontend must be mounted last so /api/* routes win.
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# Frontend (registered last so /api/* routes win): serve the built
+# files directly, and fall back to index.html for SPA routes
+# (/cover, /voice, /auto-video, /presets), so a refresh or a direct
+# link to a tool page loads the app instead of a 404.
+@app.get("/{full_path:path}")
+def frontend_fallback(full_path: str):
+    directory = _frontend_dir().resolve()
+    candidate = (directory / full_path).resolve()
+    if candidate.is_file() and candidate.is_relative_to(directory):
+        return FileResponse(candidate)
+    return FileResponse(directory / "index.html")
