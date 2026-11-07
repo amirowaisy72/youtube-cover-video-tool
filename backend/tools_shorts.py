@@ -304,6 +304,15 @@ def create_from_url(payload: ShortsUrlRequest) -> dict:
     _validate_range(payload.start_seconds, payload.end_seconds)
     if not _is_youtube_url(payload.url):
         raise HTTPException(400, "Paste a YouTube link (youtube.com or youtu.be).")
+    # A watch link carrying &list=... would make yt-dlp fetch the
+    # whole playlist (user, 2026-11-07).
+    url = video.clean_youtube_url(payload.url.strip())
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     if not shutil.which("yt-dlp"):
         try:
             import yt_dlp  # noqa: F401
@@ -318,12 +327,12 @@ def create_from_url(payload: ShortsUrlRequest) -> dict:
         "id": job_id, "tool": "shorts", "source": "youtube",
         "status": "downloading", "progress": 0,
         "stage": "Downloading video from YouTube…",
-        "url": payload.url, "start": payload.start_seconds,
+        "url": url, "start": payload.start_seconds,
         "end": payload.end_seconds,
     })
     threading.Thread(
         target=_run_from_url,
-        args=(job_id, payload.url, payload.start_seconds, payload.end_seconds),
+        args=(job_id, url, payload.start_seconds, payload.end_seconds),
         daemon=True,
     ).start()
     return {"job_id": job_id, "status": "downloading"}

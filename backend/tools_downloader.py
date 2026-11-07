@@ -191,6 +191,7 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
             "progress_hooks": [hook],
             "quiet": True,
             "no_warnings": True,
+            "noplaylist": True,
         }
     else:
         opts = {
@@ -200,6 +201,7 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
             "progress_hooks": [hook],
             "quiet": True,
             "no_warnings": True,
+            "noplaylist": True,
         }
 
     done = False
@@ -268,6 +270,16 @@ def start_download(payload: DownloaderRequest) -> dict:
         raise HTTPException(400, "format must be 'mp4' or 'mp3'.")
     if not _is_youtube_url(url):
         raise HTTPException(400, "That does not look like a YouTube video link.")
+    # A watch link carrying &list=... would make yt-dlp download
+    # the whole playlist and sit at 0% (user, 2026-11-07).
+    import video as _video
+    url = _video.clean_youtube_url(url)
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     if not _yt_dlp_available():
         raise HTTPException(
             400,

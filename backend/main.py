@@ -75,10 +75,18 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 # only as a fallback until the React app is built (npm run build
 # in frontend-react, or `bun run build`).
 REACT_BUILD_DIR = BASE_DIR / "frontend-react" / "dist"
+# Local builds go to dist-local/ (gitignored) — see start.py.
+# A local rebuild used to rewrite the committed dist/ files with
+# new hashes, dirtying the working tree and blocking `git pull`
+# (user, 2026-11-07). dist-local is served first when present.
+REACT_LOCAL_BUILD_DIR = BASE_DIR / "frontend-react" / "dist-local"
 
 
 def _frontend_dir() -> Path:
-    """React SPA build when present, else the old vanilla frontend."""
+    """Local React build first, then the committed build, else the
+    old vanilla frontend."""
+    if (REACT_LOCAL_BUILD_DIR / "index.html").is_file():
+        return REACT_LOCAL_BUILD_DIR
     if (REACT_BUILD_DIR / "index.html").is_file():
         return REACT_BUILD_DIR
     return FRONTEND_DIR
@@ -315,6 +323,13 @@ def _yt_dlp_download_opts(outtmpl: str, hook, attempt: int = 1) -> dict:
         "retries": 10,
         "fragment_retries": 10,
         "extractor_retries": 3,
+        # A watch link copied from YouTube often carries &list=...
+        # (a playlist). Without this, yt-dlp downloads the WHOLE
+        # playlist, so the progress bar sits at 0% for a very long
+        # time (user, 2026-11-07). The URL is also cleaned to one
+        # video by clean_youtube_url at the endpoints; this is the
+        # safety net for any path that still passes a list link.
+        "noplaylist": True,
         "socket_timeout": 60,
         "outtmpl": outtmpl,
         "progress_hooks": [hook],
@@ -605,10 +620,16 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
     """
     import time as _time
     dl_start = _time.time()
+    url = video.clean_youtube_url(url) or url
     job = {"id": job_id, "status": "downloading", "url": url,
            "progress": 0, "downloaded_bytes": 0, "total_bytes": None,
-           "speed": None, "eta": None, "timeline": []}
+           "speed": None, "eta": None, "timeline": [],
+           # Stage so the UI can say what is happening while the
+           # bar is still at 0%: "info" = fetching the video's
+           # title/thumbnail (yt-dlp), "downloading" = bytes moving.
+           "stage": "info"}
     job.update(fetch_original_info(url))
+    job["stage"] = "downloading"
     write_job(job)
 
     def hook(d: dict) -> None:
@@ -622,6 +643,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
             "total_bytes": total,
             "speed": d.get("speed"),
             "eta": d.get("eta"),
+            "stage": "downloading",
         })
         write_job(job)
 
@@ -667,6 +689,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
                 "-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
                 "--merge-output-format", "mp4",
                 "--concurrent-fragments", "8",
+                "--no-playlist",
                 "-o", str(target),
                 url,
             ]
@@ -696,7 +719,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
             "duration_sec": round(dur, 1),
             "detail": f"{size_mb:.1f} MB in {_fmt_duration(dur)} (avg {avg:.1f} MB/s)",
         }]
-        job.update({"status": "downloaded", "progress": 100})
+        job.update({"status": "downloaded", "progress": 100, "stage": "done"})
     else:
         job.update({"status": "failed", "error": "yt-dlp finished but no file was created."})
     write_job(job)
@@ -710,12 +733,19 @@ def download_video(payload: DownloadRequest) -> dict:
             "yt-dlp was not found. Install it with "
             "'pip install yt-dlp' (or install the yt-dlp binary) and retry.",
         )
+    url = video.clean_youtube_url(payload.url.strip())
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     job_id = uuid.uuid4().hex[:12]
     directory = job_dir(job_id)
     target = directory / "source.mp4"
     # Return immediately; the frontend polls progress (below) while
     # the download runs in the background.
-    threading.Thread(target=_run_download, args=(job_id, payload.url, target),
+    threading.Thread(target=_run_download, args=(job_id, url, target),
                      daemon=True).start()
     return {"job_id": job_id, "status": "downloading"}
 
@@ -943,11 +973,18 @@ def _run_auto(job_id: str, url: str, cover_id: str | None, settings_override: di
 def auto_video(payload: AutoRequest) -> dict:
     if not yt_dlp_available():
         raise HTTPException(400, "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.")
+    url = video.clean_youtube_url(payload.url.strip())
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     job_id = uuid.uuid4().hex[:12]
     # Credit check: reserve 1 credit BEFORE any download/FFmpeg work.
     token = _consume_or_402("cover_video", job_id)
     directory = job_dir(job_id)
-    threading.Thread(target=_run_auto, args=(job_id, payload.url, payload.cover_id),
+    threading.Thread(target=_run_auto, args=(job_id, url, payload.cover_id),
                      kwargs={"job_token": token}, daemon=True).start()
     return {"job_id": job_id, "status": "downloading", "auto": True}
 
@@ -1184,6 +1221,19 @@ def _run_group(group_id: str) -> None:
 def create_group(payload: GroupRequest) -> dict:
     if not yt_dlp_available():
         raise HTTPException(400, "yt-dlp was not found. Install it with 'pip install yt-dlp' and retry.")
+    # Clean every item's link FIRST, before any credit is spent:
+    # a watch link carrying &list=... would otherwise make yt-dlp
+    # download the whole playlist and sit at 0% (user, 2026-11-07).
+    cleaned: list[str] = []
+    for it in payload.items:
+        url = video.clean_youtube_url(it.url.strip())
+        if url is None:
+            raise HTTPException(
+                400,
+                "One of the links is a playlist, not one video. "
+                "Open the video itself and paste its link (youtube.com/watch?v=…).",
+            )
+        cleaned.append(url)
     group_id = uuid.uuid4().hex[:12]
     # Credit check: reserve 1 credit per video, up front, before
     # any work starts. If a later item cannot be reserved, refund
@@ -1205,10 +1255,10 @@ def create_group(payload: GroupRequest) -> dict:
         "status": "running",
         "current_index": 0,
         "items": [
-            {"url": it.url, "preset_name": it.preset_name, "cover_id": it.cover_id,
+            {"url": url, "preset_name": it.preset_name, "cover_id": it.cover_id,
              "upload": it.upload or "skip", "status": "waiting", "job_id": None,
              "job_token": tok}
-            for it, tok in zip(payload.items, tokens)
+            for it, tok, url in zip(payload.items, tokens, cleaned)
         ],
     }
     _write_group(group)
@@ -1429,8 +1479,15 @@ def video_info(payload: VideoInfoRequest) -> dict:
     tells the user nothing about which video gets which preset.
     Never fails: on any yt-dlp error the title is empty and the
     frontend falls back to showing the URL."""
-    info = fetch_original_info(payload.url)
-    return {"url": payload.url, "title": info.get("original_title", ""),
+    url = video.clean_youtube_url(payload.url.strip())
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
+    info = fetch_original_info(url)
+    return {"url": url, "title": info.get("original_title", ""),
             "uploader": info.get("original_uploader", ""),
             "thumbnail": info.get("original_thumbnail", "")}
 

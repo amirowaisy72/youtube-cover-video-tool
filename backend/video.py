@@ -51,6 +51,45 @@ def is_video_cover(path: str | Path) -> bool:
     return Path(path).suffix.lower() in VIDEO_COVER_SUFFIXES
 
 
+def clean_youtube_url(url: str) -> str | None:
+    """One single-video YouTube URL from any YouTube link (user, 2026-11-07).
+
+    Watch links copied from YouTube often carry `&list=...` (a
+    playlist), `&index=`, `&t=` and friends. Without cleaning,
+    yt-dlp treats the link as a PLAYLIST: it fetches the whole
+    playlist's info and then downloads video after video, so the
+    progress bar sits at 0% for a very long time and the "video"
+    is the wrong one. Returns the watch URL with only the `v`
+    parameter (youtu.be / Shorts / embed links become the same
+    watch URL), or the URL unchanged when it is not YouTube.
+    Returns None for a playlist page (youtube.com/playlist, or a
+    watch link with no video id) — there is no single video to
+    download, so the caller must ask for one video's link.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    try:
+        u = (url or "").strip()
+        p = urlparse(u)
+        host = (p.netloc or "").lower().removeprefix("www.")
+        if host in ("youtube.com", "m.youtube.com", "music.youtube.com"):
+            if p.path == "/watch":
+                v = (parse_qs(p.query).get("v") or [None])[0]
+                return f"https://www.youtube.com/watch?v={v}" if v else None
+            if p.path.startswith("/shorts/") or p.path.startswith("/embed/"):
+                vid = p.path.split("/")[2] if len(p.path.split("/")) > 2 else ""
+                return f"https://www.youtube.com/watch?v={vid}" if vid else None
+            if p.path in ("/playlist", "/results"):
+                return None
+            return u
+        if host == "youtu.be":
+            vid = p.path.strip("/").split("/")[0] if p.path.strip("/") else ""
+            return f"https://youtu.be/{vid}" if vid else None
+        return u
+    except Exception:
+        return url
+
+
 def cover_first_frame(cover: str | Path, dest_dir: str | Path) -> Path:
     """First frame of a cover as a still image path.
 

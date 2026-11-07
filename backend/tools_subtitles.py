@@ -547,6 +547,16 @@ async def create_subtitles(request: Request, file: UploadFile | None = File(None
     if url:
         if not _looks_like_youtube(url):
             raise HTTPException(400, "That does not look like a YouTube video link.")
+        # A watch link carrying &list=... would make yt-dlp fetch
+        # the whole playlist (user, 2026-11-07).
+        import video as _video
+        url = _video.clean_youtube_url(url)
+        if url is None:
+            raise HTTPException(
+                400,
+                "That is a playlist link, not one video. "
+                "Open the video itself and paste its link (youtube.com/watch?v=…).",
+            )
         if not _yt_dlp_available():
             raise HTTPException(
                 400,

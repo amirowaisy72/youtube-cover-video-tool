@@ -173,6 +173,7 @@ def _run_trim(job_id: str, url: str, start: float, end: float, target: Path) -> 
         "progress_hooks": [hook],
         "quiet": True,
         "no_warnings": True,
+        "noplaylist": True,
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -224,12 +225,22 @@ def get_trimmer_info(payload: TrimmerInfoRequest) -> dict:
     url = payload.url.strip()
     if not _YOUTUBE_RE.match(url):
         raise HTTPException(400, "That does not look like a YouTube link.")
+    # A watch link carrying &list=... would make yt-dlp fetch the
+    # whole playlist (user, 2026-11-07).
+    import video as _video
+    url = _video.clean_youtube_url(url)
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     try:
         import yt_dlp
     except ImportError:
         raise HTTPException(400, "yt-dlp is not installed.") from None
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True}) as ydl:
             info = ydl.extract_info(url, download=False) or {}
     except Exception as exc:  # noqa: BLE001 - surface yt-dlp's message
         raise HTTPException(
@@ -257,6 +268,16 @@ def create_trimmer_job(payload: TrimmerRequest) -> dict:
     url = payload.url.strip()
     if not _YOUTUBE_RE.match(url):
         raise HTTPException(400, "That does not look like a YouTube link.")
+    # A watch link carrying &list=... would make yt-dlp fetch the
+    # whole playlist (user, 2026-11-07).
+    import video as _video
+    url = _video.clean_youtube_url(url)
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     try:
         start = parse_time(payload.start)
         end = parse_time(payload.end)

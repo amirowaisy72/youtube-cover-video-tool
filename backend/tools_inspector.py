@@ -211,6 +211,16 @@ def inspect_video(payload: InspectorRequest) -> dict:
         raise HTTPException(400, "Paste a YouTube video link first.")
     if not _looks_like_youtube(url):
         raise HTTPException(400, "That does not look like a YouTube video link.")
+    # A watch link carrying &list=... would make yt-dlp read the
+    # whole playlist (user, 2026-11-07).
+    import video as _video
+    url = _video.clean_youtube_url(url)
+    if url is None:
+        raise HTTPException(
+            400,
+            "That is a playlist link, not one video. "
+            "Open the video itself and paste its link (youtube.com/watch?v=…).",
+        )
     info = _extract_info(url)
     if not info:
         raise HTTPException(

@@ -194,6 +194,16 @@ async def extract_audio(
         raise HTTPException(400, "Upload a video file or paste a YouTube link.")
     if url and "youtu" not in url:
         raise HTTPException(400, "That does not look like a YouTube link.")
+    if url:
+        # A watch link carrying &list=... would make yt-dlp fetch
+        # the whole playlist (user, 2026-11-07).
+        url = video.clean_youtube_url(url)
+        if url is None:
+            raise HTTPException(
+                400,
+                "That is a playlist link, not one video. "
+                "Open the video itself and paste its link (youtube.com/watch?v=…).",
+            )
     job_id = uuid.uuid4().hex[:12]
     directory = _job_dir(job_id)
     if file is not None:

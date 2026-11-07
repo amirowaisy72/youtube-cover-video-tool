@@ -129,11 +129,18 @@ def ensure_dependencies() -> str:
 
 def _frontend_needs_build() -> bool:
     """True when the React app (frontend-react/) has no build yet,
-    or its sources are newer than the last build."""
+    or its sources are newer than the last build.
+
+    Builds go to frontend-react/dist-local/ (gitignored), NEVER to
+    the committed dist/ — a local rebuild used to rewrite the
+    committed dist files with new hashes, which dirtied the working
+    tree and blocked the next `git pull` (user, 2026-11-07). The
+    committed dist/ is only a fallback for computers without a
+    JavaScript tool (see backend/main.py _frontend_dir)."""
     react_dir = ROOT / "frontend-react"
     if not react_dir.is_dir():
         return False
-    dist_index = react_dir / "dist" / "index.html"
+    dist_index = react_dir / "dist-local" / "index.html"
     if not dist_index.exists():
         return True
     built_at = dist_index.stat().st_mtime
@@ -150,8 +157,9 @@ def ensure_frontend() -> None:
     Only runs when the build is missing or its sources changed, so
     a normal double-click stays fast. If no JavaScript tool is
     installed (or the build fails), the server falls back to the
-    old vanilla frontend/ and the tool still starts — the message
-    below says how to get the new interface.
+    committed dist/ (or the old vanilla frontend/) and the tool
+    still starts — the message below says how to get the new
+    interface.
     """
     if not _frontend_needs_build():
         return
@@ -166,8 +174,10 @@ def ensure_frontend() -> None:
         if install.returncode != 0:
             print(f"{tool} install failed — trying the next tool…")
             continue
-        build = subprocess.run([exe, "run", "build"], cwd=str(ROOT / "frontend-react"))
-        if build.returncode == 0 and (ROOT / "frontend-react" / "dist" / "index.html").exists():
+        build = subprocess.run(
+            [exe, "run", "build", "--", "--outDir", "dist-local"],
+            cwd=str(ROOT / "frontend-react"))
+        if build.returncode == 0 and (ROOT / "frontend-react" / "dist-local" / "index.html").exists():
             print("Interface built.")
             return
         print(f"{tool} build failed.")

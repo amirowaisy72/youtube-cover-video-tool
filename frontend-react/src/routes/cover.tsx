@@ -49,6 +49,7 @@ function Cover() {
   const [step, setStep] = useState(0);
   const [url, setUrl] = useState("");
   const [dl, setDl] = useState<number | null>(null);
+  const [dlStage, setDlStage] = useState("");
   const [dlError, setDlError] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [video, setVideo] = useState<null | { title: string; dur: string; size: string; thumb?: string }>(null);
@@ -179,6 +180,7 @@ function Cover() {
     if (!url.trim()) { setDlError("Paste a YouTube link first."); return; }
     setDlError("");
     setDl(0);
+    setDlStage("info");
     setVideo(null);
     try {
       const data = await downloadVideo(url.trim());
@@ -188,6 +190,7 @@ function Cover() {
         try {
           const job = await getJob(data.job_id);
           setDl(job.progress ?? 0);
+          if (job.stage) setDlStage(job.stage);
           if (job.status === "downloaded") {
             if (dlTimer.current) clearInterval(dlTimer.current);
             setDl(null);
@@ -421,7 +424,7 @@ function Cover() {
               <input className="field text-lg" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://youtube.com/watch?v=…" />
               {!video && (
                 <button className="btn btn-primary w-full py-4 text-lg" disabled={!url.trim() || dl !== null} onClick={startDownload}>
-                  {dl !== null ? `Downloading… ${Math.round(dl)}%` : "⬇ Download video"}
+                  {dl !== null ? (dlStage === "info" ? "Getting video info…" : `Downloading… ${Math.round(dl)}%`) : "⬇ Download video"}
                 </button>
               )}
               {dl !== null && <div className="bar"><div style={{ width: `${dl}%` }} /></div>}
