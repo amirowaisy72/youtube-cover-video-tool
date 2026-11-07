@@ -197,6 +197,34 @@ def _run_trim(job_id: str, url: str, start: float, end: float, target: Path) -> 
         _write_job(job)
         return
 
+    # VERIFY the section actually got cut (2026-11-08, user report:
+    # a 0:29–2:06 section downloaded as the full 3:05 video).
+    # yt-dlp's --download-sections is unreliable for some videos /
+    # formats — it silently returns the whole video instead of the
+    # section. If the file is far longer than the requested section,
+    # cut it to the exact range with FFmpeg (re-encode, so the cut
+    # is frame-accurate, not keyframe-limited). If the FFmpeg cut
+    # fails, keep the downloaded file (a long video beats none).
+    if target.exists():
+        import video as _video
+        want_len = end - start
+        got_len = _video.get_duration(target)
+        if got_len is not None and got_len > want_len + 15:
+            cut = target.with_name("section-cut.mp4")
+            ok, _err = _video.run_command([
+                "ffmpeg", "-y", "-i", str(target),
+                "-ss", str(start), "-t", str(want_len),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                "-c:a", "aac", "-movflags", "+faststart",
+                str(cut),
+            ])
+            if ok and cut.exists():
+                cut_dur = _video.get_duration(cut)
+                if cut_dur is not None and abs(cut_dur - want_len) <= 5:
+                    cut.replace(target)
+                else:
+                    cut.unlink(missing_ok=True)
+
     job = _read_job(job_id)
     if target.exists():
         size_mb = round(target.stat().st_size / 1024 / 1024, 1)
