@@ -84,20 +84,25 @@ def search_pixabay(
     page: int = Query(1, ge=1, le=100),
     key: str = Query("", max_length=100),
 ) -> dict:
-    """Search Pixabay music or sound effects (proxied, key never stored)."""
+    """Search Pixabay music or sound effects (proxied, key never stored).
+    BUG FIX 2026-11-08 (user correction — his key IS valid): the old
+    code called /api/music/ and /api/sound-effects/, which DO NOT
+    exist (both return HTTP 404 — verified live). Pixabay's public
+    API has ONE audio endpoint, /api/audio/, serving both music and
+    sound effects; `type` only filters the results by duration
+    (music = long tracks, effects = short clips)."""
     if not key.strip():
         raise HTTPException(
             status_code=400,
             detail="Add your free Pixabay API key first (get one at pixabay.com/api/docs).",
         )
-    endpoint = "music" if type == "music" else "sound-effects"
     params = {
         "key": key.strip(),
         "q": q.strip(),
         "page": str(page),
         "per_page": str(PER_PAGE),
     }
-    url = f"{PIXABAY_BASE}/{endpoint}/?{urllib.parse.urlencode(params)}"
+    url = f"{PIXABAY_BASE}/audio/?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={"User-Agent": "YT-Guru/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
@@ -131,6 +136,21 @@ def search_pixabay(
     hits = data.get("hits", []) if isinstance(data, dict) else []
     results = []
     for h in hits:
+        # The audio endpoint serves both music and SFX; filter by
+        # duration (music = long tracks, effects = short clips).
+        # A `type` field, when present, wins over duration.
+        dur = h.get("duration") or 0
+        hit_type = str(h.get("type") or "").lower()
+        if type == "music":
+            if hit_type and "music" not in hit_type and "song" not in hit_type:
+                continue
+            if not hit_type and dur < 20:
+                continue
+        else:
+            if hit_type and "effect" not in hit_type and "sfx" not in hit_type and "sound" not in hit_type:
+                continue
+            if not hit_type and not (0 < dur <= 10):
+                continue
         if type == "music":
             results.append(
                 {

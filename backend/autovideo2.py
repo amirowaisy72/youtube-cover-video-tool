@@ -329,15 +329,22 @@ def _detect_mood(title: str, script_text: str) -> str:
     return best
 
 
-def _pixabay_search(endpoint: str, query: str, key: str,
+def _pixabay_search(kind: str, query: str, key: str,
                     per_page: int = 10) -> list[dict]:
-    """One Pixabay API search (music or sound-effects). Returns the
-    hits list, or [] on any failure. Key is sent per-request and
-    never stored."""
+    """One Pixabay AUDIO search. Returns the hits list, or [] on
+    any failure. Key is sent per-request and never stored.
+    BUG FIX 2026-11-08 (user correction — his key IS valid): the
+    old code called /api/music/ and /api/sound-effects/, which DO
+    NOT exist (both return HTTP 404 — verified live). Pixabay's
+    public API has ONE audio endpoint, /api/audio/, which serves
+    both music and sound effects; `kind` ("music" or "sfx") only
+    filters the results by duration/type, it is NOT part of the
+    URL. That is why music and SFX were silently missing even
+    with a valid key — every fetch 404'd and returned []."""
     try:
         params = {"key": key.strip(), "q": query.strip(),
                   "page": "1", "per_page": str(per_page)}
-        url = (f"https://pixabay.com/api/{endpoint}/?"
+        url = ("https://pixabay.com/api/audio/?"
                f"{urllib.parse.urlencode(params)}")
         req = urllib.request.Request(
             url, headers={"User-Agent": "YT-Guru/1.0"})
@@ -347,6 +354,26 @@ def _pixabay_search(endpoint: str, query: str, key: str,
         return hits if isinstance(hits, list) else []
     except Exception:
         return []
+
+
+def _is_music_hit(hit: dict) -> bool:
+    """True if an audio hit is a music track (not a sound
+    effect). The audio endpoint serves both; music tracks are
+    long (tens of seconds to minutes), SFX are a few seconds.
+    A `type` field, when present, wins over duration."""
+    t = str(hit.get("type") or "").lower()
+    if t:
+        return "music" in t or "song" in t
+    return (hit.get("duration") or 0) >= 20
+
+
+def _is_sfx_hit(hit: dict) -> bool:
+    """True if an audio hit is a sound effect (not a music
+    track). Short clips; a `type` field, when present, wins."""
+    t = str(hit.get("type") or "").lower()
+    if t:
+        return "effect" in t or "sfx" in t or "sound" in t
+    return 0 < (hit.get("duration") or 0) <= 10
 
 
 def _fetch_mood_music(mood: str, pixabay_key: str | None,
@@ -368,6 +395,8 @@ def _fetch_mood_music(mood: str, pixabay_key: str | None,
         probe = _pixabay_search("music", "a", pixabay_key, per_page=1)
         return None, "no_results" if probe else "key_rejected"
     for hit in hits:
+        if not _is_music_hit(hit):
+            continue
         audio_url = hit.get("audio")
         if not audio_url:
             continue
@@ -396,13 +425,15 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
     for query in _SFX_QUERIES:
         if len(sfx) >= count:
             break
-        hits = _pixabay_search("sound-effects", query, pixabay_key,
+        hits = _pixabay_search("sfx", query, pixabay_key,
                                per_page=5)
         if hits:
             any_hit = True
         # Short sounds first (a transition sound is ~0.5-1s).
         hits.sort(key=lambda h: (h.get("duration") or 99))
         for hit in hits:
+            if not _is_sfx_hit(hit):
+                continue
             audio_url = hit.get("audio")
             if not audio_url or audio_url in seen_urls:
                 continue
@@ -419,7 +450,7 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
     if sfx:
         return sfx, "ok"
     if not any_hit:
-        probe = _pixabay_search("sound-effects", "a", pixabay_key,
+        probe = _pixabay_search("sfx", "a", pixabay_key,
                                 per_page=1)
         return [], "no_results" if probe else "key_rejected"
     return [], "no_results"
