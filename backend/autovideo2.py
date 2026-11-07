@@ -283,6 +283,12 @@ _MOOD_KEYWORDS = {
                  "scary", "thriller", "secret", "hidden", "ghost", "haunted",
                  "fear", "danger", "killer", "detective", "unknown",
                  "paranormal", "curse", "nightmare"],
+    "wonder": ["wonder", "amazing", "incredible", "mind-blowing",
+               "mindblowing", "fascinating", "curious", "curiosity",
+               "discovery", "discover", "explore", "unbelievable",
+               "surprising", "surprise", "awesome", "facts",
+               "did you know", "wow", "strange", "bizarre",
+               "astonishing", "remarkable", "jaw-dropping"],
     "happy": ["happy", "joy", "fun", "celebration", "party", "laugh",
               "comedy", "funny", "cheerful", "bright", "summer", "dance",
               "birthday", "wedding", "festival"],
@@ -299,10 +305,11 @@ _MOOD_KEYWORDS = {
              "sleep", "gentle", "soft", "morning", "rain", "forest",
              "zen", "breeze"],
 }
-# Pixabay Music search query per mood (a mood word alone is too
+# Freesound search query per mood (a mood word alone is too
 # narrow; these return tracks that actually fit the mood).
 _MOOD_MUSIC_QUERY = {
     "suspense": "suspenseful dark tense",
+    "wonder": "wonder curious magical discovery",
     "happy": "happy upbeat cheerful",
     "motivational": "motivational inspiring uplifting",
     "sad": "sad emotional piano",
@@ -317,7 +324,7 @@ _MUSIC_VOLUME = 0.30  # 30% — clearly audible as background music
 # unmistakably there. (2026-11-08, user report: SFX audible,
 # music not heard despite "✓ added".)
 _SFX_VOLUME = 0.5
-# Distinct Pixabay Sound Effects queries — one track per query, so
+# Distinct Freesound queries — one track per query, so
 # the SFX library is genuinely different sounds, not six whooshes.
 _SFX_QUERIES = ["whoosh", "swoosh", "transition", "swipe", "impact",
                 "riser"]
@@ -325,11 +332,19 @@ _SFX_QUERIES = ["whoosh", "swoosh", "transition", "swipe", "impact",
 
 def _detect_mood(title: str, script_text: str) -> str:
     """Keyword mood of the title+script. Falls back to 'calm'
-    (a neutral ambient bed) when nothing matches."""
+    (a neutral ambient bed) when nothing matches.
+    WORD BOUNDARIES (2026-11-08): keywords match whole words
+    only (regex \\b), not substrings — a plain `kw in text`
+    check matched "win" inside "blo**win**g", so "10
+    Mind-Blowing Facts About Our World" was misread as
+    "motivational". It also let a "fun facts" script read as
+    "happy" instead of "wonder"."""
     text = f"{title} {script_text}".lower()
     best, best_count = "calm", 0
     for mood, keywords in _MOOD_KEYWORDS.items():
-        count = sum(1 for kw in keywords if kw in text)
+        count = sum(
+            1 for kw in keywords
+            if re.search(r"\b" + re.escape(kw) + r"\b", text))
         if count > best_count:
             best, best_count = mood, count
     return best
