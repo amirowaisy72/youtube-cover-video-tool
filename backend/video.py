@@ -215,10 +215,13 @@ def detect_green_rect(cover: str | Path) -> dict | None:
     for y in range(sh):
         for x in range(sw):
             r, g, b = px[x, y]
-            # Slightly looser than before: shadowed/darker green at
-            # the bottom of a green screen was previously missed,
-            # leaving a green strip visible under the video.
-            green[y][x] = g > 90 and g - r > 25 and g - b > 25
+            # Loose enough to catch a frame's dim outer border: the
+            # border is often shadowed/darker than the frame's bright
+            # core, and with the old g>90 test the detected box came
+            # out inset, leaving a green strip visible around the
+            # video (user, 2026-11-07). Still requires green clearly
+            # above red and blue, so wood/brown is never green.
+            green[y][x] = g > 70 and g - r > 20 and g - b > 20
     # Largest connected component (4-direction flood fill).
     visited = [[False] * sw for _ in range(sh)]
     best = None
@@ -308,22 +311,49 @@ def green_mask(cover: str | Path) -> "object | None":
 
     gr = ImageChops.subtract(g, r)
     gb = ImageChops.subtract(g, b)
-    mask = ImageChops.logical_and(_thresh(gr, 25).convert("1"),
-                                  _thresh(gb, 25).convert("1"))
-    mask = ImageChops.logical_and(mask, _thresh(g, 90).convert("1"))
+    # Same loose green test as detect_green_rect, so the mask and the
+    # detected rectangle agree about what counts as green (a frame's
+    # dim outer border included — user, 2026-11-07).
+    mask = ImageChops.logical_and(_thresh(gr, 20).convert("1"),
+                                  _thresh(gb, 20).convert("1"))
+    mask = ImageChops.logical_and(mask, _thresh(g, 70).convert("1"))
     mask = mask.convert("L")
-    bbox = mask.getbbox()
-    if bbox:
-        # Analyse on a small copy for speed; the frame test only
-        # needs border vs interior coverage, not exact pixels.
-        scale = min(1.0, 320 / max(mask.size))
-        small = mask.resize((max(1, int(mask.size[0] * scale)),
-                             max(1, int(mask.size[1] * scale))))
-        sx0 = int(bbox[0] * scale); sy0 = int(bbox[1] * scale)
-        sx1 = int(bbox[2] * scale); sy1 = int(bbox[3] * scale)
-        spx = small.load()
-        sw, sh = small.size
-        sx1 = min(sx1, sw - 1); sy1 = min(sy1, sh - 1)
+    # Frame test on the LARGEST green component's box, NOT on the box
+    # of ALL green pixels: a stray green object elsewhere in the
+    # photo (e.g. a plant) stretches the all-green box, so the
+    # frame's border no longer looks mostly green and the frame is
+    # missed — the video then shows only as thin strips (user,
+    # 2026-11-07). Analyse on a small copy for speed; the frame test
+    # only needs border vs interior coverage, not exact pixels.
+    scale = min(1.0, 320 / max(mask.size))
+    small = mask.resize((max(1, int(mask.size[0] * scale)),
+                         max(1, int(mask.size[1] * scale))))
+    spx = small.load()
+    sw, sh = small.size
+    visited = [[False] * sw for _ in range(sh)]
+    best = None
+    for sy in range(sh):
+        for sx in range(sw):
+            if spx[sx, sy] <= 0 or visited[sy][sx]:
+                continue
+            stack = [(sx, sy)]
+            visited[sy][sx] = True
+            minx = maxx = sx
+            miny = maxy = sy
+            count = 0
+            while stack:
+                cx, cy = stack.pop()
+                count += 1
+                minx, maxx = min(minx, cx), max(maxx, cx)
+                miny, maxy = min(miny, cy), max(maxy, cy)
+                for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+                    if 0 <= nx < sw and 0 <= ny < sh and spx[nx, ny] > 0 and not visited[ny][nx]:
+                        visited[ny][nx] = True
+                        stack.append((nx, ny))
+            if best is None or count > best[0]:
+                best = (count, minx, miny, maxx, maxy)
+    if best is not None:
+        _, sx0, sy0, sx1, sy1 = best
         border_hit = border_n = 0
         for xx in range(sx0, sx1 + 1):
             for yy in (sy0, sy1):
@@ -342,7 +372,9 @@ def green_mask(cover: str | Path) -> "object | None":
         interior_cov = interior_hit / interior_n if interior_n else 0
         if border_cov >= 0.5 and interior_cov < 0.5:
             filled = Image.new("L", mask.size, 0)
-            ImageDraw.Draw(filled).rectangle(bbox, fill=255)
+            ImageDraw.Draw(filled).rectangle(
+                (int(sx0 / scale), int(sy0 / scale),
+                 int((sx1 + 1) / scale), int((sy1 + 1) / scale)), fill=255)
             return filled
     return mask
 
