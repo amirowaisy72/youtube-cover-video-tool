@@ -300,15 +300,24 @@ def _yt_dlp_download_opts(outtmpl: str, hook, attempt: int = 1) -> dict:
     the work in the first place. A reset usually comes from
     YouTube closing one of many parallel DASH fragment
     connections, so later attempts deliberately get MORE
-    stable, not just repeated: attempt 1 is fast (8 fragments),
-    attempt 2 halves parallel fragments, attempts 3+ switch to
-    a single progressive file (one connection, no fragment
-    merge at all). Combined with yt-dlp's own 10 fragment
-    retries and the caller's outer retries, a single reset —
-    or even several — resumes instead of failing the video.
+    stable, not just repeated: attempt 2 halves parallel
+    fragments; attempts 3+ switch to a single progressive file
+    (one connection, no fragment merge at all). Combined with
+    yt-dlp's own 10 fragment retries and the caller's outer
+    retries, a single reset — or even several — resumes instead
+    of failing the video.
+
+    Speed (user, 2026-11-07): a 2-minute video took 5-7 minutes
+    to download, while other downloaders take seconds. The DASH
+    path (separate video+audio fragments) is what stalls: each
+    fragment connection is throttled and retries drag it out.
+    Attempt 1 now prefers a SINGLE progressive file (one
+    connection, full speed, no merge) — the format other
+    downloaders use — and falls back to DASH only when no
+    progressive file exists.
     """
     if attempt <= 1:
-        fmt = "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b"
+        fmt = "b[height<=720][ext=mp4]/b[height<=720]/bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b"
         fragments = 8
     elif attempt == 2:
         fmt = "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b"
@@ -686,7 +695,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
         for _attempt in range(1, 4):
             cmd = [
                 "yt-dlp",
-                "-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+                "-f", "b[height<=720][ext=mp4]/b[height<=720]/bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
                 "--merge-output-format", "mp4",
                 "--concurrent-fragments", "8",
                 "--no-playlist",

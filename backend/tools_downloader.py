@@ -195,7 +195,10 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
         }
     else:
         opts = {
-            "format": "bv*+ba/b",
+            # Best quality, progressive single file first (fast,
+            # one connection — same reason as Tool 1, user 2026-11-07),
+            # DASH only when no progressive file exists.
+            "format": "b[ext=mp4]/b/bv*+ba/b",
             "merge_output_format": "mp4",
             "outtmpl": str(target),
             "progress_hooks": [hook],
