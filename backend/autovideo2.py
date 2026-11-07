@@ -309,7 +309,7 @@ _MOOD_KEYWORDS = {
 # narrow; these return tracks that actually fit the mood).
 _MOOD_MUSIC_QUERY = {
     "suspense": "suspenseful dark tense",
-    "wonder": "wonder curious magical discovery",
+    "wonder": "wonder magical",
     "happy": "happy upbeat cheerful",
     "motivational": "motivational inspiring uplifting",
     "sad": "sad emotional piano",
@@ -323,7 +323,10 @@ _MUSIC_VOLUME = 0.30  # 30% — clearly audible as background music
 # bed level: the voice (100%) still dominates, but the music is
 # unmistakably there. (2026-11-08, user report: SFX audible,
 # music not heard despite "✓ added".)
-_SFX_VOLUME = 0.5
+_SFX_VOLUME = 0.8  # Was 0.5: the user heard only ONE transition
+# sound in a video with 4 SFX — Freesound preview levels vary
+# wildly, so quiet tracks were inaudible. 0.8 plus loudnorm
+# (below) makes every transition sound clearly audible.
 # Distinct Freesound queries — one track per query, so
 # the SFX library is genuinely different sounds, not six whooshes.
 _SFX_QUERIES = ["whoosh", "swoosh", "transition", "swipe", "impact",
@@ -419,26 +422,34 @@ def _fetch_mood_music(mood: str, freesound_key: str | None,
     is wrong" — the same applies here). Never raises."""
     if not freesound_key or not freesound_key.strip():
         return None, "no_key"
-    query = _MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient")
-    hits, status = _freesound_search(query, freesound_key)
-    if status == "auth":
-        return None, "key_rejected"
-    if status == "error":
-        return None, "unreachable"
-    if not hits:
-        return None, "no_results"
-    for hit in hits:
-        if not _is_music_hit(hit):
+    # Try the mood query first, then broader fallbacks — a
+    # 4-word mood query can return nothing on Freesound even
+    # though matching tracks exist (2026-11-08: "wonder curious
+    # magical discovery" found nothing, so the video had no
+    # music at all). The fallbacks are generic enough to almost
+    # always return a long track.
+    queries = [_MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient"),
+               "ambient cinematic", "cinematic"]
+    for query in queries:
+        hits, status = _freesound_search(query, freesound_key)
+        if status == "auth":
+            return None, "key_rejected"
+        if status == "error":
             continue
-        audio_url = _freesound_preview_url(hit)
-        if not audio_url:
+        if not hits:
             continue
-        dest = work_dir / "mood-music.mp3"
-        try:
-            if autovideo._download(audio_url, dest):
-                return dest, "ok"
-        except Exception:
-            continue
+        for hit in hits:
+            if not _is_music_hit(hit):
+                continue
+            audio_url = _freesound_preview_url(hit)
+            if not audio_url:
+                continue
+            dest = work_dir / "mood-music.mp3"
+            try:
+                if autovideo._download(audio_url, dest):
+                    return dest, "ok"
+            except Exception:
+                continue
     return None, "no_results"
 
 
@@ -1089,8 +1100,16 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         for i, bt in enumerate(boundary_times):
             src = i % len(sfx_paths)
             ms = int(bt * 1000)
+            # loudnorm (2026-11-08): Freesound preview levels
+            # vary wildly — a quiet whoosh at 0.5 volume is
+            # inaudible (the user heard only 1 of 4 sounds).
+            # Normalising each SFX to -16 LUFS before the volume
+            # makes every transition sound clearly audible.
+            # ORDER MATTERS: loudnorm must come BEFORE adelay —
+            # after adelay it measures the leading silence too
+            # and under-boosts (a 5s-delayed SFX stayed quiet).
             parts.append(
-                f"[{src}:a]adelay={ms}|{ms},volume={_SFX_VOLUME}[s{i}]")
+                f"[{src}:a]loudnorm=I=-16:TP=-1.5:LRA=11,volume={_SFX_VOLUME},adelay={ms}|{ms}[s{i}]")
             labels.append(f"[s{i}]")
         n_inputs = len(boundary_times) + 1
         sfx_cmd += ["-filter_complex",
