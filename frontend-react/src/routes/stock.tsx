@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, validateStockKey } from "@/lib/api";
 import { getPexelsKey, getPixabayKey, setPexelsKey as savePexelsKey, setPixabayKey as savePixabayKey } from "@/lib/keys";
 
 export const Route = createFileRoute("/stock")({
@@ -29,6 +29,11 @@ function Stock() {
   const [pixabayKey, setPixabayKey] = useState("");
   const [pexelsKey, setPexelsKey] = useState("");
   const [keySaved, setKeySaved] = useState(false);
+  // Key validation result (user, 2026-11-08): a wrong key must
+  // be caught when it is saved, not weeks later when videos
+  // silently miss the stock footage.
+  const [keyStatus, setKeyStatus] = useState<{ kind: "checking" | "valid" | "invalid" | "unreachable"; text: string } | null>(null);
+  const [keyChecking, setKeyChecking] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -48,13 +53,46 @@ function Stock() {
     if (source === "pixabay") setPixabayKey(v);
     else setPexelsKey(v);
     setKeySaved(false);
+    setKeyStatus(null);
   };
 
-  const saveKey = () => {
-    if (source === "pixabay") savePixabayKey(pixabayKey);
-    else savePexelsKey(pexelsKey);
-    setKeySaved(true);
+  const saveKey = async () => {
+    const key = activeKey.trim();
+    if (!key) return;
+    setKeyChecking(true);
+    setKeySaved(false);
+    setKeyStatus({ kind: "checking", text: "Checking the key with the provider…" });
     setError("");
+    try {
+      const res = await validateStockKey(source, key);
+      if (res.valid) {
+        if (source === "pixabay") savePixabayKey(key);
+        else savePexelsKey(key);
+        setKeySaved(true);
+        setKeyStatus({ kind: "valid", text: "✓ Key is valid and saved in your browser." });
+      } else if (res.reason === "invalid") {
+        // Wrong key: do NOT save it — saving a bad key would
+        // only make every later search (and Auto Video build)
+        // silently miss the stock footage.
+        setKeyStatus({ kind: "invalid", text: "✗ " + (res.detail || "This key was rejected — it is wrong or revoked. Copy it exactly from the provider's API page and try again.") });
+      } else {
+        // Could not check (network / rate limit / provider down):
+        // save it anyway, but tell the user to test with a search.
+        if (source === "pixabay") savePixabayKey(key);
+        else savePexelsKey(key);
+        setKeySaved(true);
+        setKeyStatus({ kind: "unreachable", text: "⚠ Key saved, but it could not be verified right now (" + (res.detail || "provider unreachable") + "). Do a test search below to confirm it works." });
+      }
+    } catch {
+      // Validation request itself failed (server down): save
+      // anyway and tell the user to test with a search.
+      if (source === "pixabay") savePixabayKey(key);
+      else savePexelsKey(key);
+      setKeySaved(true);
+      setKeyStatus({ kind: "unreachable", text: "⚠ Key saved, but it could not be verified right now. Do a test search below to confirm it works." });
+    } finally {
+      setKeyChecking(false);
+    }
   };
 
   const doSearch = async (p: number) => {
@@ -134,9 +172,13 @@ function Stock() {
             onChange={(e) => setActiveKey(e.target.value)}
             placeholder={source === "pixabay" ? "Paste your Pixabay API key here" : "Paste your Pexels API key here"}
           />
-          <button className="btn btn-primary" disabled={!activeKey.trim()} onClick={saveKey}>Save key</button>
+          <button className="btn btn-primary" disabled={!activeKey.trim() || keyChecking} onClick={() => void saveKey()}>{keyChecking ? "Checking…" : "Save key"}</button>
         </div>
-        {keySaved && <p className="text-sm text-success">✓ Key saved in your browser.</p>}
+        {keyStatus && (
+          <p className={`text-sm ${keyStatus.kind === "valid" ? "text-success" : keyStatus.kind === "invalid" ? "text-destructive" : "text-amber"}`}>
+            {keyStatus.text}
+          </p>
+        )}
       </div>
 
       <div className="glass space-y-4 p-6">

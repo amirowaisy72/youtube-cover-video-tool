@@ -22,6 +22,7 @@ import urllib.parse
 import urllib.request
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/stock")
 
@@ -155,6 +156,57 @@ def _search_pexels(q: str, page: int, key: str) -> dict:
     total = int(data.get("total_results") or 0)
     total_pages = max(1, -(-total // PER_PAGE)) if total else 1
     return {"results": results, "page": page, "total_pages": total_pages}
+
+
+class ValidateRequest(BaseModel):
+    source: str  # pixabay | pexels
+    key: str
+
+
+@router.post("/validate")
+def validate_key(payload: ValidateRequest) -> dict:
+    """Test an API key with ONE tiny request, so the user knows
+    immediately if the key is wrong. Without this, a wrong key
+    fails silently: the Stock search shows an error only when
+    you search, and Auto Video just falls back to Commons with
+    no warning at all — so a bad key can sit there for weeks
+    while every video quietly misses the stock footage.
+    Returns {valid, reason, detail}:
+      valid=true  -> the provider accepted the key.
+      valid=false, reason='invalid' -> the provider rejected
+        the key (401/403): it is wrong or revoked.
+      valid=false, reason='unreachable' -> could not check
+        (network, rate limit, provider down): the key might
+        still be fine, so the caller should save it anyway and
+        tell the user to test with a search."""
+    source = payload.source.lower()
+    key = (payload.key or "").strip()
+    if source not in ("pixabay", "pexels"):
+        return {"valid": False, "reason": "invalid",
+                "detail": "Unknown source — pick Pixabay or Pexels."}
+    if not key:
+        return {"valid": False, "reason": "invalid",
+                "detail": "Paste a key first."}
+    try:
+        if source == "pixabay":
+            url = (f"{PIXABAY_VIDEOS_BASE}?"
+                   f"{urllib.parse.urlencode({'key': key, 'q': 'test', 'per_page': '3'})}")
+            _get_json(url)
+        else:
+            url = (f"{PEXELS_SEARCH_BASE}?"
+                   f"{urllib.parse.urlencode({'query': 'test', 'page': '1', 'per_page': '1'})}")
+            _get_json(url, headers={"Authorization": key})
+    except HTTPException as e:
+        if e.status_code == 400:
+            return {"valid": False, "reason": "invalid",
+                    "detail": "The provider rejected this key — it is wrong or revoked. Copy it exactly from the provider's API page and try again."}
+        return {"valid": False, "reason": "unreachable",
+                "detail": e.detail or "Could not reach the provider."}
+    except Exception:
+        return {"valid": False, "reason": "unreachable",
+                "detail": "Could not reach the provider. Check your connection."}
+    return {"valid": True, "reason": "ok",
+            "detail": "Key accepted by the provider."}
 
 
 @router.get("/search")

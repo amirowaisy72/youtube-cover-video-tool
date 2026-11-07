@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene } from "@/lib/api";
+import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene, validateStockKey } from "@/lib/api";
 import { getPexelsKey, getPixabayKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -55,6 +55,30 @@ function AutoVideo() {
   // connects it everywhere, and vice versa. Empty = Commons only.
   const [pexelsKey, setPexelsKeyState] = useState("");
   const [pixabayKey, setPixabayKeyState] = useState("");
+  // Key validation (user, 2026-11-08): a wrong key must be
+  // caught here, not weeks later when videos silently miss
+  // the stock footage and fall back to Commons.
+  const [keyTest, setKeyTest] = useState<string | null>(null);
+  const [keyTesting, setKeyTesting] = useState(false);
+
+  const testKeys = async () => {
+    setKeyTesting(true);
+    setKeyTest(null);
+    const parts: string[] = [];
+    for (const [label, source, key] of [["Pexels", "pexels", pexelsKey], ["Pixabay", "pixabay", pixabayKey]] as const) {
+      if (!key.trim()) { parts.push(`${label}: — (no key)`); continue; }
+      try {
+        const res = await validateStockKey(source, key.trim());
+        if (res.valid) parts.push(`${label}: ✓ valid`);
+        else if (res.reason === "invalid") parts.push(`${label}: ✗ invalid — wrong or revoked key`);
+        else parts.push(`${label}: ⚠ could not verify right now`);
+      } catch {
+        parts.push(`${label}: ⚠ could not verify right now`);
+      }
+    }
+    setKeyTest(parts.join(" · "));
+    setKeyTesting(false);
+  };
   const [phase, setPhase] = useState<"form" | "build" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -213,6 +237,12 @@ function AutoVideo() {
               />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Free keys: pexels.com/api · pixabay.com/api/docs — stored only in this browser.</p>
+            <div className="mt-3 flex items-center gap-3">
+              <button type="button" className="btn btn-ghost btn-sm" disabled={keyTesting || (!pexelsKey.trim() && !pixabayKey.trim())} onClick={() => void testKeys()}>
+                {keyTesting ? "Testing…" : "🔑 Test my keys"}
+              </button>
+              {keyTest && <span className="text-sm text-muted-foreground">{keyTest}</span>}
+            </div>
           </div>
           <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim()} onClick={() => void start()}>🚀 Build my video</button>
           {error && <p className="text-sm text-destructive">{error}</p>}

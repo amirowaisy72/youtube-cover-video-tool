@@ -346,6 +346,17 @@ export const autovideoCreate = (title: string, minutes: number, voice: string, s
 
 export const autovideoJob = (jobId: string) => api<AvJob>(`/api/autovideo/${jobId}`);
 
+/** Test a stock-media API key (Pixabay / Pexels) with one tiny
+    request, so a wrong key is caught when it is saved — not
+    weeks later when videos silently miss the stock footage. */
+export type StockKeyValidation = { valid: boolean; reason: string; detail: string };
+export const validateStockKey = (source: "pixabay" | "pexels", key: string) =>
+  api<StockKeyValidation>("/api/stock/validate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source, key }),
+  });
+
 // ----------------------------------------------------------------- license
 export const licenseStatus = () => api<LicenseStatus>("/api/license/status");
 
