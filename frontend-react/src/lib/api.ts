@@ -337,11 +337,11 @@ export const ttsGenerate = (text: string, voice: string, rate: string) =>
   });
 
 // -------------------------------------------------------------- auto video
-export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "") =>
+export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "", music = true, transitions = true) =>
   api<{ job_id: string; status: string }>("/api/autovideo", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null }),
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, music, transitions }),
   });
 
 export const autovideoJob = (jobId: string) => api<AvJob>(`/api/autovideo/${jobId}`);

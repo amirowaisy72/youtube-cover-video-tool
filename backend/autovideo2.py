@@ -48,6 +48,7 @@ import re
 import subprocess
 import threading
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 import autovideo
@@ -267,6 +268,156 @@ def _srt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+# ---------------------------------------------------------------------------
+# Mood music + transition SFX (2026-11-08, user request)
+# ---------------------------------------------------------------------------
+# Background music matched to the script's mood (suspense -> a tense
+# track, happy -> an upbeat one...), mixed low (10-15%) under the
+# voiceover, and DIFFERENT transition sounds per scene change so the
+# audience never hears the same whoosh twice. Both come from Pixabay
+# (Music + Sound Effects APIs, free, same key the Stock/Music tools
+# already use). No key -> music/SFX are skipped, the video still
+# builds. Music/SFX fetch NEVER breaks a build (all failures -> None).
+_MOOD_KEYWORDS = {
+    "suspense": ["suspense", "mystery", "murder", "crime", "dark", "horror",
+                 "scary", "thriller", "secret", "hidden", "ghost", "haunted",
+                 "fear", "danger", "killer", "detective", "unknown",
+                 "paranormal", "curse", "nightmare"],
+    "happy": ["happy", "joy", "fun", "celebration", "party", "laugh",
+              "comedy", "funny", "cheerful", "bright", "summer", "dance",
+              "birthday", "wedding", "festival"],
+    "motivational": ["motivation", "success", "inspire", "dream", "goal",
+                     "achieve", "win", "champion", "hustle", "grind",
+                     "focus", "discipline", "mindset", "growth", "believe"],
+    "sad": ["sad", "loss", "grief", "heartbreak", "lonely", "goodbye",
+            "tears", "pain", "sorrow", "broken", "death", "farewell",
+            "alone", "miss"],
+    "epic": ["epic", "war", "battle", "hero", "legend", "warrior",
+             "empire", "kingdom", "glory", "victory", "adventure",
+             "quest", "myth", "dragon"],
+    "calm": ["calm", "peace", "nature", "ocean", "relax", "meditation",
+             "sleep", "gentle", "soft", "morning", "rain", "forest",
+             "zen", "breeze"],
+}
+# Pixabay Music search query per mood (a mood word alone is too
+# narrow; these return tracks that actually fit the mood).
+_MOOD_MUSIC_QUERY = {
+    "suspense": "suspenseful dark tense",
+    "happy": "happy upbeat cheerful",
+    "motivational": "motivational inspiring uplifting",
+    "sad": "sad emotional piano",
+    "epic": "epic cinematic orchestral",
+    "calm": "calm relaxing ambient",
+}
+_MUSIC_VOLUME = 0.12  # 12% — low enough that the voice stays clear.
+_SFX_VOLUME = 0.5
+# Distinct Pixabay Sound Effects queries — one track per query, so
+# the SFX library is genuinely different sounds, not six whooshes.
+_SFX_QUERIES = ["whoosh", "swoosh", "transition", "swipe", "impact",
+                "riser"]
+
+
+def _detect_mood(title: str, script_text: str) -> str:
+    """Keyword mood of the title+script. Falls back to 'calm'
+    (a neutral ambient bed) when nothing matches."""
+    text = f"{title} {script_text}".lower()
+    best, best_count = "calm", 0
+    for mood, keywords in _MOOD_KEYWORDS.items():
+        count = sum(1 for kw in keywords if kw in text)
+        if count > best_count:
+            best, best_count = mood, count
+    return best
+
+
+def _pixabay_search(endpoint: str, query: str, key: str,
+                    per_page: int = 10) -> list[dict]:
+    """One Pixabay API search (music or sound-effects). Returns the
+    hits list, or [] on any failure. Key is sent per-request and
+    never stored."""
+    try:
+        params = {"key": key.strip(), "q": query.strip(),
+                  "page": "1", "per_page": str(per_page)}
+        url = (f"https://pixabay.com/api/{endpoint}/?"
+               f"{urllib.parse.urlencode(params)}")
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "YT-Guru/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        hits = data.get("hits", [])
+        return hits if isinstance(hits, list) else []
+    except Exception:
+        return []
+
+
+def _fetch_mood_music(mood: str, pixabay_key: str | None,
+                      work_dir: Path) -> Path | None:
+    """Download a royalty-free background track matching the mood
+    from Pixabay Music. Returns the mp3 path, or None (no key, no
+    result, download failed). Never raises."""
+    if not pixabay_key or not pixabay_key.strip():
+        return None
+    query = _MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient")
+    for hit in _pixabay_search("music", query, pixabay_key):
+        audio_url = hit.get("audio")
+        if not audio_url:
+            continue
+        dest = work_dir / "mood-music.mp3"
+        try:
+            if autovideo._download(audio_url, dest):
+                return dest
+        except Exception:
+            continue
+    return None
+
+
+def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
+                          count: int = 6) -> list[Path]:
+    """Download DISTINCT royalty-free transition sounds from
+    Pixabay Sound Effects — one per query, so the library is
+    genuinely different sounds. Returns up to `count` mp3 paths
+    (short ones preferred, < 2s), or [] (no key / no results).
+    Never raises."""
+    if not pixabay_key or not pixabay_key.strip():
+        return []
+    sfx: list[Path] = []
+    seen_urls: set[str] = set()
+    for query in _SFX_QUERIES:
+        if len(sfx) >= count:
+            break
+        hits = _pixabay_search("sound-effects", query, pixabay_key,
+                               per_page=5)
+        # Short sounds first (a transition sound is ~0.5-1s).
+        hits.sort(key=lambda h: (h.get("duration") or 99))
+        for hit in hits:
+            audio_url = hit.get("audio")
+            if not audio_url or audio_url in seen_urls:
+                continue
+            if (hit.get("duration") or 0) > 3:
+                continue
+            dest = work_dir / f"sfx-{len(sfx)}.mp3"
+            try:
+                if autovideo._download(audio_url, dest):
+                    sfx.append(dest)
+                    seen_urls.add(audio_url)
+                    break  # one track per query -> distinct sounds
+            except Exception:
+                continue
+    return sfx
+
+
+# Visual transitions (xfade, 2026-11-08): a different transition
+# style at every scene boundary, rotating so no two consecutive
+# boundaries look the same. These are FFmpeg xfade transition
+# names. The join re-encodes (stream copy cannot crossfade); if
+# the xfade join fails, run_master falls back to the stream-copy
+# concat (segments keep their first/last fade, middle boundaries
+# become hard cuts — the video still builds).
+_TRANSITION_SEC = 0.5
+_TRANSITION_TYPES = ["fade", "wipeleft", "wiperight", "slideleft",
+                     "slideright", "circleopen", "fadeblack",
+                     "fadewhite", "dissolve", "pixelize"]
+
+
 def _words_to_srt(words: list[dict]) -> str:
     """Word-level timestamps -> SRT cues, YouTube-caption style:
     short phrases (up to 5 words, ~2 seconds each) that change
@@ -405,7 +556,9 @@ _SUBTITLE_STYLE = (
 
 def _segment_scene_image(image_path: Path, caption: str, duration: float,
                          dest: Path, pan_right: bool,
-                         subtitles_srt: Path | None = None) -> bool:
+                         subtitles_srt: Path | None = None,
+                         fade_in: bool = True,
+                         fade_out: bool = True) -> bool:
     """Still image -> moving segment: slow horizontal pan
     (so a photo feels like video) + fade in/out + caption.
     When subtitles_srt is given, the live word-by-word captions
@@ -439,9 +592,20 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
             f"subtitles='{subtitles_srt.name}':"
             f"force_style='{_SUBTITLE_STYLE}',"
         )
-    vf += (
-        f"fade=t=in:st=0:d=0.5,fade=t=out:st={max(duration - 0.5, 0)}:d=0.5"
-    )
+    # Fades: with xfade transitions the join IS the transition,
+    # so middle scenes have no fade (first scene fades in, last
+    # fades out). When fade_in/out are off, the segment is a hard
+    # cut at that end — the xfade still blends it in the join.
+    fade_parts = []
+    if fade_in:
+        fade_parts.append("fade=t=in:st=0:d=0.5")
+    if fade_out:
+        fade_parts.append(
+            f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
+    if fade_parts:
+        vf += ",".join(fade_parts)
+    else:
+        vf = vf.rstrip(",")
     cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(shown),
            "-vf", vf, "-r", "30", "-t", str(duration),
            "-c:v", "libx264", "-preset", "veryfast",
@@ -458,7 +622,9 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
 
 
 def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
-                        dest: Path, subtitles_srt: Path | None = None) -> bool:
+                        dest: Path, subtitles_srt: Path | None = None,
+                        fade_in: bool = True,
+                        fade_out: bool = True) -> bool:
     """Clip -> scene segment, with the scene's caption burned
     in as a bottom bar (same first-sentence caption as image
     scenes, via drawtext + a text file so punctuation in the
@@ -495,20 +661,30 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
             run_kwargs["cwd"] = str(dest.parent)
         return subprocess.run(cmd, capture_output=True, text=True, **run_kwargs).returncode == 0
 
-    fade = (f"fade=t=in:st=0:d=0.5,"
+    # Fades: with xfade transitions the join IS the transition,
+    # so middle scenes have no fade (first scene fades in, last
+    # fades out). `fade` is empty when both are off; `fade_sfx`
+    # is the ",fade..." suffix used to append it to a vf chain.
+    fade_parts = []
+    if fade_in:
+        fade_parts.append("fade=t=in:st=0:d=0.5")
+    if fade_out:
+        fade_parts.append(
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
+    fade = ",".join(fade_parts)
+    fade_sfx = f",{fade}" if fade else ""
     if subtitles_srt is not None:
         subtitled_vf = (
             f"{base_vf},"
             f"subtitles='{subtitles_srt.name}':"
-            f"force_style='{_SUBTITLE_STYLE}',"
-            f"{fade}"
+            f"force_style='{_SUBTITLE_STYLE}'"
+            f"{fade_sfx}"
         )
         if _encode(subtitled_vf):
             return True
         # Subtitled encode failed: fall through to the plain
         # segment below rather than losing the scene.
-        return _encode(f"{base_vf},{fade}")
+        return _encode(f"{base_vf}{fade_sfx}")
     caption_file = None
     font = _find_font()
     if caption and font:
@@ -521,8 +697,8 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
                 f"{base_vf},"
                 f"drawtext=fontfile={font}:textfile={caption_file}:"
                 "fontsize=28:fontcolor=white:box=1:boxcolor=black@0.75:"
-                "boxborderw=18:x=(w-text_w)/2:y=h-90,"
-                f"{fade}"
+                "boxborderw=18:x=(w-text_w)/2:y=h-90"
+                f"{fade_sfx}"
             )
             if _encode(captioned_vf):
                 caption_file.unlink(missing_ok=True)
@@ -531,14 +707,16 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
             # plain segment below rather than losing the scene.
     if caption_file is not None:
         caption_file.unlink(missing_ok=True)
-    return _encode(f"{base_vf},{fade}")
+    return _encode(f"{base_vf}{fade_sfx}")
 
 
 def _build_scene(index: int, scene: dict, title: str, visuals: str,
                  voice: str, work_dir: Path, used_urls: set, lock,
                  expressive: bool = True, subtitles: bool = True,
                  pexels_key: str | None = None,
-                 pixabay_key: str | None = None) -> dict | None:
+                 pixabay_key: str | None = None,
+                 total_scenes: int = 1,
+                 transition_sec: float = _TRANSITION_SEC) -> dict | None:
     """Build ONE scene: its voiceover, its visual, its encoded
     segment. Scenes are independent until the final join, so
     this runs in a worker thread. Returns the scene's report +
@@ -569,20 +747,32 @@ def _build_scene(index: int, scene: dict, title: str, visuals: str,
     if subtitles:
         subtitles_srt = _transcribe_scene_voice(voice_path, work_dir, index)
     dest = work_dir / f"master-seg-{index:02d}.mp4"
+    # Visual transitions (xfade, 2026-11-08): every segment except
+    # the last is `transition_sec` LONGER than its voice, so the
+    # xfade overlap eats exactly that extra time and the joined
+    # video lands on exactly the voiceover length. The join IS the
+    # transition, so middle scenes have no fade (first fades in,
+    # last fades out); the xfade chain blends the boundaries.
+    is_last = index >= total_scenes - 1
+    seg_duration = duration if is_last else duration + transition_sec
+    fade_in = index == 0
+    fade_out = is_last
     if kind == "clip":
-        ok = _segment_scene_clip(visual_path, caption, duration, dest,
-                                 subtitles_srt=subtitles_srt)
+        ok = _segment_scene_clip(visual_path, caption, seg_duration,
+                                 dest, subtitles_srt=subtitles_srt,
+                                 fade_in=fade_in, fade_out=fade_out)
     else:
-        ok = _segment_scene_image(visual_path, caption, duration,
+        ok = _segment_scene_image(visual_path, caption, seg_duration,
                                   dest, pan_right=(index % 2 == 0),
-                                  subtitles_srt=subtitles_srt)
+                                  subtitles_srt=subtitles_srt,
+                                  fade_in=fade_in, fade_out=fade_out)
     if not ok:
         # Segment encode failed: fall back to the old plain
         # segment builders for this scene.
         if kind == "clip":
-            ok = autovideo._segment_clip(visual_path, dest, duration)
+            ok = autovideo._segment_clip(visual_path, dest, seg_duration)
         else:
-            ok = autovideo._segment_image(visual_path, dest, duration)
+            ok = autovideo._segment_image(visual_path, dest, seg_duration)
     if not ok:
         return None
     return {
@@ -604,7 +794,9 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
                work_dir: Path, expressive: bool = True,
                progress_cb=None, subtitles: bool = True,
                pexels_key: str | None = None,
-               pixabay_key: str | None = None) -> dict:
+               pixabay_key: str | None = None,
+               music: bool = True,
+               transitions: bool = True) -> dict:
     """Build a scene-based video. Returns a report dict with
     final_path, script, scenes, durations and counts. Every
     failure inside a scene falls back to the next option;
@@ -619,7 +811,17 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     COPY (segments are already 1280x720 yuv420p), not a second
     full re-encode. progress_cb(done, total, stage) reports
     real per-scene progress, so the bar no longer sits at 10%
-    for the whole build."""
+    for the whole build.
+
+    TRANSITIONS + MOOD MUSIC (2026-11-08): when `transitions`
+    is on, the join is an xfade chain (a different transition
+    style at every boundary, rotating) instead of a stream copy
+    — the segments are built voice+0.5s so the overlap lands on
+    exactly the voiceover length. When `music` is on and the
+    user has a Pixabay key, a mood-matched royalty-free track
+    plays low under the voiceover, and a different Pixabay
+    sound effect plays at each scene change. Music/SFX fetch
+    never breaks a build (no key / no result -> skipped)."""
     import os
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -640,7 +842,8 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         futures = {
             pool.submit(_build_scene, index, scene, title, visuals,
                         voice, work_dir, used_urls, lock, expressive,
-                        subtitles, pexels_key, pixabay_key): index
+                        subtitles, pexels_key, pixabay_key,
+                        len(scenes), _TRANSITION_SEC): index
             for index, scene in enumerate(scenes)
         }
         done = 0
@@ -668,38 +871,94 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         "duration_sec": item["duration_sec"],
     } for item in ordered]
     engine = ordered[0]["engine"]
+    # Mood music + transition SFX (2026-11-08): detect the mood
+    # from the title + script, fetch a matching Pixabay music
+    # track and several distinct Pixabay sound effects (user's
+    # Pixabay key). No key / no result / any failure -> music
+    # and SFX are skipped, the video still builds. Fetching
+    # happens here (after the scenes) so it never slows the
+    # parallel scene build.
+    script_text = "\n\n".join(s["narration"] for s in scenes)
+    mood = _detect_mood(title, script_text)
+    music_path: Path | None = None
+    sfx_paths: list[Path] = []
+    if music:
+        music_path = _fetch_mood_music(mood, pixabay_key, work_dir)
+    if transitions:
+        sfx_paths = _fetch_transition_sfx(pixabay_key, work_dir)
     # Join scene segments, then mux the joined voiceover.
-    list_file = work_dir / "master-concat.txt"
-    list_file.write_text(
-        "".join(f"file '{seg.resolve()}'\n" for seg in segments),
-        encoding="utf-8")
     video_only = work_dir / "master-video-only.mp4"
-    # Segments are already 1280x720 yuv420p libx264 at 30fps, so
-    # a stream copy joins them with NO re-encode — the old code
-    # re-encoded the whole video a second time, which for a
-    # 20-minute video was 20 minutes of encoding wasted. If the
-    # copy join ever produces a bad/short file (mixed segment
-    # parameters), fall back to the re-encode.
     joined_ok = False
-    proc = subprocess.run(
-        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
-         "-c:v", "copy", str(video_only)],
-        capture_output=True, text=True, **video_module.no_window_kwargs())
-    if proc.returncode == 0 and video_only.exists():
-        joined_dur = video_module.get_duration(video_only) or 0
-        if joined_dur >= total_voice * 0.9:
-            joined_ok = True
+    if transitions and len(segments) > 1:
+        # Xfade join: a DIFFERENT transition style at every
+        # boundary, rotating through _TRANSITION_TYPES. Each
+        # segment is voice+0.5s (except the last), so the 0.5s
+        # overlap lands the joined video on exactly the
+        # voiceover length. The xfade offset for boundary k is
+        # the cumulative voice duration up to scene k.
+        # (Segments are 1280x720 yuv420p libx264 at 30fps, so
+        # the xfade re-encode is one pass, preset veryfast.)
+        voice_durs = [item["duration"] for item in ordered]
+        chain: list[str] = []
+        prev = "[0:v]"
+        offset = 0.0
+        for k in range(len(segments) - 1):
+            ttype = _TRANSITION_TYPES[k % len(_TRANSITION_TYPES)]
+            offset += voice_durs[k]
+            out = f"[x{k}]" if k < len(segments) - 2 else "[vout]"
+            chain.append(
+                f"{prev}[{k + 1}:v]xfade=transition={ttype}:"
+                f"duration={_TRANSITION_SEC}:offset={offset:.3f}{out}")
+            prev = out
+        filter_graph = ";".join(chain)
+        cmd = ["ffmpeg", "-y"]
+        for seg in segments:
+            cmd += ["-i", str(seg)]
+        cmd += ["-filter_complex", filter_graph,
+                "-map", "[vout]", "-r", "30",
+                "-c:v", "libx264", "-preset", "veryfast",
+                "-pix_fmt", "yuv420p", str(video_only)]
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode == 0 and video_only.exists():
+            joined_dur = video_module.get_duration(video_only) or 0
+            if joined_dur >= total_voice * 0.9:
+                joined_ok = True
+    if not joined_ok:
+        # Stream-copy fallback: no crossfades, but the video
+        # still builds (first scene fades in, last fades out,
+        # middle boundaries are hard cuts). Segments are already
+        # 1280x720 yuv420p libx264 at 30fps, so a stream copy
+        # joins them with NO re-encode.
+        if video_only.exists():
+            video_only.unlink(missing_ok=True)
+        list_file = work_dir / "master-concat.txt"
+        list_file.write_text(
+            "".join(f"file '{seg.resolve()}'\n" for seg in segments),
+            encoding="utf-8")
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(list_file), "-c:v", "copy", str(video_only)],
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
+        if proc.returncode == 0 and video_only.exists():
+            joined_dur = video_module.get_duration(video_only) or 0
+            if joined_dur >= total_voice * 0.9:
+                joined_ok = True
     if not joined_ok:
         if video_only.exists():
             video_only.unlink(missing_ok=True)
         proc = subprocess.run(
-            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(list_file),
              "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
              "-c:v", "libx264", "-preset", "veryfast",
              "-pix_fmt", "yuv420p", str(video_only)],
-            capture_output=True, text=True, **video_module.no_window_kwargs())
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
         if proc.returncode != 0 or not video_only.exists():
-            raise RuntimeError(f"Master video assembly failed: {proc.stderr[-1000:]}")
+            raise RuntimeError(
+                f"Master video assembly failed: {proc.stderr[-1000:]}")
     if progress_cb:
         progress_cb(len(scenes), len(scenes), "Joining scenes…")
     audio_list = work_dir / "master-audio.txt"
@@ -713,19 +972,100 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         capture_output=True, text=True, **video_module.no_window_kwargs())
     if proc.returncode != 0 or not voice_joined.exists():
         raise RuntimeError(f"Master audio assembly failed: {proc.stderr[-1000:]}")
+    # Transition SFX track: one (different) sound at each scene
+    # boundary, placed at the cumulative voice time. Built as a
+    # single track first so the final mux stays simple (voice +
+    # music + one SFX track). No SFX -> no track, no change.
+    sfx_track: Path | None = None
+    if sfx_paths and len(ordered) > 1:
+        boundary_times: list[float] = []
+        cum = 0.0
+        for item in ordered[:-1]:
+            cum += item["duration"]
+            boundary_times.append(cum)
+        sfx_track = work_dir / "sfx-track.m4a"
+        sfx_cmd = ["ffmpeg", "-y"]
+        for p in sfx_paths:
+            sfx_cmd += ["-i", str(p)]
+        # Round-robin the SFX so no two consecutive boundaries
+        # play the same sound (variety, per the user's ask).
+        parts: list[str] = []
+        labels: list[str] = []
+        for i, bt in enumerate(boundary_times):
+            src = i % len(sfx_paths)
+            ms = int(bt * 1000)
+            parts.append(
+                f"[{src}:a]adelay={ms}|{ms},volume={_SFX_VOLUME}[s{i}]")
+            labels.append(f"[s{i}]")
+        n_inputs = len(boundary_times) + 1
+        sfx_cmd += ["-filter_complex",
+                    ";".join(parts) + ";" +
+                    "".join(labels) +
+                    f"amix=inputs={len(boundary_times)}:"
+                    f"duration=longest:dropout_transition=0[sfx]",
+                    "-map", "[sfx]", "-t", str(total_voice),
+                    "-c:a", "aac", str(sfx_track)]
+        proc = subprocess.run(sfx_cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not sfx_track.exists():
+            sfx_track = None  # SFX failed -> skip, video still builds
     final_path = work_dir / "final.mp4"
-    proc = subprocess.run(
-        ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_joined),
-         "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
-         "-shortest", str(final_path)],
-        capture_output=True, text=True, **video_module.no_window_kwargs())
+    if music_path is not None or sfx_track is not None:
+        # Mixed final audio: voice (full) + mood music (looped,
+        # 12%, under the voice) + SFX track (at the boundaries).
+        # Video is copied, audio re-encoded to AAC.
+        mix_cmd = ["ffmpeg", "-y", "-i", str(video_only),
+                   "-i", str(voice_joined)]
+        fc_parts: list[str] = []
+        mix_labels: list[str] = ["[1:a]"]
+        input_idx = 2
+        if music_path is not None:
+            mix_cmd += ["-i", str(music_path)]
+            fc_parts.append(
+                f"[{input_idx}:a]aloop=loop=-1:size=2e+09,"
+                f"volume={_MUSIC_VOLUME},atrim=0:{total_voice:.3f}"
+                f"[music]")
+            mix_labels.append("[music]")
+            input_idx += 1
+        if sfx_track is not None:
+            mix_cmd += ["-i", str(sfx_track)]
+            mix_labels.append(f"[{input_idx}:a]")
+            input_idx += 1
+        n_mix = len(mix_labels)
+        fc = ";".join(fc_parts)
+        if fc:
+            fc += ";"
+        fc += "".join(mix_labels) + (
+            f"amix=inputs={n_mix}:duration=first:"
+            f"dropout_transition=0[aout]")
+        mix_cmd += ["-filter_complex", fc,
+                    "-map", "0:v", "-map", "[aout]",
+                    "-t", str(total_voice), "-c:v", "copy",
+                    "-c:a", "aac", "-shortest", str(final_path)]
+        proc = subprocess.run(mix_cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not final_path.exists():
+            # Mixed mux failed -> fall back to the plain mux
+            # (voice only); the video is not lost.
+            proc = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(video_only),
+                 "-i", str(voice_joined),
+                 "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
+                 "-shortest", str(final_path)],
+                capture_output=True, text=True,
+                **video_module.no_window_kwargs())
+    else:
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_joined),
+             "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
+             "-shortest", str(final_path)],
+            capture_output=True, text=True, **video_module.no_window_kwargs())
     if proc.returncode != 0 or not final_path.exists():
         raise RuntimeError(f"Master audio mux failed: {proc.stderr[-1000:]}")
     # Final quality gate: duration and size must be sane.
     final_duration = video_module.get_duration(final_path) or 0
     if final_duration <= 0 or final_path.stat().st_size < 100_000:
         raise RuntimeError("Master final video failed its quality gate.")
-    script_text = "\n\n".join(s["narration"] for s in scenes)
     return {
         "final_path": final_path,
         "script": script_text,
@@ -737,5 +1077,9 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         "kinds": kinds,
         "distinct_commons_visuals": len(used_urls),
         "voice_engine": engine,
+        "mood": mood,
+        "music": music_path.name if music_path is not None else None,
+        "transition_sfx": len(sfx_paths),
+        "transitions": transitions,
     }
 

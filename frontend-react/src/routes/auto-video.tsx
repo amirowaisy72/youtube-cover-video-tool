@@ -50,6 +50,11 @@ function AutoVideo() {
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
   const [subtitles, setSubtitles] = useState(true);
+  // Mood music + transitions (2026-11-08): a mood-matched
+  // background track (needs the Pixabay key below) and a
+  // different transition style + sound at every scene change.
+  const [music, setMusic] = useState(true);
+  const [transitions, setTransitions] = useState(true);
   // Stock-media keys (Pexels / Pixabay, free): shared with the
   // Stock and Music tools via localStorage — entering one here
   // connects it everywhere, and vice versa. Empty = Commons only.
@@ -155,7 +160,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey);
+      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey, music, transitions);
       setJobId(data.job_id);
       // Background job: the build keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -213,6 +218,20 @@ function AutoVideo() {
             <span>
               <span className="block font-semibold">💬 Live captions (subtitles)</span>
               <span className="block text-sm text-muted-foreground">Words appear at the bottom as the voice speaks them, YouTube-caption style. Off shows one caption per scene instead.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
+            <input type="checkbox" className="h-5 w-5 accent-primary" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+            <span>
+              <span className="block font-semibold">🎵 Background music by mood</span>
+              <span className="block text-sm text-muted-foreground">A royalty-free track that fits the script's mood (suspense, happy, motivational…) plays softly under the voice. Needs your Pixabay key below — without it, the video has no music.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
+            <input type="checkbox" className="h-5 w-5 accent-primary" checked={transitions} onChange={(e) => setTransitions(e.target.checked)} />
+            <span>
+              <span className="block font-semibold">✨ Transitions + sounds</span>
+              <span className="block text-sm text-muted-foreground">A different transition style (fade, wipe, slide, circle…) and a different sound effect at every scene change, so the video never repeats the same look or sound. Sounds need your Pixabay key below.</span>
             </span>
           </label>
           <div className="rounded-xl border border-border px-4 py-3">
