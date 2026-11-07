@@ -309,7 +309,13 @@ _MOOD_MUSIC_QUERY = {
     "epic": "epic cinematic orchestral",
     "calm": "calm relaxing ambient",
 }
-_MUSIC_VOLUME = 0.12  # 12% — low enough that the voice stays clear.
+_MUSIC_VOLUME = 0.30  # 30% — clearly audible as background music
+# under the voice. Was 0.12 (12%): the user reported "Music: ✓
+# added" but could NOT hear it — 12% of a quiet Freesound track
+# is inaudible under the voiceover. 30% is a standard narration
+# bed level: the voice (100%) still dominates, but the music is
+# unmistakably there. (2026-11-08, user report: SFX audible,
+# music not heard despite "✓ added".)
 _SFX_VOLUME = 0.5
 # Distinct Pixabay Sound Effects queries — one track per query, so
 # the SFX library is genuinely different sounds, not six whooshes.
