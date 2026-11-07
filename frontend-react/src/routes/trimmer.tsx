@@ -41,6 +41,56 @@ function fmtClock(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/** YouTube video id from any YouTube link (watch?v=, youtu.be, Shorts, live, embed). */
+function extractVideoId(raw: string): string | null {
+  const u = raw.trim();
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const isId = (s: string) => /^[A-Za-z0-9_-]{11}$/.test(s);
+    if (host === "youtu.be") {
+      const id = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+      return isId(id) ? id : null;
+    }
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      const v = parsed.searchParams.get("v");
+      if (v && isId(v)) return v;
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if ((parts[0] === "shorts" || parts[0] === "live" || parts[0] === "embed" || parts[0] === "v") && parts[1] && isId(parts[1])) {
+        return parts[1];
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+// Minimal YouTube IFrame API typing (loaded from youtube.com/iframe_api).
+type YTPlayer = {
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  getCurrentTime: () => number;
+  pauseVideo: () => void;
+  loadVideoById: (videoId: string) => void;
+  destroy: () => void;
+};
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        el: HTMLElement,
+        opts: {
+          videoId: string;
+          playerVars?: Record<string, string | number>;
+          events?: { onReady?: () => void };
+        },
+      ) => YTPlayer;
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
 function Trimmer() {
   const { jobs, registerJob, updateJob } = useApp();
   const [url, setUrl] = useState("");
@@ -61,6 +111,82 @@ function Trimmer() {
   const [infoError, setInfoError] = useState("");
   const trackRef = useRef<HTMLDivElement | null>(null);
   const dragTarget = useRef<"start" | "end" | null>(null);
+  // Video preview (YouTube embed, user 2026-11-08): so the user can
+  // SEE the video while picking cut points, instead of guessing
+  // from times alone. The player seeks to a handle as it is
+  // dragged, and the player can set a handle to its current time.
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [apiReady, setApiReady] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const playerHostRef = useRef<HTMLDivElement | null>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const lastSeekRef = useRef(0);
+
+  // Load the YouTube IFrame API once (for seeking + current time).
+  useEffect(() => {
+    if (window.YT?.Player) {
+      setApiReady(true);
+      return;
+    }
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      prev?.();
+      setApiReady(true);
+    };
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      tag.async = true;
+      document.head.appendChild(tag);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Create the player once the API is ready and a video is loaded;
+  // later videos load into the same player.
+  useEffect(() => {
+    if (!apiReady || !videoId) return;
+    const YT = window.YT;
+    if (!YT?.Player) return;
+    if (playerRef.current) {
+      playerRef.current.loadVideoById(videoId);
+      return;
+    }
+    const host = playerHostRef.current;
+    if (!host) return;
+    playerRef.current = new YT.Player(host, {
+      videoId,
+      playerVars: { rel: 0 },
+      events: { onReady: () => setPlayerReady(true) },
+    });
+  }, [apiReady, videoId]);
+
+  // Destroy the player when leaving the page.
+  useEffect(
+    () => () => {
+      try {
+        playerRef.current?.destroy();
+      } catch {
+        /* already gone */
+      }
+      playerRef.current = null;
+    },
+    [],
+  );
+
+  /** Seek the preview player (throttled while dragging). */
+  const seekPlayer = (t: number) => {
+    const p = playerRef.current;
+    if (!p || !playerReady) return;
+    const now = Date.now();
+    if (now - lastSeekRef.current < 150) return;
+    lastSeekRef.current = now;
+    try {
+      p.seekTo(Math.max(0, t), true);
+    } catch {
+      /* player not ready yet */
+    }
+  };
 
   useEffect(
     () => () => {
@@ -148,6 +274,7 @@ function Trimmer() {
         },
       );
       setVideoTitle(info.title);
+      setVideoId(extractVideoId(url.trim()));
       if (typeof info.duration_sec === "number" && info.duration_sec > 0) {
         const dur = info.duration_sec;
         setDurationSec(dur);
@@ -161,6 +288,7 @@ function Trimmer() {
     } catch (e) {
       setDurationSec(null);
       setVideoTitle("");
+      setVideoId(null);
       setInfoError(e instanceof Error ? e.message : "Could not load the video.");
     } finally {
       setInfoLoading(false);
@@ -184,11 +312,28 @@ function Trimmer() {
     if (which === "start") {
       const next = Math.min(Math.max(0, t), Math.max(0, e - 1), e - 1);
       const clamped = Math.max(next, e - MAX_SECTION_SECONDS);
-      setStart(fmtClock(Math.floor(Math.max(0, clamped))));
+      const v = Math.floor(Math.max(0, clamped));
+      setStart(fmtClock(v));
+      seekPlayer(v);
     } else {
       const next = Math.max(Math.min(durationSec ?? t, t), s + 1);
       const clamped = Math.min(next, s + MAX_SECTION_SECONDS);
-      setEnd(fmtClock(Math.floor(clamped)));
+      const v = Math.floor(clamped);
+      setEnd(fmtClock(v));
+      seekPlayer(v);
+    }
+  };
+
+  /** Set a handle to the preview player's current time (so the user
+      can scrub inside the YouTube player itself, then capture the
+      exact moment). */
+  const setFromPlayer = (which: "start" | "end") => {
+    const p = playerRef.current;
+    if (!p || !playerReady) return;
+    try {
+      moveHandle(which, p.getCurrentTime());
+    } catch {
+      /* player not ready yet */
     }
   };
 
@@ -196,6 +341,13 @@ function Trimmer() {
     if (durationSec === null) return;
     const t = timeFromClientX(e.clientX);
     if (t === null) return;
+    // Pause the preview so the frame stays on the cut point while
+    // the user drags, instead of playing past it.
+    try {
+      playerRef.current?.pauseVideo();
+    } catch {
+      /* player not ready yet */
+    }
     // Grab the nearest handle (a handle's own pointerdown sets it directly).
     const handle = (e.target as HTMLElement).closest("[data-handle]")?.getAttribute("data-handle");
     const which: "start" | "end" =
@@ -277,7 +429,7 @@ function Trimmer() {
       <PageHeader
         icon="✂️"
         title="Video Trimmer"
-        sub="Download only the part you need — paste a link, pick start and end."
+        sub="Download only the part you need — load the video, watch it, drag to pick start and end."
       />
       <div className="glass mx-auto max-w-2xl space-y-5 p-8">
         <div>
@@ -290,6 +442,7 @@ function Trimmer() {
               // The loaded video no longer matches this link.
               setDurationSec(null);
               setVideoTitle("");
+              setVideoId(null);
               setInfoError("");
             }}
             placeholder="https://youtube.com/watch?v=…"
@@ -332,6 +485,25 @@ function Trimmer() {
               <p className="mb-2 truncate text-sm font-semibold" title={videoTitle}>
                 {videoTitle} · {fmtClock(durationSec)}
               </p>
+            )}
+            {/* Video preview (user, 2026-11-08): the actual video,
+                so the user can SEE where to cut. Dragging a handle
+                seeks the player to that moment; the buttons below
+                capture the player's current time as a cut point. */}
+            {videoId && (
+              <div className="mb-3 overflow-hidden rounded-xl bg-black">
+                <div ref={playerHostRef} className="aspect-video w-full" />
+              </div>
+            )}
+            {videoId && playerReady && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFromPlayer("start")}>
+                  ⏱ Set start to video position
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFromPlayer("end")}>
+                  ⏱ Set end to video position
+                </button>
+              </div>
             )}
             <div
               ref={trackRef}

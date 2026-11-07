@@ -34,8 +34,14 @@ JOBS_DIR = BASE_DIR / "jobs"
 MAX_SECTION_SECONDS = 600  # 10 minutes, per the tool's limit
 
 _YOUTUBE_RE = re.compile(
+    # BUG FIX (2026-11-08): the old pattern required `watch/` (with
+    # a slash), but real watch links are `watch?v=` (with a `?`) —
+    # so EVERY standard youtube.com/watch?v= link was rejected with
+    # "That does not look like a YouTube link." (user's link with
+    # &list=...&start_radio=1 included). `watch` takes `?`, the
+    # other paths take `/`.
     r"^(https?://)?(www\.|m\.|music\.)?"
-    r"(youtube\.com/(watch|shorts|live|embed|v)/|youtu\.be/)",
+    r"(youtube\.com/watch\?|youtube\.com/(shorts|live|embed|v)/|youtu\.be/)",
     re.IGNORECASE,
 )
 
