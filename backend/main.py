@@ -134,15 +134,15 @@ DEFAULT_SETTINGS = {
     "youtube_channels": [],
     "voice_enabled": True,
     "voice_pitch_factor": 1.05,
-    "crf": 22,
-    # Size AND quality, as requested 2026-11-01: H.264 could not do
-    # both (CRF 26 shrank but dulled, CRF 20 kept quality but grew).
-    # HEVC (libx265) can: CRF 22 HEVC looks like H.264 CRF 20 at
-    # roughly 25-40% smaller size. Preset "fast" keeps HEVC encode
-    # time close to H.264 medium. If libx265 is missing, the code
-    # falls back to H.264 CRF 20 for quality.
-    "preset": "fast",
-    "encoder": "libx265",
+    "crf": 20,
+    # Speed (user, 2026-11-07): HEVC (libx265) renders far too slowly
+    # — a 2-3 minute video took many minutes. H.264 (libx264) with
+    # preset "veryfast" encodes several times faster at the same
+    # visual quality (CRF 20 H.264 ≈ CRF 22 HEVC); the file is a bit
+    # larger, but speed matters more than size here. HEVC is still
+    # available in Admin settings if a smaller file is wanted.
+    "preset": "veryfast",
+    "encoder": "libx264",
     "green_rect": {"x": 0, "y": 0, "w": 640, "h": 360},
     # Auto-detect the green area from the cover image itself, so the
     # video lands exactly on the green screen, not at a guessed 0,0.
@@ -159,19 +159,22 @@ def load_settings() -> dict:
     if SETTINGS_FILE.exists():
         try:
             saved = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            # Quality migration (2026-11-01): old installs saved
-            # CRF 26 / 1280px, which dulled detailed videos. Move to
-            # CRF 20 / 1920px so the final keeps the source's look.
-            # At 1920px the green-area video stays near source
-            # resolution instead of being downscaled to ~770px wide.
-            if saved.get("preset") in ("ultrafast", "veryfast"):
-                saved["preset"] = "medium"
-            if saved.get("crf") in (20, 26):
-                saved["crf"] = 22
-            if saved.get("preset") in ("medium",):
-                saved["preset"] = "fast"
+            # Speed migration (2026-11-07): the old HEVC defaults
+            # (libx265 + preset fast + CRF 22) render far too slowly.
+            # Move installs still on those exact defaults to H.264 +
+            # veryfast + CRF 20 (same look, several times faster, a
+            # bit larger file). A deliberate HEVC choice with other
+            # values is left alone.
+            if (saved.get("encoder") == "libx265"
+                    and saved.get("preset") == "fast"
+                    and saved.get("crf") == 22):
+                saved["encoder"] = "libx264"
+                saved["preset"] = "veryfast"
+                saved["crf"] = 20
+            if saved.get("preset") in ("ultrafast",):
+                saved["preset"] = "veryfast"
             if "encoder" not in saved:
-                saved["encoder"] = "libx265"
+                saved["encoder"] = "libx264"
             if "default_flip" not in saved:
                 saved["default_flip"] = True
             if "fit_mode" not in saved:

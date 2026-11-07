@@ -265,10 +265,22 @@ def detect_green_rect(cover: str | Path) -> dict | None:
     while _col_green(minx - 1):
         minx -= 1
     fx, fy = orig_w / sw, orig_h / sh
-    return snap_rect_even({
-        "x": int(minx * fx), "y": int(miny * fy),
-        "w": int((maxx - minx + 1) * fx), "h": int((maxy - miny + 1) * fy),
-    }, cover_w=orig_w, cover_h=orig_h)
+    # Overscan by ~4px on each side: the green edge is anti-aliased
+    # against the bezel, so a 1-2px green fringe sits just outside
+    # the detected box (user, 2026-11-07 — corners/edges still
+    # green). Expanding the box makes the video cover that fringe
+    # in the preview and in the final encode alike; a 4px spill
+    # onto the black bezel is invisible. The mask is dilated by
+    # 5px, so it stays white across the whole expanded box.
+    _ox, _oy = 4, 4
+    _x = max(0, int(minx * fx) - _ox)
+    _y = max(0, int(miny * fy) - _oy)
+    _w = int((maxx - minx + 1) * fx) + 2 * _ox
+    _h = int((maxy - miny + 1) * fy) + 2 * _oy
+    _w = min(_w, orig_w - _x)
+    _h = min(_h, orig_h - _y)
+    return snap_rect_even({"x": _x, "y": _y, "w": _w, "h": _h},
+                          cover_w=orig_w, cover_h=orig_h)
 
 
 def green_mask(cover: str | Path) -> "object | None":
@@ -375,8 +387,15 @@ def green_mask(cover: str | Path) -> "object | None":
             ImageDraw.Draw(filled).rectangle(
                 (int(sx0 / scale), int(sy0 / scale),
                  int((sx1 + 1) / scale), int((sy1 + 1) / scale)), fill=255)
-            return filled
-    return mask
+            mask = filled
+    # Dilate the white area by ~5px: the green edge is anti-aliased
+    # against the bezel, so the mask stops a few px short and a thin
+    # green fringe stays visible at the corners/edges (user,
+    # 2026-11-07 — corners still green in Live Edit). A 5px spill
+    # onto the black bezel is invisible, but it covers the fringe
+    # completely, in the preview and in the final encode alike.
+    from PIL import ImageFilter
+    return mask.filter(ImageFilter.MaxFilter(11))
 
 
 def get_duration(path: str | Path) -> float | None:
@@ -528,15 +547,41 @@ def build_process_command(
     y = int(green_rect.get("y", 0))
     w = int(green_rect.get("w", 640))
     h = int(green_rect.get("h", 360))
-    # Speed: if the cover is bigger than output_width, scale the whole
-    # cover down (and the green rectangle with it) instead of encoding
-    # a 2048px Gemini image at full size — that alone was a major
-    # reason a 3-minute video took so long. Small covers are untouched.
+    # Final video is 16:9 (YouTube): crop the cover to 16:9, centred,
+    # so a 3:2 cover does not come out pillarboxed with black bars
+    # left and right (user, 2026-11-07). The green rect moves with
+    # the crop. A 16:9 cover is untouched.
+    cc_x = cc_y = 0
+    cc_w = cc_h = None
+    _csize = get_media_size(cover)
+    if _csize:
+        _cw, _ch = _csize
+        if _cw / _ch > 16 / 9:
+            cc_w = int(_ch * 16 / 9)
+            cc_h = _ch
+            cc_x = (_cw - cc_w) // 2
+        elif _cw / _ch < 16 / 9:
+            cc_w = _cw
+            cc_h = int(_cw * 9 / 16)
+            cc_y = (_ch - cc_h) // 2
+        if cc_w is not None:
+            x -= cc_x
+            y -= cc_y
+            x = max(0, min(x, cc_w - w))
+            y = max(0, min(y, cc_h - h))
+            # Keep overlay coordinates even for yuv420p.
+            x -= x % 2
+            y -= y % 2
+    # Speed: if the (cropped) cover is bigger than output_width, scale
+    # the whole cover down (and the green rectangle with it) instead
+    # of encoding a 2048px Gemini image at full size — that alone was
+    # a major reason a 3-minute video took so long. Small covers are
+    # untouched.
     scale = 1.0
     if output_width:
-        size = get_media_size(cover)
-        if size and size[0] > int(output_width):
-            scale = int(output_width) / size[0]
+        _eff_w = cc_w if cc_w is not None else (_csize[0] if _csize else None)
+        if _eff_w and _eff_w > int(output_width):
+            scale = int(output_width) / _eff_w
             x, y, w, h = round(x * scale), round(y * scale), round(w * scale), round(h * scale)
     speed = float(speed) if speed else 1.0
     if speed <= 0:
@@ -651,7 +696,12 @@ def build_process_command(
     audio_filters.append(f"atempo={speed}")
     audio_chain = ",".join(audio_filters)
 
-    if scale != 1.0:
+    if cc_w is not None:
+        base_chain = f"[0:v]crop={cc_w}:{cc_h}:{cc_x}:{cc_y}"
+        if scale != 1.0:
+            base_chain += f",scale={int(output_width)}:-2"
+        base_chain += "[base]"
+    elif scale != 1.0:
         base_chain = f"[0:v]scale={int(output_width)}:-2[base]"
     elif output_width and output_height:
         base_chain = f"[0:v]scale={int(output_width)}:{int(output_height)}[base]"
@@ -665,9 +715,16 @@ def build_process_command(
         # still get a rectangular video spilling onto the cover.
         # The video is always box-sized here (fit videos are padded
         # to w x h first, zoomed videos are cropped to w x h), so
-        # the mask crop is always the whole box (w,h at x,y).
+        # the mask crop is always the whole box (w,h at x,y). When
+        # the cover is cropped to 16:9, the mask is cropped to the
+        # same visible region first, then to the rectangle.
         mw, mh, mx, my = w, h, x, y
-        if scale != 1.0:
+        if cc_w is not None:
+            mask_chain = f"[2:v]crop={cc_w}:{cc_h}:{cc_x}:{cc_y}"
+            if scale != 1.0:
+                mask_chain += f",scale={int(output_width)}:-2"
+            mask_chain += f",crop={mw}:{mh}:{mx}:{my}[mask]"
+        elif scale != 1.0:
             mask_chain = f"[2:v]scale={int(output_width)}:-2,crop={mw}:{mh}:{mx}:{my}[mask]"
         else:
             mask_chain = f"[2:v]crop={mw}:{mh}:{mx}:{my}[mask]"
