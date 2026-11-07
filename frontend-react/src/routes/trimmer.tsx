@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { api } from "@/lib/api";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/trimmer")({
   component: Trimmer,
@@ -41,6 +42,7 @@ function fmtClock(seconds: number): string {
 }
 
 function Trimmer() {
+  const { jobs, registerJob, updateJob } = useApp();
   const [url, setUrl] = useState("");
   const [start, setStart] = useState("0:00");
   const [end, setEnd] = useState("1:00");
@@ -51,6 +53,7 @@ function Trimmer() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobKey = useRef<string | null>(null);
   // Timeline (draggable handles) — filled by /api/trimmer/info.
   const [videoTitle, setVideoTitle] = useState("");
   const [durationSec, setDurationSec] = useState<number | null>(null);
@@ -65,6 +68,60 @@ function Trimmer() {
     },
     [],
   );
+
+  const poll = (id: string) => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(async () => {
+      try {
+        const job = await api<TrimmerJob>(`/api/trimmer/${id}`);
+        if (typeof job.progress === "number") setProgress(job.progress);
+        if (jobKey.current) {
+          updateJob(jobKey.current, {
+            progress: job.progress ?? 0,
+            stage: job.title || "Trimming…",
+            status: job.status === "done" ? "done" : job.status === "failed" ? "failed" : "running",
+          });
+        }
+        if (job.status === "done") {
+          if (timer.current) clearInterval(timer.current);
+          setBusy(false);
+          setProgress(100);
+          setTitle(job.title);
+          setFileUrl(job.download_url);
+        } else if (job.status === "failed") {
+          if (timer.current) clearInterval(timer.current);
+          setBusy(false);
+          setProgress(null);
+          setError("Download failed: " + (job.error || "unknown error"));
+        }
+      } catch (e) {
+        if (timer.current) clearInterval(timer.current);
+        setBusy(false);
+        setProgress(null);
+        setError("Progress check failed: " + (e instanceof Error ? e.message : "unknown error"));
+      }
+    }, 1000);
+  };
+
+  // Restore a trim that was started earlier and is still in
+  // the background store (user left the page and came back via
+  // the top progress bar, or refreshed). The backend job kept
+  // running the whole time.
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "trimmer" && j.status === "running");
+    const finished = jobs.find((j) => j.tool === "trimmer" && j.status === "done");
+    const found = active ?? finished;
+    if (!found || jobId) return;
+    jobKey.current = found.key;
+    setJobId(found.jobId);
+    void api<TrimmerJob>(`/api/trimmer/${found.jobId}`).then((job) => {
+      if (job.status === "done") { setBusy(false); setProgress(100); setTitle(job.title); setFileUrl(job.download_url); }
+      else if (job.status === "failed") setError("Download failed: " + (job.error || "unknown error"));
+      else { setBusy(true); if (typeof job.progress === "number") setProgress(job.progress); poll(found.jobId); }
+    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startSec = parseTime(start);
   const endSec = parseTime(end);
@@ -192,30 +249,12 @@ function Trimmer() {
         body: JSON.stringify({ url: url.trim(), start: startSec, end: endSec }),
       });
       setJobId(data.job_id);
-      if (timer.current) clearInterval(timer.current);
-      timer.current = setInterval(async () => {
-        try {
-          const job = await api<TrimmerJob>(`/api/trimmer/${data.job_id}`);
-          if (typeof job.progress === "number") setProgress(job.progress);
-          if (job.status === "done") {
-            if (timer.current) clearInterval(timer.current);
-            setBusy(false);
-            setProgress(100);
-            setTitle(job.title);
-            setFileUrl(job.download_url);
-          } else if (job.status === "failed") {
-            if (timer.current) clearInterval(timer.current);
-            setBusy(false);
-            setProgress(null);
-            setError("Download failed: " + (job.error || "unknown error"));
-          }
-        } catch (e) {
-          if (timer.current) clearInterval(timer.current);
-          setBusy(false);
-          setProgress(null);
-          setError("Progress check failed: " + (e instanceof Error ? e.message : "unknown error"));
-        }
-      }, 1000);
+      // Background job: the trim keeps running if the user
+      // leaves this page, and the top bar shows its progress.
+      const key = `trimmer:${data.job_id}`;
+      jobKey.current = key;
+      registerJob({ key, tool: "trimmer", title: url.trim(), route: "/trimmer", jobId: data.job_id });
+      poll(data.job_id);
     } catch (e) {
       setBusy(false);
       setProgress(null);

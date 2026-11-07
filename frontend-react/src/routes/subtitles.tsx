@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/subtitles")({
   component: Subtitles,
@@ -63,6 +64,7 @@ function fmtSize(bytes: number) {
 }
 
 function Subtitles() {
+  const { jobs, registerJob, updateJob } = useApp();
   const [mode, setMode] = useState<"upload" | "url">("upload");
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
@@ -78,10 +80,34 @@ function Subtitles() {
   const fileRef = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const burnTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobKey = useRef<string | null>(null);
 
   useEffect(() => () => {
     if (timer.current) clearInterval(timer.current);
     if (burnTimer.current) clearInterval(burnTimer.current);
+  }, []);
+
+  // Restore a transcription that was started earlier and is
+  // still in the background store (user left the page and came
+  // back via the top progress bar, or refreshed). The backend
+  // job kept running the whole time. (The burn-in is a
+  // follow-up action and is not tracked here.)
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "subtitles" && j.status === "running");
+    const finished = jobs.find((j) => j.tool === "subtitles" && j.status === "done");
+    const found = active ?? finished;
+    if (!found || job) return;
+    jobKey.current = found.key;
+    void fetch(`/api/subtitles/${found.jobId}`).then(async (res) => {
+      if (!res.ok) return;
+      const data = (await res.json()) as SubStatus;
+      setJob(data);
+      if (data.status === "done") setBusy(false);
+      else if (data.status === "failed") { setBusy(false); setError(data.error || "Subtitle generation failed."); }
+      else { setBusy(true); startPolling(found.jobId); }
+    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startPolling = (jobId: string) => {
@@ -92,6 +118,13 @@ function Subtitles() {
         if (!res.ok) throw new Error(`Status check failed (${res.status}).`);
         const data = (await res.json()) as SubStatus;
         setJob(data);
+        if (jobKey.current) {
+          updateJob(jobKey.current, {
+            progress: data.progress ?? 0,
+            stage: data.stage || "Transcribing…",
+            status: data.status === "done" ? "done" : data.status === "failed" ? "failed" : "running",
+          });
+        }
         if (data.status === "done" || data.status === "failed") {
           if (timer.current) clearInterval(timer.current);
           setBusy(false);
@@ -179,6 +212,11 @@ function Subtitles() {
         throw new Error(detail?.detail || `Could not start subtitles (${res.status}).`);
       }
       const data = (await res.json()) as { job_id: string; status: string };
+      // Background job: the transcription keeps running if the
+      // user leaves this page, and the top bar shows its progress.
+      const key = `subtitles:${data.job_id}`;
+      jobKey.current = key;
+      registerJob({ key, tool: "subtitles", title: mode === "url" ? url.trim() : (file?.name || "Subtitles"), route: "/subtitles", jobId: data.job_id });
       startPolling(data.job_id);
     } catch (e) {
       setBusy(false);

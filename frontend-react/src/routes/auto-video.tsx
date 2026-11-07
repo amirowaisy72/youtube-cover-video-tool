@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
 import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene } from "@/lib/api";
+import { getPexelsKey, getPixabayKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
 import s3 from "@/assets/scene-3.jpg";
@@ -48,6 +49,12 @@ function AutoVideo() {
   const [title, setTitle] = useState("10 Mind-Blowing Facts About Our World");
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
+  const [subtitles, setSubtitles] = useState(true);
+  // Stock-media keys (Pexels / Pixabay, free): shared with the
+  // Stock and Music tools via localStorage — entering one here
+  // connects it everywhere, and vice versa. Empty = Commons only.
+  const [pexelsKey, setPexelsKeyState] = useState("");
+  const [pixabayKey, setPixabayKeyState] = useState("");
   const [phase, setPhase] = useState<"form" | "build" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -81,6 +88,13 @@ function AutoVideo() {
       }
     }, 3000);
   };
+
+  // Load the shared stock-media keys (entered here, in the
+  // Stock tool or in the Music tool — one key works everywhere).
+  useEffect(() => {
+    setPexelsKeyState(getPexelsKey());
+    setPixabayKeyState(getPixabayKey());
+  }, []);
 
   // Restore a job that was started earlier and is still in the
   // background store (user left the page and came back via the
@@ -117,7 +131,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural");
+      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey);
       setJobId(data.job_id);
       // Background job: the build keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -169,6 +183,36 @@ function AutoVideo() {
               <span className="text-sm text-muted-foreground">minutes (1–30)</span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">About {dur * 3} scenes · 1 credit · longer videos take longer to build, scene by scene</p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
+            <input type="checkbox" className="h-5 w-5 accent-primary" checked={subtitles} onChange={(e) => setSubtitles(e.target.checked)} />
+            <span>
+              <span className="block font-semibold">💬 Live captions (subtitles)</span>
+              <span className="block text-sm text-muted-foreground">Words appear at the bottom as the voice speaks them, YouTube-caption style. Off shows one caption per scene instead.</span>
+            </span>
+          </label>
+          <div className="rounded-xl border border-border px-4 py-3">
+            <div className="font-semibold">🎞️ Richer stock footage (optional)</div>
+            <p className="mt-1 text-sm text-muted-foreground">Add your free Pexels / Pixabay API keys and the video uses their professional clips first (Commons is the fallback). A key entered here works in the Stock and Music tools too — never enter it twice.</p>
+            <div className="mt-3 space-y-2">
+              <input
+                className="field"
+                type="password"
+                autoComplete="off"
+                placeholder="Pexels API key (optional)"
+                value={pexelsKey}
+                onChange={(e) => { setPexelsKeyState(e.target.value); setPexelsKey(e.target.value); }}
+              />
+              <input
+                className="field"
+                type="password"
+                autoComplete="off"
+                placeholder="Pixabay API key (optional)"
+                value={pixabayKey}
+                onChange={(e) => { setPixabayKeyState(e.target.value); setPixabayKey(e.target.value); }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Free keys: pexels.com/api · pixabay.com/api/docs — stored only in this browser.</p>
           </div>
           <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim()} onClick={() => void start()}>🚀 Build my video</button>
           {error && <p className="text-sm text-destructive">{error}</p>}

@@ -4,6 +4,11 @@ import { useApp } from "@/lib/app-store";
 const TOOL_LABEL: Record<string, string> = {
   "auto-video": "🎬 Auto Video",
   "cover": "🎨 Cover Video",
+  "downloader": "⬇️ Downloader",
+  "trimmer": "✂️ Trimmer",
+  "shorts": "📱 Shorts Maker",
+  "subtitles": "💬 Subtitles",
+  "audio": "🎵 Audio Extractor",
 };
 
 /** Background-jobs bar (user, 2026-11-07): when a tool is

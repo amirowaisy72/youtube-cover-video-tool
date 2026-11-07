@@ -192,8 +192,15 @@ def _download_source(job_id: str, url: str, target: Path) -> dict | None:
         try:
             import yt_dlp
             opts = {
-                "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+                # Same download speed fix as the cover tool
+                # (main.py _yt_dlp_download_opts, user 2026-11-07):
+                # prefer a single progressive file (one connection,
+                # full speed) and download DASH fragments 8 at a
+                # time. The old DASH-first format with no fragment
+                # setting downloaded fragments 1 at a time (slow).
+                "format": "b[height<=720][ext=mp4]/b[height<=720]/bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
                 "merge_output_format": "mp4",
+                "concurrent_fragment_downloads": 8,
                 "retries": 10,
                 "fragment_retries": 10,
                 "socket_timeout": 60,
@@ -227,8 +234,9 @@ def _download_source(job_id: str, url: str, target: Path) -> dict | None:
         return None
     cmd = [
         "yt-dlp",
-        "-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
+        "-f", "b[height<=720][ext=mp4]/b[height<=720]/bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
         "--merge-output-format", "mp4",
+        "--concurrent-fragments", "8",
         "-o", str(target),
         url,
     ]

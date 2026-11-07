@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ApiError, api } from "@/lib/api";
+import { getPixabayKey, setPixabayKey } from "@/lib/keys";
 
 export const Route = createFileRoute("/music")({
   component: Music,
@@ -25,8 +26,6 @@ type PackTrack = {
   duration?: number | null;
 };
 
-const KEY_STORAGE = "ytguru-pixabay-key";
-
 function fmtDur(sec?: number | null) {
   if (!sec || !Number.isFinite(sec) || sec <= 0) return "";
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
@@ -47,14 +46,14 @@ function Music() {
   const [packError, setPackError] = useState("");
 
   useEffect(() => {
-    setApiKey(localStorage.getItem(KEY_STORAGE) ?? "");
+    setApiKey(getPixabayKey());
     api<{ tracks: PackTrack[] }>("/api/music/pack")
       .then((d) => setPack(d.tracks ?? []))
       .catch((e) => setPackError(e instanceof Error ? e.message : "Could not load the starter pack."));
   }, []);
 
   const saveKey = () => {
-    localStorage.setItem(KEY_STORAGE, apiKey.trim());
+    setPixabayKey(apiKey);
     setKeySaved(true);
     setError("");
   };

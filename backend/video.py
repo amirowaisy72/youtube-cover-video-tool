@@ -413,6 +413,32 @@ def get_duration(path: str | Path) -> float | None:
         return None
 
 
+def decode_audio_16k(path: str | Path):
+    """Decode any audio/video file to 16kHz mono float32 samples
+    (what Whisper wants), using FFmpeg — NOT faster-whisper's
+    own av-based decoder. faster-whisper 1.2.1 calls
+    av.open(..., metadata_errors='ignore'), but the av version
+    pip installs (19.x) removed that kwarg, so passing a file
+    path to model.transcribe() raises TypeError. Passing a
+    numpy array skips faster-whisper's decoder entirely, so it
+    works with any av version. Returns the samples array, or
+    None on failure."""
+    try:
+        import numpy as np
+    except Exception:
+        return None
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", str(path),
+             "-ar", "16000", "-ac", "1", "-f", "s16le", "-"],
+            capture_output=True, **no_window_kwargs())
+        if proc.returncode != 0 or not proc.stdout:
+            return None
+        return np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+    except Exception:
+        return None
+
+
 def _parse_ffmpeg_time(line: str) -> float | None:
     m = re.search(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)", line)
     if not m:

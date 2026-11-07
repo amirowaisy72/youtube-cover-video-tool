@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ApiError, api } from "@/lib/api";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/downloader")({
   component: Downloader,
@@ -40,6 +41,7 @@ function fmtSpeed(bps: number | null | undefined) {
 }
 
 function Downloader() {
+  const { jobs, registerJob, updateJob } = useApp();
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<"mp4" | "mp3">("mp4");
   const [progress, setProgress] = useState<number | null>(null);
@@ -47,6 +49,7 @@ function Downloader() {
   const [done, setDone] = useState<DlStatus | null>(null);
   const [dlError, setDlError] = useState("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobKey = useRef<string | null>(null);
 
   useEffect(
     () => () => {
@@ -54,6 +57,59 @@ function Downloader() {
     },
     [],
   );
+
+  const poll = (id: string) => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(async () => {
+      try {
+        const st = await api<DlStatus>(`/api/downloader/${id}`);
+        setProgress(st.progress ?? 0);
+        if (jobKey.current) {
+          updateJob(jobKey.current, {
+            progress: st.progress ?? 0,
+            stage: st.title || "Downloading…",
+            status: st.status === "done" ? "done" : st.status === "failed" ? "failed" : "running",
+          });
+        }
+        if (st.status === "done") {
+          if (timer.current) clearInterval(timer.current);
+          setProgress(null);
+          setDone(st);
+        } else if (st.status === "failed") {
+          if (timer.current) clearInterval(timer.current);
+          setProgress(null);
+          setDlError("Download failed: " + (st.error || "unknown error"));
+        }
+      } catch (e) {
+        if (timer.current) clearInterval(timer.current);
+        setProgress(null);
+        setDlError(
+          "Download progress check failed: " +
+            (e instanceof Error ? e.message : "unknown error"),
+        );
+      }
+    }, 1000);
+  };
+
+  // Restore a download that was started earlier and is still
+  // in the background store (user left the page and came back
+  // via the top progress bar, or refreshed). The backend job
+  // kept running the whole time.
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "downloader" && j.status === "running");
+    const finished = jobs.find((j) => j.tool === "downloader" && j.status === "done");
+    const found = active ?? finished;
+    if (!found || jobId) return;
+    jobKey.current = found.key;
+    setJobId(found.jobId);
+    void api<DlStatus>(`/api/downloader/${found.jobId}`).then((st) => {
+      if (st.status === "done") { setDone(st); setProgress(null); }
+      else if (st.status === "failed") setDlError("Download failed: " + (st.error || "unknown error"));
+      else { setProgress(st.progress ?? 0); poll(found.jobId); }
+    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startDownload = async () => {
     if (!url.trim()) {
@@ -71,29 +127,12 @@ function Downloader() {
         body: JSON.stringify({ url: url.trim(), format }),
       });
       setJobId(data.job_id);
-      if (timer.current) clearInterval(timer.current);
-      timer.current = setInterval(async () => {
-        try {
-          const st = await api<DlStatus>(`/api/downloader/${data.job_id}`);
-          setProgress(st.progress ?? 0);
-          if (st.status === "done") {
-            if (timer.current) clearInterval(timer.current);
-            setProgress(null);
-            setDone(st);
-          } else if (st.status === "failed") {
-            if (timer.current) clearInterval(timer.current);
-            setProgress(null);
-            setDlError("Download failed: " + (st.error || "unknown error"));
-          }
-        } catch (e) {
-          if (timer.current) clearInterval(timer.current);
-          setProgress(null);
-          setDlError(
-            "Download progress check failed: " +
-              (e instanceof Error ? e.message : "unknown error"),
-          );
-        }
-      }, 1000);
+      // Background job: the download keeps running if the user
+      // leaves this page, and the top bar shows its progress.
+      const key = `downloader:${data.job_id}`;
+      jobKey.current = key;
+      registerJob({ key, tool: "downloader", title: url.trim(), route: "/downloader", jobId: data.job_id });
+      poll(data.job_id);
     } catch (e) {
       setProgress(null);
       setDlError(
@@ -168,7 +207,7 @@ function Downloader() {
               <div style={{ width: `${progress ?? 0}%` }} />
             </div>
             <p className="text-sm text-muted-foreground">
-              Downloading your file… keep this tab open.
+              Downloading your file… you can leave this page — the download keeps running and the top bar shows its progress.
             </p>
           </>
         )}

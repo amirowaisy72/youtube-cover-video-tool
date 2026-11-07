@@ -46,6 +46,7 @@ import json
 import math
 import re
 import subprocess
+import threading
 import urllib.parse
 from pathlib import Path
 
@@ -179,7 +180,9 @@ def _find_font() -> str | None:
 def _scene_visual(title: str, scene: dict, visuals: str,
                   work_dir: Path, index: int,
                   used_urls: set | None = None,
-                  lock=None) -> tuple[Path, str, str]:
+                  lock=None,
+                  pexels_key: str | None = None,
+                  pixabay_key: str | None = None) -> tuple[Path, str, str]:
     """Best visual for one scene. Returns (path, kind, source).
     kind is 'clip', 'image', 'ai' or 'card'.
     DEDUP RULE: a Commons URL used in an earlier scene is never
@@ -200,7 +203,9 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # Great Wall scene showed an irrelevant clip.
     title_core = {autovideo._norm_word(w) for w in autovideo.core_words(title)}
     search_text = f"{title} {visual_text}"
-    found = autovideo.fetch_visuals(search_text, visuals)
+    found = autovideo.fetch_visuals(search_text, visuals,
+                                    pexels_key=pexels_key,
+                                    pixabay_key=pixabay_key)
 
     def _on_topic(item: dict) -> bool:
         if not title_core:
@@ -253,6 +258,105 @@ def _caption_text(scene: dict) -> str:
     return sentence
 
 
+def _srt_time(seconds: float) -> str:
+    """Seconds -> SRT timestamp 'HH:MM:SS,mmm'."""
+    total_ms = max(0, int(round(seconds * 1000)))
+    h, rem = divmod(total_ms, 3_600_000)
+    m, rem = divmod(rem, 60_000)
+    s, ms = divmod(rem, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _words_to_srt(words: list[dict]) -> str:
+    """Word-level timestamps -> SRT cues, YouTube-caption style:
+    short phrases (up to 5 words, ~2 seconds each) that change
+    as the voice speaks. A single word per cue would flash too
+    fast to read; a whole sentence per cue would lag behind the
+    voice. Breaks at sentence punctuation when one is near."""
+    cues: list[tuple[float, float, str]] = []
+    current: list[dict] = []
+    for w in words:
+        current.append(w)
+        text = " ".join(x["word"] for x in current)
+        span = w["end"] - current[0]["start"]
+        ends_sentence = w["word"].rstrip().endswith((".", "!", "?"))
+        if (len(current) >= 5 or span >= 2.0 or ends_sentence) and len(current) >= 2:
+            cues.append((current[0]["start"], current[-1]["end"], text))
+            current = []
+        elif ends_sentence and len(current) == 1:
+            cues.append((current[0]["start"], current[-1]["end"], text))
+            current = []
+    if current:
+        cues.append((current[0]["start"], current[-1]["end"],
+                      " ".join(x["word"] for x in current)))
+    lines: list[str] = []
+    for i, (start, end, text) in enumerate(cues, 1):
+        lines.append(str(i))
+        lines.append(f"{_srt_time(start)} --> {_srt_time(end)}")
+        lines.append(text)
+        lines.append("")
+    return "\n".join(lines)
+
+
+_WHISPER_MODEL = None
+_WHISPER_LOCK = threading.Lock()
+
+
+def _get_whisper_model():
+    """Lazy-load the tiny speech model once per process (same
+    model as the Subtitles tool: ~75 MB, downloaded from
+    Hugging Face on first use only, then cached). Thread-safe:
+    scenes are built in parallel, so only one worker may load
+    it."""
+    global _WHISPER_MODEL
+    if _WHISPER_MODEL is not None:
+        return _WHISPER_MODEL
+    with _WHISPER_LOCK:
+        if _WHISPER_MODEL is not None:
+            return _WHISPER_MODEL
+        from faster_whisper import WhisperModel
+        _WHISPER_MODEL = WhisperModel("tiny", device="cpu", compute_type="int8")
+        return _WHISPER_MODEL
+
+
+def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Path | None:
+    """Transcribe ONE scene's voiceover with word timestamps and
+    write a per-scene SRT (times relative to the scene start,
+    0.0s — the scene's voice starts at 0.0s inside its segment,
+    so the SRT aligns automatically). Returns the SRT path, or
+    None on ANY failure: a subtitle failure must never break a
+    scene — the segment is then built with its static caption
+    instead."""
+    try:
+        model = _get_whisper_model()
+        # Decode with FFmpeg to a numpy array (video.decode_audio_16k)
+        # instead of passing the file path: faster-whisper's own
+        # av-based decoder is broken with the av version pip
+        # installs (av 19 removed the metadata_errors kwarg
+        # faster-whisper 1.2.1 passes). A numpy array skips that
+        # decoder entirely.
+        audio = video_module.decode_audio_16k(voice_path)
+        if audio is None:
+            return None
+        segments_iter, _info = model.transcribe(
+            audio, language="en", beam_size=5, word_timestamps=True)
+        words: list[dict] = []
+        for seg in segments_iter:
+            for w in (seg.words or []):
+                text = (w.word or "").strip()
+                if text:
+                    words.append({
+                        "start": float(w.start), "end": float(w.end),
+                        "word": text})
+        if not words:
+            return None
+        srt_path = work_dir / f"scene-{index:02d}.srt"
+        srt_path.write_text(_words_to_srt(words), encoding="utf-8")
+        return srt_path
+    except Exception:
+        return None
+
+
 def _burn_caption(image_path: Path, caption: str, dest: Path) -> Path:
     """Burn a caption bar into a still image with Pillow.
     Returns dest on success, otherwise the original image
@@ -288,12 +392,34 @@ def _burn_caption(image_path: Path, caption: str, dest: Path) -> Path:
         return image_path
 
 
+# Live-caption style for the burned-in word-by-word subtitles
+# (YouTube style: white text, black outline, bottom centre).
+# The subtitles filter burns the per-scene SRT into the segment
+# during its encode — no extra re-encode pass.
+_SUBTITLE_STYLE = (
+    "FontName=Arial,FontSize=24,PrimaryColour=&HFFFFFF,"
+    "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
+    "Alignment=2,MarginV=25"
+)
+
+
 def _segment_scene_image(image_path: Path, caption: str, duration: float,
-                         dest: Path, pan_right: bool) -> bool:
+                         dest: Path, pan_right: bool,
+                         subtitles_srt: Path | None = None) -> bool:
     """Still image -> moving segment: slow horizontal pan
-    (so a photo feels like video) + fade in/out + caption."""
-    captioned = dest.with_suffix(".cap.jpg")
-    shown = _burn_caption(image_path, caption, captioned)
+    (so a photo feels like video) + fade in/out + caption.
+    When subtitles_srt is given, the live word-by-word captions
+    replace the static caption (the two bottom texts must never
+    overlap): the Pillow caption is skipped and the SRT is burned
+    in with the subtitles filter. The SRT filename is passed
+    bare and FFmpeg runs with cwd=work_dir, so no path escaping
+    is needed (Windows drive letters contain ':' which the
+    filter graph would misread)."""
+    if subtitles_srt is not None:
+        shown = image_path
+    else:
+        captioned = dest.with_suffix(".cap.jpg")
+        shown = _burn_caption(image_path, caption, captioned)
     # Pan: scale up, then crop a 1280x720 window sliding
     # across. x goes 0 -> (in_w - out_w) or the reverse.
     # FFmpeg's crop filter has NO `duration` variable — the scene
@@ -307,33 +433,49 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
         "crop=1280:720:"
         f"x='(in_w-out_w)*({direction}/{duration})':y='(in_h-out_h)/2',"
         "format=yuv420p,"
+    )
+    if subtitles_srt is not None:
+        vf += (
+            f"subtitles='{subtitles_srt.name}':"
+            f"force_style='{_SUBTITLE_STYLE}',"
+        )
+    vf += (
         f"fade=t=in:st=0:d=0.5,fade=t=out:st={max(duration - 0.5, 0)}:d=0.5"
     )
     cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(shown),
            "-vf", vf, "-r", "30", "-t", str(duration),
            "-c:v", "libx264", "-preset", "veryfast",
            "-pix_fmt", "yuv420p", str(dest)]
-    ok = subprocess.run(cmd, capture_output=True, text=True, **video_module.no_window_kwargs()).returncode == 0
-    if captioned.exists():
-        captioned.unlink(missing_ok=True)
+    run_kwargs = dict(video_module.no_window_kwargs())
+    if subtitles_srt is not None:
+        run_kwargs["cwd"] = str(dest.parent)
+    ok = subprocess.run(cmd, capture_output=True, text=True, **run_kwargs).returncode == 0
+    if subtitles_srt is None:
+        captioned = dest.with_suffix(".cap.jpg")
+        if captioned.exists():
+            captioned.unlink(missing_ok=True)
     return ok
 
 
 def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
-                        dest: Path) -> bool:
+                        dest: Path, subtitles_srt: Path | None = None) -> bool:
     """Clip -> scene segment, with the scene's caption burned
     in as a bottom bar (same first-sentence caption as image
     scenes, via drawtext + a text file so punctuation in the
     sentence cannot break the filter graph).
+    When subtitles_srt is given, the live word-by-word captions
+    replace the static caption (the two bottom texts must never
+    overlap): the drawtext caption is skipped and the SRT is
+    burned in with the subtitles filter.
     CRITICAL: if the source clip is shorter than the scene
     (e.g. a 14.7s clip for a 20.6s scene), loop it — otherwise
     the segment comes out short, the whole video comes out
     short, and -shortest cuts the last seconds of narration
     off. That exact bug cut 6 seconds off the first passing
     master test.
-    A caption failure must never break the scene: if the
-    captioned encode fails, the plain (uncaptioned) segment
-    is built instead."""
+    A caption/subtitle failure must never break the scene: if
+    the captioned/subtitled encode fails, the plain
+    (uncaptioned) segment is built instead."""
     base_vf = (
         "scale=1280:720:force_original_aspect_ratio=decrease,"
         "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p"
@@ -348,10 +490,25 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
                "-vf", vf, "-r", "30", "-t", str(duration), "-an",
                "-c:v", "libx264", "-preset", "veryfast",
                "-pix_fmt", "yuv420p", str(dest)]
-        return subprocess.run(cmd, capture_output=True, text=True, **video_module.no_window_kwargs()).returncode == 0
+        run_kwargs = dict(video_module.no_window_kwargs())
+        if subtitles_srt is not None:
+            run_kwargs["cwd"] = str(dest.parent)
+        return subprocess.run(cmd, capture_output=True, text=True, **run_kwargs).returncode == 0
 
     fade = (f"fade=t=in:st=0:d=0.5,"
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
+    if subtitles_srt is not None:
+        subtitled_vf = (
+            f"{base_vf},"
+            f"subtitles='{subtitles_srt.name}':"
+            f"force_style='{_SUBTITLE_STYLE}',"
+            f"{fade}"
+        )
+        if _encode(subtitled_vf):
+            return True
+        # Subtitled encode failed: fall through to the plain
+        # segment below rather than losing the scene.
+        return _encode(f"{base_vf},{fade}")
     caption_file = None
     font = _find_font()
     if caption and font:
@@ -379,12 +536,19 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
 
 def _build_scene(index: int, scene: dict, title: str, visuals: str,
                  voice: str, work_dir: Path, used_urls: set, lock,
-                 expressive: bool = True) -> dict | None:
+                 expressive: bool = True, subtitles: bool = True,
+                 pexels_key: str | None = None,
+                 pixabay_key: str | None = None) -> dict | None:
     """Build ONE scene: its voiceover, its visual, its encoded
     segment. Scenes are independent until the final join, so
     this runs in a worker thread. Returns the scene's report +
     segment/voice paths, or None if the scene could not be
-    built (it is skipped, never a failed job)."""
+    built (it is skipped, never a failed job).
+    When subtitles is on, the scene's voiceover is transcribed
+    with faster-whisper (word timestamps) and the live captions
+    are burned into the segment; they replace the static
+    caption. A subtitle failure never breaks the scene — it
+    falls back to the static caption."""
     # Voice for this scene only, so its length is known before
     # its visual segment is built.
     voice_path, engine = tts_module.synthesize(
@@ -398,14 +562,20 @@ def _build_scene(index: int, scene: dict, title: str, visuals: str,
         # shipping a silent scene.
         return None
     visual_path, kind, visual_source = _scene_visual(
-        title, scene, visuals, work_dir, index, used_urls, lock)
+        title, scene, visuals, work_dir, index, used_urls, lock,
+        pexels_key=pexels_key, pixabay_key=pixabay_key)
     caption = _caption_text(scene)
+    subtitles_srt: Path | None = None
+    if subtitles:
+        subtitles_srt = _transcribe_scene_voice(voice_path, work_dir, index)
     dest = work_dir / f"master-seg-{index:02d}.mp4"
     if kind == "clip":
-        ok = _segment_scene_clip(visual_path, caption, duration, dest)
+        ok = _segment_scene_clip(visual_path, caption, duration, dest,
+                                 subtitles_srt=subtitles_srt)
     else:
         ok = _segment_scene_image(visual_path, caption, duration,
-                                  dest, pan_right=(index % 2 == 0))
+                                  dest, pan_right=(index % 2 == 0),
+                                  subtitles_srt=subtitles_srt)
     if not ok:
         # Segment encode failed: fall back to the old plain
         # segment builders for this scene.
@@ -432,7 +602,9 @@ def _build_scene(index: int, scene: dict, title: str, visuals: str,
 
 def run_master(title: str, minutes: int, visuals: str, voice: str,
                work_dir: Path, expressive: bool = True,
-               progress_cb=None) -> dict:
+               progress_cb=None, subtitles: bool = True,
+               pexels_key: str | None = None,
+               pixabay_key: str | None = None) -> dict:
     """Build a scene-based video. Returns a report dict with
     final_path, script, scenes, durations and counts. Every
     failure inside a scene falls back to the next option;
@@ -467,7 +639,8 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(_build_scene, index, scene, title, visuals,
-                        voice, work_dir, used_urls, lock, expressive): index
+                        voice, work_dir, used_urls, lock, expressive,
+                        subtitles, pexels_key, pixabay_key): index
             for index, scene in enumerate(scenes)
         }
         done = 0

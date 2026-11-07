@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/audio")({
   component: AudioExtractor,
@@ -33,6 +34,7 @@ function fmtSize(bytes?: number | null) {
 }
 
 function AudioExtractor() {
+  const { jobs, registerJob, updateJob } = useApp();
   const [mode, setMode] = useState<"upload" | "url">("upload");
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
@@ -45,6 +47,7 @@ function AudioExtractor() {
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobKey = useRef<string | null>(null);
 
   useEffect(
     () => () => {
@@ -52,6 +55,30 @@ function AudioExtractor() {
     },
     [],
   );
+
+  // Restore an extraction that was started earlier and is still
+  // in the background store (user left the page and came back
+  // via the top progress bar, or refreshed). The backend job
+  // kept running the whole time.
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "audio" && j.status === "running");
+    const finished = jobs.find((j) => j.tool === "audio" && j.status === "done");
+    const found = active ?? finished;
+    if (!found || jobId) return;
+    jobKey.current = found.key;
+    setJobId(found.jobId);
+    void fetch(`/api/audio/${found.jobId}`).then(async (r) => {
+      const data = (await apiJson(r)) as unknown as AudioStatus;
+      setProgress(data.progress ?? 0);
+      setStatus(data.status);
+      if (data.title) setTitle(data.title);
+      if (data.status === "done") { setProgress(null); setDownloadUrl(data.download_url ?? null); setSizeBytes(data.size_bytes ?? null); }
+      else if (data.status === "failed") { setProgress(null); setError("Extraction failed: " + (data.error || "unknown error")); }
+      else startPolling(found.jobId);
+    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startPolling = (id: string) => {
     if (pollTimer.current) clearInterval(pollTimer.current);
@@ -62,6 +89,13 @@ function AudioExtractor() {
         setProgress(data.progress ?? 0);
         setStatus(data.status);
         if (data.title) setTitle(data.title);
+        if (jobKey.current) {
+          updateJob(jobKey.current, {
+            progress: data.progress ?? 0,
+            stage: data.status === "downloading" ? "Downloading audio…" : data.status === "converting" ? "Converting to MP3…" : data.title || "Extracting audio…",
+            status: data.status === "done" ? "done" : data.status === "failed" ? "failed" : "running",
+          });
+        }
         if (data.status === "done") {
           if (pollTimer.current) clearInterval(pollTimer.current);
           setProgress(null);
@@ -104,6 +138,11 @@ function AudioExtractor() {
       const id = String(data["job_id"] ?? "");
       if (!id) throw new Error("Server did not return a job id.");
       setJobId(id);
+      // Background job: the extraction keeps running if the user
+      // leaves this page, and the top bar shows its progress.
+      const key = `audio:${id}`;
+      jobKey.current = key;
+      registerJob({ key, tool: "audio", title: mode === "url" ? url.trim() : (file?.name || "Audio"), route: "/audio", jobId: id });
       startPolling(id);
     } catch (e) {
       setProgress(null);
@@ -224,7 +263,7 @@ function AudioExtractor() {
 
       {jobId && !downloadUrl && !error && (
         <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-muted-foreground">
-          Extracting… keep this page open. You can start a new one when it finishes.
+          Extracting… you can leave this page — it keeps running and the top bar shows its progress.
         </p>
       )}
     </div>

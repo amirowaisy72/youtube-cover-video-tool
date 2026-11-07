@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ApiError, api } from "@/lib/api";
+import { getPexelsKey, getPixabayKey, setPexelsKey as savePexelsKey, setPixabayKey as savePixabayKey } from "@/lib/keys";
 
 export const Route = createFileRoute("/stock")({
   component: Stock,
@@ -17,9 +18,6 @@ type SearchResult = {
 };
 
 type Source = "pixabay" | "pexels";
-
-const PIXABAY_KEY_STORAGE = "ytguru-pixabay-key";
-const PEXELS_KEY_STORAGE = "ytguru-pexels-key";
 
 function fmtDur(sec?: number | null) {
   if (!sec || !Number.isFinite(sec) || sec <= 0) return "";
@@ -40,8 +38,8 @@ function Stock() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setPixabayKey(localStorage.getItem(PIXABAY_KEY_STORAGE) ?? "");
-    setPexelsKey(localStorage.getItem(PEXELS_KEY_STORAGE) ?? "");
+    setPixabayKey(getPixabayKey());
+    setPexelsKey(getPexelsKey());
   }, []);
 
   const activeKey = source === "pixabay" ? pixabayKey : pexelsKey;
@@ -53,8 +51,8 @@ function Stock() {
   };
 
   const saveKey = () => {
-    if (source === "pixabay") localStorage.setItem(PIXABAY_KEY_STORAGE, pixabayKey.trim());
-    else localStorage.setItem(PEXELS_KEY_STORAGE, pexelsKey.trim());
+    if (source === "pixabay") savePixabayKey(pixabayKey);
+    else savePexelsKey(pexelsKey);
     setKeySaved(true);
     setError("");
   };

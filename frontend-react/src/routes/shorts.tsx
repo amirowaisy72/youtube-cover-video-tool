@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ApiError, api } from "@/lib/api";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/shorts")({
   component: Shorts,
@@ -32,6 +33,7 @@ function fmtDur(sec: number) {
 }
 
 function Shorts() {
+  const { jobs, registerJob, updateJob } = useApp();
   const [mode, setMode] = useState<"upload" | "youtube">("upload");
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -46,10 +48,32 @@ function Shorts() {
   const [runError, setRunError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobKey = useRef<string | null>(null);
 
   useEffect(() => () => {
     if (timer.current) clearInterval(timer.current);
     if (fileUrl) URL.revokeObjectURL(fileUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Restore a Short that was started earlier and is still in
+  // the background store (user left the page and came back via
+  // the top progress bar, or refreshed). The backend job kept
+  // running the whole time.
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "shorts" && j.status === "running");
+    const finished = jobs.find((j) => j.tool === "shorts" && j.status === "done");
+    const found = active ?? finished;
+    if (!found || jobId) return;
+    jobKey.current = found.key;
+    setJobId(found.jobId);
+    void api<ShortsJob>(`/api/shorts/${found.jobId}`).then((j) => {
+      setJob(j);
+      if (j.status === "done") setWorking(false);
+      else if (j.status === "failed") { setWorking(false); setRunError(j.error || "Making the Short failed."); }
+      else { setWorking(true); startPolling(found.jobId); }
+    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    // Only on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,6 +118,13 @@ function Shorts() {
       try {
         const j = await api<ShortsJob>(`/api/shorts/${id}`);
         setJob(j);
+        if (jobKey.current) {
+          updateJob(jobKey.current, {
+            progress: j.progress ?? 0,
+            stage: j.stage || "Making the Short…",
+            status: j.status === "done" ? "done" : j.status === "failed" ? "failed" : "running",
+          });
+        }
         if (j.status === "done" || j.status === "failed") {
           if (timer.current) clearInterval(timer.current);
           setWorking(false);
@@ -133,6 +164,11 @@ function Shorts() {
         });
       }
       setJobId(data.job_id);
+      // Background job: the Short keeps building if the user
+      // leaves this page, and the top bar shows its progress.
+      const key = `shorts:${data.job_id}`;
+      jobKey.current = key;
+      registerJob({ key, tool: "shorts", title: mode === "youtube" ? url.trim() : (file?.name || "Short"), route: "/shorts", jobId: data.job_id });
       startPolling(data.job_id);
     } catch (e) {
       setWorking(false);

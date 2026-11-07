@@ -34,6 +34,8 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
+import video as video_module
+
 router = APIRouter(prefix="/api/subtitles")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -388,6 +390,17 @@ def _get_model():
         return _MODEL
 
 
+def _decode_for_whisper(media_path: Path):
+    """Decode media to 16kHz mono float32 for Whisper (see
+    video.decode_audio_16k for why a file path cannot be passed
+    to model.transcribe). Raises on failure so the job fails
+    with a clear error instead of silently producing nothing."""
+    audio = video_module.decode_audio_16k(media_path)
+    if audio is None:
+        raise RuntimeError("Could not decode the audio for transcription.")
+    return audio
+
+
 def _run_transcribe(job_id: str, media_path: Path, language: str | None) -> None:
     """Transcribe one media file and write subtitles.srt + job.json."""
     directory = _job_dir(job_id)
@@ -399,7 +412,13 @@ def _run_transcribe(job_id: str, media_path: Path, language: str | None) -> None
         _set(job_id, status="transcribing", progress=20,
              stage="Transcribing…", duration_sec=duration)
         segments_iter, info = model.transcribe(
-            str(media_path), language=language, beam_size=5,
+            # Decode with FFmpeg to a numpy array (video.decode_audio_16k)
+            # instead of passing the file path: faster-whisper's own
+            # av-based decoder is broken with the av version pip
+            # installs (av 19 removed the metadata_errors kwarg
+            # faster-whisper 1.2.1 passes). A numpy array skips that
+            # decoder entirely.
+            _decode_for_whisper(media_path), language=language, beam_size=5,
         )
         segments: list[dict] = []
         for seg in segments_iter:

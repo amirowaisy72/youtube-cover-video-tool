@@ -197,9 +197,13 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
         opts = {
             # Best quality, progressive single file first (fast,
             # one connection — same reason as Tool 1, user 2026-11-07),
-            # DASH only when no progressive file exists.
+            # DASH only when no progressive file exists. When DASH
+            # is used, its fragments download 8 at a time (the
+            # old code had no fragment setting, so DASH crawled
+            # 1 fragment at a time).
             "format": "b[ext=mp4]/b/bv*+ba/b",
             "merge_output_format": "mp4",
+            "concurrent_fragment_downloads": 8,
             "outtmpl": str(target),
             "progress_hooks": [hook],
             "quiet": True,
@@ -234,7 +238,9 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
             ]
         else:
             cmd = [
-                "yt-dlp", "-f", "bv*+ba/b", "--merge-output-format", "mp4",
+                "yt-dlp", "-f", "b[ext=mp4]/b/bv*+ba/b",
+                "--merge-output-format", "mp4",
+                "--concurrent-fragments", "8",
                 "-o", str(target), url,
             ]
         for attempt in range(1, 3):

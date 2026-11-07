@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  api,
   autovideoJob,
   factorToPitch,
   getJob,
@@ -71,7 +72,10 @@ export function profileFromPreset(p: Preset, existing: Record<string, unknown> =
     backend job the bar polls. */
 export type ActiveJob = {
   key: string;
-  tool: string; // "auto-video" | "cover" (add more tools here)
+  // One entry per tool that runs a background job:
+  // "auto-video" | "cover" | "downloader" | "trimmer" |
+  // "shorts" | "subtitles" | "audio". (add more tools here)
+  tool: string;
   title: string;
   route: string;
   jobId: string;
@@ -83,16 +87,23 @@ export type ActiveJob = {
 /** One status read for a job, normalised across tools. The
     cover auto job reports "processed" when done and uses
     auto_progress/auto_stage; the auto-video job uses the plain
-    fields and "done". */
+    fields and "done". Every other tool reports "done" /
+    "failed" / a running state with a progress number. */
 async function fetchJobStatus(tool: string, jobId: string): Promise<{
   progress: number; stage: string; status: "running" | "done" | "failed";
 }> {
+  const norm = (status: string): "running" | "done" | "failed" =>
+    status === "done" || status === "processed"
+      ? "done"
+      : status === "failed"
+        ? "failed"
+        : "running";
   if (tool === "auto-video") {
     const j = await autovideoJob(jobId);
     return {
       progress: j.progress ?? 0,
       stage: j.stage || "",
-      status: j.status === "done" ? "done" : j.status === "failed" ? "failed" : "running",
+      status: norm(j.status),
     };
   }
   if (tool === "cover") {
@@ -100,8 +111,33 @@ async function fetchJobStatus(tool: string, jobId: string): Promise<{
     return {
       progress: j.auto_progress ?? j.progress ?? 0,
       stage: j.auto_stage || j.stage || "",
-      status: j.status === "processed" ? "done" : j.status === "failed" ? "failed" : "running",
+      status: norm(j.status),
     };
+  }
+  if (tool === "downloader") {
+    const j = await api<{ status: string; progress?: number; title?: string }>(`/api/downloader/${jobId}`);
+    return { progress: j.progress ?? 0, stage: j.title || "Downloading…", status: norm(j.status) };
+  }
+  if (tool === "trimmer") {
+    const j = await api<{ status: string; progress?: number | null; title?: string }>(`/api/trimmer/${jobId}`);
+    return { progress: j.progress ?? 0, stage: j.title || "Trimming…", status: norm(j.status) };
+  }
+  if (tool === "shorts") {
+    const j = await api<{ status: string; progress?: number; stage?: string }>(`/api/shorts/${jobId}`);
+    return { progress: j.progress ?? 0, stage: j.stage || "Making the Short…", status: norm(j.status) };
+  }
+  if (tool === "subtitles") {
+    const j = await api<{ status: string; progress?: number; stage?: string }>(`/api/subtitles/${jobId}`);
+    return { progress: j.progress ?? 0, stage: j.stage || "Transcribing…", status: norm(j.status) };
+  }
+  if (tool === "audio") {
+    const j = await api<{ status: string; progress?: number; title?: string }>(`/api/audio/${jobId}`);
+    const stage = j.status === "downloading"
+      ? "Downloading audio…"
+      : j.status === "converting"
+        ? "Converting to MP3…"
+        : j.title || "Extracting audio…";
+    return { progress: j.progress ?? 0, stage, status: norm(j.status) };
   }
   return { progress: 0, stage: "", status: "running" };
 }

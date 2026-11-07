@@ -557,7 +557,55 @@ def _commons_search(query: str, filetype: str, limit: int = 20) -> list[dict]:
     return items
 
 
-def fetch_visuals(title: str, visuals: str) -> dict:
+def _search_stock_videos(query: str, pexels_key: str | None,
+                         pixabay_key: str | None) -> list[dict]:
+    """Search Pexels and Pixabay for stock video clips (user's
+    own free API keys — the Stock tool already uses them, and
+    the keys are shared via localStorage so entering one in any
+    tool connects it everywhere). Returns items in the same
+    shape as Commons results (url/title/mime), so the scene
+    picker can try them first. A bad key, a rate limit or a
+    network error just returns fewer (or no) results — the
+    caller falls back to Commons, never a failed job."""
+    items: list[dict] = []
+    if not query:
+        return items
+    try:
+        import tools_stock
+    except Exception:
+        return items
+    if pexels_key:
+        try:
+            data = tools_stock._search_pexels(query, 1, pexels_key)
+            for r in (data.get("results") or [])[:5]:
+                if r.get("video_url"):
+                    # Pexels returns no descriptive title, so the
+                    # query itself is the title: the clip was
+                    # returned for this query, so it is on-topic
+                    # by construction (and the scene picker's
+                    # on-topic check passes).
+                    items.append({
+                        "url": r["video_url"], "title": query,
+                        "mime": "video/mp4", "source": "pexels"})
+        except Exception:
+            pass
+    if pixabay_key:
+        try:
+            data = tools_stock._search_pixabay(query, 1, pixabay_key)
+            for r in (data.get("results") or [])[:5]:
+                if r.get("video_url"):
+                    items.append({
+                        "url": r["video_url"],
+                        "title": r.get("tags") or query,
+                        "mime": "video/mp4", "source": "pixabay"})
+        except Exception:
+            pass
+    return items
+
+
+def fetch_visuals(title: str, visuals: str,
+                  pexels_key: str | None = None,
+                  pixabay_key: str | None = None) -> dict:
     """Search Commons for images and/or videos, phrase-first.
 
     Queries are ONLY phrases: the full title, then the core
@@ -585,6 +633,20 @@ def fetch_visuals(title: str, visuals: str) -> dict:
     images: list[dict] = []
     videos: list[dict] = []
     seen_urls: set[str] = set()
+
+    # Stock footage first (when the user connected a Pexels /
+    # Pixabay key): their clips are professional, cinematic and
+    # higher quality than Commons, so they are tried before
+    # Commons. One search per platform with the core phrase
+    # (not per query — that would burn the free rate limit).
+    # A bad key or a failed search just means no stock clips;
+    # Commons below still fills the video.
+    if visuals in ("videos", "both") and (pexels_key or pixabay_key):
+        for item in _search_stock_videos(core_phrase, pexels_key, pixabay_key):
+            if item["url"] in seen_urls:
+                continue
+            seen_urls.add(item["url"])
+            videos.append(item)
 
     def _add(target: list[dict], candidates: list[dict], cap: int) -> None:
         scored = []

@@ -2075,6 +2075,13 @@ class AutoVideoRequest(BaseModel):
     visuals: str = "both"  # images | videos | both
     voice: str = "en-US-AriaNeural"
     expressive: bool = True
+    subtitles: bool = True  # live word-by-word captions (Whisper)
+    # Optional stock-media keys (free, user's own). When set,
+    # Pexels/Pixabay clips are tried before Commons. The keys
+    # are the user's, stored only in their browser, sent with
+    # each job and never saved on the server.
+    pexels_key: str | None = None
+    pixabay_key: str | None = None
 
 
 def _av_job_dir(job_id: str) -> Path:
@@ -2099,7 +2106,9 @@ def _av_write(job: dict) -> None:
 
 
 def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voice: str,
-                   expressive: bool = True) -> None:
+                   expressive: bool = True, subtitles: bool = True,
+                   pexels_key: str | None = None,
+                   pixabay_key: str | None = None) -> None:
     directory = _av_job_dir(job_id)
 
     def _set(stage: str, progress: float, extra: dict | None = None) -> None:
@@ -2129,7 +2138,9 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
 
             report = autovideo2.run_master(
                 title, minutes, visuals, voice, directory,
-                expressive=expressive, progress_cb=_master_progress)
+                expressive=expressive, progress_cb=_master_progress,
+                subtitles=subtitles,
+                pexels_key=pexels_key, pixabay_key=pixabay_key)
             kinds = report["kinds"]
             _set("done", 100, {
                 "status": "done",
@@ -2244,12 +2255,16 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
 
 
 def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: str,
-                   expressive: bool = True, job_token: str | None = None) -> None:
+                   expressive: bool = True, job_token: str | None = None,
+                   subtitles: bool = True,
+                   pexels_key: str | None = None,
+                   pixabay_key: str | None = None) -> None:
     """Auto-video worker with license accounting: the job token is
     reported completed when the video was produced, refunded
     otherwise — the customer never pays for a failed video."""
     try:
-        _run_autovideo_impl(job_id, title, minutes, visuals, voice, expressive)
+        _run_autovideo_impl(job_id, title, minutes, visuals, voice, expressive, subtitles,
+                            pexels_key, pixabay_key)
     except Exception:
         if job_token:
             licensing.refund(job_token)
@@ -2280,7 +2295,8 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
     threading.Thread(
         target=_run_autovideo,
         args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice,
-              payload.expressive, token),
+              payload.expressive, token, payload.subtitles,
+              payload.pexels_key, payload.pixabay_key),
         daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 

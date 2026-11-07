@@ -162,8 +162,15 @@ def _run_trim(job_id: str, url: str, start: float, end: float, target: Path) -> 
     # 2) Download ONLY the selected section.
     section_spec = f"*{_fmt_hms(start)}-{_fmt_hms(end)}"
     opts = {
+        # DASH-first is deliberate here: --download-sections only
+        # fetches the fragments inside the chosen time range, so a
+        # progressive file (whole video) would download far more.
+        # But its fragments must download in parallel — the old
+        # code had no fragment setting, so they crawled 1 at a
+        # time (slow). Same 8-fragment fix as the cover tool.
         "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720][ext=mp4]/bv*+ba/b",
         "merge_output_format": "mp4",
+        "concurrent_fragment_downloads": 8,
         "download_sections": [section_spec],
         "retries": 10,
         "fragment_retries": 10,
