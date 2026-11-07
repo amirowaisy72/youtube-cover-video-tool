@@ -118,6 +118,53 @@ def target_words(minutes: int) -> int:
     return max(150, minutes * WORDS_PER_MINUTE)
 
 
+def _is_heading_line(line: str) -> bool:
+    """True for a standalone section heading like "Hook", "Old
+    Beginnings" or "The Evolution of Earth" — the bare lines
+    Pollinations writes between paragraphs. The voiceover must
+    never read these aloud (the user heard "Hook..." spoken in
+    an Auto Video), and they are not sentences: a heading is a
+    short line (1-6 words), with no sentence-ending punctuation,
+    whose words are Title Case (small words like "of"/"the" may
+    be lowercase, digits are ignored). Real sentences end with
+    . ! ? or are longer or have lowercase words, so they are
+    never flagged."""
+    words = line.split()
+    if not (1 <= len(words) <= 6):
+        return False
+    if line[-1] in ".!?":
+        return False
+    if line.endswith(":"):
+        return True
+    small = {"a", "an", "the", "of", "in", "on", "and", "or", "to",
+             "for", "with", "from", "by", "at"}
+    for word in words:
+        core = word.strip(".,;:!?\"'’()")
+        if not core or core[0].isdigit():
+            continue
+        if core.lower() in small:
+            continue
+        if not core[0].isupper():
+            return False
+    return True
+
+
+def _strip_inline_heading(line: str) -> str:
+    """Strip a leading "Heading: rest" prefix, e.g. "Hook:
+    Picture the Earth..." -> "Picture the Earth...". Only when
+    the prefix is short and Title Case, so a normal sentence
+    that happens to contain a colon is left alone."""
+    match = re.match(r"^([^:]{1,60}):\s+(.+)$", line)
+    if not match:
+        return line
+    prefix, rest = match.group(1).strip(), match.group(2).strip()
+    if not rest or not rest[0].isupper():
+        return line
+    if _is_heading_line(prefix):
+        return rest
+    return line
+
+
 def _clean_script(text: str) -> str:
     text = re.sub(r"#{1,6}\s*", "", text or "")
     text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
@@ -135,6 +182,17 @@ def _clean_script(text: str) -> str:
              if not re.match(r"\s*(sources?|references?)\s*:", line, re.IGNORECASE)]
     text = "\n".join(lines)
     text = re.sub(r"\s*(Sources?|References?)\s*:.*$", "", text)
+    # Section headings ("Hook", "Old Beginnings", "The Evolution
+    # of Earth") are not spoken script — drop the bare line, or
+    # the "Heading: " prefix when it leads a sentence, so the
+    # voiceover never reads a heading aloud.
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped and _is_heading_line(stripped):
+            continue
+        lines.append(_strip_inline_heading(line) if stripped else line)
+    text = "\n".join(lines)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text
 
@@ -535,6 +593,7 @@ def _segment_image(image: Path, dest: Path, duration: float) -> bool:
            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
                   "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
            "-r", "30", "-t", str(duration), "-c:v", "libx264",
+           "-preset", "veryfast",
            "-pix_fmt", "yuv420p", str(dest)]
     return subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
 
@@ -544,6 +603,7 @@ def _segment_clip(clip: Path, dest: Path, duration: float) -> bool:
            "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
                   "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
            "-r", "30", "-t", str(duration), "-an", "-c:v", "libx264",
+           "-preset", "veryfast",
            "-pix_fmt", "yuv420p", str(dest)]
     return subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
 
@@ -599,7 +659,8 @@ def assemble(voice_path: Path, images: list[Path], clips: list[Path],
     video_only = work_dir / "video_only.mp4"
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
            "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)]
+           "-c:v", "libx264", "-preset", "veryfast",
+           "-pix_fmt", "yuv420p", str(video_only)]
     proc = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs())
     if proc.returncode != 0 or not video_only.exists():
         raise RuntimeError(f"Video assembly failed: {proc.stderr[-1000:]}")
@@ -715,7 +776,8 @@ def assemble_by_paragraphs(voice_path: Path,
     video_only = work_dir / "pvideo_only.mp4"
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
            "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)]
+           "-c:v", "libx264", "-preset", "veryfast",
+           "-pix_fmt", "yuv420p", str(video_only)]
     proc = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs())
     if proc.returncode != 0 or not video_only.exists():
         raise RuntimeError(f"Video assembly failed: {proc.stderr[-1000:]}")

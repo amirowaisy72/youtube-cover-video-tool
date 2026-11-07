@@ -56,7 +56,7 @@ function fmtDur(sec: number) {
 }
 
 function Cover() {
-  const { presets, activePresetId, settings, refreshSettings } = useApp();
+  const { presets, activePresetId, settings, refreshSettings, jobs, registerJob, updateJob, removeJob } = useApp();
   const [mode, setMode] = useState<"wizard" | "auto" | "group">("wizard");
   const [step, setStep] = useState(0);
   const [url, setUrl] = useState("");
@@ -340,6 +340,70 @@ function Cover() {
 
   const stale = renderFx && JSON.stringify(renderFx) !== JSON.stringify(fx);
 
+  // Auto-mode poller, shared by a fresh run and by restoring a
+  // background job (user left the page and came back via the
+  // top progress bar). `pfx` is the preset used for the run;
+  // on restore it is the current preset, which only affects
+  // the final preview's FX summary, not the finished video.
+  const coverJobKey = useRef<string | null>(null);
+  const pollAuto = (jobId: string, pfx: Fx) => {
+    if (autoTimer.current) clearInterval(autoTimer.current);
+    autoTimer.current = setInterval(async () => {
+      try {
+        const job = await getJob(jobId);
+        setAutoProgress(job.auto_progress ?? 0);
+        setAutoStage(AUTO_STAGES[job.auto_stage ?? ""] || job.auto_stage || "Working…");
+        setAutoTimeline(job.timeline || []);
+        setFinalJob(job);
+        if (coverJobKey.current) {
+          updateJob(coverJobKey.current, {
+            progress: job.auto_progress ?? job.progress ?? 0,
+            stage: AUTO_STAGES[job.auto_stage ?? ""] || job.auto_stage || job.stage || "",
+            status: job.status === "processed" ? "done" : job.status === "failed" ? "failed" : "running",
+          });
+        }
+        if (job.status === "processed" && job.auto_summary) {
+          if (autoTimer.current) clearInterval(autoTimer.current);
+          setAutoSummary(job.auto_summary);
+          setAutoProgress(null);
+          setRenderFx(pfx);
+          setPreviewUrl(`/api/preview/${jobId}?t=${Date.now()}`);
+          setFinalUrl(`/api/download/${jobId}`);
+          setStep(3);
+          setMode("wizard");
+        } else if (job.status === "failed") {
+          if (autoTimer.current) clearInterval(autoTimer.current);
+          setAutoProgress(null);
+          setAutoError("Auto failed: " + (job.error || "unknown error"));
+        }
+      } catch (e) {
+        if (autoTimer.current) clearInterval(autoTimer.current);
+        setAutoProgress(null);
+        setAutoError("Auto progress check failed: " + (e instanceof Error ? e.message : "unknown error"));
+      }
+    }, 1000);
+  };
+
+  // Restore a cover auto job that is still running in the
+  // background (see ActiveJob in app-store). The backend job
+  // kept running while the user was away.
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "cover" && j.status === "running");
+    if (!active) return;
+    coverJobKey.current = active.key;
+    setJobId(active.jobId);
+    setMode("auto");
+    setAutoProgress(active.progress ?? 0);
+    setAutoStage(active.stage || "Working…");
+    const p = presets.find((x) => x.id === activePresetId);
+    const pfx: Fx = p
+      ? { flip: p.flip, speed: p.speed, zoom: p.zoom, panX: p.panX, panY: p.panY, fit: p.fit, voice: p.voice, pitch: p.pitch }
+      : defaultPreset;
+    pollAuto(active.jobId, pfx);
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const runAuto = async () => {
     if (!url.trim()) { setAutoError("Paste a YouTube link for Auto mode first."); return; }
     setAutoError("");
@@ -356,34 +420,12 @@ function Cover() {
     try {
       const data = await autoVideo(url.trim(), coverObj?.id ?? covers[0]?.id ?? null);
       setJobId(data.job_id);
-      if (autoTimer.current) clearInterval(autoTimer.current);
-      autoTimer.current = setInterval(async () => {
-        try {
-          const job = await getJob(data.job_id);
-          setAutoProgress(job.auto_progress ?? 0);
-          setAutoStage(AUTO_STAGES[job.auto_stage ?? ""] || job.auto_stage || "Working…");
-          setAutoTimeline(job.timeline || []);
-          setFinalJob(job);
-          if (job.status === "processed" && job.auto_summary) {
-            if (autoTimer.current) clearInterval(autoTimer.current);
-            setAutoSummary(job.auto_summary);
-            setAutoProgress(null);
-            setRenderFx(pfx);
-            setPreviewUrl(`/api/preview/${data.job_id}?t=${Date.now()}`);
-            setFinalUrl(`/api/download/${data.job_id}`);
-            setStep(3);
-            setMode("wizard");
-          } else if (job.status === "failed") {
-            if (autoTimer.current) clearInterval(autoTimer.current);
-            setAutoProgress(null);
-            setAutoError("Auto failed: " + (job.error || "unknown error"));
-          }
-        } catch (e) {
-          if (autoTimer.current) clearInterval(autoTimer.current);
-          setAutoProgress(null);
-          setAutoError("Auto progress check failed: " + (e instanceof Error ? e.message : "unknown error"));
-        }
-      }, 1000);
+      // Background job: the build keeps running if the user
+      // leaves this page, and the top bar shows its progress.
+      const key = `cover:${data.job_id}`;
+      coverJobKey.current = key;
+      registerJob({ key, tool: "cover", title: url.trim(), route: "/cover", jobId: data.job_id });
+      pollAuto(data.job_id, pfx);
     } catch (e) {
       setAutoProgress(null);
       setAutoError(
@@ -913,7 +955,7 @@ function Cover() {
                   <h3 className="mb-4 font-semibold">Timeline</h3>
                   <Timeline job={finalJob} />
                 </div>
-                <button className="btn btn-ghost w-full" onClick={() => { setStep(0); setVideo(null); setRenderFx(null); setFinalJob(null); setPreviewUrl(null); setFinalUrl(null); }}>Start a new one</button>
+                <button className="btn btn-ghost w-full" onClick={() => { if (coverJobKey.current) removeJob(coverJobKey.current); coverJobKey.current = null; setStep(0); setVideo(null); setRenderFx(null); setFinalJob(null); setPreviewUrl(null); setFinalUrl(null); }}>Start a new one</button>
               </div>
             </div>
           )}

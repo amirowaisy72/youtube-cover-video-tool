@@ -10,6 +10,7 @@ import { useEffect } from "react";
 
 import { AppProvider } from "@/lib/app-store";
 import { TopBar } from "@/components/TopBar";
+import { ActiveJobsBar } from "@/components/ActiveJobsBar";
 
 function NotFoundComponent() {
   return (
@@ -85,6 +86,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <AppProvider>
         <TopBar />
+        <ActiveJobsBar />
         <main className="mx-auto max-w-6xl px-6 py-10">
           <Outlet />
         </main>

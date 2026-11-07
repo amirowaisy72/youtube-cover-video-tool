@@ -2119,9 +2119,17 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
         try:
             import autovideo2
             _set("Building scenes…", 10, {"status": "running"})
+
+            def _master_progress(done: int, total: int, stage: str) -> None:
+                # 10% for the script, 10-90% for the scenes, 90-100%
+                # for the join/mux. The old code sat at 10% for the
+                # whole build, which is why the bar looked stuck.
+                pct = 10 + (80 * done / max(total, 1)) if total else 10
+                _set(stage, round(pct, 1), {"status": "running"})
+
             report = autovideo2.run_master(
                 title, minutes, visuals, voice, directory,
-                expressive=expressive)
+                expressive=expressive, progress_cb=_master_progress)
             kinds = report["kinds"]
             _set("done", 100, {
                 "status": "done",

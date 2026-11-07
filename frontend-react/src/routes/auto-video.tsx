@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 // a comment-only edit does not change the built bundle.
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
+import { useApp } from "@/lib/app-store";
 import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene } from "@/lib/api";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -25,10 +26,15 @@ const lines = [
   "Nature's golden hour lasts only a few minutes.",
 ];
 
-/** Backend stage text -> which of the 4 build stages is current. */
+/** Backend stage text -> which of the 4 build stages is current.
+    The master pipeline reports per-scene progress ("Building
+    scene X of Y…"), which is the video-clip stage, and "Joining
+    scenes…" is the final assembly. */
 function stageIndex(job: AvJob | null): number {
   const s = (job?.stage || "").toLowerCase();
-  if (s.includes("script") || s.includes("building scenes")) return 0;
+  if (s.includes("building scene")) return 2;
+  if (s.includes("joining")) return 3;
+  if (s.includes("script")) return 0;
   if (s.includes("voiceover")) return 1;
   if (s.includes("visual")) return 2;
   if (s.includes("assembl")) return 3;
@@ -38,13 +44,64 @@ function stageIndex(job: AvJob | null): number {
 }
 
 function AutoVideo() {
+  const { jobs, registerJob, updateJob, removeJob } = useApp();
   const [title, setTitle] = useState("10 Mind-Blowing Facts About Our World");
   const [dur, setDur] = useState(2);
+  const [durInput, setDurInput] = useState("2");
   const [phase, setPhase] = useState<"form" | "build" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobKey = useRef<string | null>(null);
+
+  const poll = (id: string) => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(async () => {
+      try {
+        const j = await autovideoJob(id);
+        setJob(j);
+        if (jobKey.current) {
+          updateJob(jobKey.current, {
+            progress: j.progress ?? 0,
+            stage: j.stage || "",
+            status: j.status === "done" ? "done" : j.status === "failed" ? "failed" : "running",
+          });
+        }
+        if (j.status === "done") {
+          if (timer.current) clearInterval(timer.current);
+          setPhase("done");
+        } else if (j.status === "failed") {
+          if (timer.current) clearInterval(timer.current);
+          setPhase("form");
+          setError("Failed: " + (j.error || "Unknown error."));
+        }
+      } catch {
+        /* Keep polling on a transient error. */
+      }
+    }, 3000);
+  };
+
+  // Restore a job that was started earlier and is still in the
+  // background store (user left the page and came back via the
+  // top progress bar, or refreshed). The backend job kept
+  // running the whole time.
+  useEffect(() => {
+    const active = jobs.find((j) => j.tool === "auto-video" && j.status === "running");
+    const finished = jobs.find((j) => j.tool === "auto-video" && j.status === "done");
+    const found = active ?? finished;
+    if (!found || jobId) return;
+    jobKey.current = found.key;
+    setJobId(found.jobId);
+    void autovideoJob(found.jobId).then((j) => {
+      setJob(j);
+      if (j.status === "done") setPhase("done");
+      else if (j.status === "failed") { setPhase("form"); setError("Failed: " + (j.error || "Unknown error.")); }
+      else { setPhase("build"); poll(found.jobId); }
+    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
 
@@ -62,23 +119,12 @@ function AutoVideo() {
     try {
       const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural");
       setJobId(data.job_id);
-      if (timer.current) clearInterval(timer.current);
-      timer.current = setInterval(async () => {
-        try {
-          const j = await autovideoJob(data.job_id);
-          setJob(j);
-          if (j.status === "done") {
-            if (timer.current) clearInterval(timer.current);
-            setPhase("done");
-          } else if (j.status === "failed") {
-            if (timer.current) clearInterval(timer.current);
-            setPhase("form");
-            setError("Failed: " + (j.error || "Unknown error."));
-          }
-        } catch {
-          /* Keep polling on a transient error. */
-        }
-      }, 3000);
+      // Background job: the build keeps running if the user
+      // leaves this page, and the top bar shows its progress.
+      const key = `autovideo:${data.job_id}`;
+      jobKey.current = key;
+      registerJob({ key, tool: "auto-video", title: title.trim(), route: "/auto-video", jobId: data.job_id });
+      poll(data.job_id);
     } catch (e) {
       setPhase("form");
       setError(
@@ -102,9 +148,27 @@ function AutoVideo() {
           <div>
             <label className="mb-2 block font-semibold">Length</label>
             <div className="seg">
-              {[1, 2, 3, 5].map((d) => <button key={d} data-on={dur === d} onClick={() => setDur(d)}>{d} min</button>)}
+              {[1, 2, 3, 5].map((d) => <button key={d} data-on={dur === d} onClick={() => { setDur(d); setDurInput(String(d)); }}>{d} min</button>)}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">About {dur * 3} scenes · 1 credit</p>
+            <div className="mt-3 flex items-center gap-2">
+              <label className="text-sm text-muted-foreground" htmlFor="av-custom-min">Custom:</label>
+              <input
+                id="av-custom-min"
+                className="field w-20 text-center"
+                type="number" min={1} max={30} step={1}
+                value={durInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDurInput(v);
+                  const n = parseInt(v, 10);
+                  if (Number.isFinite(n)) setDur(Math.min(30, Math.max(1, n)));
+                }}
+                onBlur={() => setDurInput(String(dur))}
+                aria-label="Custom length in minutes"
+              />
+              <span className="text-sm text-muted-foreground">minutes (1–30)</span>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">About {dur * 3} scenes · 1 credit · longer videos take longer to build, scene by scene</p>
           </div>
           <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim()} onClick={() => void start()}>🚀 Build my video</button>
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -169,7 +233,7 @@ function AutoVideo() {
               {job.download_url && (
                 <a className="btn btn-amber flex-1" href={job.download_url} download={`autovideo-${jobId ?? "video"}.mp4`}>⬇ Download MP4</a>
               )}
-              <button className="btn btn-ghost" onClick={() => { setPhase("form"); setJob(null); }}>Make another</button>
+              <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); }}>Make another</button>
             </div>
           </div>
           <SceneList count={sceneCount} current={-1} scenes={job.scenes} done />

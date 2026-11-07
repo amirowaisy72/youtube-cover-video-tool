@@ -56,6 +56,33 @@ import video as video_module
 SCENE_MIN_WORDS = 30
 
 
+def _reserve_url(used_urls: set, lock, url: str) -> bool:
+    """Atomically claim a Commons URL for one scene; False if
+    another (parallel) scene already claimed it. The dedup rule
+    (a URL is never reused across scenes) must still hold when
+    scenes are built in parallel."""
+    if lock is not None:
+        with lock:
+            if url in used_urls:
+                return False
+            used_urls.add(url)
+            return True
+    if url in used_urls:
+        return False
+    used_urls.add(url)
+    return True
+
+
+def _release_url(used_urls: set, lock, url: str) -> None:
+    """Give a reservation back when its download/validation
+    failed, so another scene may still try that URL."""
+    if lock is not None:
+        with lock:
+            used_urls.discard(url)
+    else:
+        used_urls.discard(url)
+
+
 def _clean_text(text: str) -> str:
     return autovideo._clean_script(text or "")
 
@@ -151,14 +178,19 @@ def _find_font() -> str | None:
 
 def _scene_visual(title: str, scene: dict, visuals: str,
                   work_dir: Path, index: int,
-                  used_urls: set | None = None) -> tuple[Path, str, str]:
+                  used_urls: set | None = None,
+                  lock=None) -> tuple[Path, str, str]:
     """Best visual for one scene. Returns (path, kind, source).
     kind is 'clip', 'image', 'ai' or 'card'.
     DEDUP RULE: a Commons URL used in an earlier scene is never
     reused in a later scene — repetition was a real complaint
     about earlier versions, where the same picture kept coming
     back. Candidates are tried in score order, skipping used
-    ones, so each scene gets a fresh visual."""
+    ones, so each scene gets a fresh visual. When scenes are
+    built in parallel, `lock` makes the claim atomic: a URL is
+    reserved before its download starts and released if the
+    download fails, so two scenes can never end up with the
+    same visual."""
     used_urls = used_urls if used_urls is not None else set()
     visual_text = scene.get("visual") or scene["narration"][:200]
     # TITLE ANCHOR: search with the title in front, and reject
@@ -180,22 +212,26 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # description, best first.
     if visuals in ("videos", "both"):
         for item in found["videos"][:5]:
-            if item["url"] in used_urls or not _on_topic(item):
+            if not _on_topic(item):
+                continue
+            if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
             dest = work_dir / f"scene-{index:02d}{suffix}"
             if autovideo._download(item["url"], dest):
                 if autovideo._ffprobe_duration(dest):
-                    used_urls.add(item["url"])
                     return dest, "clip", item["title"]
+            _release_url(used_urls, lock, item["url"])
     if visuals in ("images", "both"):
         for item in found["images"][:5]:
-            if item["url"] in used_urls or not _on_topic(item):
+            if not _on_topic(item):
+                continue
+            if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             dest = work_dir / f"scene-{index:02d}.jpg"
             if autovideo._download(item["url"], dest) and autovideo._valid_image(dest):
-                used_urls.add(item["url"])
                 return dest, "image", item["title"]
+            _release_url(used_urls, lock, item["url"])
     # AI image for this scene's visual description.
     dest = work_dir / f"scene-{index:02d}-ai.jpg"
     if autovideo.generate_ai_image(title, visual_text, dest):
@@ -260,18 +296,24 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
     shown = _burn_caption(image_path, caption, captioned)
     # Pan: scale up, then crop a 1280x720 window sliding
     # across. x goes 0 -> (in_w - out_w) or the reverse.
-    direction = "t" if pan_right else "(duration-t)"
+    # FFmpeg's crop filter has NO `duration` variable — the scene
+    # length must be substituted as a number, or the filter fails
+    # ("Undefined constant ... 'duration'") and the scene falls
+    # back to a plain still. (That was a real bug: the pan never
+    # worked, so image scenes lost their motion + caption.)
+    direction = "t" if pan_right else f"({duration}-t)"
     vf = (
-        "scale=2560:1440:force_original_aspect_ratio=increase,"
+        "scale=1920:1080:force_original_aspect_ratio=increase,"
         "crop=1280:720:"
-        f"x='(in_w-out_w)*({direction}/duration)':y='(in_h-out_h)/2',"
+        f"x='(in_w-out_w)*({direction}/{duration})':y='(in_h-out_h)/2',"
         "format=yuv420p,"
         f"fade=t=in:st=0:d=0.5,fade=t=out:st={max(duration - 0.5, 0)}:d=0.5"
     )
     cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(shown),
            "-vf", vf, "-r", "30", "-t", str(duration),
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)]
-    ok = subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
+           "-c:v", "libx264", "-preset", "veryfast",
+           "-pix_fmt", "yuv420p", str(dest)]
+    ok = subprocess.run(cmd, capture_output=True, text=True, **video_module.no_window_kwargs()).returncode == 0
     if captioned.exists():
         captioned.unlink(missing_ok=True)
     return ok
@@ -304,8 +346,9 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
     def _encode(vf: str) -> bool:
         cmd = ["ffmpeg", "-y"] + loop_args + ["-i", str(clip_path),
                "-vf", vf, "-r", "30", "-t", str(duration), "-an",
-               "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)]
-        return subprocess.run(cmd, capture_output=True, text=True, **no_window_kwargs()).returncode == 0
+               "-c:v", "libx264", "-preset", "veryfast",
+               "-pix_fmt", "yuv420p", str(dest)]
+        return subprocess.run(cmd, capture_output=True, text=True, **video_module.no_window_kwargs()).returncode == 0
 
     fade = (f"fade=t=in:st=0:d=0.5,"
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
@@ -334,84 +377,158 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
     return _encode(f"{base_vf},{fade}")
 
 
+def _build_scene(index: int, scene: dict, title: str, visuals: str,
+                 voice: str, work_dir: Path, used_urls: set, lock,
+                 expressive: bool = True) -> dict | None:
+    """Build ONE scene: its voiceover, its visual, its encoded
+    segment. Scenes are independent until the final join, so
+    this runs in a worker thread. Returns the scene's report +
+    segment/voice paths, or None if the scene could not be
+    built (it is skipped, never a failed job)."""
+    # Voice for this scene only, so its length is known before
+    # its visual segment is built.
+    voice_path, engine = tts_module.synthesize(
+        scene["narration"], voice, "+0%", work_dir,
+        expressive=False)  # plain voice: SSML is banned
+    duration = video_module.get_duration(voice_path)
+    if not duration or duration <= 0:
+        # Retry once with the fallback engine path inside
+        # synthesize (it already falls back to gTTS); if still
+        # unmeasurable, skip this scene's voice rather than
+        # shipping a silent scene.
+        return None
+    visual_path, kind, visual_source = _scene_visual(
+        title, scene, visuals, work_dir, index, used_urls, lock)
+    caption = _caption_text(scene)
+    dest = work_dir / f"master-seg-{index:02d}.mp4"
+    if kind == "clip":
+        ok = _segment_scene_clip(visual_path, caption, duration, dest)
+    else:
+        ok = _segment_scene_image(visual_path, caption, duration,
+                                  dest, pan_right=(index % 2 == 0))
+    if not ok:
+        # Segment encode failed: fall back to the old plain
+        # segment builders for this scene.
+        if kind == "clip":
+            ok = autovideo._segment_clip(visual_path, dest, duration)
+        else:
+            ok = autovideo._segment_image(visual_path, dest, duration)
+    if not ok:
+        return None
+    return {
+        "index": index,
+        "narration": scene["narration"],
+        "visual": scene["visual"],
+        "caption": caption,
+        "kind": kind,
+        "visual_source": visual_source,
+        "duration_sec": round(duration, 1),
+        "segment": dest,
+        "voice_path": voice_path,
+        "duration": duration,
+        "engine": engine,
+    }
+
+
 def run_master(title: str, minutes: int, visuals: str, voice: str,
-               work_dir: Path, expressive: bool = True
-               ) -> dict:
+               work_dir: Path, expressive: bool = True,
+               progress_cb=None) -> dict:
     """Build a scene-based video. Returns a report dict with
     final_path, script, scenes, durations and counts. Every
     failure inside a scene falls back to the next option;
     only a total FFmpeg failure raises, and the caller then
-    falls back to the old pipeline."""
+    falls back to the old pipeline.
+
+    SPEED (2026-11-07): scenes are built in PARALLEL (up to 4
+    workers) instead of one after another — a scene's voiceover
+    (network), visual search (network) and segment encode (CPU)
+    are independent of the other scenes, so wall time drops
+    roughly by the worker count. The final join is a stream
+    COPY (segments are already 1280x720 yuv420p), not a second
+    full re-encode. progress_cb(done, total, stage) reports
+    real per-scene progress, so the bar no longer sits at 10%
+    for the whole build."""
+    import os
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     work_dir.mkdir(parents=True, exist_ok=True)
     scenes, source = generate_scenes(title, minutes)
     if not scenes:
         raise RuntimeError("Could not build a scene script.")
-    voice_files: list[Path] = []
-    durations: list[float] = []
-    scene_reports: list[dict] = []
-    segments: list[Path] = []
-    kinds = {"clip": 0, "image": 0, "ai": 0, "card": 0}
+    if progress_cb:
+        progress_cb(0, len(scenes), "Script ready — building scenes…")
+    workers = max(2, min(4, os.cpu_count() or 4))
     used_urls: set = set()
+    lock = threading.Lock()
+    kinds = {"clip": 0, "image": 0, "ai": 0, "card": 0}
     total_voice = 0.0
-    for index, scene in enumerate(scenes):
-        # Voice for this scene only, so its length is known
-        # before its visual segment is built.
-        voice_path, engine = tts_module.synthesize(
-            scene["narration"], voice, "+0%", work_dir,
-            expressive=False)  # plain voice: SSML is banned
-        duration = video_module.get_duration(voice_path)
-        if not duration or duration <= 0:
-            # Retry once with the fallback engine path inside
-            # synthesize (it already falls back to gTTS); if
-            # still unmeasurable, skip this scene's voice
-            # rather than shipping a silent scene.
-            continue
-        voice_files.append(voice_path)
-        durations.append(duration)
-        total_voice += duration
-        visual_path, kind, visual_source = _scene_visual(
-            title, scene, visuals, work_dir, index, used_urls)
-        kinds[kind] += 1
-        caption = _caption_text(scene)
-        dest = work_dir / f"master-seg-{index:02d}.mp4"
-        if kind == "clip":
-            ok = _segment_scene_clip(visual_path, caption, duration, dest)
-        else:
-            ok = _segment_scene_image(visual_path, caption, duration,
-                                      dest, pan_right=(index % 2 == 0))
-        if not ok:
-            # Segment encode failed: fall back to the old
-            # plain segment builders for this scene.
-            if kind == "clip":
-                ok = autovideo._segment_clip(visual_path, dest, duration)
-            else:
-                ok = autovideo._segment_image(visual_path, dest, duration)
-        if not ok:
-            continue
-        segments.append(dest)
-        scene_reports.append({
-            "narration": scene["narration"],
-            "visual": scene["visual"],
-            "caption": caption,
-            "kind": kind,
-            "visual_source": visual_source,
-            "duration_sec": round(duration, 1),
-        })
-    if not segments or not voice_files:
+    results: dict[int, dict] = {}
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(_build_scene, index, scene, title, visuals,
+                        voice, work_dir, used_urls, lock, expressive): index
+            for index, scene in enumerate(scenes)
+        }
+        done = 0
+        for future in as_completed(futures):
+            done += 1
+            result = future.result()
+            if result is not None:
+                results[result["index"]] = result
+                kinds[result["kind"]] += 1
+                total_voice += result["duration"]
+            if progress_cb:
+                progress_cb(done, len(scenes),
+                            f"Building scene {done} of {len(scenes)}…")
+    ordered = [results[i] for i in sorted(results)]
+    if not ordered:
         raise RuntimeError("Master pipeline produced no usable scenes.")
+    segments = [item["segment"] for item in ordered]
+    voice_files = [item["voice_path"] for item in ordered]
+    scene_reports = [{
+        "narration": item["narration"],
+        "visual": item["visual"],
+        "caption": item["caption"],
+        "kind": item["kind"],
+        "visual_source": item["visual_source"],
+        "duration_sec": item["duration_sec"],
+    } for item in ordered]
+    engine = ordered[0]["engine"]
     # Join scene segments, then mux the joined voiceover.
     list_file = work_dir / "master-concat.txt"
     list_file.write_text(
         "".join(f"file '{seg.resolve()}'\n" for seg in segments),
         encoding="utf-8")
     video_only = work_dir / "master-video-only.mp4"
+    # Segments are already 1280x720 yuv420p libx264 at 30fps, so
+    # a stream copy joins them with NO re-encode — the old code
+    # re-encoded the whole video a second time, which for a
+    # 20-minute video was 20 minutes of encoding wasted. If the
+    # copy join ever produces a bad/short file (mixed segment
+    # parameters), fall back to the re-encode.
+    joined_ok = False
     proc = subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
-         "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
-         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video_only)],
+         "-c:v", "copy", str(video_only)],
         capture_output=True, text=True, **video_module.no_window_kwargs())
-    if proc.returncode != 0 or not video_only.exists():
-        raise RuntimeError(f"Master video assembly failed: {proc.stderr[-1000:]}")
+    if proc.returncode == 0 and video_only.exists():
+        joined_dur = video_module.get_duration(video_only) or 0
+        if joined_dur >= total_voice * 0.9:
+            joined_ok = True
+    if not joined_ok:
+        if video_only.exists():
+            video_only.unlink(missing_ok=True)
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+             "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
+             "-c:v", "libx264", "-preset", "veryfast",
+             "-pix_fmt", "yuv420p", str(video_only)],
+            capture_output=True, text=True, **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not video_only.exists():
+            raise RuntimeError(f"Master video assembly failed: {proc.stderr[-1000:]}")
+    if progress_cb:
+        progress_cb(len(scenes), len(scenes), "Joining scenes…")
     audio_list = work_dir / "master-audio.txt"
     audio_list.write_text(
         "".join(f"file '{path.resolve()}'\n" for path in voice_files),

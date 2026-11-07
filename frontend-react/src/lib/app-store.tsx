@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  autovideoJob,
   factorToPitch,
+  getJob,
   getSettings,
   licenseActivate,
   licenseStatus,
@@ -59,6 +61,53 @@ export function profileFromPreset(p: Preset, existing: Record<string, unknown> =
   };
 }
 
+/** A long-running tool job that keeps working in the background
+    (user, 2026-11-07): when the user leaves a tool's page while
+    it is processing, the job is NOT cancelled — the backend
+    keeps running it — and a progress bar for it stays at the
+    top of the home page (and every page, under the TopBar).
+    Clicking it returns to that tool, which restores the job
+    view. `route` is where the bar links to; `jobId` is the
+    backend job the bar polls. */
+export type ActiveJob = {
+  key: string;
+  tool: string; // "auto-video" | "cover" (add more tools here)
+  title: string;
+  route: string;
+  jobId: string;
+  progress: number;
+  stage: string;
+  status: "running" | "done" | "failed";
+};
+
+/** One status read for a job, normalised across tools. The
+    cover auto job reports "processed" when done and uses
+    auto_progress/auto_stage; the auto-video job uses the plain
+    fields and "done". */
+async function fetchJobStatus(tool: string, jobId: string): Promise<{
+  progress: number; stage: string; status: "running" | "done" | "failed";
+}> {
+  if (tool === "auto-video") {
+    const j = await autovideoJob(jobId);
+    return {
+      progress: j.progress ?? 0,
+      stage: j.stage || "",
+      status: j.status === "done" ? "done" : j.status === "failed" ? "failed" : "running",
+    };
+  }
+  if (tool === "cover") {
+    const j = await getJob(jobId);
+    return {
+      progress: j.auto_progress ?? j.progress ?? 0,
+      stage: j.auto_stage || j.stage || "",
+      status: j.status === "processed" ? "done" : j.status === "failed" ? "failed" : "running",
+    };
+  }
+  return { progress: 0, stage: "", status: "running" };
+}
+
+const JOBS_STORAGE_KEY = "ytguru-active-jobs";
+
 type Store = {
   /** Credit balance from the license server; null when not activated / unknown. */
   credits: number | null;
@@ -75,6 +124,11 @@ type Store = {
   /** Raw backend settings (encoder/CRF/green rect/active preset...). */
   settings: Settings | null;
   refreshSettings: () => Promise<void>;
+  /** Long-running jobs, kept across routes (see ActiveJob). */
+  jobs: ActiveJob[];
+  registerJob: (job: Omit<ActiveJob, "progress" | "stage" | "status"> & { progress?: number; stage?: string }) => void;
+  updateJob: (key: string, patch: Partial<Pick<ActiveJob, "progress" | "stage" | "status">>) => void;
+  removeJob: (key: string) => void;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -85,6 +139,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [licenseKey, setKey] = useState<string | null>(null);
   const [licenseError, setLicenseError] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
+  // Background jobs (see ActiveJob): restored from localStorage
+  // so a refresh does not lose a running job either; the
+  // poller below corrects any stale "running" state.
+  const [jobs, setJobs] = useState<ActiveJob[]>(() => {
+    try {
+      const raw = localStorage.getItem(JOBS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as ActiveJob[];
+      return Array.isArray(parsed) ? parsed.filter((j) => j && j.key && j.jobId) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const registerJob = useCallback((job: Omit<ActiveJob, "progress" | "stage" | "status"> & { progress?: number; stage?: string }) => {
+    const full: ActiveJob = {
+      ...job,
+      progress: job.progress ?? 0,
+      stage: job.stage ?? "Starting…",
+      status: "running",
+    };
+    // One active job per tool: starting a new build replaces
+    // the previous one for that tool.
+    setJobs((prev) => [...prev.filter((j) => j.tool !== job.tool), full]);
+  }, []);
+
+  const updateJob = useCallback((key: string, patch: Partial<Pick<ActiveJob, "progress" | "stage" | "status">>) => {
+    setJobs((prev) => prev.map((j) => (j.key === key ? { ...j, ...patch } : j)));
+  }, []);
+
+  const removeJob = useCallback((key: string) => {
+    setJobs((prev) => prev.filter((j) => j.key !== key));
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
+    } catch {
+      // Storage full/blocked: jobs still work in memory.
+    }
+  }, [jobs]);
+
+  // Global poller: every 3s, refresh each running job's
+  // progress/stage. This is what keeps the bar moving after
+  // the user leaves the tool's page (the tool page's own
+  // poller stops when it unmounts). Finished jobs stay in the
+  // bar as "Ready" until dismissed, so the user can click
+  // through to the result.
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      const running = jobsRef.current.filter((j) => j.status === "running");
+      for (const job of running) {
+        try {
+          const s = await fetchJobStatus(job.tool, job.jobId);
+          setJobs((prev) => prev.map((j) => (j.key === job.key ? { ...j, ...s } : j)));
+        } catch {
+          // Transient poll error: keep the last known progress.
+        }
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Raw profiles (backend shape) kept alongside, so saving never
   // wipes keys the design does not edit (encoder, CRF, green rect...).
@@ -192,6 +310,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         credits, licensed, licenseKey, licenseError, activate, refreshLicense,
         presets, setPresets, activePresetId, setActivePresetId,
         settings, refreshSettings,
+        jobs, registerJob, updateJob, removeJob,
       }}
     >
       {children}
