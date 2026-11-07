@@ -29,6 +29,7 @@ YouTube downloads, so this adds no new requirement.
 from __future__ import annotations
 
 import json
+import math
 import re
 import subprocess
 import urllib.parse
@@ -119,25 +120,53 @@ def target_words(minutes: int) -> int:
 
 
 def _is_heading_line(line: str) -> bool:
-    """True for a standalone section heading like "Hook", "Old
-    Beginnings" or "The Evolution of Earth" — the bare lines
-    Pollinations writes between paragraphs. The voiceover must
-    never read these aloud (the user heard "Hook..." spoken in
-    an Auto Video), and they are not sentences: a heading is a
-    short line (1-6 words), with no sentence-ending punctuation,
-    whose words are Title Case (small words like "of"/"the" may
-    be lowercase, digits are ignored). Real sentences end with
-    . ! ? or are longer or have lowercase words, so they are
-    never flagged."""
+    """True for a section-heading line. Pollinations writes
+    headings in many shapes, and the voiceover must never read
+    any of them aloud (the user heard "Hook, a searing dream in
+    red" spoken in an Auto Video):
+      - bare label: "Hook", "Old Beginnings", "The Evolution of Earth"
+      - label with subtitle: "Hook, a searing dream in red"
+      - "Section One – Where Life Could Spark" / "Chapter 2: ..."
+      - label with a trailing period/colon: "Hook.", "Introduction:"
+    A heading is a short line (1-10 words) with no sentence-
+    ending punctuation (! or ?), that either is Title Case, or
+    starts with a known heading word (Hook, Introduction,
+    Section, ...), or matches the Section/Chapter/Part label
+    pattern. Real narration sentences end with . ! ? or are
+    longer or have lowercase words, so they are never flagged."""
     words = line.split()
-    if not (1 <= len(words) <= 6):
+    if not (1 <= len(words) <= 10):
         return False
-    if line[-1] in ".!?":
+    stripped = line.strip()
+    if stripped.endswith(("!", "?")):
         return False
-    if line.endswith(":"):
+    # "Section One – Title" / "Chapter 2: Title" / "Part 3 - ..."
+    if re.match(r"(?i)^(section|chapter|part)\s+\S+\s*[–—:\-]\s*.+$", stripped):
+        return True
+    # A trailing period is a label ("Hook.", "Introduction.")
+    # only for very short lines; a real sentence that short is
+    # almost never Title Case narration.
+    if stripped.endswith(".") and len(words) > 3:
+        return False
+    if stripped.endswith(":"):
         return True
     small = {"a", "an", "the", "of", "in", "on", "and", "or", "to",
              "for", "with", "from", "by", "at"}
+    heading_starters = {
+        "hook", "introduction", "intro", "conclusion", "outro",
+        "section", "chapter", "part", "prologue", "epilogue",
+        "beginning", "ending", "overview", "summary", "finale",
+        "closing", "opening",
+    }
+    first = words[0].strip(".,;:!?\"'’()").lower()
+    if first in heading_starters and not stripped.endswith("."):
+        return True
+    if first in heading_starters and len(words) <= 3:
+        return True
+    # Title Case: every word starts uppercase (small words and
+    # digits may be lowercase). "Hook, a searing dream in red"
+    # is NOT Title Case, so it is caught by the starter rule
+    # above ("Hook"); this rule catches "Old Beginnings" etc.
     for word in words:
         core = word.strip(".,;:!?\"'’()")
         if not core or core[0].isdigit():
@@ -150,11 +179,18 @@ def _is_heading_line(line: str) -> bool:
 
 
 def _strip_inline_heading(line: str) -> str:
-    """Strip a leading "Heading: rest" prefix, e.g. "Hook:
-    Picture the Earth..." -> "Picture the Earth...". Only when
-    the prefix is short and Title Case, so a normal sentence
-    that happens to contain a colon is left alone."""
-    match = re.match(r"^([^:]{1,60}):\s+(.+)$", line)
+    """Strip a leading "Heading: rest" / "Heading – rest" /
+    "Heading — rest" prefix, e.g. "Hook: Picture the Earth..."
+    -> "Picture the Earth...". Only when the prefix is short
+    and Title Case (or a known heading word), so a normal
+    sentence that happens to contain a colon or dash is left
+    alone. Also drops a trailing "Section N – Title" label
+    that Pollinations appends to the end of a narration line."""
+    # Trailing label: "...begins? Section One – Where Life Could Spark"
+    line = re.sub(
+        r"\s+(?i:section|chapter|part)\s+\S+\s*[–—:\-]\s*[^.!?\n]{1,80}$",
+        "", line)
+    match = re.match(r"^([^:–—\-]{1,60})\s*[:–—\-]\s+(.+)$", line)
     if not match:
         return line
     prefix, rest = match.group(1).strip(), match.group(2).strip()
@@ -197,17 +233,15 @@ def _clean_script(text: str) -> str:
     return text
 
 
-def generate_script(title: str, minutes: int) -> tuple[str, str]:
-    """Return (script, source). Source is pollinations, wikipedia,
-    or template — recorded so the UI can say honestly where the
-    script came from."""
-    words = target_words(minutes)
-    # Prompt wording matters: the clause "Do not include stage
-    # directions..." makes Pollinations return HTTP 400 for this
-    # title (bisect-tested 2026-11-03: that clause alone fails,
-    # while the other clauses pass). So it is deliberately left
-    # out; the script is cleaned of headings/markdown in code
-    # instead (_clean_script).
+def _generate_script_single(title: str, words: int) -> str:
+    """One Pollinations call for the whole script. Returns the
+    cleaned script, or "" on failure / too short. Prompt wording
+    matters: the clause "Do not include stage directions..."
+    makes Pollinations return HTTP 400 for this title
+    (bisect-tested 2026-11-03: that clause alone fails, while
+    the other clauses pass). So it is deliberately left out;
+    the script is cleaned of headings/markdown in code instead
+    (_clean_script)."""
     prompt = (
         f"Write a YouTube video script in English, in a warm, expressive, "
         f"storytelling spoken style, like a passionate narrator, about: "
@@ -221,36 +255,185 @@ def generate_script(title: str, minutes: int) -> tuple[str, str]:
     try:
         url = "https://text.pollinations.ai/" + urllib.parse.quote(prompt)
         raw = _http_get(url, timeout=180).decode("utf-8", "ignore")
-        script = _clean_script(raw)
-        if len(script.split()) >= words * 0.4:
-            # Pollinations often overshoots the word target (269
-            # words for a 150-word request), which would make a
-            # 1-minute video nearly 2 minutes. Trim to the last
-            # sentence boundary at or below 115% of target, so
-            # the voiceover stays about the requested minutes.
-            if len(script.split()) > words * 1.15:
-                sentences = re.split(r"(?<=[.!?])\s+", script)
-                trimmed, count = [], 0
-                for sentence in sentences:
-                    sentence_words = len(sentence.split())
-                    if count + sentence_words > words * 1.15 and trimmed:
-                        break
-                    trimmed.append(sentence)
-                    count += sentence_words
-                if trimmed:
-                    script = " ".join(trimmed)
-            return script, "pollinations"
+        return _clean_script(raw)
+    except Exception:
+        return ""
+
+
+def _trim_script(script: str, words: int) -> str:
+    """Trim an overshooting script to the last sentence boundary
+    at or below 115% of target, so the voiceover stays about
+    the requested minutes. Pollinations often overshoots (269
+    words for a 150-word request), which would make a 1-minute
+    video nearly 2 minutes."""
+    if len(script.split()) <= words * 1.15:
+        return script
+    sentences = re.split(r"(?<=[.!?])\s+", script)
+    trimmed, count = [], 0
+    for sentence in sentences:
+        sentence_words = len(sentence.split())
+        if count + sentence_words > words * 1.15 and trimmed:
+            break
+        trimmed.append(sentence)
+        count += sentence_words
+    return " ".join(trimmed) if trimmed else script
+
+
+def _section_focuses(title: str, count: int) -> list[str]:
+    """Section focuses for a long script. First try a short
+    outline call (one LLM call, ~seconds); if it fails, fall
+    back to generic focuses built from the title's core words.
+    Always returns exactly `count` focuses — if the outline
+    comes back short, it is padded with generic focuses, so a
+    top-up round never runs out of focuses (an IndexError here
+    used to crash the whole script build). The focuses only
+    steer each section — the LLM still writes real, specific
+    content for each one, so the result is never the generic
+    template."""
+    topic = " ".join(core_words(title)) or title
+    base = [
+        f"Introduction to {topic}",
+        f"The story of {topic}",
+        f"Key facts about {topic}",
+        f"Why {topic} matters",
+        f"Surprising details about {topic}",
+        f"The future of {topic}",
+    ]
+    try:
+        prompt = (
+            f"List {count} short section headings for a YouTube video "
+            f"script about: {title}. One heading per line, no numbers, "
+            f"no extra text."
+        )
+        url = "https://text.pollinations.ai/" + urllib.parse.quote(prompt)
+        raw = _http_get(url, timeout=60).decode("utf-8", "ignore")
+        lines = []
+        for ln in raw.splitlines():
+            ln = re.sub(r"^\s*[\d\.\-\*\)]+\s*", "", ln).strip()
+            ln = ln.strip("*# ").strip()
+            if 2 <= len(ln) <= 80 and not ln.lower().startswith(
+                    ("here", "sure", "note", "of course")):
+                lines.append(ln)
+        if len(lines) >= 3:
+            # Pad with generic focuses if the outline came back
+            # short of `count`.
+            for b in base:
+                if len(lines) >= count:
+                    break
+                if b not in lines:
+                    lines.append(b)
+            i = 0
+            while len(lines) < count:
+                lines.append(base[i % len(base)])
+                i += 1
+            return lines[:count]
     except Exception:
         pass
-    # Fallback 1: Wikipedia — factual, free, no key.
-    try:
-        search = _http_json(
-            "https://en.wikipedia.org/w/api.php?action=query&format=json"
-            "&list=search&srsearch=" + urllib.parse.quote(title) + "&srlimit=1",
-            timeout=30,
-        )
-        results = (search.get("query") or {}).get("search") or []
-        if results:
+    focuses: list[str] = []
+    while len(focuses) < count:
+        focuses.extend(base)
+    return focuses[:count]
+
+
+def _generate_section(title: str, focus: str, words: int) -> str:
+    """One section of the script (~words words). Two attempts:
+    a section that comes back empty or tiny is retried once,
+    because one failed section must not shrink the whole video.
+    A section under 150 words is treated as a failure (a real
+    section is ~350 words) and retried. Returns the cleaned
+    section, or "" if both attempts failed."""
+    prompt = (
+        f"Write one section of a YouTube video script in English, in a warm, "
+        f"expressive, storytelling spoken style, like a passionate narrator, "
+        f"about: {title}. This section is about: {focus}. Length: about "
+        f"{words} words. Write only the spoken narration for this section, "
+        f"in paragraphs. Do not include any section heading, title, or "
+        f"label — only the spoken words."
+    )
+    for _ in range(2):
+        try:
+            url = "https://text.pollinations.ai/" + urllib.parse.quote(prompt)
+            raw = _http_get(url, timeout=120).decode("utf-8", "ignore")
+            script = _clean_script(raw)
+            if len(script.split()) >= 150:
+                return script
+        except Exception:
+            pass
+    return ""
+
+
+def _generate_script_sections(title: str, words: int) -> str:
+    """Build a long script section by section. Pollinations caps
+    one response at ~650 words (measured 2026-11-07: a 4500-word
+    request returned 656), so a 30-minute (4500-word) script can
+    never come from one call — and the old code then threw the
+    good 656 words away (40% threshold) and fell back to the
+    150-word generic template, which is why the user's 30-minute
+    "Facts about Life at Mars" video got that template script.
+    Sections are generated in parallel (4 workers) and joined,
+    so the total reaches the target and the video is really the
+    requested length. TOP-UP: Pollinations sometimes returns a
+    short section or fails one, so after the first batch the
+    word count is checked, and if it is under 70% of target,
+    extra sections are generated in one more parallel batch —
+    the video must not come out short just because a few calls
+    were weak."""
+    from concurrent.futures import ThreadPoolExecutor
+    # Each Pollinations call returns ~400-500 words for a 500-word
+    # ask (it caps one response at ~650). Fewer, longer sections
+    # mean fewer slow network calls: a 30-minute script needs ~9
+    # sections, not 13. One top-up round only — a second round
+    # would make script generation alone take 4+ minutes.
+    per_section = 500
+    count = max(3, math.ceil(words / per_section))
+    count = min(count, 12)
+    section_words = max(250, math.ceil(words / count))
+    # Get a few extra focuses up front, so a top-up round never
+    # needs another outline call.
+    focuses = _section_focuses(title, count + 6)
+
+    def _batch(idxs: list[int]) -> list[str]:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            return list(pool.map(
+                lambda i: _generate_section(title, focuses[i], section_words),
+                idxs))
+
+    kept = [s for s in _batch(list(range(count))) if s]
+    total = sum(len(s.split()) for s in kept)
+    # One top-up round if the script came out short: add the
+    # missing sections in a single parallel batch. The video must
+    # not come out noticeably short just because a few calls were
+    # weak — a 30-minute request should give ~30 minutes, not 20.
+    if total < words * 0.75 and len(focuses) > count:
+        extra_n = min(6, math.ceil((words - total) / per_section))
+        extra_n = min(extra_n, len(focuses) - count)
+        if extra_n > 0:
+            extra = [s for s in _batch(
+                list(range(count, count + extra_n))) if s]
+            kept.extend(extra)
+    return "\n\n".join(kept)
+
+
+def _wikipedia_script(title: str) -> str:
+    """Factual script from Wikipedia (free, no key). Tries the
+    full title first, then the core phrase ("Facts about Life at
+    Mars" -> "life mars" -> the "Life on Mars" article), because
+    a clickbait title is rarely an article title. Returns "" if
+    no usable extract was found."""
+    queries = [title]
+    core_phrase = " ".join(core_words(title))
+    if core_phrase and core_phrase.lower() not in title.lower():
+        queries.append(core_phrase)
+    for query in queries:
+        try:
+            search = _http_json(
+                "https://en.wikipedia.org/w/api.php?action=query&format=json"
+                "&list=search&srsearch=" + urllib.parse.quote(query) + "&srlimit=1",
+                timeout=30,
+            )
+            results = (search.get("query") or {}).get("search") or []
+            if not results:
+                continue
             page_title = results[0]["title"]
             summary = _http_json(
                 "https://en.wikipedia.org/api/rest_v1/page/summary/"
@@ -268,9 +451,52 @@ def generate_script(title: str, minutes: int) -> tuple[str, str]:
                     f"this helpful, like and subscribe for more videos "
                     f"like this one, and I will see you in the next one."
                 )
-                return _clean_script(intro + extract + outro), "wikipedia"
-    except Exception:
-        pass
+                return _clean_script(intro + extract + outro)
+        except Exception:
+            continue
+    return ""
+
+
+def generate_script(title: str, minutes: int) -> tuple[str, str]:
+    """Return (script, source). Source is pollinations,
+    pollinations-sections, wikipedia, or template — recorded so
+    the UI can say honestly where the script came from.
+
+    Word-count manager (the efficiency rule): human speech is
+    ~150 words/minute, so the target is minutes x 150. Short
+    videos (<= 4 min, <= 600 words) come from one Pollinations
+    call, which can fulfil that length. Long videos are built
+    section by section (see _generate_script_sections), because
+    one call caps at ~650 words and can never fill 30 minutes.
+    The generic template is the last resort only, and only when
+    every free source failed — it must never replace a real
+    script just because one call came back short."""
+    words = target_words(minutes)
+    if words <= 600:
+        script = _generate_script_single(title, words)
+        if script and len(script.split()) >= max(120, words * 0.4):
+            return _trim_script(script, words), "pollinations"
+        # One call too short: top it up with sections, and keep
+        # whichever is longer — never throw a real script away.
+        sections = _generate_script_sections(title, words)
+        if sections and len(sections.split()) > len(script.split()):
+            return _trim_script(sections, words), "pollinations-sections"
+        if script:
+            return _trim_script(script, words), "pollinations"
+    else:
+        script = _generate_script_sections(title, words)
+        if script and len(script.split()) >= words * 0.4:
+            return _trim_script(script, words), "pollinations-sections"
+        # Sections fell short: try one call as a base, keep the longer.
+        single = _generate_script_single(title, words)
+        if single and len(single.split()) > len(script.split()):
+            return _trim_script(single, words), "pollinations"
+        if script:
+            return _trim_script(script, words), "pollinations-sections"
+    # Fallback 1: Wikipedia — factual, free, no key.
+    wiki = _wikipedia_script(title)
+    if wiki:
+        return wiki, "wikipedia"
     # Fallback 2: template — always works, but generic. Honest
     # labelling matters more than pretending this is unique.
     script = (
@@ -552,11 +778,26 @@ def generate_fallback_visuals(title: str, paragraphs: list[str],
 def split_paragraphs(script: str) -> list[str]:
     """Paragraphs from the script; if it is one long paragraph,
     group its sentences three at a time so visuals can still
-    change with the narration."""
+    change with the narration. Safety net: any heading line
+    that survived _clean_script is dropped here, and a paragraph
+    that is only a heading is dropped entirely — it must never
+    become a scene, or the voiceover would read it aloud."""
     paragraphs = [para.strip() for para in re.split(r"\n\s*\n", script) if para.strip()]
+    cleaned: list[str] = []
+    for para in paragraphs:
+        lines = [ln for ln in para.splitlines()
+                 if not (ln.strip() and _is_heading_line(ln.strip()))]
+        text = "\n".join(lines).strip()
+        if text:
+            cleaned.append(text)
+    paragraphs = cleaned
     if len(paragraphs) > 1:
         return paragraphs
-    sentences = re.split(r"(?<=[.!?])\s+", script.strip())
+    # One long paragraph: group its sentences three at a time.
+    # Use the cleaned text (headings already dropped), not the
+    # raw script, or a surviving heading would be spoken.
+    text = " ".join(paragraphs)
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     grouped: list[str] = []
     for i in range(0, len(sentences), 3):
         grouped.append(" ".join(sentences[i:i + 3]).strip())
