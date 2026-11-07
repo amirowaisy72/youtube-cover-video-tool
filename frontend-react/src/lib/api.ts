@@ -223,6 +223,109 @@ export const autoVideo = (url: string, coverId: string | null) =>
     body: JSON.stringify({ url, cover_id: coverId }),
   });
 
+// -------------------------------------------------------------------- group
+export type GroupItem = {
+  url: string;
+  preset_name?: string | null;
+  cover_id?: string | null;
+  upload: string;
+  status: string;
+  job_id?: string | null;
+  title?: string;
+  download_url?: string;
+  youtube_url?: string;
+  error?: string | null;
+  progress?: number;
+  stage?: string;
+  duration_sec?: number;
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  status: string;
+  current_index?: number | null;
+  items: GroupItem[];
+  elapsed_sec?: number | null;
+  eta_sec?: number | null;
+};
+
+export type GroupListItem = { id: string; name: string; status: string; total: number; done: number };
+
+export const videoInfo = (url: string) =>
+  api<{ title?: string; uploader?: string }>("/api/video-info", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+
+export const createGroup = (
+  name: string,
+  items: { url: string; preset_name: string | null; cover_id: string | null; upload: string }[],
+) =>
+  api<Group>("/api/groups", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, items }),
+  });
+
+export const getGroup = (id: string) => api<Group>(`/api/groups/${id}`);
+
+export const retryGroup = (id: string) =>
+  api<Group & { retried?: number; message?: string }>(`/api/groups/${id}/retry`, { method: "POST" });
+
+export const listGroups = async () => (await api<{ groups: GroupListItem[] }>("/api/groups")).groups;
+
+export const youtubeStatus = () =>
+  api<{ connected: boolean; channels?: { id: string; title: string }[] }>("/api/youtube/status");
+
+// YouTube sign-in, shared by the top bar and the Cover upload step:
+// opens Google sign-in, then polls until it finishes. Returns true
+// once the account is connected.
+export async function connectYoutubeFlow(): Promise<boolean> {
+  const data = await api<{ auth_url: string }>("/api/youtube/connect-start", { method: "POST" });
+  if (data.auth_url) window.open(data.auth_url, "_blank");
+  for (let i = 0; i < 150; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const st = await api<{ in_progress: boolean; error: string; connected: boolean }>(
+      "/api/youtube/connect-status",
+    );
+    if (st.error) throw new Error(st.error);
+    if (st.connected) return true;
+    if (!st.in_progress) break;
+  }
+  return false;
+}
+
+// ------------------------------------------------------------------ upload
+export const generateMetadata = (jobId: string, variant: number = 0) =>
+  api<{ job_id: string; generated_title: string; generated_description: string; generated_tags: string[] }>(
+    "/api/generate-metadata",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: jobId, variant }),
+    },
+  );
+
+export const uploadYoutube = (body: {
+  job_id: string;
+  title: string;
+  description: string;
+  tags: string;
+  privacy_status: string;
+  channel_id: string;
+}) =>
+  api<{ job_id: string; status: string; video_id?: string; url?: string; local_files_deleted?: boolean }>(
+    "/api/upload-youtube",
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  );
+
+export const uploadProgress = (jobId: string) =>
+  api<{ job_id: string; percent?: number; uploaded_bytes?: number; total_bytes?: number; status?: string }>(
+    `/api/upload-progress/${jobId}`,
+  );
+
 // --------------------------------------------------------------------- tts
 export const ttsVoices = () => api<{ voices: TtsVoice[]; max_text_chars: number }>("/api/tts/voices");
 
