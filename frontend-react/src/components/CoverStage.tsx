@@ -1,10 +1,45 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import coverImg from "@/assets/cover-template.jpg";
 import scene1 from "@/assets/scene-1.jpg";
 import type { Preset } from "@/lib/app-store";
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export const defaultRect: Rect = { x: 41.8, y: 16.7, w: 53, h: 61 };
+
+/**
+ * Map a % rect (of the FULL cover) to % of the VISIBLE region.
+ *
+ * The stage is aspect-video and the cover is object-cover, so a cover
+ * that is not 16:9 is centre-cropped — a 3:2 cover (e.g. 1920x1280)
+ * loses its top and bottom. The rect prop is % of the full cover, so
+ * rendering it as-is puts the video shifted down and too short, and
+ * green strips stay visible above and below it (user, 2026-11-07 —
+ * the same cover detected fine before the theme update, because the
+ * old frontend did not crop the cover to 16:9). Convert to % of the
+ * cropped region the user actually sees.
+ */
+function toVisibleRect(rect: Rect, cw: number, ch: number): Rect {
+  const containerAspect = 16 / 9;
+  const coverAspect = cw / ch;
+  let visX = 0, visY = 0, visW = cw, visH = ch;
+  if (coverAspect < containerAspect) {
+    visH = cw / containerAspect;
+    visY = (ch - visH) / 2;
+  } else if (coverAspect > containerAspect) {
+    visW = ch * containerAspect;
+    visX = (cw - visW) / 2;
+  }
+  const px = (rect.x / 100) * cw;
+  const py = (rect.y / 100) * ch;
+  const pw = (rect.w / 100) * cw;
+  const ph = (rect.h / 100) * ch;
+  return {
+    x: ((px - visX) / visW) * 100,
+    y: ((py - visY) / visH) * 100,
+    w: (pw / visW) * 100,
+    h: (ph / visH) * 100,
+  };
+}
 
 type Fx = Omit<Preset, "id" | "name">;
 export type CoverSize = { w: number; h: number };
@@ -24,11 +59,17 @@ export function CoverStage({ rect, fx, highlight, showVideo = true, playing = tr
   onVideoError?: (hasError: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [coverSize, setCoverSize] = useState<CoverSize | null>(null);
+  const onSize = (s: CoverSize) => { setCoverSize(s); onCoverSize?.(s); };
 
   // playbackRate is not a React prop — set it directly.
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = fx?.speed ?? 1;
   }, [fx?.speed]);
+
+  // Render the rect % of the visible (cropped) region, not of the
+  // full cover — see toVisibleRect above.
+  const disp = coverSize ? toVisibleRect(rect, coverSize.w, coverSize.h) : rect;
 
   const zoom = fx?.zoom ?? 1;
   // Same clamp the backend applies: pan is forced to 0 at zoom <= 1.
@@ -52,17 +93,17 @@ export function CoverStage({ rect, fx, highlight, showVideo = true, playing = tr
         coverIsVideo ? (
           <video src={coverUrl} muted loop autoPlay playsInline
             className="h-full w-full object-cover"
-            onLoadedMetadata={(e) => onCoverSize?.({ w: e.currentTarget.videoWidth || 1280, h: e.currentTarget.videoHeight || 720 })} />
+            onLoadedMetadata={(e) => onSize({ w: e.currentTarget.videoWidth || 1280, h: e.currentTarget.videoHeight || 720 })} />
         ) : (
           <img src={coverUrl} alt="Cover" className="h-full w-full object-cover"
-            onLoad={(e) => onCoverSize?.({ w: e.currentTarget.naturalWidth || 1280, h: e.currentTarget.naturalHeight || 720 })} />
+            onLoad={(e) => onSize({ w: e.currentTarget.naturalWidth || 1280, h: e.currentTarget.naturalHeight || 720 })} />
         )
       ) : (
         <img src={coverImg} alt="Cover" width={1280} height={720} className="h-full w-full object-cover" />
       )}
       <div className={`absolute overflow-hidden rounded-md ${highlight ? "chroma-zone" : ""}`}
         style={{
-          left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`,
+          left: `${disp.x}%`, top: `${disp.y}%`, width: `${disp.w}%`, height: `${disp.h}%`,
           background: "#000",
           ...(maskUrl
             ? {
