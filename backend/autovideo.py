@@ -119,6 +119,18 @@ def target_words(minutes: int) -> int:
     return max(150, minutes * WORDS_PER_MINUTE)
 
 
+# Known section-heading starter words. Used by _is_heading_line
+# and by the "Heading. Rest" strip in _strip_inline_heading
+# (the "Opening hook." case) — a period prefix is only stripped
+# when it starts with one of these, so "Dr. Smith..." is safe.
+_HEADING_STARTERS = {
+    "hook", "introduction", "intro", "conclusion", "outro",
+    "section", "chapter", "part", "prologue", "epilogue",
+    "beginning", "ending", "overview", "summary", "finale",
+    "closing", "opening",
+}
+
+
 def _is_heading_line(line: str) -> bool:
     """True for a section-heading line. Pollinations writes
     headings in many shapes, and the voiceover must never read
@@ -152,12 +164,7 @@ def _is_heading_line(line: str) -> bool:
         return True
     small = {"a", "an", "the", "of", "in", "on", "and", "or", "to",
              "for", "with", "from", "by", "at"}
-    heading_starters = {
-        "hook", "introduction", "intro", "conclusion", "outro",
-        "section", "chapter", "part", "prologue", "epilogue",
-        "beginning", "ending", "overview", "summary", "finale",
-        "closing", "opening",
-    }
+    heading_starters = _HEADING_STARTERS
     first = words[0].strip(".,;:!?\"'’()").lower()
     if first in heading_starters and not stripped.endswith("."):
         return True
@@ -180,24 +187,42 @@ def _is_heading_line(line: str) -> bool:
 
 def _strip_inline_heading(line: str) -> str:
     """Strip a leading "Heading: rest" / "Heading – rest" /
-    "Heading — rest" prefix, e.g. "Hook: Picture the Earth..."
-    -> "Picture the Earth...". Only when the prefix is short
-    and Title Case (or a known heading word), so a normal
+    "Heading — rest" / "Heading. rest" prefix, e.g. "Hook: Picture
+    the Earth..." -> "Picture the Earth...". Only when the prefix
+    is short and Title Case (or a known heading word), so a normal
     sentence that happens to contain a colon or dash is left
     alone. Also drops a trailing "Section N – Title" label
-    that Pollinations appends to the end of a narration line."""
+    that Pollinations appends to the end of a narration line.
+    NOTE 2026-11-08: the ". " form matters — Pollinations often
+    writes the hook as "Opening hook. Did you know..." (a period,
+    not a colon), and the old colon/dash-only strip let the voice
+    read "Opening hook" aloud. A period prefix is only stripped
+    when it is a KNOWN heading word (Hook/Opening/Introduction/
+    ...), so a real first sentence is never eaten."""
     # Trailing label: "...begins? Section One – Where Life Could Spark"
     line = re.sub(
         r"\s+(?i:section|chapter|part)\s+\S+\s*[–—:\-]\s*[^.!?\n]{1,80}$",
         "", line)
     match = re.match(r"^([^:–—\-]{1,60})\s*[:–—\-]\s+(.+)$", line)
-    if not match:
+    if match:
+        prefix, rest = match.group(1).strip(), match.group(2).strip()
+        if rest and rest[0].isupper() and _is_heading_line(prefix):
+            return rest
         return line
-    prefix, rest = match.group(1).strip(), match.group(2).strip()
-    if not rest or not rest[0].isupper():
-        return line
-    if _is_heading_line(prefix):
-        return rest
+    # "Heading. Rest" — period separator (the "Opening hook."
+    # case). Only when the prefix STARTS with a KNOWN heading
+    # word (Hook/Opening/Introduction/...), and only when the
+    # rest is a real sentence (starts uppercase). A bare Title
+    # Case check would eat "Dr. Smith..." ("Dr" is Title Case),
+    # so the starter-word requirement is what keeps real
+    # sentences safe.
+    match = re.match(r"^([A-Z][A-Za-z'’\- ]{0,40})\.\s+(.+)$", line)
+    if match:
+        prefix, rest = match.group(1).strip(), match.group(2).strip()
+        first_word = prefix.split()[0].strip(".,;:!?\"'’()").lower() \
+            if prefix.split() else ""
+        if rest and rest[0].isupper() and first_word in _HEADING_STARTERS:
+            return rest
     return line
 
 

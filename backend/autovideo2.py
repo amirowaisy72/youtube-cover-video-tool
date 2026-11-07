@@ -350,42 +350,56 @@ def _pixabay_search(endpoint: str, query: str, key: str,
 
 
 def _fetch_mood_music(mood: str, pixabay_key: str | None,
-                      work_dir: Path) -> Path | None:
+                      work_dir: Path) -> tuple[Path | None, str]:
     """Download a royalty-free background track matching the mood
-    from Pixabay Music. Returns the mp3 path, or None (no key, no
-    result, download failed). Never raises."""
+    from Pixabay Music. Returns (mp3 path or None, status) where
+    status is "ok" | "no_key" | "key_rejected" | "no_results".
+    The status is reported in the job result so a missing track
+    is never silent (the user asked "how would I know if the key
+    is wrong" — the same applies here). Never raises."""
     if not pixabay_key or not pixabay_key.strip():
-        return None
+        return None, "no_key"
     query = _MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient")
-    for hit in _pixabay_search("music", query, pixabay_key):
+    hits = _pixabay_search("music", query, pixabay_key)
+    if not hits:
+        # Distinguish a rejected key from "no results": a tiny
+        # search with an empty query still returns hits for a
+        # valid key, and 400/401/403 for a bad one.
+        probe = _pixabay_search("music", "a", pixabay_key, per_page=1)
+        return None, "no_results" if probe else "key_rejected"
+    for hit in hits:
         audio_url = hit.get("audio")
         if not audio_url:
             continue
         dest = work_dir / "mood-music.mp3"
         try:
             if autovideo._download(audio_url, dest):
-                return dest
+                return dest, "ok"
         except Exception:
             continue
-    return None
+    return None, "no_results"
 
 
 def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
-                          count: int = 6) -> list[Path]:
+                          count: int = 6) -> tuple[list[Path], str]:
     """Download DISTINCT royalty-free transition sounds from
     Pixabay Sound Effects — one per query, so the library is
-    genuinely different sounds. Returns up to `count` mp3 paths
-    (short ones preferred, < 2s), or [] (no key / no results).
+    genuinely different sounds. Returns (mp3 paths, status)
+    where status is "ok" | "no_key" | "key_rejected" |
+    "no_results" (same visibility rule as the music fetch).
     Never raises."""
     if not pixabay_key or not pixabay_key.strip():
-        return []
+        return [], "no_key"
     sfx: list[Path] = []
     seen_urls: set[str] = set()
+    any_hit = False
     for query in _SFX_QUERIES:
         if len(sfx) >= count:
             break
         hits = _pixabay_search("sound-effects", query, pixabay_key,
                                per_page=5)
+        if hits:
+            any_hit = True
         # Short sounds first (a transition sound is ~0.5-1s).
         hits.sort(key=lambda h: (h.get("duration") or 99))
         for hit in hits:
@@ -402,7 +416,13 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
                     break  # one track per query -> distinct sounds
             except Exception:
                 continue
-    return sfx
+    if sfx:
+        return sfx, "ok"
+    if not any_hit:
+        probe = _pixabay_search("sound-effects", "a", pixabay_key,
+                                per_page=1)
+        return [], "no_results" if probe else "key_rejected"
+    return [], "no_results"
 
 
 # Visual transitions (xfade, 2026-11-08): a different transition
@@ -881,14 +901,19 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     script_text = "\n\n".join(s["narration"] for s in scenes)
     mood = _detect_mood(title, script_text)
     music_path: Path | None = None
+    music_status = "off"
     sfx_paths: list[Path] = []
+    sfx_status = "off"
     if music:
-        music_path = _fetch_mood_music(mood, pixabay_key, work_dir)
+        music_path, music_status = _fetch_mood_music(
+            mood, pixabay_key, work_dir)
     if transitions:
-        sfx_paths = _fetch_transition_sfx(pixabay_key, work_dir)
+        sfx_paths, sfx_status = _fetch_transition_sfx(
+            pixabay_key, work_dir)
     # Join scene segments, then mux the joined voiceover.
     video_only = work_dir / "master-video-only.mp4"
     joined_ok = False
+    join_method = "copy"
     if transitions and len(segments) > 1:
         # Xfade join: a DIFFERENT transition style at every
         # boundary, rotating through _TRANSITION_TYPES. Each
@@ -924,6 +949,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
             joined_dur = video_module.get_duration(video_only) or 0
             if joined_dur >= total_voice * 0.9:
                 joined_ok = True
+                join_method = "xfade"
     if not joined_ok:
         # Stream-copy fallback: no crossfades, but the video
         # still builds (first scene fades in, last fades out,
@@ -1079,7 +1105,10 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         "voice_engine": engine,
         "mood": mood,
         "music": music_path.name if music_path is not None else None,
+        "music_status": music_status,
         "transition_sfx": len(sfx_paths),
+        "sfx_status": sfx_status,
         "transitions": transitions,
+        "join": join_method,
     }
 

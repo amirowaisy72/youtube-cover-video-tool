@@ -316,6 +316,18 @@ function AutoVideo() {
               {job.ai_images ? ` · AI images: ${job.ai_images}` : ""}{job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: {job.voice_engine || ""}
               {job.visual_warning ? ` · ${job.visual_warning}` : ""}
             </p>
+            {/* Mood music + transitions status (2026-11-08): what
+                actually got added, so a missing track is never
+                silent. "Key rejected" means the Pixabay key is
+                wrong — press "Test my keys" below to check it. */}
+            {(job.mood || job.music_status || job.sfx_status || job.join) && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {job.mood ? `Mood: ${job.mood} · ` : ""}
+                Music: {job.music_status === "ok" ? "✓ added" : job.music_status === "no_key" ? "✗ no Pixabay key" : job.music_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.music_status === "no_results" ? "✗ no matching track found" : "off"}
+                {" · "}Sounds: {job.sfx_status === "ok" ? `✓ ${job.transition_sfx ?? 0} different sounds` : job.sfx_status === "no_key" ? "✗ no Pixabay key" : job.sfx_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.sfx_status === "no_results" ? "✗ no sounds found" : "off"}
+                {" · "}Transitions: {job.join === "xfade" ? "✓ applied (different style each scene)" : "✗ not applied (fell back to plain join)"}
+              </p>
+            )}
             {job.script && (
               <details className="mt-4">
                 <summary className="cursor-pointer font-semibold">Script</summary>

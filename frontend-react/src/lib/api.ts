@@ -135,6 +135,17 @@ export type AvJob = {
   title_cards?: number;
   visual_warning?: string;
   pipeline?: string;
+  // Mood music + transitions (2026-11-08): what actually got
+  // added, so a missing track is never silent. music_status /
+  // sfx_status: "ok" | "no_key" | "key_rejected" | "no_results" |
+  // "off". join: "xfade" (transitions applied) | "copy" (fallback).
+  mood?: string;
+  music?: string | null;
+  music_status?: string;
+  transition_sfx?: number;
+  sfx_status?: string;
+  transitions?: boolean;
+  join?: string;
 };
 
 /** Error with the HTTP status attached (402 = out of credits, etc.). */
