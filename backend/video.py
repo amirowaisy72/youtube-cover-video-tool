@@ -91,25 +91,63 @@ def clean_youtube_url(url: str) -> str | None:
 
 
 def cover_first_frame(cover: str | Path, dest_dir: str | Path) -> Path:
-    """First frame of a cover as a still image path.
+    """Best still frame of a cover for green detection / mask building.
 
-    Image covers are returned as-is. For a video cover, frame 0
-    is extracted to <dest_dir>/cover_first_frame.png — the green
-    rectangle and the shape mask are detected from that frame
-    (the green area is assumed fixed in place across the cover
-    video, which is how cover videos are made)."""
+    Image covers are returned as-is. For a video cover, the green
+    rectangle and the shape mask are detected from a frame — the
+    green area is assumed fixed in place across the cover video,
+    which is how cover videos are made.
+    TWO FIXES (2026-11-08, user report: a Breaking News green-
+    screen video cover detected "No green area found" even though
+    the green screen is clearly visible):
+    (1) Frame 0 is often black (fade-in) or a title card, so it
+    has no green at all. Sample several timestamps (0s, 0.5s, 1s,
+    2s, mid-video) and return the FIRST frame that actually has
+    a green area; fall back to frame 0 only if none does.
+    (2) The old code cached to a FIXED name (cover_first_frame.png),
+    so switching covers silently reused the FIRST cover's frame.
+    The cache name now includes a hash of the cover path + size,
+    so each cover gets its own frame.
+    """
     cover = Path(cover)
     if not is_video_cover(cover):
         return cover
-    dest = Path(dest_dir) / "cover_first_frame.png"
-    if dest.exists():
-        return dest
-    ok, _ = run_command([
-        "ffmpeg", "-y", "-i", str(cover),
-        "-vframes", "1", "-q:v", "2", str(dest)])
-    if not ok or not dest.exists():
-        raise RuntimeError("Could not read the first frame of the cover video.")
-    return dest
+    import hashlib
+    try:
+        _size = cover.stat().st_size
+    except Exception:
+        _size = 0
+    key = hashlib.md5(f"{cover.resolve()}|{_size}".encode()).hexdigest()[:12]
+    duration = get_duration(cover) or 0
+    candidates = [0.0, 0.5, 1.0, 2.0]
+    if duration > 3:
+        candidates.append(duration / 2)
+    for t in candidates:
+        dest = Path(dest_dir) / f"cover_frame_{key}_{t}.png"
+        if not dest.exists():
+            ok, _ = run_command([
+                "ffmpeg", "-y", "-ss", str(t), "-i", str(cover),
+                "-vframes", "1", "-q:v", "2", str(dest)])
+            if not ok or not dest.exists():
+                continue
+        # Does this frame actually have a green area? detect_green_rect
+        # is defined below in this module; it resolves at call time.
+        try:
+            if detect_green_rect(dest) is not None:
+                return dest
+        except Exception:
+            continue
+    # No sampled frame had green — return frame 0 so the caller can
+    # report "no green area" (and the mask stays empty) instead of
+    # crashing on a missing frame.
+    dest0 = Path(dest_dir) / f"cover_frame_{key}_0.0.png"
+    if not dest0.exists():
+        ok, _ = run_command([
+            "ffmpeg", "-y", "-i", str(cover),
+            "-vframes", "1", "-q:v", "2", str(dest0)])
+        if not ok or not dest0.exists():
+            raise RuntimeError("Could not read the first frame of the cover video.")
+    return dest0
 
 
 def check_ffmpeg() -> str | None:

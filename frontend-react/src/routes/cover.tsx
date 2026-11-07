@@ -71,6 +71,13 @@ function Cover() {
   const [coverNatural, setCoverNatural] = useState<CoverSize | null>(null);
   const [rectPx, setRectPx] = useState<Rect | null>(null);
   const [detected, setDetected] = useState(false);
+  // True only when the green area was actually auto-detected.
+  // `detected` is also true for the manual fallback rectangle
+  // (so the user can still proceed to Live edit), but the
+  // "Green area found" badge must not claim a detection that
+  // failed (2026-11-08: the badge showed ✓ even when the
+  // message said "No green area found").
+  const [greenFound, setGreenFound] = useState(false);
   const [detectMsg, setDetectMsg] = useState("");
   const [rect, setRect] = useState<Rect>(defaultRect);
   const [fx, setFx] = useState<Fx>(defaultPreset);
@@ -185,18 +192,21 @@ function Cover() {
     setCoverNatural(null);
     setRectPx(null);
     setDetected(false);
+    setGreenFound(false);
     setDetectMsg("");
     if (!cover) return;
     try {
       const px = await detectGreen(cover.id);
       setRectPx(px);
       setDetected(true);
+      setGreenFound(true);
       setDetectMsg(`Green area auto-detected: ${px.x},${px.y} ${px.w}x${px.h} — video will fill exactly this area.`);
     } catch (e) {
       // No green area: fall back to the manual rectangle and let the
       // user adjust it in Live edit, instead of blocking the flow.
       setRectPx({ x: 0, y: 0, w: 640, h: 360 });
       setDetected(true);
+      setGreenFound(false);
       setDetectMsg("No green area found in this cover — using the manual rectangle. Adjust it in Live edit.");
     }
   };
@@ -824,7 +834,8 @@ function Cover() {
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button className="btn btn-ghost" onClick={() => fileRef.current?.click()}>⬆ Upload cover</button>
                   <button className="btn btn-amber" disabled={!coverObj} onClick={() => { if (coverObj) void selectCover(coverObj); }}>🟩 Detect green area</button>
-                  {detected && <span className="chip self-center text-success">✓ Green area found</span>}
+                  {greenFound && <span className="chip self-center text-success">✓ Green area found</span>}
+                  {detected && !greenFound && <span className="chip self-center text-warning">Manual rectangle — adjust in Live edit</span>}
                 </div>
                 {detectMsg && <p className="mt-3 text-sm text-muted-foreground">{detectMsg}</p>}
                 {coversError && <p className="mt-3 text-sm text-destructive">{coversError}</p>}
