@@ -330,17 +330,22 @@ def _detect_mood(title: str, script_text: str) -> str:
 
 
 def _pixabay_search(kind: str, query: str, key: str,
-                    per_page: int = 10) -> list[dict]:
-    """One Pixabay AUDIO search. Returns the hits list, or [] on
-    any failure. Key is sent per-request and never stored.
-    BUG FIX 2026-11-08 (user correction — his key IS valid): the
-    old code called /api/music/ and /api/sound-effects/, which DO
-    NOT exist (both return HTTP 404 — verified live). Pixabay's
-    public API has ONE audio endpoint, /api/audio/, which serves
-    both music and sound effects; `kind` ("music" or "sfx") only
-    filters the results by duration/type, it is NOT part of the
-    URL. That is why music and SFX were silently missing even
-    with a valid key — every fetch 404'd and returned []."""
+                    per_page: int = 10) -> tuple[list[dict], str]:
+    """One Pixabay AUDIO search. Returns (hits, status) where
+    status is "ok" | "auth" | "error". Key is sent per-request
+    and never stored.
+    BUG FIX 2026-11-08 (user correction #2 — his key IS valid,
+    "Test my keys" says ✓, yet the result said "key rejected"):
+    the old code probed with query "a" to distinguish "no
+    results" from "key rejected" — but "a" returns NO hits even
+    with a valid key (too generic), so the probe always failed
+    and every empty search was misreported as "key rejected".
+    Now the status comes from the HTTP response itself: 401/403
+    (or a 400 that mentions the API key) = the key is bad;
+    any other failure = "error" (network/endpoint), never
+    misreported as a bad key. The Pixabay audio endpoint is
+    /api/audio/ (the old /api/music/ and /api/sound-effects/
+    paths 404 — fixed 2026-11-08)."""
     try:
         params = {"key": key.strip(), "q": query.strip(),
                   "page": "1", "per_page": str(per_page)}
@@ -351,9 +356,21 @@ def _pixabay_search(kind: str, query: str, key: str,
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         hits = data.get("hits", [])
-        return hits if isinstance(hits, list) else []
+        return (hits if isinstance(hits, list) else []), "ok"
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return [], "auth"
+        if e.code == 400:
+            try:
+                body = e.read().decode("utf-8", "ignore")
+            except Exception:
+                body = ""
+            if "api key" in body.lower():
+                return [], "auth"
+            return [], "error"
+        return [], "error"
     except Exception:
-        return []
+        return [], "error"
 
 
 def _is_music_hit(hit: dict) -> bool:
@@ -387,13 +404,13 @@ def _fetch_mood_music(mood: str, pixabay_key: str | None,
     if not pixabay_key or not pixabay_key.strip():
         return None, "no_key"
     query = _MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient")
-    hits = _pixabay_search("music", query, pixabay_key)
+    hits, status = _pixabay_search("music", query, pixabay_key)
+    if status == "auth":
+        return None, "key_rejected"
+    if status == "error":
+        return None, "unreachable"
     if not hits:
-        # Distinguish a rejected key from "no results": a tiny
-        # search with an empty query still returns hits for a
-        # valid key, and 400/401/403 for a bad one.
-        probe = _pixabay_search("music", "a", pixabay_key, per_page=1)
-        return None, "no_results" if probe else "key_rejected"
+        return None, "no_results"
     for hit in hits:
         if not _is_music_hit(hit):
             continue
@@ -425,8 +442,12 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
     for query in _SFX_QUERIES:
         if len(sfx) >= count:
             break
-        hits = _pixabay_search("sfx", query, pixabay_key,
-                               per_page=5)
+        hits, status = _pixabay_search("sfx", query, pixabay_key,
+                                       per_page=5)
+        if status == "auth":
+            return [], "key_rejected"
+        if status == "error":
+            continue
         if hits:
             any_hit = True
         # Short sounds first (a transition sound is ~0.5-1s).
@@ -449,11 +470,7 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
                 continue
     if sfx:
         return sfx, "ok"
-    if not any_hit:
-        probe = _pixabay_search("sfx", "a", pixabay_key,
-                                per_page=1)
-        return [], "no_results" if probe else "key_rejected"
-    return [], "no_results"
+    return [], "no_results" if any_hit else "unreachable"
 
 
 # Visual transitions (xfade, 2026-11-08): a different transition
@@ -463,7 +480,11 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
 # the xfade join fails, run_master falls back to the stream-copy
 # concat (segments keep their first/last fade, middle boundaries
 # become hard cuts — the video still builds).
-_TRANSITION_SEC = 0.5
+# TRANSITION_SEC is 1.0s (raised from 0.5s, 2026-11-08): the user
+# reported "no transition effect" twice even though the result
+# said "applied" — a 0.5s crossfade is too subtle to notice, so
+# the transitions are now a full second, unmistakable.
+_TRANSITION_SEC = 1.0
 _TRANSITION_TYPES = ["fade", "wipeleft", "wiperight", "slideleft",
                      "slideright", "circleopen", "fadeblack",
                      "fadewhite", "dissolve", "pixelize"]

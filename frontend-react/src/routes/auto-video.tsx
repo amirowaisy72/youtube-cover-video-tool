@@ -323,8 +323,8 @@ function AutoVideo() {
             {(job.mood || job.music_status || job.sfx_status || job.join) && (
               <p className="mt-2 text-sm text-muted-foreground">
                 {job.mood ? `Mood: ${job.mood} · ` : ""}
-                Music: {job.music_status === "ok" ? "✓ added" : job.music_status === "no_key" ? "✗ no Pixabay key" : job.music_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.music_status === "no_results" ? "✗ no matching track found" : "off"}
-                {" · "}Sounds: {job.sfx_status === "ok" ? `✓ ${job.transition_sfx ?? 0} different sounds` : job.sfx_status === "no_key" ? "✗ no Pixabay key" : job.sfx_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.sfx_status === "no_results" ? "✗ no sounds found" : "off"}
+                Music: {job.music_status === "ok" ? "✓ added" : job.music_status === "no_key" ? "✗ no Pixabay key" : job.music_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.music_status === "no_results" ? "✗ no matching track found" : job.music_status === "unreachable" ? "✗ could not reach Pixabay — check connection and try again" : "off"}
+                {" · "}Sounds: {job.sfx_status === "ok" ? `✓ ${job.transition_sfx ?? 0} different sounds` : job.sfx_status === "no_key" ? "✗ no Pixabay key" : job.sfx_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.sfx_status === "no_results" ? "✗ no sounds found" : job.sfx_status === "unreachable" ? "✗ could not reach Pixabay — check connection and try again" : "off"}
                 {" · "}Transitions: {job.join === "xfade" ? "✓ applied (different style each scene)" : "✗ not applied (fell back to plain join)"}
               </p>
             )}
