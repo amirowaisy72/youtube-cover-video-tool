@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ApiError, api } from "@/lib/api";
-import { getPixabayKey, setPixabayKey } from "@/lib/keys";
+import { getFreesoundKey, setFreesoundKey } from "@/lib/keys";
 
 export const Route = createFileRoute("/music")({
   component: Music,
@@ -16,6 +16,7 @@ type SearchResult = {
   preview_url?: string | null;
   download_url?: string | null;
   username?: string | null;
+  license?: string | null;
 };
 
 type PackTrack = {
@@ -46,21 +47,21 @@ function Music() {
   const [packError, setPackError] = useState("");
 
   useEffect(() => {
-    setApiKey(getPixabayKey());
+    setApiKey(getFreesoundKey());
     api<{ tracks: PackTrack[] }>("/api/music/pack")
       .then((d) => setPack(d.tracks ?? []))
       .catch((e) => setPackError(e instanceof Error ? e.message : "Could not load the starter pack."));
   }, []);
 
   const saveKey = () => {
-    setPixabayKey(apiKey);
+    setFreesoundKey(apiKey);
     setKeySaved(true);
     setError("");
   };
 
   const doSearch = async (p: number) => {
     if (!apiKey.trim()) {
-      setError("Add your free Pixabay API key first — get one at pixabay.com/api/docs.");
+      setError("Add your free Freesound API key first — get one at freesound.org/apiv2/apply.");
       return;
     }
     setLoading(true);
@@ -98,15 +99,17 @@ function Music() {
           <button data-on={tab === "music"} onClick={() => switchTab("music")}>🎵 Music</button>
           <button data-on={tab === "effects"} onClick={() => switchTab("effects")}>🔊 Sound Effects</button>
         </div>
-        <span className="chip">Pixabay License — safe for YouTube</span>
+        <span className="chip">Freesound — check each track's license before using it</span>
       </div>
 
       <div className="glass mb-6 space-y-3 p-6">
-        <h2 className="text-lg font-bold">Your Pixabay API key</h2>
+        <h2 className="text-lg font-bold">Your Freesound API key</h2>
         <p className="text-sm text-muted-foreground">
-          Pixabay gives free music and sound effects. You need your own free API key — it is stored only in
-          your browser, never sent anywhere except to Pixabay. Get your free key at{" "}
-          <a className="text-primary underline" href="https://pixabay.com/api/docs" target="_blank" rel="noreferrer">pixabay.com/api/docs</a>.
+          Freesound gives free music and sound effects. Pixabay's API does not provide audio, so this tool
+          uses Freesound instead — the same key Auto Video already uses for background music, so it is
+          filled in automatically if you added it there. Your key is stored only in your browser, never
+          sent anywhere except to Freesound. Get your free key at{" "}
+          <a className="text-primary underline" href="https://freesound.org/apiv2/apply" target="_blank" rel="noreferrer">freesound.org/apiv2/apply</a>.
         </p>
         <div className="flex gap-2">
           <input
@@ -114,7 +117,7 @@ function Music() {
             type="password"
             value={apiKey}
             onChange={(e) => { setApiKey(e.target.value); setKeySaved(false); }}
-            placeholder="Paste your Pixabay API key here"
+            placeholder="Paste your Freesound API key here"
           />
           <button className="btn btn-primary" disabled={!apiKey.trim()} onClick={saveKey}>Save key</button>
         </div>
@@ -125,7 +128,7 @@ function Music() {
         <h2 className="text-lg font-bold">🎁 Built-in starter pack — no key needed</h2>
         {packError && <p className="text-sm text-destructive">{packError}</p>}
         {pack.length === 0 && !packError && (
-          <p className="text-sm text-muted-foreground">No starter tracks bundled yet — use the Pixabay search below.</p>
+          <p className="text-sm text-muted-foreground">No starter tracks bundled yet — use the Freesound search below.</p>
         )}
         {pack.map((t) => (
           <div key={t.file} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-3">
@@ -169,6 +172,7 @@ function Music() {
               <div className="text-sm text-muted-foreground">
                 {r.username ? `by ${r.username}` : ""}
                 {r.duration ? ` · ${fmtDur(r.duration)}` : ""}
+                {r.license ? ` · ${r.license}` : ""}
                 {r.tags ? ` · ${r.tags}` : ""}
               </div>
             </div>

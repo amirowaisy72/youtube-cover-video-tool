@@ -1,18 +1,26 @@
 """Royalty-Free Music & Sound Effects — free tool, no credits.
 
 Endpoints (all under /api/music):
-  GET /api/music/search?type=music|effects&q=<query>&page=<n>&key=<pixabay key>
-      -> {results: [{id, name, duration, tags, preview_url, download_url, username}], page, total_pages}
-      Proxies the free Pixabay API. The user's key is never logged or stored
-      server-side — it is only forwarded to Pixabay in this one request.
+  GET /api/music/search?type=music|effects&q=<query>&page=<n>&key=<freesound key>
+      -> {results: [{id, name, duration, tags, preview_url, download_url, username, license}], page, total_pages}
+      Proxies the free Freesound API. The user's key is never logged or stored
+      server-side — it is only forwarded to Freesound in this one request.
   GET /api/music/pack
       -> {tracks: [{name, artist, license, file, duration}]} — built-in starter
       pack, works with no API key.
   GET /api/music/pack/{filename} -> the audio file (path-traversal guarded).
 
-Pixabay music/sound effects are cleared for use in YouTube videos
-(Pixabay License). The user supplies their own free Pixabay API key
-(get it at pixabay.com/api/docs) in the page; it is kept in localStorage.
+FREESOUND (2026-11-08, user: "pixabay to audio provide hi nhi krta"):
+Pixabay's public API covers images + videos ONLY — it has NO audio
+endpoint (verified live: /api/audio/ returns 403 Access denied for a
+key that is valid for images/videos). The earlier "one audio endpoint"
+/api/audio/ fix was a dead end. Freesound is a real audio API (free key
+at freesound.org/apiv2/apply) serving both music and sound effects —
+the same source Auto Video already uses for mood music + transition
+sounds (proven working with the user's key). The key is shared with
+Auto Video (same localStorage key), so it is already filled in.
+Freesound tracks carry a per-track license (CC0 / CC-BY / CC-BY-NC…)
+shown in the UI — check it before using a track in a video.
 """
 
 from __future__ import annotations
@@ -32,7 +40,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_DIR = BASE_DIR / "backend" / "music_pack"
 PACK_JSON = PACK_DIR / "pack.json"
 
-PIXABAY_BASE = "https://pixabay.com/api"
+FREESOUND_BASE = "https://freesound.org/apiv2/search/text/"
 PER_PAGE = 20
 
 
@@ -78,103 +86,93 @@ def get_pack_file(filename: str):
 
 
 @router.get("/search")
-def search_pixabay(
+def search_music(
     type: str = Query("music", pattern="^(music|effects)$"),
     q: str = Query("", max_length=100),
     page: int = Query(1, ge=1, le=100),
     key: str = Query("", max_length=100),
 ) -> dict:
-    """Search Pixabay music or sound effects (proxied, key never stored).
-    BUG FIX 2026-11-08 (user correction — his key IS valid): the old
-    code called /api/music/ and /api/sound-effects/, which DO NOT
-    exist (both return HTTP 404 — verified live). Pixabay's public
-    API has ONE audio endpoint, /api/audio/, serving both music and
-    sound effects; `type` only filters the results by duration
-    (music = long tracks, effects = short clips)."""
+    """Search Freesound music or sound effects (proxied, key never stored).
+
+    FREESOUND (2026-11-08): Pixabay has NO audio endpoint — the old
+    /api/audio/ code returned 403 for a valid key. Freesound's
+    /apiv2/search/text/ is a real audio API (same source Auto Video
+    uses). Music = long tracks (>= 20 s), effects = short clips
+    (<= 10 s) — the same duration split Auto Video uses. The
+    preview MP3 (hq, else lq) is both the preview and the download
+    — Freesound previews need only the API key, no OAuth.
+    """
     if not key.strip():
         raise HTTPException(
             status_code=400,
-            detail="Add your free Pixabay API key first (get one at pixabay.com/api/docs).",
+            detail="Add your free Freesound API key first (get one at freesound.org/apiv2/apply).",
         )
+    # Freesound needs a query; an empty search shows a broad browse.
+    query = q.strip() or ("music" if type == "music" else "sound effect")
     params = {
-        "key": key.strip(),
-        "q": q.strip(),
+        "query": query,
+        "token": key.strip(),
         "page": str(page),
-        "per_page": str(PER_PAGE),
+        "page_size": str(PER_PAGE),
+        "fields": "id,name,duration,previews,license,tags,username",
     }
-    url = f"{PIXABAY_BASE}/audio/?{urllib.parse.urlencode(params)}"
+    url = f"{FREESOUND_BASE}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={"User-Agent": "YT-Guru/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        if e.code in (400, 401, 403, 404):
+        if e.code in (401, 403):
             raise HTTPException(
                 status_code=400,
-                detail="Pixabay rejected the key or query — check your API key.",
+                detail="Freesound rejected the key — check your API key.",
             ) from e
         if e.code == 429:
             raise HTTPException(
                 status_code=502,
-                detail="Pixabay rate limit reached — try again in a minute.",
+                detail="Freesound rate limit reached — try again in a minute.",
             ) from e
         raise HTTPException(
             status_code=502,
-            detail=f"Pixabay returned an error ({e.code}). Try again.",
+            detail=f"Freesound returned an error ({e.code}). Try again.",
         ) from e
     except urllib.error.URLError as e:
         raise HTTPException(
             status_code=502,
-            detail=f"Could not reach Pixabay: {e.reason}. Check your connection.",
+            detail=f"Could not reach Freesound: {e.reason}. Check your connection.",
         ) from e
     except ValueError as e:
         raise HTTPException(
             status_code=502,
-            detail="Pixabay returned an unexpected response. Try again.",
+            detail="Freesound returned an unexpected response. Try again.",
         ) from e
 
-    hits = data.get("hits", []) if isinstance(data, dict) else []
+    hits = data.get("results", []) if isinstance(data, dict) else []
     results = []
     for h in hits:
-        # The audio endpoint serves both music and SFX; filter by
-        # duration (music = long tracks, effects = short clips).
-        # A `type` field, when present, wins over duration.
         dur = h.get("duration") or 0
-        hit_type = str(h.get("type") or "").lower()
-        if type == "music":
-            if hit_type and "music" not in hit_type and "song" not in hit_type:
-                continue
-            if not hit_type and dur < 20:
-                continue
-        else:
-            if hit_type and "effect" not in hit_type and "sfx" not in hit_type and "sound" not in hit_type:
-                continue
-            if not hit_type and not (0 < dur <= 10):
-                continue
-        if type == "music":
-            results.append(
-                {
-                    "id": h.get("id"),
-                    "name": h.get("name") or h.get("title") or "Untitled",
-                    "duration": h.get("duration"),
-                    "tags": h.get("tags"),
-                    "preview_url": h.get("audio"),
-                    "download_url": h.get("audio"),
-                    "username": h.get("username"),
-                }
-            )
-        else:
-            results.append(
-                {
-                    "id": h.get("id"),
-                    "name": h.get("name") or h.get("title") or "Untitled",
-                    "duration": h.get("duration"),
-                    "tags": h.get("tags"),
-                    "preview_url": h.get("audio"),
-                    "download_url": h.get("audio"),
-                    "username": h.get("username"),
-                }
-            )
-    total = int(data.get("totalHits") or 0)
+        # Music = long tracks, effects = short clips.
+        if type == "music" and dur < 20:
+            continue
+        if type == "effects" and not (0 < dur <= 10):
+            continue
+        previews = h.get("previews") or {}
+        preview = previews.get("preview-hq-mp3") or previews.get("preview-lq-mp3")
+        if not preview:
+            continue
+        tags = h.get("tags")
+        results.append(
+            {
+                "id": h.get("id"),
+                "name": h.get("name") or "Untitled",
+                "duration": h.get("duration"),
+                "tags": ", ".join(tags) if isinstance(tags, list) else (tags or None),
+                "preview_url": preview,
+                "download_url": preview,
+                "username": h.get("username"),
+                "license": h.get("license"),
+            }
+        )
+    total = int(data.get("count") or 0)
     total_pages = max(1, -(-total // PER_PAGE)) if total else 1
     return {"results": results, "page": page, "total_pages": total_pages}
