@@ -329,82 +329,77 @@ def _detect_mood(title: str, script_text: str) -> str:
     return best
 
 
-def _pixabay_search(kind: str, query: str, key: str,
-                    per_page: int = 10) -> tuple[list[dict], str]:
-    """One Pixabay AUDIO search. Returns (hits, status) where
-    status is "ok" | "auth" | "error". Key is sent per-request
-    and never stored.
-    BUG FIX 2026-11-08 (user correction #2 — his key IS valid,
-    "Test my keys" says ✓, yet the result said "key rejected"):
-    the old code probed with query "a" to distinguish "no
-    results" from "key rejected" — but "a" returns NO hits even
-    with a valid key (too generic), so the probe always failed
-    and every empty search was misreported as "key rejected".
-    Now the status comes from the HTTP response itself: 401/403
-    (or a 400 that mentions the API key) = the key is bad;
-    any other failure = "error" (network/endpoint), never
-    misreported as a bad key. The Pixabay audio endpoint is
-    /api/audio/ (the old /api/music/ and /api/sound-effects/
-    paths 404 — fixed 2026-11-08)."""
+def _freesound_search(query: str, key: str,
+                       per_page: int = 10) -> tuple[list[dict], str]:
+    """One Freesound search. Returns (hits, status) where status
+    is "ok" | "auth" | "error". Key is sent per-request and
+    never stored. Each hit carries `duration` (seconds) and
+    `previews` {"preview-hq-mp3", "preview-lq-mp3"} (direct MP3
+    URLs — previews need only the API key, no OAuth).
+    WHY FREESOUND (2026-11-08): Pixabay's public API does NOT
+    expose audio to standard keys — verified live by two
+    independent projects (sfxdock, x-post-scheduler) and by this
+    user's own valid key: /api/audio/ returns 403 Access denied
+    for a key that is valid for images/videos. Gemini was right;
+    the earlier /api/audio/ "fix" only changed which dead end
+    the code hit. Freesound is a real audio API (free key at
+    freesound.org/apiv2/apply) serving both music and SFX."""
     try:
-        params = {"key": key.strip(), "q": query.strip(),
-                  "page": "1", "per_page": str(per_page)}
-        url = ("https://pixabay.com/api/audio/?"
+        params = {"query": query.strip(), "token": key.strip(),
+                  "page_size": str(per_page),
+                  "fields": "id,name,duration,previews,license"}
+        url = ("https://freesound.org/apiv2/search/text/?"
                f"{urllib.parse.urlencode(params)}")
         req = urllib.request.Request(
             url, headers={"User-Agent": "YT-Guru/1.0"})
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        hits = data.get("hits", [])
+        hits = data.get("results", [])
         return (hits if isinstance(hits, list) else []), "ok"
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
             return [], "auth"
-        if e.code == 400:
-            try:
-                body = e.read().decode("utf-8", "ignore")
-            except Exception:
-                body = ""
-            if "api key" in body.lower():
-                return [], "auth"
-            return [], "error"
         return [], "error"
     except Exception:
         return [], "error"
 
 
+def _freesound_preview_url(hit: dict) -> str | None:
+    """Best downloadable MP3 preview URL for a Freesound hit."""
+    previews = hit.get("previews") or {}
+    return (previews.get("preview-hq-mp3")
+            or previews.get("preview-lq-mp3") or None)
+
+
 def _is_music_hit(hit: dict) -> bool:
-    """True if an audio hit is a music track (not a sound
-    effect). The audio endpoint serves both; music tracks are
-    long (tens of seconds to minutes), SFX are a few seconds.
-    A `type` field, when present, wins over duration."""
-    t = str(hit.get("type") or "").lower()
-    if t:
-        return "music" in t or "song" in t
+    """True if a Freesound hit is a music track (not a sound
+    effect): long (tens of seconds to minutes) with a playable
+    preview. SFX are a few seconds."""
+    if not _freesound_preview_url(hit):
+        return False
     return (hit.get("duration") or 0) >= 20
 
 
 def _is_sfx_hit(hit: dict) -> bool:
-    """True if an audio hit is a sound effect (not a music
-    track). Short clips; a `type` field, when present, wins."""
-    t = str(hit.get("type") or "").lower()
-    if t:
-        return "effect" in t or "sfx" in t or "sound" in t
+    """True if a Freesound hit is a sound effect (not a music
+    track): a short clip with a playable preview."""
+    if not _freesound_preview_url(hit):
+        return False
     return 0 < (hit.get("duration") or 0) <= 10
 
 
-def _fetch_mood_music(mood: str, pixabay_key: str | None,
+def _fetch_mood_music(mood: str, freesound_key: str | None,
                       work_dir: Path) -> tuple[Path | None, str]:
     """Download a royalty-free background track matching the mood
-    from Pixabay Music. Returns (mp3 path or None, status) where
+    from Freesound. Returns (mp3 path or None, status) where
     status is "ok" | "no_key" | "key_rejected" | "no_results".
     The status is reported in the job result so a missing track
     is never silent (the user asked "how would I know if the key
     is wrong" — the same applies here). Never raises."""
-    if not pixabay_key or not pixabay_key.strip():
+    if not freesound_key or not freesound_key.strip():
         return None, "no_key"
     query = _MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient")
-    hits, status = _pixabay_search("music", query, pixabay_key)
+    hits, status = _freesound_search(query, freesound_key)
     if status == "auth":
         return None, "key_rejected"
     if status == "error":
@@ -414,7 +409,7 @@ def _fetch_mood_music(mood: str, pixabay_key: str | None,
     for hit in hits:
         if not _is_music_hit(hit):
             continue
-        audio_url = hit.get("audio")
+        audio_url = _freesound_preview_url(hit)
         if not audio_url:
             continue
         dest = work_dir / "mood-music.mp3"
@@ -426,15 +421,14 @@ def _fetch_mood_music(mood: str, pixabay_key: str | None,
     return None, "no_results"
 
 
-def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
+def _fetch_transition_sfx(freesound_key: str | None, work_dir: Path,
                           count: int = 6) -> tuple[list[Path], str]:
     """Download DISTINCT royalty-free transition sounds from
-    Pixabay Sound Effects — one per query, so the library is
-    genuinely different sounds. Returns (mp3 paths, status)
-    where status is "ok" | "no_key" | "key_rejected" |
-    "no_results" (same visibility rule as the music fetch).
-    Never raises."""
-    if not pixabay_key or not pixabay_key.strip():
+    Freesound — one per query, so the library is genuinely
+    different sounds. Returns (mp3 paths, status) where status
+    is "ok" | "no_key" | "key_rejected" | "no_results" (same
+    visibility rule as the music fetch). Never raises."""
+    if not freesound_key or not freesound_key.strip():
         return [], "no_key"
     sfx: list[Path] = []
     seen_urls: set[str] = set()
@@ -442,8 +436,8 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
     for query in _SFX_QUERIES:
         if len(sfx) >= count:
             break
-        hits, status = _pixabay_search("sfx", query, pixabay_key,
-                                       per_page=5)
+        hits, status = _freesound_search(query, freesound_key,
+                                         per_page=5)
         if status == "auth":
             return [], "key_rejected"
         if status == "error":
@@ -455,7 +449,7 @@ def _fetch_transition_sfx(pixabay_key: str | None, work_dir: Path,
         for hit in hits:
             if not _is_sfx_hit(hit):
                 continue
-            audio_url = hit.get("audio")
+            audio_url = _freesound_preview_url(hit)
             if not audio_url or audio_url in seen_urls:
                 continue
             if (hit.get("duration") or 0) > 3:
@@ -867,6 +861,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
                progress_cb=None, subtitles: bool = True,
                pexels_key: str | None = None,
                pixabay_key: str | None = None,
+               freesound_key: str | None = None,
                music: bool = True,
                transitions: bool = True) -> dict:
     """Build a scene-based video. Returns a report dict with
@@ -890,8 +885,8 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     style at every boundary, rotating) instead of a stream copy
     — the segments are built voice+0.5s so the overlap lands on
     exactly the voiceover length. When `music` is on and the
-    user has a Pixabay key, a mood-matched royalty-free track
-    plays low under the voiceover, and a different Pixabay
+    user has a Freesound key, a mood-matched royalty-free track
+    plays low under the voiceover, and a different Freesound
     sound effect plays at each scene change. Music/SFX fetch
     never breaks a build (no key / no result -> skipped)."""
     import os
@@ -944,12 +939,13 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     } for item in ordered]
     engine = ordered[0]["engine"]
     # Mood music + transition SFX (2026-11-08): detect the mood
-    # from the title + script, fetch a matching Pixabay music
-    # track and several distinct Pixabay sound effects (user's
-    # Pixabay key). No key / no result / any failure -> music
-    # and SFX are skipped, the video still builds. Fetching
-    # happens here (after the scenes) so it never slows the
-    # parallel scene build.
+    # from the title + script, fetch a matching Freesound music
+    # track and several distinct Freesound sound effects (user's
+    # Freesound key — Pixabay's API has no audio endpoint).
+    # No key / no result / any failure -> music and SFX are
+    # skipped, the video still builds. Fetching happens here
+    # (after the scenes) so it never slows the parallel scene
+    # build.
     script_text = "\n\n".join(s["narration"] for s in scenes)
     mood = _detect_mood(title, script_text)
     music_path: Path | None = None
@@ -958,10 +954,10 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     sfx_status = "off"
     if music:
         music_path, music_status = _fetch_mood_music(
-            mood, pixabay_key, work_dir)
+            mood, freesound_key, work_dir)
     if transitions:
         sfx_paths, sfx_status = _fetch_transition_sfx(
-            pixabay_key, work_dir)
+            freesound_key, work_dir)
     # Join scene segments, then mux the joined voiceover.
     video_only = work_dir / "master-video-only.mp4"
     joined_ok = False

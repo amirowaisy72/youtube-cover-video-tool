@@ -348,11 +348,11 @@ export const ttsGenerate = (text: string, voice: string, rate: string) =>
   });
 
 // -------------------------------------------------------------- auto video
-export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "", music = true, transitions = true) =>
+export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "", freesoundKey = "", music = true, transitions = true) =>
   api<{ job_id: string; status: string }>("/api/autovideo", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, music, transitions }),
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, freesound_key: freesoundKey || null, music, transitions }),
   });
 
 export const autovideoJob = (jobId: string) => api<AvJob>(`/api/autovideo/${jobId}`);
@@ -361,7 +361,7 @@ export const autovideoJob = (jobId: string) => api<AvJob>(`/api/autovideo/${jobI
     request, so a wrong key is caught when it is saved — not
     weeks later when videos silently miss the stock footage. */
 export type StockKeyValidation = { valid: boolean; reason: string; detail: string };
-export const validateStockKey = (source: "pixabay" | "pexels", key: string) =>
+export const validateStockKey = (source: "pixabay" | "pexels" | "freesound", key: string) =>
   api<StockKeyValidation>("/api/stock/validate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

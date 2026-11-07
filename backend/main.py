@@ -2076,9 +2076,12 @@ class AutoVideoRequest(BaseModel):
     voice: str = "en-US-AriaNeural"
     expressive: bool = True
     subtitles: bool = True  # live word-by-word captions (Whisper)
-    # Mood-matched background music (Pixabay, user's key) + a
-    # different transition sound at each scene change (Pixabay
-    # Sound Effects). Both default ON; no key -> skipped.
+    # Mood-matched background music (Freesound, user's key) + a
+    # different transition sound at each scene change (Freesound
+    # SFX). Both default ON; no key -> skipped. Pixabay's API
+    # has no audio endpoint (verified 2026-11-08), so audio
+    # uses Freesound; Pixabay/Pexels keys are for stock video
+    # clips only.
     music: bool = True
     transitions: bool = True  # visual xfade transitions + SFX
     # Optional stock-media keys (free, user's own). When set,
@@ -2087,6 +2090,7 @@ class AutoVideoRequest(BaseModel):
     # each job and never saved on the server.
     pexels_key: str | None = None
     pixabay_key: str | None = None
+    freesound_key: str | None = None
 
 
 def _av_job_dir(job_id: str) -> Path:
@@ -2114,6 +2118,7 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                    expressive: bool = True, subtitles: bool = True,
                    pexels_key: str | None = None,
                    pixabay_key: str | None = None,
+                   freesound_key: str | None = None,
                    music: bool = True,
                    transitions: bool = True) -> None:
     directory = _av_job_dir(job_id)
@@ -2148,6 +2153,7 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                 expressive=expressive, progress_cb=_master_progress,
                 subtitles=subtitles,
                 pexels_key=pexels_key, pixabay_key=pixabay_key,
+                freesound_key=freesound_key,
                 music=music, transitions=transitions)
             kinds = report["kinds"]
             _set("done", 100, {
@@ -2274,6 +2280,7 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
                    subtitles: bool = True,
                    pexels_key: str | None = None,
                    pixabay_key: str | None = None,
+                   freesound_key: str | None = None,
                    music: bool = True,
                    transitions: bool = True) -> None:
     """Auto-video worker with license accounting: the job token is
@@ -2281,7 +2288,7 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
     otherwise — the customer never pays for a failed video."""
     try:
         _run_autovideo_impl(job_id, title, minutes, visuals, voice, expressive, subtitles,
-                            pexels_key, pixabay_key, music, transitions)
+                            pexels_key, pixabay_key, freesound_key, music, transitions)
     except Exception:
         if job_token:
             licensing.refund(job_token)
@@ -2314,7 +2321,7 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
         args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice,
               payload.expressive, token, payload.subtitles,
               payload.pexels_key, payload.pixabay_key,
-              payload.music, payload.transitions),
+              payload.freesound_key, payload.music, payload.transitions),
         daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 

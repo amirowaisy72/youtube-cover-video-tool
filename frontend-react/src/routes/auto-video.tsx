@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
 import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene, validateStockKey } from "@/lib/api";
-import { getPexelsKey, getPixabayKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
+import { getFreesoundKey, getPexelsKey, getPixabayKey, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
 import s3 from "@/assets/scene-3.jpg";
@@ -51,7 +51,7 @@ function AutoVideo() {
   const [durInput, setDurInput] = useState("2");
   const [subtitles, setSubtitles] = useState(true);
   // Mood music + transitions (2026-11-08): a mood-matched
-  // background track (needs the Pixabay key below) and a
+  // background track (needs the Freesound key below) and a
   // different transition style + sound at every scene change.
   const [music, setMusic] = useState(true);
   const [transitions, setTransitions] = useState(true);
@@ -60,6 +60,7 @@ function AutoVideo() {
   // connects it everywhere, and vice versa. Empty = Commons only.
   const [pexelsKey, setPexelsKeyState] = useState("");
   const [pixabayKey, setPixabayKeyState] = useState("");
+  const [freesoundKey, setFreesoundKeyState] = useState("");
   // Key validation (user, 2026-11-08): a wrong key must be
   // caught here, not weeks later when videos silently miss
   // the stock footage and fall back to Commons.
@@ -70,7 +71,7 @@ function AutoVideo() {
     setKeyTesting(true);
     setKeyTest(null);
     const parts: string[] = [];
-    for (const [label, source, key] of [["Pexels", "pexels", pexelsKey], ["Pixabay", "pixabay", pixabayKey]] as const) {
+    for (const [label, source, key] of [["Pexels", "pexels", pexelsKey], ["Pixabay", "pixabay", pixabayKey], ["Freesound", "freesound", freesoundKey]] as const) {
       if (!key.trim()) { parts.push(`${label}: — (no key)`); continue; }
       try {
         const res = await validateStockKey(source, key.trim());
@@ -123,6 +124,7 @@ function AutoVideo() {
   useEffect(() => {
     setPexelsKeyState(getPexelsKey());
     setPixabayKeyState(getPixabayKey());
+    setFreesoundKeyState(getFreesoundKey());
   }, []);
 
   // Restore a job that was started earlier and is still in the
@@ -160,7 +162,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey, music, transitions);
+      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey, freesoundKey, music, transitions);
       setJobId(data.job_id);
       // Background job: the build keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -224,19 +226,19 @@ function AutoVideo() {
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={music} onChange={(e) => setMusic(e.target.checked)} />
             <span>
               <span className="block font-semibold">🎵 Background music by mood</span>
-              <span className="block text-sm text-muted-foreground">A royalty-free track that fits the script's mood (suspense, happy, motivational…) plays softly under the voice. Needs your Pixabay key below — without it, the video has no music.</span>
+              <span className="block text-sm text-muted-foreground">A royalty-free track that fits the script's mood (suspense, happy, motivational…) plays softly under the voice. Needs your Freesound key below — without it, the video has no music.</span>
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={transitions} onChange={(e) => setTransitions(e.target.checked)} />
             <span>
               <span className="block font-semibold">✨ Transitions + sounds</span>
-              <span className="block text-sm text-muted-foreground">A different transition style (fade, wipe, slide, circle…) and a different sound effect at every scene change, so the video never repeats the same look or sound. Sounds need your Pixabay key below.</span>
+              <span className="block text-sm text-muted-foreground">A different transition style (fade, wipe, slide, circle…) and a different sound effect at every scene change, so the video never repeats the same look or sound. Sounds need your Freesound key below.</span>
             </span>
           </label>
           <div className="rounded-xl border border-border px-4 py-3">
             <div className="font-semibold">🎞️ Richer stock footage (optional)</div>
-            <p className="mt-1 text-sm text-muted-foreground">Add your free Pexels / Pixabay API keys and the video uses their professional clips first (Commons is the fallback). A key entered here works in the Stock and Music tools too — never enter it twice.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Add your free Pexels / Pixabay API keys and the video uses their professional clips first (Commons is the fallback). The Freesound key is for the background music and transition sounds — Pixabay's API has no audio, so music and sounds come from Freesound. A key entered here works in the Stock and Music tools too — never enter it twice.</p>
             <div className="mt-3 space-y-2">
               <input
                 className="field"
@@ -254,10 +256,18 @@ function AutoVideo() {
                 value={pixabayKey}
                 onChange={(e) => { setPixabayKeyState(e.target.value); setPixabayKey(e.target.value); }}
               />
+              <input
+                className="field"
+                type="password"
+                autoComplete="off"
+                placeholder="Freesound API key — for music + sounds (optional)"
+                value={freesoundKey}
+                onChange={(e) => { setFreesoundKeyState(e.target.value); setFreesoundKey(e.target.value); }}
+              />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">Free keys: pexels.com/api · pixabay.com/api/docs — stored only in this browser.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Free keys: pexels.com/api · pixabay.com/api/docs · freesound.org/apiv2/apply — stored only in this browser.</p>
             <div className="mt-3 flex items-center gap-3">
-              <button type="button" className="btn btn-ghost btn-sm" disabled={keyTesting || (!pexelsKey.trim() && !pixabayKey.trim())} onClick={() => void testKeys()}>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={keyTesting || (!pexelsKey.trim() && !pixabayKey.trim() && !freesoundKey.trim())} onClick={() => void testKeys()}>
                 {keyTesting ? "Testing…" : "🔑 Test my keys"}
               </button>
               {keyTest && <span className="text-sm text-muted-foreground">{keyTest}</span>}
@@ -318,13 +328,13 @@ function AutoVideo() {
             </p>
             {/* Mood music + transitions status (2026-11-08): what
                 actually got added, so a missing track is never
-                silent. "Key rejected" means the Pixabay key is
+                silent. "Key rejected" means the Freesound key is
                 wrong — press "Test my keys" below to check it. */}
             {(job.mood || job.music_status || job.sfx_status || job.join) && (
               <p className="mt-2 text-sm text-muted-foreground">
                 {job.mood ? `Mood: ${job.mood} · ` : ""}
-                Music: {job.music_status === "ok" ? "✓ added" : job.music_status === "no_key" ? "✗ no Pixabay key" : job.music_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.music_status === "no_results" ? "✗ no matching track found" : job.music_status === "unreachable" ? "✗ could not reach Pixabay — check connection and try again" : "off"}
-                {" · "}Sounds: {job.sfx_status === "ok" ? `✓ ${job.transition_sfx ?? 0} different sounds` : job.sfx_status === "no_key" ? "✗ no Pixabay key" : job.sfx_status === "key_rejected" ? "✗ Pixabay key rejected — press “Test my keys” below" : job.sfx_status === "no_results" ? "✗ no sounds found" : job.sfx_status === "unreachable" ? "✗ could not reach Pixabay — check connection and try again" : "off"}
+                Music: {job.music_status === "ok" ? "✓ added" : job.music_status === "no_key" ? "✗ no Freesound key" : job.music_status === "key_rejected" ? "✗ Freesound key rejected — press “Test my keys” below" : job.music_status === "no_results" ? "✗ no matching track found" : job.music_status === "unreachable" ? "✗ could not reach Freesound — check connection and try again" : "off"}
+                {" · "}Sounds: {job.sfx_status === "ok" ? `✓ ${job.transition_sfx ?? 0} different sounds` : job.sfx_status === "no_key" ? "✗ no Freesound key" : job.sfx_status === "key_rejected" ? "✗ Freesound key rejected — press “Test my keys” below" : job.sfx_status === "no_results" ? "✗ no sounds found" : job.sfx_status === "unreachable" ? "✗ could not reach Freesound — check connection and try again" : "off"}
                 {" · "}Transitions: {job.join === "xfade" ? "✓ applied (different style each scene)" : "✗ not applied (fell back to plain join)"}
               </p>
             )}

@@ -159,7 +159,7 @@ def _search_pexels(q: str, page: int, key: str) -> dict:
 
 
 class ValidateRequest(BaseModel):
-    source: str  # pixabay | pexels
+    source: str  # pixabay | pexels | freesound
     key: str
 
 
@@ -181,9 +181,9 @@ def validate_key(payload: ValidateRequest) -> dict:
         tell the user to test with a search."""
     source = payload.source.lower()
     key = (payload.key or "").strip()
-    if source not in ("pixabay", "pexels"):
+    if source not in ("pixabay", "pexels", "freesound"):
         return {"valid": False, "reason": "invalid",
-                "detail": "Unknown source — pick Pixabay or Pexels."}
+                "detail": "Unknown source — pick Pixabay, Pexels or Freesound."}
     if not key:
         return {"valid": False, "reason": "invalid",
                 "detail": "Paste a key first."}
@@ -191,6 +191,10 @@ def validate_key(payload: ValidateRequest) -> dict:
         if source == "pixabay":
             url = (f"{PIXABAY_VIDEOS_BASE}?"
                    f"{urllib.parse.urlencode({'key': key, 'q': 'test', 'per_page': '3'})}")
+            _get_json(url)
+        elif source == "freesound":
+            url = ("https://freesound.org/apiv2/search/text/?"
+                   f"{urllib.parse.urlencode({'query': 'test', 'token': key, 'page_size': '1'})}")
             _get_json(url)
         else:
             url = (f"{PEXELS_SEARCH_BASE}?"
