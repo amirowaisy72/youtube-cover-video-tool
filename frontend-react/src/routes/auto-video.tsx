@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCreate, autovideoJob, autovideoTrim, autovideoUpload, type AvJob, type AvScene, type AvUploadResult, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoCreate, autovideoJob, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvScene, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -88,6 +88,28 @@ function AutoVideo() {
         .then((d) => {
           setChannelDesc((d.description || "").trim());
           setChannelKeywords((d.keywords || "").trim());
+          // Auto-fetch the niche (user, 2026-11-09): when no niche
+          // was saved for this channel — e.g. it was connected
+          // directly, not through the wizard's Step 4 — derive it
+          // from the channel's live keywords, so the field fills
+          // itself from the selected channel. The functional
+          // setNiche keeps anything the user typed meanwhile.
+          const kws = (d.keywords || "").trim();
+          if (!getChannelNiche(activeChannelId) && kws) {
+            const derived = kws
+              .split(",")
+              .map((k) => k.trim())
+              .filter(Boolean)
+              .slice(0, 3)
+              .join(", ");
+            if (derived) {
+              setNiche((prev) => {
+                if (prev.trim()) return prev;
+                setChannelNiche(activeChannelId, derived);
+                return derived;
+              });
+            }
+          }
         })
         .catch(() => undefined);
     }
@@ -96,6 +118,17 @@ function AutoVideo() {
   const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
+  // Voice (user, 2026-11-09): the narration voice. Was hardcoded
+  // to Aria — now the user picks. Aria is the default (what all
+  // earlier videos used). Each voice has its own natural tone;
+  // preview any of them in the Text to Voice tool first.
+  const [voiceList, setVoiceList] = useState<TtsVoice[]>([]);
+  const [voice, setVoice] = useState("en-US-AriaNeural");
+  useEffect(() => {
+    ttsVoices()
+      .then((d) => setVoiceList(d.voices || []))
+      .catch(() => undefined);
+  }, []);
   // Custom script (user, 2026-11-09): the user can paste a script
   // written by another AI (e.g. Gemini) and the video is built
   // from it. Empty = the tool writes the script itself.
@@ -157,6 +190,7 @@ function AutoVideo() {
   const [upResult, setUpResult] = useState<AvUploadResult | null>(null);
   const descPrompt = `Write a YouTube video description for a video titled "${(upTitle || title).trim() || "my video"}"${activeChannelTitle ? ` on the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. 2-3 short paragraphs: what the video covers, why it matters, and a call to subscribe. Friendly, clear tone. End with 3-5 relevant hashtags on their own line.`;
   const tagsPrompt = `Suggest 15 YouTube video tags for a video titled "${(upTitle || title).trim() || "my video"}"${niche.trim() ? ` about ${niche.trim()}` : ""}. Cover the topic, related searches, and audience intent. Return them as a comma-separated list only, no numbering, no extra text.`;
+  const thumbPrompt = `Create a YouTube thumbnail image, 1280x720, for a video titled "${(upTitle || title).trim() || "my video"}"${activeChannelTitle ? ` on the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. Bold, high-contrast design that stands out in the feed: one clear focal image, at most 3-4 large readable words of text, strong colours, no clutter, no small text.`;
   const doUpload = async () => {
     if (!job || upLoading) return;
     const t = (upTitle || job.title || title).trim();
@@ -277,7 +311,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey, freesoundKey, music, transitions, customScript);
+      const data = await autovideoCreate(title.trim(), dur, voice, subtitles, pexelsKey, pixabayKey, freesoundKey, music, transitions, customScript);
       setJobId(data.job_id);
       // Background job: the build keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -315,7 +349,7 @@ function AutoVideo() {
             <input className="field text-lg" value={title} autoComplete="off" onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 5 Secrets of the Ocean" />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-semibold">Channel topic / niche <span className="text-muted-foreground">(used by Prompt for AI — set once per channel)</span></label>
+            <label className="mb-2 block text-sm font-semibold">Channel topic / niche <span className="text-muted-foreground">(auto-filled from the selected channel — edit if needed)</span></label>
             <input
               className="field"
               value={niche}
@@ -371,6 +405,18 @@ function AutoVideo() {
               <span className="text-sm text-muted-foreground">minutes (1–30)</span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">About {dur * 3} scenes · 1 credit · longer videos take longer to build, scene by scene</p>
+          </div>
+          <div>
+            <label className="mb-2 block font-semibold">Narration voice <span className="text-sm font-normal text-muted-foreground">(who reads the script — each voice has its own tone; preview them in Text to Voice)</span></label>
+            <select className="field" value={voice} onChange={(e) => setVoice(e.target.value)}>
+              {voiceList.length > 0 ? (
+                voiceList.map((v) => (
+                  <option key={v.id} value={v.id}>{v.label}</option>
+                ))
+              ) : (
+                <option value="en-US-AriaNeural">English (US) — Female, Aria</option>
+              )}
+            </select>
           </div>
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={subtitles} onChange={(e) => setSubtitles(e.target.checked)} />
@@ -436,8 +482,8 @@ function AutoVideo() {
       )}
 
       {phase === "build" && (
-        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-          <div className="glass p-6">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[1.5fr_1fr]">
+          <div className="glass min-w-0 p-6">
             {/* Video title (user, 2026-11-09): show which video is
                 being built, not just the scene count. */}
             <h3 className="mb-1 text-lg font-bold">{title}</h3>
@@ -502,8 +548,8 @@ function AutoVideo() {
       )}
 
       {phase === "done" && job && (
-        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-          <div className="glass p-6">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[1.5fr_1fr]">
+          <div className="glass min-w-0 p-6">
             <span className="chip mb-3 text-success">✓ Your video is ready</span>
             <h3 className="mb-4 text-2xl font-bold">{job.title || title}</h3>
             {job.download_url ? (
@@ -602,7 +648,7 @@ function AutoVideo() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="min-w-0">
                   <label className="mb-2 block text-sm font-semibold">Privacy</label>
                   <select className="field" value={upPrivacy} onChange={(e) => setUpPrivacy(e.target.value)}>
                     <option value="private">Private</option>
@@ -610,13 +656,22 @@ function AutoVideo() {
                     <option value="public">Public</option>
                   </select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="mb-2 block text-sm font-semibold">Channel</label>
                   <input className="field" value={activeChannelTitle || "Default channel"} disabled />
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-semibold">Thumbnail <span className="text-muted-foreground">(optional — JPG/PNG)</span></label>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold">Thumbnail <span className="text-muted-foreground">(optional — JPG/PNG)</span></label>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Prompt for AI — copy a prompt for Gemini or any AI image tool to generate a thumbnail for this video"
+                    onClick={() => void copyText(thumbPrompt)}
+                  >
+                    {copied ? "✓ Copied" : "✨ Prompt for AI"}
+                  </button>
+                </div>
                 <input
                   className="field"
                   type="file"
@@ -722,7 +777,7 @@ function AutoVideo() {
 
 function SceneList({ count, current, scenes, done }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean }) {
   return (
-    <div className="glass max-h-[640px] overflow-auto p-4">
+    <div className="glass max-h-[640px] min-w-0 overflow-auto p-4">
       <h3 className="mb-3 px-2 font-semibold">Scenes</h3>
       <div className="space-y-2">
         {Array.from({ length: count }).map((_, i) => {
