@@ -224,10 +224,27 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # Prefer a clip for motion, then an image. Candidates are
     # already scored by file-title overlap with the visual
     # description, best first.
+    # CLIP-FIRST FIX (user, 2026-11-09): a 30-minute video came
+    # out with ONLY images and ZERO clips. The on-topic filter
+    # below rejected nearly every Commons video (their file
+    # titles rarely contain the title's core words), so scenes
+    # fell through to images even when clips were available.
+    # Now two passes: on-topic clips first, then ANY clip from
+    # the found list — a moving clip, even loosely related, keeps
+    # viewers watching far better than a static image.
     if visuals in ("videos", "both"):
         for item in found["videos"][:5]:
             if not _on_topic(item):
                 continue
+            if not _reserve_url(used_urls, lock, item["url"]):
+                continue
+            suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
+            dest = work_dir / f"scene-{index:02d}{suffix}"
+            if autovideo._download(item["url"], dest):
+                if autovideo._ffprobe_duration(dest):
+                    return dest, "clip", item["title"]
+            _release_url(used_urls, lock, item["url"])
+        for item in found["videos"][:8]:
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
@@ -894,6 +911,290 @@ def _build_scene(index: int, scene: dict, title: str, visuals: str,
         "duration": duration,
         "engine": engine,
     }
+
+
+def list_mood_music(mood: str, freesound_key: str | None) -> tuple[list[dict], str]:
+    """Music-track options for a mood (user, 2026-11-09 — change
+    the background music AFTER the video is built). Returns a
+    list of {id, name, duration_sec, preview_url, license} the
+    user can listen to and pick from, plus a status ("ok" |
+    "no_key" | "key_rejected" | "no_results"). Only real music
+    tracks (>= 20s, playable preview) — never SFX. Tries the
+    mood query first, then the generic fallbacks."""
+    if not freesound_key or not freesound_key.strip():
+        return [], "no_key"
+    queries = [_MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient"),
+               "ambient cinematic", "cinematic"]
+    seen: set[int] = set()
+    options: list[dict] = []
+    for query in queries:
+        hits, status = _freesound_search(query, freesound_key, per_page=10)
+        if status == "auth":
+            return [], "key_rejected"
+        if status == "error" or not hits:
+            continue
+        for hit in hits:
+            if not _is_music_hit(hit):
+                continue
+            hid = hit.get("id")
+            if hid in seen:
+                continue
+            seen.add(hid)
+            preview = _freesound_preview_url(hit)
+            if not preview:
+                continue
+            options.append({
+                "id": hid,
+                "name": hit.get("name") or "Untitled track",
+                "duration_sec": round(float(hit.get("duration") or 0), 1),
+                "preview_url": preview,
+                "license": hit.get("license") or "",
+            })
+            if len(options) >= 8:
+                return options, "ok"
+    if not options:
+        return [], "no_results"
+    return options, "ok"
+
+
+def remix_music(work_dir: Path, music_path: Path, volume: float,
+                total_voice: float) -> dict:
+    """Re-mix a finished video with a DIFFERENT background music
+    track at a chosen volume (user, 2026-11-09). The video and
+    voiceover are untouched — only the music bed changes. Takes
+    the video-only stream (master-video-only.mp4), the unchanged
+    voiceover (master-voice.mp3), the new track (looped, at the
+    given volume) and the existing SFX track (if any), and muxes
+    a new final.mp4. The new track is also saved as
+    mood-music.mp3 so a later scene change keeps it. Returns
+    {final_path, final_duration_sec}."""
+    video_only = work_dir / "master-video-only.mp4"
+    voice_joined = work_dir / "master-voice.mp3"
+    sfx_track = work_dir / "sfx-track.m4a"
+    if not video_only.exists():
+        raise RuntimeError("Video-only file missing — cannot re-mix.")
+    if not voice_joined.exists():
+        raise RuntimeError("Voiceover file missing — cannot re-mix.")
+    if not music_path.exists():
+        raise RuntimeError("Music track missing — cannot re-mix.")
+    volume = max(0.0, min(1.0, float(volume)))
+    final_path = work_dir / "final.mp4"
+    mix_cmd = ["ffmpeg", "-y", "-i", str(video_only),
+               "-i", str(voice_joined)]
+    fc_parts: list[str] = []
+    mix_labels: list[str] = ["[1:a]"]
+    input_idx = 2
+    mix_cmd += ["-i", str(music_path)]
+    fc_parts.append(
+        f"[{input_idx}:a]aloop=loop=-1:size=2e+09,"
+        f"volume={volume},atrim=0:{total_voice:.3f}"
+        f"[music]")
+    mix_labels.append("[music]")
+    input_idx += 1
+    if sfx_track.exists():
+        mix_cmd += ["-i", str(sfx_track)]
+        mix_labels.append(f"[{input_idx}:a]")
+        input_idx += 1
+    n_mix = len(mix_labels)
+    fc = ";".join(fc_parts)
+    if fc:
+        fc += ";"
+    fc += "".join(mix_labels) + (
+        f"amix=inputs={n_mix}:duration=first:"
+        f"dropout_transition=0[aout]")
+    mix_cmd += ["-filter_complex", fc,
+                "-map", "0:v", "-map", "[aout]",
+                "-t", str(total_voice), "-c:v", "copy",
+                "-c:a", "aac", "-shortest", str(final_path)]
+    proc = subprocess.run(mix_cmd, capture_output=True, text=True,
+                          **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not final_path.exists():
+        raise RuntimeError(
+            f"Music re-mix failed: {proc.stderr[-1000:]}")
+    final_duration = video_module.get_duration(final_path) or 0
+    return {
+        "final_path": final_path,
+        "final_duration_sec": round(final_duration, 1),
+    }
+
+
+def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
+                                     transitions: bool = True) -> dict:
+    """Re-join + re-mux a finished Auto Video after ONE scene's
+    visual changed (user, 2026-11-09 — scene change is his most
+    important feature: he changes MANY scenes). Only the VIDEO
+    is rebuilt: the voiceover (master-voice.mp3), mood music
+    (mood-music.mp3) and SFX track (sfx-track.m4a) are untouched,
+    because a visual change never changes the narration. The
+    segments are the on-disk master-seg-XX.mp4 files; the caller
+    rebuilt the changed one first. The join is the same xfade
+    chain run_master uses (same transition rotation, same
+    offsets from the voice durations), with the same stream-copy
+    fallbacks. Returns {final_path, final_duration_sec, join}."""
+    segments = [work_dir / f"master-seg-{i:02d}.mp4" for i in range(len(scenes))]
+    for seg in segments:
+        if not seg.exists():
+            raise RuntimeError(f"Scene segment missing: {seg.name}")
+    voice_durs = [float(s.get("duration_sec") or 0) for s in scenes]
+    total_voice = sum(voice_durs)
+    if total_voice <= 0:
+        raise RuntimeError("No scene durations — cannot re-join.")
+    voice_joined = work_dir / "master-voice.mp3"
+    if not voice_joined.exists():
+        raise RuntimeError("Voiceover file missing — cannot re-mux.")
+    video_only = work_dir / "master-video-only.mp4"
+    joined_ok = False
+    join_method = "copy"
+    if transitions and len(segments) > 1:
+        chain: list[str] = []
+        prev = "[0:v]"
+        offset = 0.0
+        for k in range(len(segments) - 1):
+            ttype = _TRANSITION_TYPES[k % len(_TRANSITION_TYPES)]
+            offset += voice_durs[k]
+            out = f"[x{k}]" if k < len(segments) - 2 else "[vout]"
+            chain.append(
+                f"{prev}[{k + 1}:v]xfade=transition={ttype}:"
+                f"duration={_TRANSITION_SEC}:offset={offset:.3f}{out}")
+            prev = out
+        filter_graph = ";".join(chain)
+        cmd = ["ffmpeg", "-y"]
+        for seg in segments:
+            cmd += ["-i", str(seg)]
+        cmd += ["-filter_complex", filter_graph,
+                "-map", "[vout]", "-r", "30",
+                "-c:v", "libx264", "-preset", "veryfast",
+                "-pix_fmt", "yuv420p", str(video_only)]
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode == 0 and video_only.exists():
+            joined_dur = video_module.get_duration(video_only) or 0
+            if joined_dur >= total_voice * 0.9:
+                joined_ok = True
+                join_method = "xfade"
+    if not joined_ok:
+        if video_only.exists():
+            video_only.unlink(missing_ok=True)
+        list_file = work_dir / "master-concat.txt"
+        list_file.write_text(
+            "".join(f"file '{seg.resolve()}'\n" for seg in segments),
+            encoding="utf-8")
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(list_file), "-c:v", "copy", str(video_only)],
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
+        if proc.returncode == 0 and video_only.exists():
+            joined_dur = video_module.get_duration(video_only) or 0
+            if joined_dur >= total_voice * 0.9:
+                joined_ok = True
+    if not joined_ok:
+        if video_only.exists():
+            video_only.unlink(missing_ok=True)
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(list_file),
+             "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
+             "-c:v", "libx264", "-preset", "veryfast",
+             "-pix_fmt", "yuv420p", str(video_only)],
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not video_only.exists():
+            raise RuntimeError(
+                f"Scene-change re-join failed: {proc.stderr[-1000:]}")
+    # Re-mux: video + the UNCHANGED voiceover + mood music +
+    # SFX track (both only if they exist from the original build).
+    music_path = work_dir / "mood-music.mp3"
+    sfx_track = work_dir / "sfx-track.m4a"
+    final_path = work_dir / "final.mp4"
+    mix_cmd = ["ffmpeg", "-y", "-i", str(video_only),
+               "-i", str(voice_joined)]
+    fc_parts: list[str] = []
+    mix_labels: list[str] = ["[1:a]"]
+    input_idx = 2
+    if music_path.exists():
+        mix_cmd += ["-i", str(music_path)]
+        fc_parts.append(
+            f"[{input_idx}:a]aloop=loop=-1:size=2e+09,"
+            f"volume={_MUSIC_VOLUME},atrim=0:{total_voice:.3f}"
+            f"[music]")
+        mix_labels.append("[music]")
+        input_idx += 1
+    if sfx_track.exists():
+        mix_cmd += ["-i", str(sfx_track)]
+        mix_labels.append(f"[{input_idx}:a]")
+        input_idx += 1
+    n_mix = len(mix_labels)
+    fc = ";".join(fc_parts)
+    if fc:
+        fc += ";"
+    fc += "".join(mix_labels) + (
+        f"amix=inputs={n_mix}:duration=first:"
+        f"dropout_transition=0[aout]")
+    mix_cmd += ["-filter_complex", fc,
+                "-map", "0:v", "-map", "[aout]",
+                "-t", str(total_voice), "-c:v", "copy",
+                "-c:a", "aac", "-shortest", str(final_path)]
+    proc = subprocess.run(mix_cmd, capture_output=True, text=True,
+                          **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not final_path.exists():
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(video_only),
+             "-i", str(voice_joined),
+             "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
+             "-shortest", str(final_path)],
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not final_path.exists():
+        raise RuntimeError(
+            f"Scene-change re-mux failed: {proc.stderr[-1000:]}")
+    final_duration = video_module.get_duration(final_path) or 0
+    return {
+        "final_path": final_path,
+        "final_duration_sec": round(final_duration, 1),
+        "join": join_method,
+    }
+
+
+def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
+                          visual_path: Path, kind: str,
+                          total_scenes: int) -> dict:
+    """Rebuild ONE scene's segment with a new visual (user,
+    2026-11-09 — scene change). The narration, voiceover and
+    captions are unchanged, so no TTS and no Whisper run: the
+    existing per-scene SRT (scene-XX.srt) is reused when it
+    exists, else the static caption is used. The segment is
+    voice+transition_sec long (except the last scene), exactly
+    as the original build made it, so the re-join lands on the
+    same total duration. Returns the updated scene report
+    fields (kind, visual_source, duration_sec)."""
+    duration = float(scene.get("duration_sec") or 0)
+    if duration <= 0:
+        raise RuntimeError("Scene has no duration — cannot rebuild.")
+    is_last = index >= total_scenes - 1
+    seg_duration = duration if is_last else duration + _TRANSITION_SEC
+    caption = scene.get("caption") or _caption_text(scene)
+    srt_path = work_dir / f"scene-{index:02d}.srt"
+    subtitles_srt = srt_path if srt_path.exists() else None
+    dest = work_dir / f"master-seg-{index:02d}.mp4"
+    fade_in = index == 0
+    fade_out = is_last
+    if kind == "clip":
+        ok = _segment_scene_clip(visual_path, caption, seg_duration,
+                                 dest, subtitles_srt=subtitles_srt,
+                                 fade_in=fade_in, fade_out=fade_out)
+        if not ok:
+            ok = autovideo._segment_clip(visual_path, dest, seg_duration)
+    else:
+        ok = _segment_scene_image(visual_path, caption, seg_duration,
+                                  dest, pan_right=(index % 2 == 0),
+                                  subtitles_srt=subtitles_srt,
+                                  fade_in=fade_in, fade_out=fade_out)
+        if not ok:
+            ok = autovideo._segment_image(visual_path, dest, seg_duration)
+    if not ok:
+        raise RuntimeError("Could not build the new scene segment.")
+    return {"kind": kind, "duration_sec": round(duration, 1)}
 
 
 def run_master(title: str, minutes: int, visuals: str, voice: str,

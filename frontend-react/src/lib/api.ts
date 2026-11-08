@@ -159,6 +159,7 @@ export type AvJob = {
   mood?: string;
   music?: string | null;
   music_status?: string;
+  music_volume?: number;
   transition_sfx?: number;
   sfx_status?: string;
   transitions?: boolean;
@@ -426,6 +427,70 @@ export const autovideoUpload = (
   if (thumbnail) form.append("thumbnail", thumbnail);
   return api<AvUploadResult>(`/api/autovideo/${jobId}/upload`, { method: "POST", body: form });
 };
+
+export type AvAltVisual = {
+  url: string;
+  thumb: string;
+  title: string;
+  kind: "clip" | "image";
+  source: string;
+  mime: string;
+};
+
+export type AvSceneAlternatives = {
+  scene: number;
+  clips: AvAltVisual[];
+  images: AvAltVisual[];
+};
+
+export const autovideoSceneAlternatives = (
+  jobId: string, idx: number, pexelsKey = "", pixabayKey = "",
+) =>
+  api<AvSceneAlternatives>(
+    `/api/autovideo/${jobId}/scene/${idx}/alternatives?pexels_key=${encodeURIComponent(pexelsKey)}&pixabay_key=${encodeURIComponent(pixabayKey)}`,
+  );
+
+export const autovideoSceneVisual = (jobId: string, idx: number, url: string, kind: "clip" | "image") =>
+  api<{ scene: number; kind: string; video_url: string; final_duration_sec: number; join: string }>(
+    `/api/autovideo/${jobId}/scene/${idx}/visual`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, kind }),
+    },
+  );
+
+export type AvMusicOption = {
+  id: number;
+  name: string;
+  duration_sec: number;
+  preview_url: string;
+  license: string;
+};
+
+export type AvMusicOptions = {
+  mood: string;
+  status: string;
+  moods: string[];
+  options: AvMusicOption[];
+};
+
+export const autovideoMusicOptions = (jobId: string, mood: string, freesoundKey: string) =>
+  api<AvMusicOptions>(
+    `/api/autovideo/${jobId}/music-options?mood=${encodeURIComponent(mood)}&freesound_key=${encodeURIComponent(freesoundKey)}`,
+  );
+
+export const autovideoRemixMusic = (
+  jobId: string, previewUrl: string, name: string, volume: number,
+) =>
+  api<{ video_url: string; final_duration_sec: number; music: string; volume: number }>(
+    `/api/autovideo/${jobId}/remix-music`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preview_url: previewUrl, name, volume }),
+    },
+  );
 
 /** Test a stock-media API key (Pixabay / Pexels) with one tiny
     request, so a wrong key is caught when it is saved — not

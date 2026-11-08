@@ -592,6 +592,10 @@ def _commons_search(query: str, filetype: str, limit: int = 20) -> list[dict]:
             "url": url,
             "mime": info.get("mime", ""),
             "size": size,
+            # Poster thumbnail for videos (a JPG, not the video):
+            # the scene-change picker shows this so it never has
+            # to stream full clips just to preview them.
+            "thumb": info.get("thumburl") or "",
         })
     return items
 
@@ -713,31 +717,31 @@ def fetch_visuals(title: str, visuals: str,
                 _add(images, _commons_search(query, "bitmap", 30), 20)
             except Exception:
                 pass
-        if visuals in ("videos", "both") and len(videos) < 10:
+        if visuals in ("videos", "both") and len(videos) < 20:
             try:
-                _add(videos, _commons_search(query, "video", 30), 10)
+                _add(videos, _commons_search(query, "video", 30), 20)
             except Exception:
                 pass
-        if len(images) >= 12 and len(videos) >= 5:
+        if len(images) >= 12 and len(videos) >= 10:
             break
     # Fallback: if phrase searches still left us short, try single
     # core words ("pyramids" alone). Single words are banned as
     # the FIRST search because they return irrelevant results,
     # but as a fallback they beat a black video — and scoring
     # still ranks the best-matching files first.
-    if len(images) < 12 or (visuals in ("videos", "both") and len(videos) < 3):
+    if len(images) < 12 or (visuals in ("videos", "both") and len(videos) < 5):
         for word in core:
             if visuals in ("images", "both") and len(images) < 20:
                 try:
                     _add(images, _commons_search(word, "bitmap", 30), 20)
                 except Exception:
                     pass
-            if visuals in ("videos", "both") and len(videos) < 10:
+            if visuals in ("videos", "both") and len(videos) < 20:
                 try:
-                    _add(videos, _commons_search(word, "video", 30), 10)
+                    _add(videos, _commons_search(word, "video", 30), 20)
                 except Exception:
                     pass
-            if len(images) >= 12 and len(videos) >= 5:
+            if len(images) >= 12 and len(videos) >= 10:
                 break
     return {"images": images, "videos": videos}
 

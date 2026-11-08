@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCreate, autovideoJob, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvScene, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoCreate, autovideoJob, autovideoMusicOptions, autovideoRemixMusic, autovideoSceneAlternatives, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -188,6 +188,86 @@ function AutoVideo() {
   const [upLoading, setUpLoading] = useState(false);
   const [upError, setUpError] = useState("");
   const [upResult, setUpResult] = useState<AvUploadResult | null>(null);
+  // Scene change (user, 2026-11-09 — his most important
+  // feature): pick a different clip/image for any scene.
+  const [changeIdx, setChangeIdx] = useState<number | null>(null);
+  const [changeAlts, setChangeAlts] = useState<AvSceneAlternatives | null>(null);
+  const [changeLoading, setChangeLoading] = useState(false);
+  const [changeError, setChangeError] = useState("");
+  const [changeApplying, setChangeApplying] = useState(false);
+  const loadAlts = async (idx: number) => {
+    if (!job) return;
+    setChangeIdx(idx);
+    setChangeAlts(null);
+    setChangeError("");
+    setChangeLoading(true);
+    try {
+      const alts = await autovideoSceneAlternatives(job.id, idx, pexelsKey, pixabayKey);
+      setChangeAlts(alts);
+    } catch (e) {
+      setChangeError(e instanceof ApiError ? e.message : "Could not load alternatives.");
+    } finally {
+      setChangeLoading(false);
+    }
+  };
+  const applyVisual = async (url: string, kind: "clip" | "image") => {
+    if (!job || changeIdx === null || changeApplying) return;
+    setChangeApplying(true);
+    setChangeError("");
+    try {
+      await autovideoSceneVisual(job.id, changeIdx, url, kind);
+      // Refresh the job (new scene kind/source) and the video
+      // (the player re-loads the re-rendered file).
+      const j = await autovideoJob(job.id);
+      setJob(j);
+      setChangeIdx(null);
+      setChangeAlts(null);
+    } catch (e) {
+      setChangeError(e instanceof ApiError ? e.message : "Scene change failed.");
+    } finally {
+      setChangeApplying(false);
+    }
+  };
+  // Music change (user, 2026-11-09): swap the background music
+  // after the build, with a volume slider.
+  const [musicMood, setMusicMood] = useState("");
+  const [musicOpts, setMusicOpts] = useState<AvMusicOptions | null>(null);
+  const [musicLoading, setMusicLoading] = useState(false);
+  const [musicError, setMusicError] = useState("");
+  const [musicVolume, setMusicVolume] = useState(30);
+  const [musicApplying, setMusicApplying] = useState(false);
+  const [musicApplied, setMusicApplied] = useState("");
+  const loadMusic = async () => {
+    if (!job) return;
+    setMusicLoading(true);
+    setMusicError("");
+    setMusicOpts(null);
+    try {
+      const opts = await autovideoMusicOptions(job.id, musicMood, freesoundKey);
+      setMusicOpts(opts);
+      if (!musicMood) setMusicMood(opts.mood);
+    } catch (e) {
+      setMusicError(e instanceof ApiError ? e.message : "Could not load music.");
+    } finally {
+      setMusicLoading(false);
+    }
+  };
+  const applyMusic = async (previewUrl: string, name: string) => {
+    if (!job || musicApplying) return;
+    setMusicApplying(true);
+    setMusicError("");
+    setMusicApplied("");
+    try {
+      const res = await autovideoRemixMusic(job.id, previewUrl, name, musicVolume / 100);
+      setMusicApplied(`✓ Music changed to "${res.music}" at ${Math.round(res.volume * 100)}% volume.`);
+      const j = await autovideoJob(job.id);
+      setJob(j);
+    } catch (e) {
+      setMusicError(e instanceof ApiError ? e.message : "Music change failed.");
+    } finally {
+      setMusicApplying(false);
+    }
+  };
   const descPrompt = `Write a YouTube video description for a video titled "${(upTitle || title).trim() || "my video"}"${activeChannelTitle ? ` on the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. 2-3 short paragraphs: what the video covers, why it matters, and a call to subscribe. Friendly, clear tone. End with 3-5 relevant hashtags on their own line.`;
   const tagsPrompt = `Suggest 15 YouTube video tags for a video titled "${(upTitle || title).trim() || "my video"}"${niche.trim() ? ` about ${niche.trim()}` : ""}. Cover the topic, related searches, and audience intent. Return them as a comma-separated list only, no numbering, no extra text.`;
   const thumbPrompt = `Create a YouTube thumbnail image, 1280x720, for a video titled "${(upTitle || title).trim() || "my video"}"${activeChannelTitle ? ` on the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. Bold, high-contrast design that stands out in the feed: one clear focal image, at most 3-4 large readable words of text, strong colours, no clutter, no small text.`;
@@ -548,6 +628,7 @@ function AutoVideo() {
       )}
 
       {phase === "done" && job && (
+        <>
         <div className="grid min-w-0 gap-6 lg:grid-cols-[1.5fr_1fr]">
           <div className="glass min-w-0 p-6">
             <span className="chip mb-3 text-success">✓ Your video is ready</span>
@@ -768,14 +849,114 @@ function AutoVideo() {
               <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); }}>Make another</button>
             </div>
           </div>
-          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done />
+          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => void loadAlts(i)} />
         </div>
+        {/* Scene change picker (user, 2026-11-09 — his most
+            important feature): alternatives for the selected
+            scene, clips AND images, pick one to re-render. */}
+        {changeIdx !== null && (
+          <div className="glass mt-6 p-6">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold">Change Scene {changeIdx + 1} — pick a clip or image</p>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setChangeIdx(null); setChangeAlts(null); setChangeError(""); }}>✕ Close</button>
+            </div>
+            {changeLoading && <p className="text-sm text-muted-foreground">Loading alternatives…</p>}
+            {changeError && <p className="text-sm text-destructive">{changeError}</p>}
+            {changeApplying && <p className="text-sm text-muted-foreground">Re-rendering the video with the new visual…</p>}
+            {changeAlts && (
+              <>
+                {changeAlts.clips.length > 0 && (
+                  <>
+                    <p className="mb-2 text-sm font-semibold">🎬 Video clips</p>
+                    <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {changeAlts.clips.map((c, i) => (
+                        <button key={`c${i}`} className="overflow-hidden rounded-xl border border-border text-left hover:border-primary" disabled={changeApplying} onClick={() => void applyVisual(c.url, "clip")}>
+                          {c.thumb ? (
+                            <img src={c.thumb} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+                          ) : (
+                            <video src={c.url} muted preload="metadata" className="aspect-video w-full object-cover" />
+                          )}
+                          <p className="truncate px-2 py-1 text-xs text-muted-foreground">{c.title || c.source}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {changeAlts.images.length > 0 && (
+                  <>
+                    <p className="mb-2 text-sm font-semibold">🖼️ Images</p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {changeAlts.images.map((im, i) => (
+                        <button key={`i${i}`} className="overflow-hidden rounded-xl border border-border text-left hover:border-primary" disabled={changeApplying} onClick={() => void applyVisual(im.url, "image")}>
+                          <img src={im.thumb || im.url} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+                          <p className="truncate px-2 py-1 text-xs text-muted-foreground">{im.title || im.source}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {changeAlts.clips.length === 0 && changeAlts.images.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No alternatives found for this scene. Try changing a different scene.</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {/* Change background music (user, 2026-11-09): load
+            tracks by mood, listen, pick one, set its volume. */}
+        <div className="glass mt-6 p-6">
+          <p className="font-semibold">🎵 Change background music</p>
+          <p className="mb-3 text-sm text-muted-foreground">Current music: {job.music || "none"}{job.music_volume !== undefined ? ` · volume ${Math.round((job.music_volume as number) * 100)}%` : ""}. Pick a mood, load tracks, listen, and apply one at the volume you want.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <select className="field w-auto" value={musicMood || job.mood || "calm"} onChange={(e) => setMusicMood(e.target.value)}>
+              {(musicOpts?.moods || ["suspense", "wonder", "happy", "motivational", "sad", "epic", "calm"]).map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <button className="btn btn-ghost" disabled={musicLoading} onClick={() => void loadMusic()}>
+              {musicLoading ? "Loading…" : "Load music"}
+            </button>
+            <label className="flex items-center gap-2 text-sm">
+              Volume
+              <input type="range" min={0} max={100} value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value, 10))} className="w-32 accent-primary" />
+              <span className="w-10 text-right font-semibold">{musicVolume}%</span>
+            </label>
+          </div>
+          {musicError && <p className="mt-3 text-sm text-destructive">{musicError}</p>}
+          {musicApplied && <p className="mt-3 text-sm text-success">{musicApplied}</p>}
+          {musicOpts && musicOpts.options.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {musicOpts.options.map((o) => (
+                <div key={o.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{o.name}</p>
+                    <p className="text-xs text-muted-foreground">{Math.round(o.duration_sec)}s · {o.license || "royalty-free"}</p>
+                  </div>
+                  <audio src={o.preview_url} controls preload="none" className="h-8 w-56 max-w-full" />
+                  <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyMusic(o.preview_url, o.name)}>
+                    {musicApplying ? "Applying…" : "Use this"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {musicOpts && musicOpts.options.length === 0 && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {musicOpts.status === "no_key"
+                ? "No Freesound key — add your free Freesound key in the form above (or the Stock tool) to load music."
+                : musicOpts.status === "key_rejected"
+                  ? "Freesound rejected the key — check it and try again."
+                  : "No tracks found for this mood — try another mood."}
+            </p>
+          )}
+        </div>
+        </>
       )}
     </div>
   );
 }
 
-function SceneList({ count, current, scenes, done }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean }) {
+function SceneList({ count, current, scenes, done, onChange }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void }) {
   return (
     <div className="glass max-h-[640px] min-w-0 overflow-auto p-4">
       <h3 className="mb-3 px-2 font-semibold">Scenes</h3>
@@ -792,6 +973,11 @@ function SceneList({ count, current, scenes, done }: { count: number; current: n
                 <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.visual_source ? ` · ${s.visual_source}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}</div>
                 <div className="truncate text-xs text-muted-foreground">{line}</div>
               </div>
+              {done && onChange && (
+                <button className="btn btn-ghost btn-sm shrink-0" title="Change this scene's clip or image" onClick={() => onChange(i)}>
+                  🔄 Change
+                </button>
+              )}
               <span className="text-sm">{isDone ? "✓" : active ? "⏳" : ""}</span>
             </div>
           );
