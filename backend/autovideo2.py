@@ -1212,6 +1212,432 @@ def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
     return {"kind": kind, "duration_sec": round(duration, 1)}
 
 
+# ---------------------------------------------------------------------------
+# STEP-BY-STEP PIPELINE (user, 2026-11-09)
+# ---------------------------------------------------------------------------
+# The old one-click flow built everything at once (script + voice +
+# footage + render) and only then let the user edit — every edit
+# re-rendered. The user asked for a simpler step flow instead, where
+# the DECISIONS happen before any rendering:
+#   Step 1 — Setup: title, length, niche, voice, script.
+#   Step 2 — Footage: script + scenes, footage collected scene by
+#     scene and shown in sequence; any scene's footage is changed
+#     right there (no rendering yet, so changes are instant).
+#   Step 3 — Audio: voiceover + background music + SFX gathered;
+#     the music is changeable before the render.
+#   Step 4 — Render: the video is edited from the chosen footage
+#     + audio, reviewed, and still modifiable (scene/music change
+#     still work on the finished video, as before).
+# The three phase functions below are the steps; run_master (the
+# old one-click path) is kept working and now calls join_and_mux
+# so the join/mux code has a single home.
+def synthesize_scene_voice(index: int, narration: str, voice: str,
+                           work_dir: Path) -> tuple[Path | None, str, float]:
+    """TTS for ONE scene (plain voice — SSML is banned: it slowed
+    speech 3x). Returns (voice_path, engine, duration_sec); the
+    path is None when the voice could not be measured."""
+    voice_path, engine = tts_module.synthesize(
+        narration, voice, "+0%", work_dir, expressive=False)
+    duration = video_module.get_duration(voice_path) or 0
+    if not duration or duration <= 0:
+        return None, engine, 0.0
+    return voice_path, engine, duration
+
+
+def encode_scene_segment(index: int, visual_path: Path, kind: str,
+                         caption: str, voice_duration: float,
+                         work_dir: Path, voice_path: Path,
+                         subtitles: bool = True, total_scenes: int = 1,
+                         transition_sec: float = _TRANSITION_SEC
+                         ) -> Path | None:
+    """Encode ONE scene's segment from its chosen visual + voice
+    length. Word-by-word Whisper subtitles are burned in when
+    they transcribe; a subtitle failure falls back to the static
+    caption. Returns the segment path, or None on failure."""
+    subtitles_srt: Path | None = None
+    if subtitles:
+        subtitles_srt = _transcribe_scene_voice(voice_path, work_dir, index)
+    dest = work_dir / f"master-seg-{index:02d}.mp4"
+    is_last = index >= total_scenes - 1
+    seg_duration = voice_duration if is_last else voice_duration + transition_sec
+    fade_in = index == 0
+    fade_out = is_last
+    if kind == "clip":
+        ok = _segment_scene_clip(visual_path, caption, seg_duration,
+                                 dest, subtitles_srt=subtitles_srt,
+                                 fade_in=fade_in, fade_out=fade_out)
+    else:
+        ok = _segment_scene_image(visual_path, caption, seg_duration,
+                                  dest, pan_right=(index % 2 == 0),
+                                  subtitles_srt=subtitles_srt,
+                                  fade_in=fade_in, fade_out=fade_out)
+    if not ok:
+        # Segment encode failed: fall back to the old plain
+        # segment builders for this scene.
+        if kind == "clip":
+            ok = autovideo._segment_clip(visual_path, dest, seg_duration)
+        else:
+            ok = autovideo._segment_image(visual_path, dest, seg_duration)
+    return dest if ok else None
+
+
+def join_and_mux(work_dir: Path, segments: list[Path],
+                 voice_files: list[Path], durations: list[float],
+                 total_voice: float, music_path: Path | None,
+                 music_volume: float, sfx_paths: list[Path],
+                 transitions: bool, total_scenes: int,
+                 progress_cb=None) -> tuple[Path, float, str]:
+    """Join scene segments (xfade chain when transitions are on,
+    stream-copy fallback, re-encode last resort), join the
+    voiceover, build the SFX track at the scene boundaries, and
+    mux voice + music + SFX into final.mp4. The music volume is
+    a parameter (the step flow lets the user pick it; the old
+    flow passes _MUSIC_VOLUME). Returns (final_path,
+    final_duration_sec, join_method). Raises on failure."""
+    video_only = work_dir / "master-video-only.mp4"
+    joined_ok = False
+    join_method = "copy"
+    if transitions and len(segments) > 1:
+        chain: list[str] = []
+        prev = "[0:v]"
+        offset = 0.0
+        for k in range(len(segments) - 1):
+            ttype = _TRANSITION_TYPES[k % len(_TRANSITION_TYPES)]
+            offset += durations[k]
+            out = f"[x{k}]" if k < len(segments) - 2 else "[vout]"
+            chain.append(
+                f"{prev}[{k + 1}:v]xfade=transition={ttype}:"
+                f"duration={_TRANSITION_SEC}:offset={offset:.3f}{out}")
+            prev = out
+        filter_graph = ";".join(chain)
+        cmd = ["ffmpeg", "-y"]
+        for seg in segments:
+            cmd += ["-i", str(seg)]
+        cmd += ["-filter_complex", filter_graph,
+                "-map", "[vout]", "-r", "30",
+                "-c:v", "libx264", "-preset", "veryfast",
+                "-pix_fmt", "yuv420p", str(video_only)]
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode == 0 and video_only.exists():
+            joined_dur = video_module.get_duration(video_only) or 0
+            if joined_dur >= total_voice * 0.9:
+                joined_ok = True
+                join_method = "xfade"
+    list_file = work_dir / "master-concat.txt"
+    if not joined_ok:
+        if video_only.exists():
+            video_only.unlink(missing_ok=True)
+        list_file.write_text(
+            "".join(f"file '{seg.resolve()}'\n" for seg in segments),
+            encoding="utf-8")
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(list_file), "-c:v", "copy", str(video_only)],
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
+        if proc.returncode == 0 and video_only.exists():
+            joined_dur = video_module.get_duration(video_only) or 0
+            if joined_dur >= total_voice * 0.9:
+                joined_ok = True
+    if not joined_ok:
+        if video_only.exists():
+            video_only.unlink(missing_ok=True)
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(list_file),
+             "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
+             "-c:v", "libx264", "-preset", "veryfast",
+             "-pix_fmt", "yuv420p", str(video_only)],
+            capture_output=True, text=True,
+            **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not video_only.exists():
+            raise RuntimeError(
+                f"Master video assembly failed: {proc.stderr[-1000:]}")
+    if progress_cb:
+        progress_cb(total_scenes, total_scenes, "Joining scenes…")
+    audio_list = work_dir / "master-audio.txt"
+    audio_list.write_text(
+        "".join(f"file '{path.resolve()}'\n" for path in voice_files),
+        encoding="utf-8")
+    voice_joined = work_dir / "master-voice.mp3"
+    proc = subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list),
+         "-c:a", "libmp3lame", str(voice_joined)],
+        capture_output=True, text=True, **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not voice_joined.exists():
+        raise RuntimeError(f"Master audio assembly failed: {proc.stderr[-1000:]}")
+    # Transition SFX track: one (different) sound at each scene
+    # boundary, placed at the cumulative voice time.
+    sfx_track: Path | None = None
+    if sfx_paths and len(durations) > 1:
+        boundary_times: list[float] = []
+        cum = 0.0
+        for d in durations[:-1]:
+            cum += d
+            boundary_times.append(cum)
+        sfx_track = work_dir / "sfx-track.m4a"
+        sfx_cmd = ["ffmpeg", "-y"]
+        for p in sfx_paths:
+            sfx_cmd += ["-i", str(p)]
+        parts: list[str] = []
+        labels: list[str] = []
+        for i, bt in enumerate(boundary_times):
+            src = i % len(sfx_paths)
+            ms = int(bt * 1000)
+            parts.append(
+                f"[{src}:a]loudnorm=I=-16:TP=-1.5:LRA=11,volume={_SFX_VOLUME},adelay={ms}|{ms}[s{i}]")
+            labels.append(f"[s{i}]")
+        sfx_cmd += ["-filter_complex",
+                    ";".join(parts) + ";" +
+                    "".join(labels) +
+                    f"amix=inputs={len(boundary_times)}:"
+                    f"duration=longest:dropout_transition=0[sfx]",
+                    "-map", "[sfx]", "-t", str(total_voice),
+                    "-c:a", "aac", str(sfx_track)]
+        proc = subprocess.run(sfx_cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not sfx_track.exists():
+            sfx_track = None  # SFX failed -> skip, video still builds
+    final_path = work_dir / "final.mp4"
+    if music_path is not None or sfx_track is not None:
+        mix_cmd = ["ffmpeg", "-y", "-i", str(video_only),
+                   "-i", str(voice_joined)]
+        fc_parts: list[str] = []
+        mix_labels: list[str] = ["[1:a]"]
+        input_idx = 2
+        if music_path is not None:
+            mix_cmd += ["-i", str(music_path)]
+            fc_parts.append(
+                f"[{input_idx}:a]aloop=loop=-1:size=2e+09,"
+                f"volume={music_volume},atrim=0:{total_voice:.3f}"
+                f"[music]")
+            mix_labels.append("[music]")
+            input_idx += 1
+        if sfx_track is not None:
+            mix_cmd += ["-i", str(sfx_track)]
+            mix_labels.append(f"[{input_idx}:a]")
+            input_idx += 1
+        n_mix = len(mix_labels)
+        fc = ";".join(fc_parts)
+        if fc:
+            fc += ";"
+        fc += "".join(mix_labels) + (
+            f"amix=inputs={n_mix}:duration=first:"
+            f"dropout_transition=0[aout]")
+        mix_cmd += ["-filter_complex", fc,
+                    "-map", "0:v", "-map", "[aout]",
+                    "-t", str(total_voice), "-c:v", "copy",
+                    "-c:a", "aac", "-shortest", str(final_path)]
+        proc = subprocess.run(mix_cmd, capture_output=True, text=True,
+                              **video_module.no_window_kwargs())
+        if proc.returncode != 0 or not final_path.exists():
+            proc = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(video_only),
+                 "-i", str(voice_joined),
+                 "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
+                 "-shortest", str(final_path)],
+                capture_output=True, text=True,
+                **video_module.no_window_kwargs())
+    else:
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_joined),
+             "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
+             "-shortest", str(final_path)],
+            capture_output=True, text=True, **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not final_path.exists():
+        raise RuntimeError(f"Master audio mux failed: {proc.stderr[-1000:]}")
+    final_duration = video_module.get_duration(final_path) or 0
+    if final_duration <= 0 or final_path.stat().st_size < 100_000:
+        raise RuntimeError("Master final video failed its quality gate.")
+    return final_path, round(final_duration, 1), join_method
+
+
+def plan_footage(title: str, minutes: int, script: str | None,
+                 visuals: str, work_dir: Path,
+                 pexels_key: str | None = None,
+                 pixabay_key: str | None = None,
+                 progress_cb=None) -> dict:
+    """STEP 2 — Footage collection. Generates the scene script,
+    then collects one visual per scene (clip/image/AI/card,
+    same picking + dedup as _scene_visual) and downloads it
+    into work_dir as scene-XX.<ext>. NO voiceover, NO rendering
+    — so a scene's footage can be changed instantly afterwards.
+    Returns {scenes, script, script_source, script_words} where
+    each scene carries narration, visual, caption, kind,
+    visual_source, visual_file (local name) and visual_url."""
+    import os
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    work_dir.mkdir(parents=True, exist_ok=True)
+    scenes, source = generate_scenes(title, minutes, script=script)
+    if not scenes:
+        raise RuntimeError("Could not build a scene script.")
+    script_text = "\n\n".join(s["narration"] for s in scenes)
+    used_urls: set = set()
+    lock = threading.Lock()
+    results: dict[int, dict] = {}
+
+    def _collect(index: int, scene: dict) -> dict:
+        visual_path, kind, visual_source = _scene_visual(
+            title, scene, visuals, work_dir, index, used_urls, lock,
+            pexels_key=pexels_key, pixabay_key=pixabay_key)
+        return {
+            "index": index,
+            "narration": scene["narration"],
+            "visual": scene["visual"],
+            "caption": _caption_text(scene),
+            "kind": kind,
+            "visual_source": visual_source,
+            "visual_file": visual_path.name,
+            "visual_url": visual_source if visual_source.startswith("http") else "",
+            "duration_sec": 0,
+        }
+
+    workers = max(2, min(4, os.cpu_count() or 4))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_collect, i, s): i
+                   for i, s in enumerate(scenes)}
+        done = 0
+        for future in as_completed(futures):
+            result = future.result()
+            results[result["index"]] = result
+            done += 1
+            if progress_cb:
+                progress_cb(done, len(scenes),
+                            f"Collecting footage — scene {done} of {len(scenes)}…")
+    ordered = [results[i] for i in sorted(results)]
+    if not ordered:
+        raise RuntimeError("Footage collection produced no scenes.")
+    return {
+        "scenes": ordered,
+        "script": script_text,
+        "script_source": source,
+        "script_words": len(script_text.split()),
+    }
+
+
+def prepare_audio(title: str, scenes: list[dict], voice: str,
+                  work_dir: Path, freesound_key: str | None = None,
+                  music: bool = True,
+                  progress_cb=None) -> dict:
+    """STEP 3 — Audio. Voices every scene (parallel), joins the
+    voiceover into master-voice.mp3, detects the mood and lists
+    the matching Freesound tracks, and fetches transition SFX.
+    The DEFAULT mood track is also downloaded as mood-music.mp3
+    so the render has music even if the user picks nothing.
+    Returns {durations, voice_files, voice_engine, total_voice,
+    mood, music, music_status, music_options, music_options_status,
+    transition_sfx, sfx_status}."""
+    import os
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    workers = max(2, min(4, os.cpu_count() or 4))
+    results: dict[int, dict] = {}
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(synthesize_scene_voice, i,
+                        s["narration"], voice, work_dir): i
+            for i, s in enumerate(scenes)
+        }
+        done = 0
+        for future in as_completed(futures):
+            voice_path, engine, duration = future.result()
+            idx = futures[future]
+            results[idx] = {"voice_path": voice_path, "engine": engine,
+                            "duration": duration}
+            done += 1
+            if progress_cb:
+                progress_cb(done, len(scenes),
+                            f"Voicing scene {done} of {len(scenes)}…")
+    ordered = [results[i] for i in sorted(results)]
+    if not ordered or any(r["voice_path"] is None for r in ordered):
+        raise RuntimeError("Voiceover failed for a scene.")
+    voice_files = [r["voice_path"] for r in ordered]
+    durations = [r["duration"] for r in ordered]
+    total_voice = sum(durations)
+    engine = ordered[0]["engine"]
+    # Join the voiceover now (also gives the render its file).
+    audio_list = work_dir / "master-audio.txt"
+    audio_list.write_text(
+        "".join(f"file '{path.resolve()}'\n" for path in voice_files),
+        encoding="utf-8")
+    voice_joined = work_dir / "master-voice.mp3"
+    proc = subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list),
+         "-c:a", "libmp3lame", str(voice_joined)],
+        capture_output=True, text=True, **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not voice_joined.exists():
+        raise RuntimeError(f"Voiceover assembly failed: {proc.stderr[-1000:]}")
+    script_text = "\n\n".join(s["narration"] for s in scenes)
+    mood = _detect_mood(title, script_text)
+    if music:
+        music_path, music_status = _fetch_mood_music(
+            mood, freesound_key, work_dir)
+        options, options_status = list_mood_music(mood, freesound_key)
+    else:
+        music_path, music_status = None, "off"
+        options, options_status = [], "off"
+    sfx_paths, sfx_status = _fetch_transition_sfx(freesound_key, work_dir)
+    return {
+        "durations": [round(d, 1) for d in durations],
+        "voice_files": [p.name for p in voice_files],
+        "voice_engine": engine,
+        "total_voice": round(total_voice, 1),
+        "mood": mood,
+        "music": music_path.name if music_path is not None else None,
+        "music_status": music_status,
+        "music_options": options,
+        "music_options_status": options_status,
+        "transition_sfx": len(sfx_paths),
+        "sfx_status": sfx_status,
+    }
+
+
+def render_video(work_dir: Path, scenes: list[dict],
+                 durations: list[float], voice_files: list[Path],
+                 music_path: Path | None, music_volume: float,
+                 sfx_paths: list[Path], transitions: bool = True,
+                 subtitles: bool = True,
+                 progress_cb=None) -> dict:
+    """STEP 4 — Render. Encodes every scene's segment from its
+    chosen visual + voice length, then joins + muxes via
+    join_and_mux. Returns {final_path, final_duration_sec,
+    join, kinds}."""
+    total_voice = sum(durations)
+    segments: list[Path] = []
+    kinds = {"clip": 0, "image": 0, "ai": 0, "card": 0}
+    for i, scene in enumerate(scenes):
+        visual_path = work_dir / scene["visual_file"]
+        if not visual_path.exists():
+            raise RuntimeError(
+                f"Scene {i + 1} footage missing: {scene['visual_file']}")
+        voice_path = voice_files[i]
+        caption = scene.get("caption") or _caption_text(scene)
+        dest = encode_scene_segment(
+            i, visual_path, scene["kind"], caption, durations[i],
+            work_dir, voice_path, subtitles=subtitles,
+            total_scenes=len(scenes))
+        if dest is None:
+            raise RuntimeError(f"Scene {i + 1} segment failed to encode.")
+        segments.append(dest)
+        kinds[scene["kind"]] = kinds.get(scene["kind"], 0) + 1
+        if progress_cb:
+            progress_cb(i + 1, len(scenes),
+                        f"Rendering scene {i + 1} of {len(scenes)}…")
+    final_path, final_duration, join_method = join_and_mux(
+        work_dir, segments, voice_files, durations, total_voice,
+        music_path, music_volume, sfx_paths, transitions,
+        len(scenes), progress_cb=progress_cb)
+    return {
+        "final_path": final_path,
+        "final_duration_sec": final_duration,
+        "join": join_method,
+        "kinds": kinds,
+    }
+
+
 def run_master(title: str, minutes: int, visuals: str, voice: str,
                work_dir: Path, expressive: bool = True,
                progress_cb=None, subtitles: bool = True,
@@ -1321,203 +1747,20 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     if transitions:
         sfx_paths, sfx_status = _fetch_transition_sfx(
             freesound_key, work_dir)
-    # Join scene segments, then mux the joined voiceover.
-    video_only = work_dir / "master-video-only.mp4"
-    joined_ok = False
-    join_method = "copy"
-    if transitions and len(segments) > 1:
-        # Xfade join: a DIFFERENT transition style at every
-        # boundary, rotating through _TRANSITION_TYPES. Each
-        # segment is voice+0.5s (except the last), so the 0.5s
-        # overlap lands the joined video on exactly the
-        # voiceover length. The xfade offset for boundary k is
-        # the cumulative voice duration up to scene k.
-        # (Segments are 1280x720 yuv420p libx264 at 30fps, so
-        # the xfade re-encode is one pass, preset veryfast.)
-        voice_durs = [item["duration"] for item in ordered]
-        chain: list[str] = []
-        prev = "[0:v]"
-        offset = 0.0
-        for k in range(len(segments) - 1):
-            ttype = _TRANSITION_TYPES[k % len(_TRANSITION_TYPES)]
-            offset += voice_durs[k]
-            out = f"[x{k}]" if k < len(segments) - 2 else "[vout]"
-            chain.append(
-                f"{prev}[{k + 1}:v]xfade=transition={ttype}:"
-                f"duration={_TRANSITION_SEC}:offset={offset:.3f}{out}")
-            prev = out
-        filter_graph = ";".join(chain)
-        cmd = ["ffmpeg", "-y"]
-        for seg in segments:
-            cmd += ["-i", str(seg)]
-        cmd += ["-filter_complex", filter_graph,
-                "-map", "[vout]", "-r", "30",
-                "-c:v", "libx264", "-preset", "veryfast",
-                "-pix_fmt", "yuv420p", str(video_only)]
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              **video_module.no_window_kwargs())
-        if proc.returncode == 0 and video_only.exists():
-            joined_dur = video_module.get_duration(video_only) or 0
-            if joined_dur >= total_voice * 0.9:
-                joined_ok = True
-                join_method = "xfade"
-    if not joined_ok:
-        # Stream-copy fallback: no crossfades, but the video
-        # still builds (first scene fades in, last fades out,
-        # middle boundaries are hard cuts). Segments are already
-        # 1280x720 yuv420p libx264 at 30fps, so a stream copy
-        # joins them with NO re-encode.
-        if video_only.exists():
-            video_only.unlink(missing_ok=True)
-        list_file = work_dir / "master-concat.txt"
-        list_file.write_text(
-            "".join(f"file '{seg.resolve()}'\n" for seg in segments),
-            encoding="utf-8")
-        proc = subprocess.run(
-            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
-             "-i", str(list_file), "-c:v", "copy", str(video_only)],
-            capture_output=True, text=True,
-            **video_module.no_window_kwargs())
-        if proc.returncode == 0 and video_only.exists():
-            joined_dur = video_module.get_duration(video_only) or 0
-            if joined_dur >= total_voice * 0.9:
-                joined_ok = True
-    if not joined_ok:
-        if video_only.exists():
-            video_only.unlink(missing_ok=True)
-        proc = subprocess.run(
-            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
-             "-i", str(list_file),
-             "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
-             "-c:v", "libx264", "-preset", "veryfast",
-             "-pix_fmt", "yuv420p", str(video_only)],
-            capture_output=True, text=True,
-            **video_module.no_window_kwargs())
-        if proc.returncode != 0 or not video_only.exists():
-            raise RuntimeError(
-                f"Master video assembly failed: {proc.stderr[-1000:]}")
-    if progress_cb:
-        progress_cb(len(scenes), len(scenes), "Joining scenes…")
-    audio_list = work_dir / "master-audio.txt"
-    audio_list.write_text(
-        "".join(f"file '{path.resolve()}'\n" for path in voice_files),
-        encoding="utf-8")
-    voice_joined = work_dir / "master-voice.mp3"
-    proc = subprocess.run(
-        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list),
-         "-c:a", "libmp3lame", str(voice_joined)],
-        capture_output=True, text=True, **video_module.no_window_kwargs())
-    if proc.returncode != 0 or not voice_joined.exists():
-        raise RuntimeError(f"Master audio assembly failed: {proc.stderr[-1000:]}")
-    # Transition SFX track: one (different) sound at each scene
-    # boundary, placed at the cumulative voice time. Built as a
-    # single track first so the final mux stays simple (voice +
-    # music + one SFX track). No SFX -> no track, no change.
-    sfx_track: Path | None = None
-    if sfx_paths and len(ordered) > 1:
-        boundary_times: list[float] = []
-        cum = 0.0
-        for item in ordered[:-1]:
-            cum += item["duration"]
-            boundary_times.append(cum)
-        sfx_track = work_dir / "sfx-track.m4a"
-        sfx_cmd = ["ffmpeg", "-y"]
-        for p in sfx_paths:
-            sfx_cmd += ["-i", str(p)]
-        # Round-robin the SFX so no two consecutive boundaries
-        # play the same sound (variety, per the user's ask).
-        parts: list[str] = []
-        labels: list[str] = []
-        for i, bt in enumerate(boundary_times):
-            src = i % len(sfx_paths)
-            ms = int(bt * 1000)
-            # loudnorm (2026-11-08): Freesound preview levels
-            # vary wildly — a quiet whoosh at 0.5 volume is
-            # inaudible (the user heard only 1 of 4 sounds).
-            # Normalising each SFX to -16 LUFS before the volume
-            # makes every transition sound clearly audible.
-            # ORDER MATTERS: loudnorm must come BEFORE adelay —
-            # after adelay it measures the leading silence too
-            # and under-boosts (a 5s-delayed SFX stayed quiet).
-            parts.append(
-                f"[{src}:a]loudnorm=I=-16:TP=-1.5:LRA=11,volume={_SFX_VOLUME},adelay={ms}|{ms}[s{i}]")
-            labels.append(f"[s{i}]")
-        n_inputs = len(boundary_times) + 1
-        sfx_cmd += ["-filter_complex",
-                    ";".join(parts) + ";" +
-                    "".join(labels) +
-                    f"amix=inputs={len(boundary_times)}:"
-                    f"duration=longest:dropout_transition=0[sfx]",
-                    "-map", "[sfx]", "-t", str(total_voice),
-                    "-c:a", "aac", str(sfx_track)]
-        proc = subprocess.run(sfx_cmd, capture_output=True, text=True,
-                              **video_module.no_window_kwargs())
-        if proc.returncode != 0 or not sfx_track.exists():
-            sfx_track = None  # SFX failed -> skip, video still builds
-    final_path = work_dir / "final.mp4"
-    if music_path is not None or sfx_track is not None:
-        # Mixed final audio: voice (full) + mood music (looped,
-        # 12%, under the voice) + SFX track (at the boundaries).
-        # Video is copied, audio re-encoded to AAC.
-        mix_cmd = ["ffmpeg", "-y", "-i", str(video_only),
-                   "-i", str(voice_joined)]
-        fc_parts: list[str] = []
-        mix_labels: list[str] = ["[1:a]"]
-        input_idx = 2
-        if music_path is not None:
-            mix_cmd += ["-i", str(music_path)]
-            fc_parts.append(
-                f"[{input_idx}:a]aloop=loop=-1:size=2e+09,"
-                f"volume={_MUSIC_VOLUME},atrim=0:{total_voice:.3f}"
-                f"[music]")
-            mix_labels.append("[music]")
-            input_idx += 1
-        if sfx_track is not None:
-            mix_cmd += ["-i", str(sfx_track)]
-            mix_labels.append(f"[{input_idx}:a]")
-            input_idx += 1
-        n_mix = len(mix_labels)
-        fc = ";".join(fc_parts)
-        if fc:
-            fc += ";"
-        fc += "".join(mix_labels) + (
-            f"amix=inputs={n_mix}:duration=first:"
-            f"dropout_transition=0[aout]")
-        mix_cmd += ["-filter_complex", fc,
-                    "-map", "0:v", "-map", "[aout]",
-                    "-t", str(total_voice), "-c:v", "copy",
-                    "-c:a", "aac", "-shortest", str(final_path)]
-        proc = subprocess.run(mix_cmd, capture_output=True, text=True,
-                              **video_module.no_window_kwargs())
-        if proc.returncode != 0 or not final_path.exists():
-            # Mixed mux failed -> fall back to the plain mux
-            # (voice only); the video is not lost.
-            proc = subprocess.run(
-                ["ffmpeg", "-y", "-i", str(video_only),
-                 "-i", str(voice_joined),
-                 "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
-                 "-shortest", str(final_path)],
-                capture_output=True, text=True,
-                **video_module.no_window_kwargs())
-    else:
-        proc = subprocess.run(
-            ["ffmpeg", "-y", "-i", str(video_only), "-i", str(voice_joined),
-             "-t", str(total_voice), "-c:v", "copy", "-c:a", "aac",
-             "-shortest", str(final_path)],
-            capture_output=True, text=True, **video_module.no_window_kwargs())
-    if proc.returncode != 0 or not final_path.exists():
-        raise RuntimeError(f"Master audio mux failed: {proc.stderr[-1000:]}")
-    # Final quality gate: duration and size must be sane.
-    final_duration = video_module.get_duration(final_path) or 0
-    if final_duration <= 0 or final_path.stat().st_size < 100_000:
-        raise RuntimeError("Master final video failed its quality gate.")
+    # Join scene segments, then mux the joined voiceover
+    # (shared join_and_mux — the step flow's render uses it too).
+    voice_durs = [item["duration"] for item in ordered]
+    final_path, final_duration, join_method = join_and_mux(
+        work_dir, segments, voice_files, voice_durs, total_voice,
+        music_path, _MUSIC_VOLUME, sfx_paths, transitions,
+        len(scenes), progress_cb=progress_cb)
     return {
         "final_path": final_path,
         "script": script_text,
         "script_source": source,
         "script_words": len(script_text.split()),
         "voice_duration_sec": round(total_voice, 1),
-        "final_duration_sec": round(final_duration, 1),
+        "final_duration_sec": final_duration,
         "scenes": scene_reports,
         "kinds": kinds,
         "distinct_commons_visuals": len(used_urls),
@@ -1530,4 +1773,3 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
         "transitions": transitions,
         "join": join_method,
     }
-

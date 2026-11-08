@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCreate, autovideoJob, autovideoMusicOptions, autovideoRemixMusic, autovideoRemixVolume, autovideoSceneAlternatives, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoJob, autovideoMusicOptions, autovideoPlan, autovideoPrepareAudio, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -170,7 +170,13 @@ function AutoVideo() {
     setKeyTest(parts.join(" · "));
     setKeyTesting(false);
   };
-  const [phase, setPhase] = useState<"form" | "build" | "done">("form");
+  // Step flow (user, 2026-11-09): Setup -> Footage -> Audio ->
+  // Render & Review. "build" is the working state (collecting
+  // footage / voicing / rendering); "footage" and "audio" are
+  // the review stops where the user changes things before the
+  // next step. "done" is the finished video (still editable).
+  const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "done">("form");
+  const step = phase === "form" ? 1 : phase === "footage" ? 2 : phase === "audio" ? 3 : 4;
   const [job, setJob] = useState<AvJob | null>(null);
   // Trim the start (user, 2026-11-09): cut the first seconds off
   // the finished video (often an unwanted "Hook").
@@ -470,13 +476,23 @@ function AutoVideo() {
             status: j.status === "done" ? "done" : j.status === "failed" ? "failed" : "running",
           });
         }
-        if (j.status === "done") {
+        // Step flow (user, 2026-11-09): stop polling at the
+        // review stops (footage / audio) so the user can change
+        // things; keep polling while a step is working.
+        const ph = j.phase || (j.status === "done" ? "done" : "");
+        if (ph === "planned") {
+          if (timer.current) clearInterval(timer.current);
+          setPhase("footage");
+        } else if (ph === "audio-ready") {
+          if (timer.current) clearInterval(timer.current);
+          setPhase("audio");
+        } else if (j.status === "done") {
           if (timer.current) clearInterval(timer.current);
           setPhase("done");
-        } else if (j.status === "failed") {
+        } else if (j.status === "error" || j.status === "failed") {
           if (timer.current) clearInterval(timer.current);
           setPhase("form");
-          setError("Failed: " + (j.error || "Unknown error."));
+          setError("Failed: " + (j.error || j.stage || "Unknown error."));
         }
       } catch {
         /* Keep polling on a transient error. */
@@ -509,8 +525,11 @@ function AutoVideo() {
       // or the page shows the default title ("10 Mind-Blowing
       // Facts…") for a video built with a different title.
       if (j.title) setTitle(j.title);
+      const ph = j.phase || (j.status === "done" ? "done" : "");
       if (j.status === "done") setPhase("done");
-      else if (j.status === "failed") { setPhase("form"); setError("Failed: " + (j.error || "Unknown error.")); }
+      else if (ph === "planned") setPhase("footage");
+      else if (ph === "audio-ready") setPhase("audio");
+      else if (j.status === "error" || j.status === "failed") { setPhase("form"); setError("Failed: " + (j.error || j.stage || "Unknown error.")); }
       else { setPhase("build"); poll(found.jobId); }
     }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
     // Only on mount.
@@ -525,15 +544,18 @@ function AutoVideo() {
   const stageIdx = stageIndex(job);
   const caption = job?.scenes?.[current]?.caption || job?.scenes?.[current]?.narration || lines[current % lines.length];
 
-  const start = async () => {
+  // Step 2 (user, 2026-11-09): collect the footage first —
+  // script + scenes, one visual per scene. No voice, no render
+  // yet, so changing a scene's footage afterwards is instant.
+  const startPlan = async () => {
     if (!title.trim()) return;
     setError("");
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoCreate(title.trim(), dur, voice, subtitles, pexelsKey, pixabayKey, freesoundKey, music, transitions, customScript);
+      const data = await autovideoPlan(title.trim(), dur, voice, pexelsKey, pixabayKey, customScript);
       setJobId(data.job_id);
-      // Background job: the build keeps running if the user
+      // Background job: the step keeps running if the user
       // leaves this page, and the top bar shows its progress.
       const key = `autovideo:${data.job_id}`;
       jobKey.current = key;
@@ -549,9 +571,54 @@ function AutoVideo() {
     }
   };
 
+  // Step 3: voice every scene + gather music and sounds.
+  const startAudio = async () => {
+    if (!job) return;
+    setError("");
+    setPhase("build");
+    try {
+      await autovideoPrepareAudio(job.id, freesoundKey, music);
+      poll(job.id);
+    } catch (e) {
+      setPhase("footage");
+      setError("Failed: " + (e instanceof ApiError ? e.message : "Could not start the audio step."));
+    }
+  };
+
+  // Step 4: render the video from the chosen footage + audio.
+  const startRender = async () => {
+    if (!job) return;
+    setError("");
+    setPhase("build");
+    try {
+      await autovideoRender(job.id, musicVolume / 100, transitions, subtitles, music);
+      poll(job.id);
+    } catch (e) {
+      setPhase("audio");
+      setError("Failed: " + (e instanceof ApiError ? e.message : "Could not start the render."));
+    }
+  };
+
   return (
     <div data-tool="auto-video">
-      <PageHeader icon="🎬" title="Auto Video from Title" sub="One title in, one finished video out." />
+      <PageHeader icon="🎬" title="Auto Video from Title" sub="Four steps: setup, footage, audio, then render — change anything before the video is built." />
+
+      {/* Stepper (user, 2026-11-09): the four steps, with the
+          current one highlighted. */}
+      {phase !== "form" && (
+        <div className="mx-auto mb-6 flex max-w-2xl items-center gap-2">
+          {["1 · Setup", "2 · Footage", "3 · Audio", "4 · Render"].map((label, i) => {
+            const n = i + 1;
+            const done = n < step;
+            const now = n === step;
+            return (
+              <div key={label} className={`flex-1 rounded-xl border px-3 py-2 text-center text-sm font-semibold ${now ? "border-primary bg-accent" : done ? "border-border text-success" : "border-border text-muted-foreground"}`}>
+                {done ? "✓ " : ""}{label}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {phase === "form" && (
         <div className="glass mx-auto max-w-2xl space-y-6 p-8">
@@ -696,7 +763,121 @@ function AutoVideo() {
               {keyTest && <span className="text-sm text-muted-foreground">{keyTest}</span>}
             </div>
           </div>
-          <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim()} onClick={() => void start()}>🚀 Build my video</button>
+          <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim()} onClick={() => void startPlan()}>🎬 Collect footage →</button>
+          <p className="text-center text-sm text-muted-foreground">Step 2 collects the footage scene by scene — you review and change it before any voice or rendering happens. 1 credit.</p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+      )}
+
+      {/* STEP 2 — Footage (user, 2026-11-09): the collected
+          footages in sequence, downloaded and shown, with a
+          Change button on every scene so any footage is swapped
+          right here — before any voice or rendering. */}
+      {phase === "footage" && job && (
+        <div className="mx-auto max-w-3xl space-y-4">
+          <div className="glass p-6">
+            <h3 className="text-xl font-bold">{job.title || title}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Script: {job.script_words ?? "?"} words ({job.script_source ?? ""}) · {job.scenes?.length ?? "?"} scenes · Check every scene's footage below — change any you don't like, then go to the audio step.
+            </p>
+          </div>
+          {(job.scenes || []).map((s, i) => (
+            <div key={i} className="glass flex gap-4 p-4">
+              <div className="w-40 shrink-0">
+                {s.visual_file ? (
+                  s.kind === "clip" ? (
+                    <video src={autovideoSceneFileUrl(job.id, s.visual_file)} muted loop playsInline preload="metadata" className="aspect-video w-full rounded-lg bg-black object-cover" onMouseEnter={(e) => void (e.currentTarget as HTMLVideoElement).play()} onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0; }} />
+                  ) : (
+                    <img src={autovideoSceneFileUrl(job.id, s.visual_file)} alt="" className="aspect-video w-full rounded-lg bg-black object-cover" />
+                  )
+                ) : (
+                  <div className="aspect-video w-full rounded-lg bg-black" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">Scene {i + 1}</span>
+                  <span className="chip">{s.kind === "clip" ? "🎬 clip" : s.kind === "ai" ? "🤖 AI image" : s.kind === "card" ? "📝 title card" : "🖼️ image"}</span>
+                  <span className="truncate text-sm text-muted-foreground">{s.visual_source || ""}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm">{s.narration || ""}</p>
+                <button className="btn btn-ghost btn-sm mt-2" onClick={() => openBrowser(i)}>🔄 Change footage</button>
+              </div>
+            </div>
+          ))}
+          <div className="flex gap-3">
+            <button className="btn btn-ghost" onClick={() => { setJob(null); setJobId(null); setPhase("form"); }}>← Back to setup</button>
+            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startAudio()}>🎙️ Next: Audio →</button>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+      )}
+
+      {/* STEP 3 — Audio (user, 2026-11-09): the voiceover and
+          background music, gathered by the tool, changeable
+          here before the render. */}
+      {phase === "audio" && job && (
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div className="glass p-6">
+            <h3 className="text-xl font-bold">{job.title || title}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Voiceover: {job.voice_duration_sec ? `${Math.round(job.voice_duration_sec)}s` : "?"} · {job.voice_engine || ""} · Mood: {job.mood || "?"} · {job.transition_sfx ? `${job.transition_sfx} transition sound(s)` : "no transition sounds (needs a Freesound key)"}
+            </p>
+          </div>
+          <div className="glass p-6">
+            <p className="font-semibold">🎵 Background music</p>
+            <p className="mb-3 text-sm text-muted-foreground">Current music: {job.music || "none"}{job.music_volume !== undefined ? ` · volume ${Math.round((job.music_volume as number) * 100)}%` : ""}. Pick a track below, or load more by mood. The render uses the track you pick.</p>
+            {(musicOpts?.options?.length ? musicOpts.options : (job.music_options && job.music_options.length > 0 ? job.music_options : null)) ? (
+              <div className="space-y-2">
+                {(musicOpts?.options?.length ? musicOpts.options : (job.music_options as { id: number; name: string; duration_sec: number; preview_url: string; license: string }[])).map((o) => (
+                  <div key={o.id} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{o.name}</span>
+                    <span className="text-sm text-muted-foreground">{o.duration_sec ? `${Math.round(o.duration_sec)}s` : ""}</span>
+                    <audio src={o.preview_url} controls preload="none" className="h-8 w-56 max-w-full" />
+                    <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyMusic(o.preview_url, o.name)}>
+                      {applyingMusicId === o.preview_url ? "Applying…" : "Use this"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {job.music_options_status === "no_key"
+                  ? "No music tracks — add your free Freesound key in Step 1 (Setup) and the music step will list tracks. The video can still render without music."
+                  : "No music tracks found for this mood."}
+              </p>
+            )}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <select className="field w-auto" value={musicMood || job.mood || "calm"} onChange={(e) => setMusicMood(e.target.value)}>
+                {(musicOpts?.moods || ["suspense", "wonder", "happy", "motivational", "sad", "epic", "calm"]).map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <button className="btn btn-ghost" disabled={musicLoading} onClick={() => void loadMusic()}>
+                {musicLoading ? "Loading…" : "Load more music"}
+              </button>
+              <label className="flex items-center gap-2 text-sm">
+                Volume
+                <input type="range" min={0} max={100} value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value, 10))} className="w-32 accent-primary" />
+                <span className="w-10 text-right font-semibold">{musicVolume}%</span>
+              </label>
+              <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyVolume()}>
+                {applyingMusicId === "volume" ? "Applying…" : "Apply volume"}
+              </button>
+            </div>
+            {musicApplying && (
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-1/3 rounded-full bg-primary" style={{ animation: "music-progress 1.2s ease-in-out infinite" }} />
+                <style>{`@keyframes music-progress { 0% { margin-left: 0; } 50% { margin-left: 66%; } 100% { margin-left: 0; } }`}</style>
+              </div>
+            )}
+            {musicError && <p className="mt-3 text-sm text-destructive">{musicError}</p>}
+            {musicApplied && <p className="mt-3 text-sm text-success">{musicApplied}</p>}
+          </div>
+          <div className="flex gap-3">
+            <button className="btn btn-ghost" onClick={() => setPhase("footage")}>← Back to footage</button>
+            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startRender()}>🎬 Render video →</button>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
       )}
@@ -1078,9 +1259,16 @@ function AutoVideo() {
                 </div>
               </div>
               {/* Current footage: the finished video, seeked to
-                  this scene's start. */}
+                  this scene's start — or, in the Footage step
+                  (no video yet), the scene's own footage file. */}
               {job.download_url ? (
                 <video key={`${browserIdx}-${videoVersion}`} ref={browserVideoRef} src={`${job.download_url}${job.download_url.includes("?") ? "&" : "?"}v=${videoVersion}`} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onLoadedMetadata={() => { const v = browserVideoRef.current; if (v) v.currentTime = sceneStart(browserIdx); }} />
+              ) : job.scenes[browserIdx].visual_file ? (
+                job.scenes[browserIdx].kind === "clip" ? (
+                  <video key={`${browserIdx}-${videoVersion}`} src={autovideoSceneFileUrl(job.id, job.scenes[browserIdx].visual_file as string)} controls loop preload="metadata" className="aspect-video w-full rounded-xl bg-black" />
+                ) : (
+                  <img src={autovideoSceneFileUrl(job.id, job.scenes[browserIdx].visual_file as string)} alt="" className="aspect-video w-full rounded-xl bg-black object-cover" />
+                )
               ) : (
                 <div className="aspect-video w-full rounded-xl bg-black" />
               )}

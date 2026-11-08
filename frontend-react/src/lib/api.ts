@@ -112,6 +112,10 @@ export type AvScene = {
   visual?: string;
   narration?: string;
   visual_source?: string;
+  // Step flow (user, 2026-11-09): the collected footage file in
+  // the job dir + its original URL.
+  visual_file?: string;
+  visual_url?: string;
 };
 
 export type AvTimelineEvent = { t: number; text: string };
@@ -164,6 +168,11 @@ export type AvJob = {
   sfx_status?: string;
   transitions?: boolean;
   join?: string;
+  // Step flow (user, 2026-11-09): "planning" -> "planned" ->
+  // "audio" -> "audio-ready" -> "rendering" -> "done".
+  phase?: string;
+  music_options?: AvMusicOption[];
+  music_options_status?: string;
 };
 
 /** Error with the HTTP status attached (402 = out of credits, etc.). */
@@ -392,6 +401,35 @@ export const autovideoCreate = (title: string, minutes: number, voice: string, s
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, freesound_key: freesoundKey || null, music, transitions, script: script.trim() || null }),
   });
+
+// -------------------------------------------------------------- auto video — step flow (user, 2026-11-09)
+// Setup (Step 1) -> Footage (Step 2) -> Audio (Step 3) -> Render (Step 4).
+// The decisions happen BEFORE any rendering, so a scene's footage or the
+// music can be changed instantly until the final render.
+export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "") =>
+  api<{ job_id: string; status: string; phase: string }>("/api/autovideo/plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null }),
+  });
+
+export const autovideoPrepareAudio = (jobId: string, freesoundKey = "", music = true) =>
+  api<{ job_id: string; status: string; phase: string }>(`/api/autovideo/${jobId}/prepare-audio`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ freesound_key: freesoundKey || null, music }),
+  });
+
+export const autovideoRender = (jobId: string, musicVolume = 0.2, transitions = true, subtitles = true, music = true) =>
+  api<{ job_id: string; status: string; phase: string }>(`/api/autovideo/${jobId}/render`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ music_volume: musicVolume, music, transitions, subtitles }),
+  });
+
+// URL of one collected footage file (Step 2 preview).
+export const autovideoSceneFileUrl = (jobId: string, filename: string) =>
+  `/api/autovideo/${jobId}/scene-file/${encodeURIComponent(filename)}`;
 
 export const autovideoJob = (jobId: string) => api<AvJob>(`/api/autovideo/${jobId}`);
 

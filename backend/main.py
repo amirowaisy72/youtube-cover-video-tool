@@ -2354,6 +2354,275 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
     return {"job_id": job_id, "status": "running"}
 
 
+# ---------------------------------------------------------------------------
+# STEP-BY-STEP FLOW (user, 2026-11-09)
+# ---------------------------------------------------------------------------
+# Setup (Step 1) -> Footage (Step 2) -> Audio (Step 3) -> Render
+# (Step 4). The decisions happen BEFORE any rendering, so changing a
+# scene's footage or the music is instant until the final render.
+# A job carries `phase`: "planning" -> "planned" -> "audio" ->
+# "audio-ready" -> "rendering" -> "done" (status mirrors phase;
+# "done" is the same status the old one-click flow ends with, so
+# the existing edit endpoints keep working on a finished video).
+class AutoVideoPlanRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=200)
+    minutes: int = Field(..., ge=1, le=30)
+    visuals: str = "both"  # images | videos | both
+    voice: str = "en-US-AriaNeural"
+    script: str | None = None
+    pexels_key: str | None = None
+    pixabay_key: str | None = None
+
+
+def _run_autovideo_plan(job_id: str, title: str, minutes: int,
+                        visuals: str, voice: str, script: str | None,
+                        pexels_key: str | None, pixabay_key: str | None,
+                        job_token: str | None) -> None:
+    """Step 2 worker: collect footage scene by scene, no voice,
+    no render. On failure the credit is refunded."""
+    try:
+        directory = _av_job_dir(job_id)
+        job = _av_read(job_id)
+        job.update({"status": "planning", "phase": "planning",
+                    "stage": "Collecting footage…", "progress": 10})
+        _av_write(job)
+
+        def _plan_progress(done: int, total: int, stage: str) -> None:
+            pct = 10 + (80 * done / max(total, 1)) if total else 10
+            j = _av_read(job_id)
+            j.update({"stage": stage, "progress": round(pct, 1),
+                      "status": "planning", "phase": "planning",
+                      "scene_total": total})
+            _av_write(j)
+
+        plan = autovideo2.plan_footage(
+            title, minutes, script, visuals, directory,
+            pexels_key=pexels_key, pixabay_key=pixabay_key,
+            progress_cb=_plan_progress)
+        job = _av_read(job_id)
+        job.update({
+            "status": "planned", "phase": "planned",
+            "stage": "Footage ready — review the scenes.",
+            "progress": 100,
+            "script": plan["script"],
+            "script_source": plan["script_source"],
+            "script_words": plan["script_words"],
+            "scenes": plan["scenes"],
+            "scene_total": len(plan["scenes"]),
+        })
+        _av_write(job)
+    except Exception as exc:  # noqa: BLE001
+        job = _av_read(job_id)
+        job.update({"status": "error", "phase": "error",
+                    "stage": f"Footage collection failed: {exc}"})
+        _av_write(job)
+        if job_token:
+            licensing.refund(job_token)
+
+
+@app.post("/api/autovideo/plan")
+def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
+    """STEP 2 — Footage collection. Creates the job, generates
+    the scene script and collects one visual per scene (shown in
+    sequence on the frontend, changeable right there). No
+    voiceover, no rendering yet."""
+    if payload.visuals not in ("images", "videos", "both"):
+        raise HTTPException(400, "Visuals must be images, videos, or both.")
+    if payload.voice not in tts_module.VOICE_IDS:
+        raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
+    job_id = uuid.uuid4().hex[:12]
+    token = _consume_or_402("autovideo", job_id)
+    _av_write({"id": job_id, "status": "planning", "phase": "planning",
+               "stage": "Starting…", "progress": 0, "title": payload.title,
+               "minutes": payload.minutes, "visuals": payload.visuals,
+               "voice": payload.voice, "job_token": token})
+    threading.Thread(
+        target=_run_autovideo_plan,
+        args=(job_id, payload.title, payload.minutes, payload.visuals,
+              payload.voice, payload.script, payload.pexels_key,
+              payload.pixabay_key, token),
+        daemon=True).start()
+    return {"job_id": job_id, "status": "planning", "phase": "planning"}
+
+
+class AutoVideoPrepareAudioRequest(BaseModel):
+    freesound_key: str | None = None
+    music: bool = True
+
+
+def _run_autovideo_audio(job_id: str, voice: str,
+                         freesound_key: str | None,
+                         job_token: str | None,
+                         music: bool = True) -> None:
+    """Step 3 worker: voice every scene, join the voiceover,
+    detect the mood, list music options, fetch SFX."""
+    try:
+        directory = _av_job_dir(job_id)
+        job = _av_read(job_id)
+        scenes = job.get("scenes") or []
+        if not scenes:
+            raise RuntimeError("No scenes — run the footage step first.")
+        job.update({"status": "audio", "phase": "audio",
+                    "stage": "Voicing scenes…", "progress": 10})
+        _av_write(job)
+
+        def _audio_progress(done: int, total: int, stage: str) -> None:
+            pct = 10 + (80 * done / max(total, 1)) if total else 10
+            j = _av_read(job_id)
+            j.update({"stage": stage, "progress": round(pct, 1),
+                      "status": "audio", "phase": "audio"})
+            _av_write(j)
+
+        audio = autovideo2.prepare_audio(
+            job.get("title") or "", scenes, voice, directory,
+            freesound_key=freesound_key, music=music,
+            progress_cb=_audio_progress)
+        job = _av_read(job_id)
+        for i, d in enumerate(audio["durations"]):
+            if i < len(job["scenes"]):
+                job["scenes"][i]["duration_sec"] = d
+        job.update({
+            "status": "audio-ready", "phase": "audio-ready",
+            "stage": "Audio ready — pick the music.",
+            "progress": 100,
+            "voice_duration_sec": audio["total_voice"],
+            "voice_engine": audio["voice_engine"],
+            "voice_files": audio["voice_files"],
+            "mood": audio["mood"],
+            "music": audio["music"],
+            "music_status": audio["music_status"],
+            "music_options": audio["music_options"],
+            "music_options_status": audio["music_options_status"],
+            "music_volume": 0.20,
+            "transition_sfx": audio["transition_sfx"],
+            "sfx_status": audio["sfx_status"],
+            "final_minutes": round(audio["total_voice"] / 60, 1),
+        })
+        _av_write(job)
+    except Exception as exc:  # noqa: BLE001
+        job = _av_read(job_id)
+        job.update({"status": "error", "phase": "error",
+                    "stage": f"Audio step failed: {exc}"})
+        _av_write(job)
+        if job_token:
+            licensing.refund(job_token)
+
+
+@app.post("/api/autovideo/{job_id}/prepare-audio")
+def autovideo_prepare_audio(job_id: str,
+                            payload: AutoVideoPrepareAudioRequest) -> dict:
+    """STEP 3 — Audio. Voices every scene, joins the voiceover,
+    detects the mood and lists matching music tracks + SFX.
+    Runs after the footage step."""
+    job = _av_read(job_id)
+    if job.get("phase") != "planned":
+        raise HTTPException(400, "Run the footage step first.")
+    token = job.get("job_token")
+    threading.Thread(
+        target=_run_autovideo_audio,
+        args=(job_id, job.get("voice") or "en-US-AriaNeural",
+              payload.freesound_key, token, payload.music),
+        daemon=True).start()
+    return {"job_id": job_id, "status": "audio", "phase": "audio"}
+
+
+class AutoVideoRenderRequest(BaseModel):
+    music_volume: float = Field(0.20, ge=0.0, le=1.0)
+    music: bool = True
+    transitions: bool = True
+    subtitles: bool = True
+
+
+def _run_autovideo_render(job_id: str, music_volume: float,
+                          transitions: bool, subtitles: bool,
+                          job_token: str | None, title: str,
+                          music: bool = True) -> None:
+    """Step 4 worker: encode every scene's segment from its
+    chosen footage + voice length, join + mux into final.mp4.
+    Reports the credit completed on success, refunds on failure."""
+    try:
+        directory = _av_job_dir(job_id)
+        job = _av_read(job_id)
+        scenes = job.get("scenes") or []
+        durations = [float(s.get("duration_sec") or 0) for s in scenes]
+        voice_files = [directory / name for name in (job.get("voice_files") or [])]
+        if not scenes or not all(durations) or len(voice_files) != len(scenes):
+            raise RuntimeError("Audio step incomplete — run it first.")
+        if any(not vf.exists() for vf in voice_files):
+            raise RuntimeError("A voiceover file is missing — re-run the audio step.")
+        job.update({"status": "rendering", "phase": "rendering",
+                    "stage": "Rendering scenes…", "progress": 5})
+        _av_write(job)
+
+        def _render_progress(done: int, total: int, stage: str) -> None:
+            pct = 5 + (85 * done / max(total, 1)) if total else 5
+            j = _av_read(job_id)
+            j.update({"stage": stage, "progress": round(pct, 1),
+                      "status": "rendering", "phase": "rendering"})
+            _av_write(j)
+
+        music_path = directory / "mood-music.mp3"
+        if not music or not music_path.exists():
+            music_path = None
+        sfx_track = directory / "sfx-track.m4a"
+        # The SFX track is built inside join_and_mux from the
+        # fetched SFX files; _fetch_transition_sfx saved them as
+        # sfx-00.mp3, sfx-01.mp3… in the job dir.
+        sfx_paths = sorted(directory.glob("sfx-*.mp3"))
+        result = autovideo2.render_video(
+            directory, scenes, durations, voice_files,
+            music_path, music_volume, sfx_paths, transitions,
+            subtitles=subtitles, progress_cb=_render_progress)
+        kinds = result["kinds"]
+        job = _av_read(job_id)
+        job.update({
+            "status": "done", "phase": "done",
+            "stage": "done", "progress": 100,
+            "download_url": f"/api/autovideo/download/{job_id}",
+            "final_duration_sec": result["final_duration_sec"],
+            "final_minutes": round(result["final_duration_sec"] / 60, 1),
+            "music_volume": music_volume,
+            "transitions": transitions,
+            "join": result["join"],
+            "images_used": kinds.get("image", 0) + kinds.get("ai", 0) + kinds.get("card", 0),
+            "clips_used": kinds.get("clip", 0),
+            "ai_images": kinds.get("ai", 0),
+            "title_cards": kinds.get("card", 0),
+            "pipeline": "master-scenes-steps",
+        })
+        _av_write(job)
+        if job_token:
+            licensing.report(job_token, "completed", tool="autovideo",
+                             title=title, topic=title,
+                             minutes=job.get("final_minutes"))
+    except Exception as exc:  # noqa: BLE001
+        job = _av_read(job_id)
+        job.update({"status": "error", "phase": "error",
+                    "stage": f"Render failed: {exc}"})
+        _av_write(job)
+        if job_token:
+            licensing.refund(job_token)
+
+
+@app.post("/api/autovideo/{job_id}/render")
+def autovideo_render(job_id: str,
+                     payload: AutoVideoRenderRequest) -> dict:
+    """STEP 4 — Render. Edits the video from the chosen footage
+    + audio and produces final.mp4. Runs after the audio step.
+    The finished video stays editable (scene/music change)."""
+    job = _av_read(job_id)
+    if job.get("phase") != "audio-ready":
+        raise HTTPException(400, "Run the audio step first.")
+    token = job.get("job_token")
+    threading.Thread(
+        target=_run_autovideo_render,
+        args=(job_id, payload.music_volume, payload.transitions,
+              payload.subtitles, token, job.get("title") or "",
+              payload.music),
+        daemon=True).start()
+    return {"job_id": job_id, "status": "rendering", "phase": "rendering"}
+
+
 @app.get("/api/autovideo/{job_id}")
 def autovideo_job(job_id: str) -> dict:
     return _av_read(job_id)
@@ -2365,6 +2634,29 @@ def autovideo_download(job_id: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(404, "Video not ready yet.")
     return FileResponse(path, media_type="video/mp4", filename=f"autovideo-{job_id}.mp4")
+
+
+@app.get("/api/autovideo/{job_id}/scene-file/{filename}")
+def autovideo_scene_file(job_id: str, filename: str) -> FileResponse:
+    """Serve one collected footage file for the Step 2 preview
+    (user, 2026-11-09 — the footage list shows each scene's
+    actual clip/image in sequence). Only media files inside the
+    job dir; the resolved path must stay in that dir."""
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z0-9._-]+", filename):
+        raise HTTPException(400, "Bad filename.")
+    if not filename.lower().endswith((".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp")):
+        raise HTTPException(400, "Not a media file.")
+    job_dir = _av_job_dir(job_id)
+    path = (job_dir / filename).resolve()
+    if path.parent != job_dir.resolve() or not path.is_file():
+        raise HTTPException(404, "File not found.")
+    low = filename.lower()
+    media = ("video/mp4" if low.endswith(".mp4") else
+             "video/webm" if low.endswith(".webm") else
+             "image/jpeg" if low.endswith((".jpg", ".jpeg")) else
+             "image/png" if low.endswith(".png") else "image/webp")
+    return FileResponse(path, media_type=media)
 
 
 class AutoVideoTrimRequest(BaseModel):
@@ -2450,6 +2742,24 @@ class AutoVideoSceneVisualRequest(BaseModel):
     kind: str = Field(..., pattern="^(clip|image)$")
 
 
+def _plan_scene_visual(job: dict, idx: int,
+                       visual_path: Path, kind: str) -> dict:
+    """Step-flow plan mode (user, 2026-11-09): record a scene's
+    new visual in job.json WITHOUT rebuilding — nothing is
+    rendered yet, so the change is instant and the render will
+    use it. Used by the URL-pick and upload endpoints when the
+    job has no final.mp4 yet."""
+    scenes = job.get("scenes") or []
+    scene = scenes[idx]
+    scene["kind"] = kind
+    scene["visual_file"] = visual_path.name
+    scene["visual_source"] = f"changed: {visual_path.name}"
+    scene["visual_url"] = ""
+    job["scene_changed"] = idx
+    _av_write(job)
+    return {"scene": idx, "kind": kind}
+
+
 def _apply_scene_visual(job: dict, job_dir: Path, idx: int,
                         visual_path: Path, kind: str) -> dict:
     """Rebuild one scene's segment with the given local visual
@@ -2485,11 +2795,7 @@ def autovideo_scene_visual(job_id: str, idx: int,
     scenes = job.get("scenes") or []
     if idx < 0 or idx >= len(scenes):
         raise HTTPException(404, "Scene not found.")
-    if job.get("status") != "done":
-        raise HTTPException(400, "Video is not finished yet.")
     job_dir = _av_job_dir(job_id)
-    if not (job_dir / "final.mp4").exists():
-        raise HTTPException(404, "Video not ready yet.")
     kind = payload.kind
     suffix = ".webm" if "webm" in (payload.url or "").lower() else (".mp4" if kind == "clip" else ".jpg")
     visual_path = job_dir / f"scene-change-{idx:02d}{suffix}"
@@ -2502,6 +2808,12 @@ def autovideo_scene_visual(job_id: str, idx: int,
         else:
             if not autovideo._valid_image(visual_path):
                 raise HTTPException(502, "That image could not be read.")
+        # Step flow (user, 2026-11-09): before the render, just
+        # record the choice — no segment rebuild yet.
+        if not (job_dir / "final.mp4").exists():
+            return _plan_scene_visual(job, idx, visual_path, kind)
+        if job.get("status") != "done":
+            raise HTTPException(400, "Video is not finished yet.")
         rejoined = _apply_scene_visual(job, job_dir, idx, visual_path, kind)
     except HTTPException:
         raise
@@ -2529,11 +2841,7 @@ async def autovideo_scene_upload_visual(job_id: str, idx: int,
     scenes = job.get("scenes") or []
     if idx < 0 or idx >= len(scenes):
         raise HTTPException(404, "Scene not found.")
-    if job.get("status") != "done":
-        raise HTTPException(400, "Video is not finished yet.")
     job_dir = _av_job_dir(job_id)
-    if not (job_dir / "final.mp4").exists():
-        raise HTTPException(404, "Video not ready yet.")
     name = (file.filename or "").lower()
     if name.endswith((".mp4", ".webm", ".mov", ".mkv")):
         kind = "clip"
@@ -2557,6 +2865,11 @@ async def autovideo_scene_upload_visual(job_id: str, idx: int,
         else:
             if not autovideo._valid_image(visual_path):
                 raise HTTPException(502, "That image could not be read.")
+        # Step flow: before the render, just record the choice.
+        if not (job_dir / "final.mp4").exists():
+            return _plan_scene_visual(job, idx, visual_path, kind)
+        if job.get("status") != "done":
+            raise HTTPException(400, "Video is not finished yet.")
         rejoined = _apply_scene_visual(job, job_dir, idx, visual_path, kind)
     except HTTPException:
         raise
@@ -2574,14 +2887,16 @@ async def autovideo_scene_upload_visual(job_id: str, idx: int,
 @app.get("/api/autovideo/{job_id}/music-options")
 def autovideo_music_options(job_id: str, mood: str = "",
                             freesound_key: str = "") -> dict:
-    """Background-music options for a finished video (user,
-    2026-11-09 — change the music AFTER the build). The mood
-    defaults to the one detected for this video's script; the
-    user can ask for any of the 7 moods. Returns up to 8 tracks
-    with playable preview URLs so he can listen and pick one."""
+    """Background-music options for a video (user, 2026-11-09 —
+    change the music AFTER the build, or pick it in Step 3
+    before the render). The mood defaults to the one detected
+    for this video's script; the user can ask for any of the 7
+    moods. Returns up to 8 tracks with playable preview URLs
+    so he can listen and pick one. Works before the render too
+    (the step flow lists music in Step 3)."""
     job = _av_read(job_id)
-    if job.get("status") != "done":
-        raise HTTPException(400, "Video is not finished yet.")
+    if not (job.get("scenes") or []):
+        raise HTTPException(400, "No scenes yet — run the footage step first.")
     use_mood = (mood or "").strip().lower() or (job.get("mood") or "calm")
     if use_mood not in autovideo2._MOOD_MUSIC_QUERY:
         use_mood = "calm"
@@ -2609,24 +2924,17 @@ def autovideo_remix_music(job_id: str,
     with it at the chosen volume (0 = silent, 1 = full) — the
     video and voiceover are untouched, only the music bed
     changes. The new track becomes mood-music.mp3, so a later
-    scene change keeps it."""
+    scene change keeps it. STEP FLOW: before the render, the
+    track is just downloaded as mood-music.mp3 and recorded —
+    the render will use it, no re-mix yet."""
     job = _av_read(job_id)
-    if job.get("status") != "done":
-        raise HTTPException(400, "Video is not finished yet.")
     job_dir = _av_job_dir(job_id)
-    if not (job_dir / "final.mp4").exists():
-        raise HTTPException(404, "Video not ready yet.")
-    total_voice = float(job.get("voice_duration_sec") or 0)
-    if total_voice <= 0:
-        raise HTTPException(400, "No voiceover duration on record.")
     music_path = job_dir / "mood-music-new.mp3"
     try:
         if not autovideo._download(payload.preview_url, music_path):
             raise HTTPException(502, "Could not download that track.")
         if not autovideo._ffprobe_duration(music_path):
             raise HTTPException(502, "That track could not be read.")
-        result = autovideo2.remix_music(
-            job_dir, music_path, payload.volume, total_voice)
         # The new track becomes the video's music from now on.
         final_music = job_dir / "mood-music.mp3"
         try:
@@ -2639,6 +2947,23 @@ def autovideo_remix_music(job_id: str,
         raise HTTPException(503, f"Music change failed: {exc}")
     job["music"] = (payload.name or "changed track")
     job["music_volume"] = payload.volume
+    _av_write(job)
+    # Step flow: no final.mp4 yet — just record the choice.
+    if not (job_dir / "final.mp4").exists():
+        return {
+            "music": job["music"],
+            "volume": payload.volume,
+        }
+    if job.get("status") != "done":
+        raise HTTPException(400, "Video is not finished yet.")
+    total_voice = float(job.get("voice_duration_sec") or 0)
+    if total_voice <= 0:
+        raise HTTPException(400, "No voiceover duration on record.")
+    try:
+        result = autovideo2.remix_music(
+            job_dir, final_music, payload.volume, total_voice)
+    except Exception as exc:
+        raise HTTPException(503, f"Music change failed: {exc}")
     job["final_minutes"] = round(result["final_duration_sec"] / 60, 1)
     _av_write(job)
     return {
@@ -2656,18 +2981,25 @@ class AutoVideoRemixVolumeRequest(BaseModel):
 @app.post("/api/autovideo/{job_id}/remix-volume")
 def autovideo_remix_volume(job_id: str,
                            payload: AutoVideoRemixVolumeRequest) -> dict:
-    """Change ONLY the background-music volume of a finished
-    video (user, 2026-11-09): he lowered the slider but nothing
-    changed, because the volume only took effect when picking a
-    NEW track. This re-mixes the video with the SAME current
-    music (mood-music.mp3) at the new volume — no new track
-    needed. 0 = music silent, 1 = full."""
+    """Change ONLY the background-music volume of a video (user,
+    2026-11-09): he lowered the slider but nothing changed,
+    because the volume only took effect when picking a NEW track.
+    This re-mixes the video with the SAME current music
+    (mood-music.mp3) at the new volume — no new track needed.
+    0 = music silent, 1 = full. STEP FLOW: before the render,
+    the volume is just recorded — the render will use it."""
     job = _av_read(job_id)
+    job_dir = _av_job_dir(job_id)
+    job["music_volume"] = payload.volume
+    _av_write(job)
+    # Step flow: no final.mp4 yet — just record the volume.
+    if not (job_dir / "final.mp4").exists():
+        return {
+            "music": job.get("music") or "current track",
+            "volume": payload.volume,
+        }
     if job.get("status") != "done":
         raise HTTPException(400, "Video is not finished yet.")
-    job_dir = _av_job_dir(job_id)
-    if not (job_dir / "final.mp4").exists():
-        raise HTTPException(404, "Video not ready yet.")
     music_path = job_dir / "mood-music.mp3"
     if not music_path.exists():
         raise HTTPException(400, "This video has no background music to adjust.")
@@ -2679,7 +3011,6 @@ def autovideo_remix_volume(job_id: str,
             job_dir, music_path, payload.volume, total_voice)
     except Exception as exc:
         raise HTTPException(503, f"Volume change failed: {exc}")
-    job["music_volume"] = payload.volume
     job["final_minutes"] = round(result["final_duration_sec"] / 60, 1)
     _av_write(job)
     return {
