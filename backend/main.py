@@ -38,7 +38,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
@@ -2076,6 +2076,11 @@ class AutoVideoRequest(BaseModel):
     voice: str = "en-US-AriaNeural"
     expressive: bool = True
     subtitles: bool = True  # live word-by-word captions (Whisper)
+    # Optional user-written script (user, 2026-11-09): when the
+    # user pastes a script (e.g. from Gemini), the video is built
+    # from their words instead of an auto-generated script.
+    # Empty / missing = auto-generate as before.
+    script: str | None = None
     # Mood-matched background music (Freesound, user's key) + a
     # different transition sound at each scene change (Freesound
     # SFX). Both default ON; no key -> skipped. Pixabay's API
@@ -2120,12 +2125,23 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                    pixabay_key: str | None = None,
                    freesound_key: str | None = None,
                    music: bool = True,
-                   transitions: bool = True) -> None:
+                   transitions: bool = True,
+                   script: str | None = None) -> None:
     directory = _av_job_dir(job_id)
+    started_at = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
     def _set(stage: str, progress: float, extra: dict | None = None) -> None:
         job = _av_read(job_id)
         job.update({"stage": stage, "progress": progress})
+        # Progress timeline (user, 2026-11-09): every distinct
+        # stage message is recorded with its elapsed time, so the
+        # frontend can show an expandable timeline of what has
+        # happened and what is running now.
+        timeline = job.get("timeline") or []
+        if not timeline or timeline[-1].get("text") != stage:
+            elapsed = round(datetime.datetime.now(datetime.timezone.utc).timestamp() - started_at)
+            timeline.append({"t": elapsed, "text": stage})
+            job["timeline"] = timeline[-200:]
         if extra:
             job.update(extra)
         _av_write(job)
@@ -2146,7 +2162,10 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                 # for the join/mux. The old code sat at 10% for the
                 # whole build, which is why the bar looked stuck.
                 pct = 10 + (80 * done / max(total, 1)) if total else 10
-                _set(stage, round(pct, 1), {"status": "running"})
+                # scene_total: the REAL scene count (from the generated
+                # script), so the frontend stops estimating dur*3 and
+                # the "Scene X of Y" header matches the stage text.
+                _set(stage, round(pct, 1), {"status": "running", "scene_total": total})
 
             report = autovideo2.run_master(
                 title, minutes, visuals, voice, directory,
@@ -2154,7 +2173,8 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                 subtitles=subtitles,
                 pexels_key=pexels_key, pixabay_key=pixabay_key,
                 freesound_key=freesound_key,
-                music=music, transitions=transitions)
+                music=music, transitions=transitions,
+                script=script)
             kinds = report["kinds"]
             _set("done", 100, {
                 "status": "done",
@@ -2188,7 +2208,11 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                 "status": "running",
                 "master_fallback": str(master_exc)[-500:]})
         _set("Writing script…", 5, {"status": "running"})
-        script, source = autovideo.generate_script(title, minutes)
+        if script and script.strip():
+            script_text, source = script.strip(), "custom"
+        else:
+            script_text, source = autovideo.generate_script(title, minutes)
+        script = script_text
         words = len(script.split())
         _av_write({**_av_read(job_id), "script": script, "script_source": source,
                    "script_words": words})
@@ -2282,13 +2306,15 @@ def _run_autovideo(job_id: str, title: str, minutes: int, visuals: str, voice: s
                    pixabay_key: str | None = None,
                    freesound_key: str | None = None,
                    music: bool = True,
-                   transitions: bool = True) -> None:
+                   transitions: bool = True,
+                   script: str | None = None) -> None:
     """Auto-video worker with license accounting: the job token is
     reported completed when the video was produced, refunded
     otherwise — the customer never pays for a failed video."""
     try:
         _run_autovideo_impl(job_id, title, minutes, visuals, voice, expressive, subtitles,
-                            pexels_key, pixabay_key, freesound_key, music, transitions)
+                            pexels_key, pixabay_key, freesound_key, music, transitions,
+                            script=script)
     except Exception:
         if job_token:
             licensing.refund(job_token)
@@ -2321,7 +2347,8 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
         args=(job_id, payload.title, payload.minutes, payload.visuals, payload.voice,
               payload.expressive, token, payload.subtitles,
               payload.pexels_key, payload.pixabay_key,
-              payload.freesound_key, payload.music, payload.transitions),
+              payload.freesound_key, payload.music, payload.transitions,
+              payload.script),
         daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 
@@ -2337,6 +2364,127 @@ def autovideo_download(job_id: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(404, "Video not ready yet.")
     return FileResponse(path, media_type="video/mp4", filename=f"autovideo-{job_id}.mp4")
+
+
+class AutoVideoTrimRequest(BaseModel):
+    start_seconds: float = Field(..., gt=0, le=600)
+
+
+@app.post("/api/autovideo/{job_id}/trim")
+def autovideo_trim(job_id: str, payload: AutoVideoTrimRequest) -> dict:
+    """Cut the first N seconds off a finished video (user, 2026-11-09):
+    the auto script often opens with a "Hook" the user does not want.
+    Re-encodes from start_seconds to the end (frame-accurate), saves
+    as trimmed.mp4 next to final.mp4, and returns its download URL.
+    The original video is kept untouched."""
+    src = _av_job_dir(job_id) / "final.mp4"
+    if not src.exists():
+        raise HTTPException(404, "Video not ready yet.")
+    duration = video.get_duration(src) or 0
+    if duration and payload.start_seconds >= duration:
+        raise HTTPException(400, "Cut is longer than the video itself.")
+    out = _av_job_dir(job_id) / "trimmed.mp4"
+    proc = subprocess.run(
+        ["ffmpeg", "-y", "-ss", str(payload.start_seconds), "-i", str(src),
+         "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", str(out)],
+        capture_output=True, text=True, **video.no_window_kwargs())
+    if proc.returncode != 0 or not out.exists():
+        raise HTTPException(503, f"Trim failed: {proc.stderr[-500:]}")
+    new_duration = video.get_duration(out) or 0
+    job = _av_read(job_id)
+    job["trimmed_url"] = f"/api/autovideo/download-trimmed/{job_id}"
+    job["trimmed_start_seconds"] = payload.start_seconds
+    job["trimmed_duration_sec"] = round(new_duration, 1)
+    _av_write(job)
+    return {
+        "trimmed_url": job["trimmed_url"],
+        "trimmed_start_seconds": payload.start_seconds,
+        "trimmed_duration_sec": round(new_duration, 1),
+    }
+
+
+@app.get("/api/autovideo/download-trimmed/{job_id}")
+def autovideo_download_trimmed(job_id: str) -> FileResponse:
+    path = _av_job_dir(job_id) / "trimmed.mp4"
+    if not path.exists():
+        raise HTTPException(404, "No trimmed video yet — trim the start first.")
+    return FileResponse(path, media_type="video/mp4", filename=f"autovideo-{job_id}-trimmed.mp4")
+
+
+@app.post("/api/autovideo/{job_id}/upload")
+async def autovideo_upload(
+    job_id: str,
+    title: str = Form(..., min_length=1, max_length=100),
+    description: str = Form(""),
+    tags: str = Form(""),
+    privacy_status: str = Form("private"),
+    channel_id: str = Form(""),
+    thumbnail: UploadFile | None = File(None),
+) -> dict:
+    """Upload a finished Auto Video to YouTube (user, 2026-11-09):
+    title, description, tags and privacy (public/unlisted/private)
+    from the form, to the selected connected channel. Uses the
+    trimmed video when one exists, else the final video. An
+    optional thumbnail image (JPG/PNG) is set on the video after
+    the upload. Returns the YouTube video id + watch URL."""
+    if privacy_status not in ("public", "unlisted", "private"):
+        raise HTTPException(400, "privacy_status must be public, unlisted or private.")
+    job_dir = _av_job_dir(job_id)
+    trimmed = job_dir / "trimmed.mp4"
+    src = trimmed if trimmed.exists() else job_dir / "final.mp4"
+    if not src.exists():
+        raise HTTPException(404, "Video not ready yet.")
+    job = _av_read(job_id)
+    if job.get("status") != "done":
+        raise HTTPException(400, "Video is not finished yet — wait for the build to complete.")
+    try:
+        result = youtube_upload.upload_video(
+            src, title.strip(), description=description,
+            tags=tags, privacy_status=privacy_status,
+            channel_id=(channel_id or "").strip(),
+        )
+    except Exception as exc:
+        raise HTTPException(503, f"Upload failed: {exc}")
+    video_id = result.get("video_id", "")
+    thumb_ok = False
+    thumb_error = ""
+    if thumbnail is not None and video_id:
+        try:
+            ext = (Path(thumbnail.filename or "").suffix or ".jpg").lower()
+            if ext not in (".jpg", ".jpeg", ".png"):
+                ext = ".jpg"
+            thumb_path = job_dir / f"upload-thumb{ext}"
+            thumb_path.write_bytes(await thumbnail.read())
+            from google.oauth2.credentials import Credentials
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaFileUpload
+            token_file = (
+                youtube_upload.token_path_for_channel(channel_id.strip())
+                if (channel_id or "").strip()
+                else youtube_upload.token_path()
+            )
+            creds = Credentials.from_authorized_user_file(str(token_file))
+            youtube = build("youtube", "v3", credentials=creds)
+            youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(
+                    str(thumb_path),
+                    mimetype="image/png" if ext == ".png" else "image/jpeg"),
+            ).execute()
+            thumb_ok = True
+        except Exception as exc:
+            thumb_error = f"Thumbnail was not set ({exc})."
+    job["uploaded_video_id"] = video_id
+    job["uploaded_url"] = result.get("url", "")
+    job["uploaded_privacy"] = privacy_status
+    _av_write(job)
+    return {
+        "video_id": video_id,
+        "url": result.get("url", ""),
+        "privacy_status": privacy_status,
+        "thumbnail_set": thumb_ok,
+        "thumbnail_error": thumb_error,
+    }
 
 
 @app.get("/api/health")

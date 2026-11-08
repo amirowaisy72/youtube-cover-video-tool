@@ -111,13 +111,18 @@ export type AvScene = {
   caption?: string;
   visual?: string;
   narration?: string;
+  visual_source?: string;
 };
+
+export type AvTimelineEvent = { t: number; text: string };
 
 export type AvJob = {
   id: string;
   status: string;
   stage?: string;
   progress?: number;
+  scene_total?: number;
+  timeline?: AvTimelineEvent[];
   title?: string;
   minutes?: number;
   error?: string;
@@ -137,6 +142,16 @@ export type AvJob = {
   title_cards?: number;
   visual_warning?: string;
   pipeline?: string;
+  // Trimmed version (user, 2026-11-09): cutting the first seconds
+  // off the finished video (e.g. an unwanted Hook).
+  trimmed_url?: string;
+  trimmed_start_seconds?: number;
+  trimmed_duration_sec?: number;
+  // Uploaded to YouTube (user, 2026-11-09): the video id + watch
+  // URL from the last upload of this job.
+  uploaded_video_id?: string;
+  uploaded_url?: string;
+  uploaded_privacy?: string;
   // Mood music + transitions (2026-11-08): what actually got
   // added, so a missing track is never silent. music_status /
   // sfx_status: "ok" | "no_key" | "key_rejected" | "no_results" |
@@ -370,14 +385,47 @@ export const ttsGenerate = (text: string, voice: string, rate: string) =>
   });
 
 // -------------------------------------------------------------- auto video
-export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "", freesoundKey = "", music = true, transitions = true) =>
+export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "", freesoundKey = "", music = true, transitions = true, script = "") =>
   api<{ job_id: string; status: string }>("/api/autovideo", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, freesound_key: freesoundKey || null, music, transitions }),
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, expressive: true, subtitles, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, freesound_key: freesoundKey || null, music, transitions, script: script.trim() || null }),
   });
 
 export const autovideoJob = (jobId: string) => api<AvJob>(`/api/autovideo/${jobId}`);
+
+export const autovideoTrim = (jobId: string, startSeconds: number) =>
+  api<{ trimmed_url: string; trimmed_start_seconds: number; trimmed_duration_sec: number }>(
+    `/api/autovideo/${jobId}/trim`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start_seconds: startSeconds }),
+    },
+  );
+
+export type AvUploadResult = {
+  video_id: string;
+  url: string;
+  privacy_status: string;
+  thumbnail_set: boolean;
+  thumbnail_error: string;
+};
+
+export const autovideoUpload = (
+  jobId: string,
+  fields: { title: string; description: string; tags: string; privacy: string; channelId: string },
+  thumbnail: File | null,
+) => {
+  const form = new FormData();
+  form.append("title", fields.title);
+  form.append("description", fields.description);
+  form.append("tags", fields.tags);
+  form.append("privacy_status", fields.privacy);
+  form.append("channel_id", fields.channelId);
+  if (thumbnail) form.append("thumbnail", thumbnail);
+  return api<AvUploadResult>(`/api/autovideo/${jobId}/upload`, { method: "POST", body: form });
+};
 
 /** Test a stock-media API key (Pixabay / Pexels) with one tiny
     request, so a wrong key is caught when it is saved — not

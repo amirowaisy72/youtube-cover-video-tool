@@ -169,6 +169,7 @@ function Stock() {
             className="field"
             type="password"
             value={activeKey}
+            autoComplete="off"
             onChange={(e) => setActiveKey(e.target.value)}
             placeholder={source === "pixabay" ? "Paste your Pixabay API key here" : "Paste your Pexels API key here"}
           />
@@ -187,6 +188,7 @@ function Stock() {
           <input
             className="field"
             value={query}
+            autoComplete="off"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void doSearch(1); }}
             placeholder="e.g. city night, ocean waves, cooking… (leave empty for popular clips)"

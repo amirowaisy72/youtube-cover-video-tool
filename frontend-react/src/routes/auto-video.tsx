@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoCreate, autovideoJob, autovideoTrim, autovideoUpload, type AvJob, type AvScene, type AvUploadResult, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -54,6 +54,12 @@ function AutoVideo() {
   // user types it once here and it is remembered per channel.
   const [activeChannelTitle, setActiveChannelTitle] = useState("");
   const [niche, setNiche] = useState("");
+  // The channel's live description + keywords (user, 2026-11-09):
+  // the Prompt for AI must tell Gemini the channel's category, not
+  // just its name — so the prompt carries the real About text and
+  // keywords from YouTube, even when the niche box is empty.
+  const [channelDesc, setChannelDesc] = useState("");
+  const [channelKeywords, setChannelKeywords] = useState("");
   const [copied, setCopied] = useState(false);
   const copyText = async (text: string) => {
     try {
@@ -72,11 +78,29 @@ function AutoVideo() {
         setActiveChannelTitle((active ?? chans[0])?.title ?? "");
       })
       .catch(() => undefined);
-    if (activeChannelId) setNiche(getChannelNiche(activeChannelId));
+    if (activeChannelId) {
+      setNiche(getChannelNiche(activeChannelId));
+      // Read the channel's live About + keywords so the prompt
+      // knows its category. A failure just leaves them blank.
+      api<{ description: string; keywords: string }>(
+        `/api/channel/inspect?channel_id=${encodeURIComponent(activeChannelId)}`,
+      )
+        .then((d) => {
+          setChannelDesc((d.description || "").trim());
+          setChannelKeywords((d.keywords || "").trim());
+        })
+        .catch(() => undefined);
+    }
   }, [activeChannelId]);
-  const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}. The titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
+  const descSnippet = channelDesc.length > 400 ? `${channelDesc.slice(0, 400)}…` : channelDesc;
+  const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
+  // Custom script (user, 2026-11-09): the user can paste a script
+  // written by another AI (e.g. Gemini) and the video is built
+  // from it. Empty = the tool writes the script itself.
+  const [customScript, setCustomScript] = useState("");
+  const scriptPrompt = `Write a YouTube video script for a video titled "${title.trim() || "my video"}"${activeChannelTitle ? ` for the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. The video should be about ${dur} minute(s) long (roughly ${dur * 150} words). Start with a strong hook in the first 15 seconds, then explain the topic in simple, clear language with interesting examples. Write it as plain spoken narration only — no scene directions, no headings, no bullet points. Separate paragraphs with a blank line, one idea per paragraph.`;
   const [subtitles, setSubtitles] = useState(true);
   // Mood music + transitions (2026-11-08): a mood-matched
   // background track (needs the Freesound key below) and a
@@ -115,6 +139,65 @@ function AutoVideo() {
   };
   const [phase, setPhase] = useState<"form" | "build" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
+  // Trim the start (user, 2026-11-09): cut the first seconds off
+  // the finished video (often an unwanted "Hook").
+  const [trimSeconds, setTrimSeconds] = useState("5");
+  const [trimLoading, setTrimLoading] = useState(false);
+  const [trimError, setTrimError] = useState("");
+  const [trimmedUrl, setTrimmedUrl] = useState("");
+  // Upload to YouTube (user, 2026-11-09): title, description,
+  // tags, privacy and thumbnail, to the selected channel.
+  const [upTitle, setUpTitle] = useState("");
+  const [upDesc, setUpDesc] = useState("");
+  const [upTags, setUpTags] = useState("");
+  const [upPrivacy, setUpPrivacy] = useState("private");
+  const [upThumb, setUpThumb] = useState<File | null>(null);
+  const [upLoading, setUpLoading] = useState(false);
+  const [upError, setUpError] = useState("");
+  const [upResult, setUpResult] = useState<AvUploadResult | null>(null);
+  const descPrompt = `Write a YouTube video description for a video titled "${(upTitle || title).trim() || "my video"}"${activeChannelTitle ? ` on the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. 2-3 short paragraphs: what the video covers, why it matters, and a call to subscribe. Friendly, clear tone. End with 3-5 relevant hashtags on their own line.`;
+  const tagsPrompt = `Suggest 15 YouTube video tags for a video titled "${(upTitle || title).trim() || "my video"}"${niche.trim() ? ` about ${niche.trim()}` : ""}. Cover the topic, related searches, and audience intent. Return them as a comma-separated list only, no numbering, no extra text.`;
+  const doUpload = async () => {
+    if (!job || upLoading) return;
+    const t = (upTitle || job.title || title).trim();
+    if (!t) {
+      setUpError("Enter a video title first.");
+      return;
+    }
+    setUpLoading(true);
+    setUpError("");
+    setUpResult(null);
+    try {
+      const res = await autovideoUpload(
+        job.id,
+        { title: t, description: upDesc, tags: upTags, privacy: upPrivacy, channelId: activeChannelId || "" },
+        upThumb,
+      );
+      setUpResult(res);
+    } catch (e) {
+      setUpError(e instanceof ApiError ? e.message : "Upload failed. Please try again.");
+    } finally {
+      setUpLoading(false);
+    }
+  };
+  const doTrim = async () => {
+    if (!job || trimLoading) return;
+    const secs = Number(trimSeconds);
+    if (!Number.isFinite(secs) || secs <= 0) {
+      setTrimError("Enter how many seconds to cut from the start (more than 0).");
+      return;
+    }
+    setTrimLoading(true);
+    setTrimError("");
+    try {
+      const res = await autovideoTrim(job.id, secs);
+      setTrimmedUrl(res.trimmed_url);
+    } catch (e) {
+      setTrimError(e instanceof ApiError ? e.message : "Trim failed. Please try again.");
+    } finally {
+      setTrimLoading(false);
+    }
+  };
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -168,6 +251,10 @@ function AutoVideo() {
     setJobId(found.jobId);
     void autovideoJob(found.jobId).then((j) => {
       setJob(j);
+      // The job carries the title it was built with — restore it,
+      // or the page shows the default title ("10 Mind-Blowing
+      // Facts…") for a video built with a different title.
+      if (j.title) setTitle(j.title);
       if (j.status === "done") setPhase("done");
       else if (j.status === "failed") { setPhase("form"); setError("Failed: " + (j.error || "Unknown error.")); }
       else { setPhase("build"); poll(found.jobId); }
@@ -178,7 +265,7 @@ function AutoVideo() {
 
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
 
-  const sceneCount = job?.scenes?.length || dur * 3;
+  const sceneCount = job?.scene_total || job?.scenes?.length || dur * 3;
   const pct = job?.progress ?? 0;
   const current = Math.min(sceneCount - 1, Math.floor((pct / 100) * sceneCount));
   const stageIdx = stageIndex(job);
@@ -190,7 +277,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey, freesoundKey, music, transitions);
+      const data = await autovideoCreate(title.trim(), dur, "en-US-AriaNeural", subtitles, pexelsKey, pixabayKey, freesoundKey, music, transitions, customScript);
       setJobId(data.job_id);
       // Background job: the build keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -225,18 +312,39 @@ function AutoVideo() {
                 {copied ? "✓ Copied" : "✨ Prompt for AI"}
               </button>
             </div>
-            <input className="field text-lg" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 5 Secrets of the Ocean" />
+            <input className="field text-lg" value={title} autoComplete="off" onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 5 Secrets of the Ocean" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-semibold">Channel topic / niche <span className="text-muted-foreground">(used by Prompt for AI — set once per channel)</span></label>
             <input
               className="field"
               value={niche}
+              autoComplete="off"
               onChange={(e) => {
                 setNiche(e.target.value);
                 if (activeChannelId) setChannelNiche(activeChannelId, e.target.value);
               }}
               placeholder="e.g. personal finance, amazing facts"
+            />
+          </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="font-semibold">Script <span className="text-muted-foreground">(optional — leave empty to auto-write it)</span></label>
+              <button
+                className="btn btn-ghost btn-sm"
+                title="Prompt for AI — copy a prompt for Gemini or any AI to write this video's script"
+                onClick={() => void copyText(scriptPrompt)}
+              >
+                {copied ? "✓ Copied" : "✨ Prompt for AI"}
+              </button>
+            </div>
+            <textarea
+              className="field w-full text-sm leading-relaxed"
+              rows={6}
+              value={customScript}
+              autoComplete="off"
+              onChange={(e) => setCustomScript(e.target.value)}
+              placeholder="Paste a script here (e.g. written by Gemini) — the video will be built from your words. Leave empty and the tool writes the script itself."
             />
           </div>
           <div>
@@ -330,12 +438,47 @@ function AutoVideo() {
       {phase === "build" && (
         <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
           <div className="glass p-6">
+            {/* Video title (user, 2026-11-09): show which video is
+                being built, not just the scene count. */}
+            <h3 className="mb-1 text-lg font-bold">{title}</h3>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-xl font-bold">Building scene {current + 1} of {sceneCount}</h3>
               <span className="font-display text-3xl font-bold text-gradient">{Math.round(pct)}%</span>
             </div>
             <div className="bar mb-5"><div style={{ width: `${pct}%` }} /></div>
             <p className="mb-4 text-sm text-muted-foreground">{job?.stage || "Starting…"}</p>
+            {/* Progress timeline (user, 2026-11-09): click to expand
+                and see everything that has happened so far and what
+                is running now, with the stock-footage source per
+                scene. */}
+            {job?.timeline && job.timeline.length > 0 && (
+              <details className="mb-4 rounded-xl border border-border p-3">
+                <summary className="cursor-pointer text-sm font-semibold">Progress details — {job.timeline.length} step(s)</summary>
+                <div className="mt-3 max-h-56 space-y-1.5 overflow-auto text-sm">
+                  {job.timeline.map((ev, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground">{Math.floor(ev.t / 60)}:{String(ev.t % 60).padStart(2, "0")}</span>
+                      <span className="text-muted-foreground">{ev.text}</span>
+                    </div>
+                  ))}
+                </div>
+                {job.scenes && job.scenes.length > 0 && (
+                  <div className="mt-3 border-t border-border pt-3 text-sm">
+                    <p className="font-semibold">Stock footage so far</p>
+                    <p className="text-muted-foreground">
+                      {(() => {
+                        const bySource: Record<string, number> = {};
+                        for (const s of job.scenes) {
+                          const key = `${s.kind || "?"} from ${s.visual_source || "?"}`;
+                          bySource[key] = (bySource[key] || 0) + 1;
+                        }
+                        return Object.entries(bySource).map(([k, v]) => `${v}× ${k}`).join(" · ");
+                      })()}
+                    </p>
+                  </div>
+                )}
+              </details>
+            )}
             <div className="relative aspect-video overflow-hidden rounded-xl">
               <img src={imgs[current % 3]} alt="" className="h-full w-full object-cover animate-kenburns" />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background p-5">
@@ -362,7 +505,7 @@ function AutoVideo() {
         <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
           <div className="glass p-6">
             <span className="chip mb-3 text-success">✓ Your video is ready</span>
-            <h3 className="mb-4 text-2xl font-bold">{title}</h3>
+            <h3 className="mb-4 text-2xl font-bold">{job.title || title}</h3>
             {job.download_url ? (
               <video src={job.download_url} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" />
             ) : (
@@ -375,6 +518,136 @@ function AutoVideo() {
               {job.ai_images ? ` · AI images: ${job.ai_images}` : ""}{job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: {job.voice_engine || ""}
               {job.visual_warning ? ` · ${job.visual_warning}` : ""}
             </p>
+            {/* Trim the start (user, 2026-11-09): cut the first
+                seconds off the finished video — the opening "Hook"
+                is often unwanted. The original is kept. */}
+            <div className="mt-4 rounded-xl border border-border p-4">
+              <p className="font-semibold">Trim the start</p>
+              <p className="mb-3 text-sm text-muted-foreground">Cut the first seconds off this video (the opening Hook is usually 3–5 seconds). The original stays as it is.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  className="field w-24 text-center"
+                  type="number" min={1} max={600} step={1}
+                  value={trimSeconds}
+                  autoComplete="off"
+                  onChange={(e) => setTrimSeconds(e.target.value)}
+                  aria-label="Seconds to cut from the start"
+                />
+                <span className="text-sm text-muted-foreground">seconds</span>
+                <button className="btn btn-primary" disabled={trimLoading} onClick={() => void doTrim()}>
+                  {trimLoading ? "Trimming…" : "✂️ Trim"}
+                </button>
+              </div>
+              {trimError && <p className="mt-2 text-sm text-destructive">{trimError}</p>}
+              {(trimmedUrl || job.trimmed_url) && (
+                <div className="mt-3">
+                  <p className="text-sm text-success">✓ Trimmed — first {job.trimmed_start_seconds ?? trimSeconds}s cut{job.trimmed_duration_sec ? `, new length ${Math.round(job.trimmed_duration_sec)}s` : ""}.</p>
+                  <video src={trimmedUrl || job.trimmed_url} controls preload="metadata" className="mt-2 aspect-video w-full rounded-xl bg-black" />
+                  <a className="btn btn-ghost mt-2" href={trimmedUrl || job.trimmed_url} download>⬇ Download trimmed video</a>
+                </div>
+              )}
+            </div>
+            {/* Upload to YouTube (user, 2026-11-09): title,
+                description, tags, privacy and thumbnail, to the
+                selected channel. The trimmed video is uploaded
+                when one exists, else the final video. */}
+            <div className="mt-4 space-y-4 rounded-xl border border-border p-4">
+              <p className="font-semibold">Upload to YouTube</p>
+              <div>
+                <label className="mb-2 block text-sm font-semibold">Title</label>
+                <input
+                  className="field"
+                  value={upTitle || job.title || title}
+                  autoComplete="off"
+                  onChange={(e) => setUpTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold">Description</label>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Prompt for AI — copy a prompt for Gemini or any AI to write this video's description"
+                    onClick={() => void copyText(descPrompt)}
+                  >
+                    {copied ? "✓ Copied" : "✨ Prompt for AI"}
+                  </button>
+                </div>
+                <textarea
+                  className="field w-full text-sm leading-relaxed"
+                  rows={4}
+                  value={upDesc}
+                  autoComplete="off"
+                  onChange={(e) => setUpDesc(e.target.value)}
+                  placeholder="Write the description, or copy the Prompt for AI into Gemini and paste the result here."
+                />
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold">Tags <span className="text-muted-foreground">(comma separated)</span></label>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Prompt for AI — copy a prompt for Gemini or any AI to suggest tags for this video"
+                    onClick={() => void copyText(tagsPrompt)}
+                  >
+                    {copied ? "✓ Copied" : "✨ Prompt for AI"}
+                  </button>
+                </div>
+                <input
+                  className="field"
+                  value={upTags}
+                  autoComplete="off"
+                  onChange={(e) => setUpTags(e.target.value)}
+                  placeholder="tag one, tag two, tag three"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">Privacy</label>
+                  <select className="field" value={upPrivacy} onChange={(e) => setUpPrivacy(e.target.value)}>
+                    <option value="private">Private</option>
+                    <option value="unlisted">Unlisted</option>
+                    <option value="public">Public</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">Channel</label>
+                  <input className="field" value={activeChannelTitle || "Default channel"} disabled />
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold">Thumbnail <span className="text-muted-foreground">(optional — JPG/PNG)</span></label>
+                <input
+                  className="field"
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={(e) => setUpThumb(e.target.files?.[0] ?? null)}
+                />
+                {upThumb && <p className="mt-1 text-xs text-muted-foreground">{upThumb.name}</p>}
+              </div>
+              {upError && <p className="text-sm text-destructive">{upError}</p>}
+              <button className="btn btn-primary w-full py-3" disabled={upLoading} onClick={() => void doUpload()}>
+                {upLoading ? "Uploading to YouTube…" : "⬆ Upload to YouTube"}
+              </button>
+              {upResult && (
+                <div className="rounded-xl border border-border p-3 text-sm">
+                  <p className="text-success">✓ Uploaded ({upResult.privacy_status}).</p>
+                  {upResult.url && (
+                    <a className="text-primary underline" href={upResult.url} target="_blank" rel="noreferrer">
+                      Watch on YouTube
+                    </a>
+                  )}
+                  {upResult.thumbnail_set && <p className="text-success">✓ Thumbnail set.</p>}
+                  {upResult.thumbnail_error && <p className="text-destructive">{upResult.thumbnail_error}</p>}
+                </div>
+              )}
+              {job.uploaded_url && !upResult && (
+                <p className="text-sm text-muted-foreground">
+                  Already uploaded ({job.uploaded_privacy || ""}):{" "}
+                  <a className="text-primary underline" href={job.uploaded_url} target="_blank" rel="noreferrer">Watch on YouTube</a>
+                </p>
+              )}
+            </div>
             {/* Mood music + transitions status (2026-11-08): what
                 actually got added, so a missing track is never
                 silent. "Key rejected" means the Freesound key is
@@ -391,6 +664,46 @@ function AutoVideo() {
               <details className="mt-4">
                 <summary className="cursor-pointer font-semibold">Script</summary>
                 <p className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap text-sm text-muted-foreground">{job.script}</p>
+              </details>
+            )}
+            {/* Collected footage — media bin (user, 2026-11-09):
+                like a video editor's media pool: every visual the
+                build collected for this video, what kind it is,
+                where it came from, and how long it runs. */}
+            {job.scenes && job.scenes.length > 0 && (
+              <details className="mt-4" open>
+                <summary className="cursor-pointer font-semibold">
+                  Collected footage — {job.scenes.length} scene(s)
+                </summary>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {(() => {
+                    const bySource: Record<string, number> = {};
+                    for (const s of job.scenes) {
+                      const key = `${s.kind || "?"} from ${s.visual_source || "?"}`;
+                      bySource[key] = (bySource[key] || 0) + 1;
+                    }
+                    return (
+                      <p className="mb-3">
+                        {Object.entries(bySource).map(([k, v]) => `${v}× ${k}`).join(" · ")}
+                      </p>
+                    );
+                  })()}
+                </div>
+                <div className="mt-2 max-h-72 space-y-2 overflow-auto">
+                  {job.scenes.map((s, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-border p-2">
+                      <span className="shrink-0 rounded-lg bg-accent px-2 py-1 text-xs font-semibold">Scene {i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">
+                          {s.kind === "clip" ? "🎬 Video clip" : s.kind === "image" ? "🖼️ Image" : s.kind === "ai" ? "🤖 AI image" : s.kind === "card" ? "🪧 Title card" : s.kind || "Visual"}
+                          {s.visual_source ? ` · ${s.visual_source}` : ""}
+                          {s.duration_sec ? ` · ${s.duration_sec}s` : ""}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{s.visual || s.narration || ""}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </details>
             )}
             <div className="mt-5 flex gap-3">
@@ -421,7 +734,7 @@ function SceneList({ count, current, scenes, done }: { count: number; current: n
             <div key={i} className={`flex items-center gap-3 rounded-xl p-2 ${active ? "bg-accent" : ""}`}>
               <img src={imgs[i % 3]} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}</div>
+                <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.visual_source ? ` · ${s.visual_source}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}</div>
                 <div className="truncate text-xs text-muted-foreground">{line}</div>
               </div>
               <span className="text-sm">{isDone ? "✓" : active ? "⏳" : ""}</span>

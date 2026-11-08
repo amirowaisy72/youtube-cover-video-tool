@@ -89,7 +89,7 @@ def _clean_text(text: str) -> str:
     return autovideo._clean_script(text or "")
 
 
-def generate_scenes(title: str, minutes: int) -> tuple[list[dict], str]:
+def generate_scenes(title: str, minutes: int, script: str | None = None) -> tuple[list[dict], str]:
     """Return (scenes, source). Each scene: narration + visual.
     NOTE 2026-11-03: asking Pollinations for a SCENE/NARRATION/
     VISUAL format returns HTTP 400 (same filter that rejected
@@ -98,8 +98,16 @@ def generate_scenes(title: str, minutes: int) -> tuple[list[dict], str]:
     and the script is split into scenes locally. A scene's
     visual search is always anchored to the title (see
     _scene_visual), so a generic sentence word like 'ever' or
-    'fought' can never pull an irrelevant clip again."""
-    script, source = autovideo.generate_script(title, minutes)
+    'fought' can never pull an irrelevant clip again.
+    CUSTOM SCRIPT (user, 2026-11-09): when the user pastes a
+    script they wrote (e.g. from Gemini), use it as-is instead
+    of generating one — the same paragraph split turns it into
+    scenes, so the video is built from their words."""
+    if script and script.strip():
+        script = _clean_text(script.strip())
+        source = "custom"
+    else:
+        script, source = autovideo.generate_script(title, minutes)
     scenes: list[dict] = []
     for paragraph in autovideo.split_paragraphs(script):
         paragraph = paragraph.strip()
@@ -895,7 +903,8 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
                pixabay_key: str | None = None,
                freesound_key: str | None = None,
                music: bool = True,
-               transitions: bool = True) -> dict:
+               transitions: bool = True,
+               script: str | None = None) -> dict:
     """Build a scene-based video. Returns a report dict with
     final_path, script, scenes, durations and counts. Every
     failure inside a scene falls back to the next option;
@@ -926,7 +935,7 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     work_dir.mkdir(parents=True, exist_ok=True)
-    scenes, source = generate_scenes(title, minutes)
+    scenes, source = generate_scenes(title, minutes, script=script)
     if not scenes:
         raise RuntimeError("Could not build a scene script.")
     if progress_cb:
@@ -954,8 +963,14 @@ def run_master(title: str, minutes: int, visuals: str, voice: str,
                 kinds[result["kind"]] += 1
                 total_voice += result["duration"]
             if progress_cb:
+                # Include which visual this scene got and from where,
+                # so the progress timeline shows the stock-footage
+                # source per scene (e.g. "clip from Pexels").
+                src = ""
+                if result is not None:
+                    src = f" — scene {result['index'] + 1}: {result['kind']} from {result.get('visual_source', '?')}"
                 progress_cb(done, len(scenes),
-                            f"Building scene {done} of {len(scenes)}…")
+                            f"Building scene {done} of {len(scenes)}…{src}")
     ordered = [results[i] for i in sorted(results)]
     if not ordered:
         raise RuntimeError("Master pipeline produced no usable scenes.")

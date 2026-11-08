@@ -32,6 +32,7 @@ import json
 import math
 import re
 import subprocess
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -361,12 +362,13 @@ def _section_focuses(title: str, count: int) -> list[str]:
 
 
 def _generate_section(title: str, focus: str, words: int) -> str:
-    """One section of the script (~words words). Two attempts:
-    a section that comes back empty or tiny is retried once,
-    because one failed section must not shrink the whole video.
-    A section under 150 words is treated as a failure (a real
-    section is ~350 words) and retried. Returns the cleaned
-    section, or "" if both attempts failed."""
+    """One section of the script (~words words). Three attempts:
+    a section that comes back empty or tiny is retried, because
+    one failed section must not shrink the whole video. A section
+    under 150 words is treated as a failure (a real section is
+    ~350 words) and retried. Returns the cleaned section, or ""
+    if all attempts failed. A short pause between attempts keeps
+    the free API from rate-limiting rapid retries."""
     prompt = (
         f"Write one section of a YouTube video script in English, in a warm, "
         f"expressive, storytelling spoken style, like a passionate narrator, "
@@ -375,7 +377,7 @@ def _generate_section(title: str, focus: str, words: int) -> str:
         f"in paragraphs. Do not include any section heading, title, or "
         f"label — only the spoken words."
     )
-    for _ in range(2):
+    for attempt in range(3):
         try:
             url = "https://text.pollinations.ai/" + urllib.parse.quote(prompt)
             raw = _http_get(url, timeout=120).decode("utf-8", "ignore")
@@ -384,6 +386,8 @@ def _generate_section(title: str, focus: str, words: int) -> str:
                 return script
         except Exception:
             pass
+        if attempt < 2:
+            time.sleep(3)
     return ""
 
 
@@ -425,17 +429,27 @@ def _generate_script_sections(title: str, words: int) -> str:
 
     kept = [s for s in _batch(list(range(count))) if s]
     total = sum(len(s.split()) for s in kept)
-    # One top-up round if the script came out short: add the
-    # missing sections in a single parallel batch. The video must
-    # not come out noticeably short just because a few calls were
-    # weak — a 30-minute request should give ~30 minutes, not 20.
-    if total < words * 0.75 and len(focuses) > count:
+    # Top-up rounds (user, 2026-11-09 — CRITICAL): a long video
+    # must come out the requested length, even if it takes longer.
+    # The old code did ONE top-up round and then gave up, so a
+    # 30-minute request fell back to the 153-word generic template
+    # whenever several Pollinations calls failed. Now up to 3
+    # top-up rounds keep adding sections until the script reaches
+    # 75% of target (or the focuses run out). The user would
+    # rather wait than get a 52-second video for a 30-minute ask.
+    for _round in range(3):
+        total = sum(len(s.split()) for s in kept)
+        if total >= words * 0.75 or len(focuses) <= count:
+            break
         extra_n = min(6, math.ceil((words - total) / per_section))
         extra_n = min(extra_n, len(focuses) - count)
-        if extra_n > 0:
-            extra = [s for s in _batch(
-                list(range(count, count + extra_n))) if s]
-            kept.extend(extra)
+        if extra_n <= 0:
+            break
+        extra = [s for s in _batch(
+            list(range(count, count + extra_n))) if s]
+        kept.extend(extra)
+        count += extra_n
+        time.sleep(2)
     return "\n\n".join(kept)
 
 

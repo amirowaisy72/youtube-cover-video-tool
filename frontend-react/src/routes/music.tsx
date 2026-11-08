@@ -116,6 +116,7 @@ function Music() {
             className="field"
             type="password"
             value={apiKey}
+            autoComplete="off"
             onChange={(e) => { setApiKey(e.target.value); setKeySaved(false); }}
             placeholder="Paste your Freesound API key here"
           />
@@ -151,6 +152,7 @@ function Music() {
           <input
             className="field"
             value={query}
+            autoComplete="off"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void doSearch(1); }}
             placeholder={tab === "music" ? "e.g. calm piano, upbeat, cinematic…" : "e.g. applause, whoosh, rain…"}
