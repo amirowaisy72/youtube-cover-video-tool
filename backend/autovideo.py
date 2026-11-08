@@ -48,6 +48,29 @@ STOPWORDS = {
     "how", "why", "what", "is", "are", "was", "were", "be", "by", "at",
     "from", "into", "about", "best", "top", "new", "amazing", "secret",
     "secrets", "guide", "explained", "everything", "you", "need", "know",
+    # Common narration words that say nothing about the topic
+    # (user, 2026-11-09 — they were leaking into core words and
+    # pulling totally irrelevant Commons files: a search for
+    # "not" or "your" matches any file with that word in its
+    # title).
+    "not", "no", "nor", "your", "yours", "our", "ours", "their", "theirs",
+    "his", "her", "its", "my", "we", "they", "them", "us", "he", "she",
+    "it", "this", "that", "these", "those", "there", "here", "when",
+    "where", "which", "who", "whom", "whose", "have", "has", "had",
+    "will", "would", "can", "could", "should", "may", "might", "must",
+    "do", "does", "did", "done", "more", "most", "less", "least", "much",
+    "many", "some", "any", "all", "every", "each", "both", "either",
+    "one", "two", "three", "first", "second", "day", "days", "time",
+    "times", "way", "ways", "thing", "things", "people", "person",
+    "get", "gets", "got", "make", "makes", "made", "take", "takes",
+    "took", "go", "goes", "went", "come", "comes", "came", "see",
+    "sees", "saw", "tell", "tells", "told", "say", "says", "said",
+    "meanwhile", "today", "now", "then", "just", "only", "even",
+    "also", "well", "really", "very", "still", "already", "yet",
+    "back", "away", "little", "keep", "keeps", "wait", "start",
+    "starts", "begin", "begins", "let", "lets", "like", "want",
+    "wants", "know", "knows", "think", "thinks", "feel", "feels",
+    "ourselves", "yourself", "himself", "herself", "itself",
 }
 
 # Filler words that say nothing about the topic itself. Removing
@@ -646,6 +669,48 @@ def _search_stock_videos(query: str, pexels_key: str | None,
     return items
 
 
+def _search_stock_images(query: str, pexels_key: str | None,
+                         pixabay_key: str | None) -> list[dict]:
+    """Search Pexels and Pixabay for stock PHOTOS (user,
+    2026-11-09): stock was only ever searched for VIDEOS, so
+    every image came from Commons — that is why the images were
+    often irrelevant and low quality. Same free keys, same shape
+    as Commons results. A bad key or network error just returns
+    fewer results — Commons below still fills the video."""
+    items: list[dict] = []
+    if not query:
+        return items
+    try:
+        import tools_stock
+    except Exception:
+        return items
+    if pexels_key:
+        try:
+            data = tools_stock._search_pexels_images(query, 1, pexels_key)
+            for r in (data.get("results") or [])[:5]:
+                if r.get("image_url"):
+                    items.append({
+                        "url": r["image_url"],
+                        "thumb": r.get("thumb_url") or r["image_url"],
+                        "title": r.get("tags") or query,
+                        "mime": "image/jpeg", "source": "pexels"})
+        except Exception:
+            pass
+    if pixabay_key:
+        try:
+            data = tools_stock._search_pixabay_images(query, 1, pixabay_key)
+            for r in (data.get("results") or [])[:5]:
+                if r.get("image_url"):
+                    items.append({
+                        "url": r["image_url"],
+                        "thumb": r.get("thumb_url") or r["image_url"],
+                        "title": r.get("tags") or query,
+                        "mime": "image/jpeg", "source": "pixabay"})
+        except Exception:
+            pass
+    return items
+
+
 def fetch_visuals(title: str, visuals: str,
                   pexels_key: str | None = None,
                   pixabay_key: str | None = None) -> dict:
@@ -690,6 +755,17 @@ def fetch_visuals(title: str, visuals: str,
                 continue
             seen_urls.add(item["url"])
             videos.append(item)
+
+    # Stock photos first too (user, 2026-11-09): Pexels/Pixabay
+    # images are professional and on-topic by construction
+    # (they were returned for this query), so they are tried
+    # before Commons images.
+    if visuals in ("images", "both") and (pexels_key or pixabay_key):
+        for item in _search_stock_images(core_phrase, pexels_key, pixabay_key):
+            if item["url"] in seen_urls:
+                continue
+            seen_urls.add(item["url"])
+            images.append(item)
 
     def _add(target: list[dict], candidates: list[dict], cap: int) -> None:
         scored = []
@@ -742,6 +818,37 @@ def fetch_visuals(title: str, visuals: str,
                 except Exception:
                     pass
             if len(images) >= 12 and len(videos) >= 10:
+                break
+    # LAST RESORT (user, 2026-11-09): "No alternatives found"
+    # must never happen — with a library this big, returning
+    # nothing is a bug, not a fact. If scoring dropped
+    # everything (niche topic, odd file titles), take the top
+    # Commons results for the first query UNSCORED. A loosely
+    # related clip beats an empty picker, and the user can
+    # always re-search with his own query or upload his own.
+    if not images and not videos:
+        for query in queries[:2]:
+            if visuals in ("images", "both"):
+                try:
+                    for item in _commons_search(query, "bitmap", 12):
+                        if item["url"] not in seen_urls:
+                            seen_urls.add(item["url"])
+                            images.append(item)
+                        if len(images) >= 8:
+                            break
+                except Exception:
+                    pass
+            if visuals in ("videos", "both"):
+                try:
+                    for item in _commons_search(query, "video", 12):
+                        if item["url"] not in seen_urls:
+                            seen_urls.add(item["url"])
+                            videos.append(item)
+                        if len(videos) >= 8:
+                            break
+                except Exception:
+                    pass
+            if images or videos:
                 break
     return {"images": images, "videos": videos}
 

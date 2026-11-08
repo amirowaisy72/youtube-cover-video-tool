@@ -27,7 +27,9 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/stock")
 
 PIXABAY_VIDEOS_BASE = "https://pixabay.com/api/videos/"
+PIXABAY_IMAGES_BASE = "https://pixabay.com/api/"
 PEXELS_SEARCH_BASE = "https://api.pexels.com/videos/search"
+PEXELS_IMAGES_BASE = "https://api.pexels.com/v1/search"
 PER_PAGE = 20
 # Pixabay caps totalHits at 500, so pages beyond that would be empty.
 PIXABAY_MAX_RESULTS = 500

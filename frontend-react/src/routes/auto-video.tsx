@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCreate, autovideoJob, autovideoMusicOptions, autovideoRemixMusic, autovideoSceneAlternatives, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoCreate, autovideoJob, autovideoMusicOptions, autovideoRemixMusic, autovideoRemixVolume, autovideoSceneAlternatives, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -188,44 +188,147 @@ function AutoVideo() {
   const [upLoading, setUpLoading] = useState(false);
   const [upError, setUpError] = useState("");
   const [upResult, setUpResult] = useState<AvUploadResult | null>(null);
-  // Scene change (user, 2026-11-09 — his most important
-  // feature): pick a different clip/image for any scene.
-  const [changeIdx, setChangeIdx] = useState<number | null>(null);
-  const [changeAlts, setChangeAlts] = useState<AvSceneAlternatives | null>(null);
-  const [changeLoading, setChangeLoading] = useState(false);
-  const [changeError, setChangeError] = useState("");
-  const [changeApplying, setChangeApplying] = useState(false);
-  const loadAlts = async (idx: number) => {
+  // Scene sync (user, 2026-11-09): when the video plays or the
+  // user seeks/clicks, the Scenes panel on the right follows —
+  // the scene playing at that timestamp is highlighted and
+  // scrolled into view.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [activeScene, setActiveScene] = useState(-1);
+  const syncSceneFromVideo = () => {
+    const v = videoRef.current;
+    if (!v || !job?.scenes?.length) return;
+    const t = v.currentTime || 0;
+    let acc = 0;
+    let idx = job.scenes.length - 1;
+    for (let i = 0; i < job.scenes.length; i++) {
+      const d = job.scenes[i]?.duration_sec || 0;
+      if (t < acc + d) { idx = i; break; }
+      acc += d;
+    }
+    setActiveScene((prev) => (prev === idx ? prev : idx));
+  };
+  // QUICK FOOTAGE BROWSER (user, 2026-11-09 — his idea): one
+  // scene at a time, flip with ◀ ▶ arrows (or keyboard
+  // Left/Right), see that scene's footage + narration, and
+  // change it right there. Fast enough to fix even a long
+  // video scene by scene. The "Change" button on any scene
+  // row opens the browser at that scene.
+  const [browserIdx, setBrowserIdx] = useState<number | null>(null);
+  const [browserAlts, setBrowserAlts] = useState<AvSceneAlternatives | null>(null);
+  const [browserLoading, setBrowserLoading] = useState(false);
+  const [browserError, setBrowserError] = useState("");
+  const [browserApplying, setBrowserApplying] = useState(false);
+  const [browserQuery, setBrowserQuery] = useState("");
+  const [browserCopied, setBrowserCopied] = useState("");
+  const [browserUploadFile, setBrowserUploadFile] = useState<File | null>(null);
+  const browserVideoRef = useRef<HTMLVideoElement | null>(null);
+  const browserTotal = job?.scenes?.length || 0;
+  // Start time of a scene in the finished video (cumulative
+  // durations) — the browser preview seeks the full video here.
+  const sceneStart = (idx: number) => {
+    let acc = 0;
+    for (let i = 0; i < idx && job?.scenes?.[i]; i++) acc += job.scenes[i]?.duration_sec || 0;
+    return acc;
+  };
+  const loadBrowserAlts = async (idx: number, query = "") => {
     if (!job) return;
-    setChangeIdx(idx);
-    setChangeAlts(null);
-    setChangeError("");
-    setChangeLoading(true);
+    setBrowserAlts(null);
+    setBrowserError("");
+    setBrowserCopied("");
+    setBrowserUploadFile(null);
+    setBrowserLoading(true);
     try {
-      const alts = await autovideoSceneAlternatives(job.id, idx, pexelsKey, pixabayKey);
-      setChangeAlts(alts);
+      const alts = await autovideoSceneAlternatives(job.id, idx, pexelsKey, pixabayKey, query);
+      setBrowserAlts(alts);
+      setBrowserQuery(alts.query || "");
     } catch (e) {
-      setChangeError(e instanceof ApiError ? e.message : "Could not load alternatives.");
+      setBrowserError(e instanceof ApiError ? e.message : "Could not load alternatives.");
     } finally {
-      setChangeLoading(false);
+      setBrowserLoading(false);
     }
   };
-  const applyVisual = async (url: string, kind: "clip" | "image") => {
-    if (!job || changeIdx === null || changeApplying) return;
-    setChangeApplying(true);
-    setChangeError("");
+  const openBrowser = (idx: number) => {
+    setBrowserIdx(idx);
+    void loadBrowserAlts(idx);
+  };
+  const browserNav = (delta: number) => {
+    if (browserIdx === null || browserTotal === 0) return;
+    const next = Math.min(Math.max(browserIdx + delta, 0), browserTotal - 1);
+    if (next === browserIdx) return;
+    setBrowserIdx(next);
+    void loadBrowserAlts(next);
+  };
+  // Seek the browser preview to the current scene when the
+  // scene changes.
+  useEffect(() => {
+    const v = browserVideoRef.current;
+    if (v && browserIdx !== null) {
+      const t = sceneStart(browserIdx);
+      if (Math.abs(v.currentTime - t) > 0.5) v.currentTime = t;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browserIdx]);
+  // Keyboard: ◀ ▶ flip scenes, Escape closes (user, 2026-11-09).
+  useEffect(() => {
+    if (browserIdx === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); browserNav(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); browserNav(1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browserIdx, browserTotal]);
+  // Prompt for AI (user, 2026-11-09): copy a prompt to generate
+  // this scene's footage himself with an AI tool, then upload it.
+  const copyBrowserPrompt = async () => {
+    if (!job || browserIdx === null) return;
+    const scene = job.scenes?.[browserIdx];
+    const desc = scene?.visual || scene?.narration || "";
+    const prompt = `Generate a cinematic 16:9 video clip (or a still image) for a YouTube video scene. Video title: "${job.title}". Scene ${browserIdx + 1} narration: "${desc}". Style: realistic, high quality, natural lighting, no text, no watermark, no people facing the camera unless the narration needs it. Duration about ${Math.round(scene?.duration_sec || 10)} seconds if video.`;
     try {
-      await autovideoSceneVisual(job.id, changeIdx, url, kind);
-      // Refresh the job (new scene kind/source) and the video
-      // (the player re-loads the re-rendered file).
+      await navigator.clipboard.writeText(prompt);
+      setBrowserCopied("✓ Prompt copied — paste it into your AI tool, generate the footage, then upload it below.");
+    } catch {
+      setBrowserCopied("Copy failed — select and copy the prompt manually.");
+    }
+  };
+  const uploadBrowserVisual = async () => {
+    if (!job || browserIdx === null || !browserUploadFile || browserApplying) return;
+    setBrowserApplying(true);
+    setBrowserError("");
+    try {
+      await autovideoSceneUpload(job.id, browserIdx, browserUploadFile);
       const j = await autovideoJob(job.id);
       setJob(j);
-      setChangeIdx(null);
-      setChangeAlts(null);
+      setBrowserUploadFile(null);
+      // Stay in the browser on the same scene — the preview
+      // re-loads the re-rendered video at this scene's start.
+      const v = browserVideoRef.current;
+      if (v) v.load();
     } catch (e) {
-      setChangeError(e instanceof ApiError ? e.message : "Scene change failed.");
+      setBrowserError(e instanceof ApiError ? e.message : "Upload failed.");
     } finally {
-      setChangeApplying(false);
+      setBrowserApplying(false);
+    }
+  };
+  const applyBrowserVisual = async (url: string, kind: "clip" | "image") => {
+    if (!job || browserIdx === null || browserApplying) return;
+    setBrowserApplying(true);
+    setBrowserError("");
+    try {
+      await autovideoSceneVisual(job.id, browserIdx, url, kind);
+      // Refresh the job (new scene kind/source) and stay in the
+      // browser on the same scene to see the result.
+      const j = await autovideoJob(job.id);
+      setJob(j);
+      const v = browserVideoRef.current;
+      if (v) v.load();
+    } catch (e) {
+      setBrowserError(e instanceof ApiError ? e.message : "Scene change failed.");
+    } finally {
+      setBrowserApplying(false);
     }
   };
   // Music change (user, 2026-11-09): swap the background music
@@ -234,7 +337,7 @@ function AutoVideo() {
   const [musicOpts, setMusicOpts] = useState<AvMusicOptions | null>(null);
   const [musicLoading, setMusicLoading] = useState(false);
   const [musicError, setMusicError] = useState("");
-  const [musicVolume, setMusicVolume] = useState(30);
+  const [musicVolume, setMusicVolume] = useState(20);
   const [musicApplying, setMusicApplying] = useState(false);
   const [musicApplied, setMusicApplied] = useState("");
   const loadMusic = async () => {
@@ -264,6 +367,25 @@ function AutoVideo() {
       setJob(j);
     } catch (e) {
       setMusicError(e instanceof ApiError ? e.message : "Music change failed.");
+    } finally {
+      setMusicApplying(false);
+    }
+  };
+  // Volume only (user, 2026-11-09): the slider alone did
+  // nothing — the volume only took effect when picking a NEW
+  // track. This applies the slider's value to the CURRENT music.
+  const applyVolume = async () => {
+    if (!job || musicApplying) return;
+    setMusicApplying(true);
+    setMusicError("");
+    setMusicApplied("");
+    try {
+      const res = await autovideoRemixVolume(job.id, musicVolume / 100);
+      setMusicApplied(`✓ Volume set to ${Math.round(res.volume * 100)}% on the current music.`);
+      const j = await autovideoJob(job.id);
+      setJob(j);
+    } catch (e) {
+      setMusicError(e instanceof ApiError ? e.message : "Volume change failed.");
     } finally {
       setMusicApplying(false);
     }
@@ -634,7 +756,7 @@ function AutoVideo() {
             <span className="chip mb-3 text-success">✓ Your video is ready</span>
             <h3 className="mb-4 text-2xl font-bold">{job.title || title}</h3>
             {job.download_url ? (
-              <video src={job.download_url} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" />
+              <video ref={videoRef} src={job.download_url} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onTimeUpdate={syncSceneFromVideo} onSeeked={syncSceneFromVideo} onLoadedMetadata={syncSceneFromVideo} />
             ) : (
               <div className="relative aspect-video overflow-hidden rounded-xl">
                 <img src={imgs[0]} alt="" className="h-full w-full object-cover" />
@@ -645,6 +767,60 @@ function AutoVideo() {
               {job.ai_images ? ` · AI images: ${job.ai_images}` : ""}{job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: {job.voice_engine || ""}
               {job.visual_warning ? ` · ${job.visual_warning}` : ""}
             </p>
+            {/* Change background music (user, 2026-11-09): it
+                used to sit at the very bottom, below Upload —
+                moved up here, right under the video, where it
+                belongs. Load tracks by mood, listen, pick one,
+                set its volume. */}
+            <div className="mt-4 rounded-xl border border-border p-4">
+              <p className="font-semibold">🎵 Change background music</p>
+              <p className="mb-3 text-sm text-muted-foreground">Current music: {job.music || "none"}{job.music_volume !== undefined ? ` · volume ${Math.round((job.music_volume as number) * 100)}%` : ""}. Pick a mood, load tracks, listen, and apply one at the volume you want.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <select className="field w-auto" value={musicMood || job.mood || "calm"} onChange={(e) => setMusicMood(e.target.value)}>
+                  {(musicOpts?.moods || ["suspense", "wonder", "happy", "motivational", "sad", "epic", "calm"]).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <button className="btn btn-ghost" disabled={musicLoading} onClick={() => void loadMusic()}>
+                  {musicLoading ? "Loading…" : "Load music"}
+                </button>
+                <label className="flex items-center gap-2 text-sm">
+                  Volume
+                  <input type="range" min={0} max={100} value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value, 10))} className="w-32 accent-primary" />
+                  <span className="w-10 text-right font-semibold">{musicVolume}%</span>
+                </label>
+                <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyVolume()}>
+                  {musicApplying ? "Applying…" : "Apply volume"}
+                </button>
+              </div>
+              {musicError && <p className="mt-3 text-sm text-destructive">{musicError}</p>}
+              {musicApplied && <p className="mt-3 text-sm text-success">{musicApplied}</p>}
+              {musicOpts && musicOpts.options.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {musicOpts.options.map((o) => (
+                    <div key={o.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{o.name}</p>
+                        <p className="text-xs text-muted-foreground">{Math.round(o.duration_sec)}s · {o.license || "royalty-free"}</p>
+                      </div>
+                      <audio src={o.preview_url} controls preload="none" className="h-8 w-56 max-w-full" />
+                      <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyMusic(o.preview_url, o.name)}>
+                        {musicApplying ? "Applying…" : "Use this"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {musicOpts && musicOpts.options.length === 0 && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {musicOpts.status === "no_key"
+                    ? "No Freesound key — add your free Freesound key in the form above (or the Stock tool) to load music."
+                    : musicOpts.status === "key_rejected"
+                      ? "Freesound rejected the key — check it and try again."
+                      : "No tracks found for this mood — try another mood."}
+                </p>
+              )}
+            </div>
             {/* Trim the start (user, 2026-11-09): cut the first
                 seconds off the finished video — the opening "Hook"
                 is often unwanted. The original is kept. */}
@@ -849,128 +1025,151 @@ function AutoVideo() {
               <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); }}>Make another</button>
             </div>
           </div>
-          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => void loadAlts(i)} />
+          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} />
         </div>
-        {/* Scene change picker (user, 2026-11-09 — his most
-            important feature): alternatives for the selected
-            scene, clips AND images, pick one to re-render. */}
-        {changeIdx !== null && (
-          <div className="glass mt-6 p-6">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="font-semibold">Change Scene {changeIdx + 1} — pick a clip or image</p>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setChangeIdx(null); setChangeAlts(null); setChangeError(""); }}>✕ Close</button>
+        {/* QUICK FOOTAGE BROWSER (user, 2026-11-09): one scene
+            at a time — ◀ ▶ arrows (or keyboard Left/Right) flip
+            scenes, the preview seeks to that scene, and the
+            alternatives below are for THIS scene. Change it
+            right here, then flip to the next. */}
+        {browserIdx !== null && job?.scenes?.[browserIdx] && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>
+            <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">Scene {browserIdx + 1} of {browserTotal}</p>
+                <div className="flex items-center gap-2">
+                  <button className="btn btn-ghost btn-sm" disabled={browserIdx <= 0} onClick={() => browserNav(-1)}>◀ Prev</button>
+                  <button className="btn btn-ghost btn-sm" disabled={browserIdx >= browserTotal - 1} onClick={() => browserNav(1)}>Next ▶</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>✕ Close</button>
+                </div>
+              </div>
+              {/* Current footage: the finished video, seeked to
+                  this scene's start. */}
+              {job.download_url ? (
+                <video ref={browserVideoRef} src={job.download_url} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onLoadedMetadata={() => { const v = browserVideoRef.current; if (v) v.currentTime = sceneStart(browserIdx); }} />
+              ) : (
+                <div className="aspect-video w-full rounded-xl bg-black" />
+              )}
+              <p className="mt-3 text-sm">{job.scenes[browserIdx].caption || job.scenes[browserIdx].narration || ""}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {job.scenes[browserIdx].kind || "?"} · {job.scenes[browserIdx].visual_source || "?"} · {job.scenes[browserIdx].duration_sec || "?"}s · starts at {Math.round(sceneStart(browserIdx))}s
+              </p>
+              {/* Duplicate footage (user, 2026-11-09): scenes
+                  sharing the same visual_source (same file,
+                  same AI prompt, or same title card) are the
+                  "same footage". Show how many, and let him
+                  jump to each one to fix them quickly. */}
+              {(() => {
+                const key = (job.scenes[browserIdx].visual_source || "").trim();
+                if (!key) return null;
+                const same = (job.scenes || [])
+                  .map((s, i) => ({ s, i }))
+                  .filter(({ s }) => (s.visual_source || "").trim() === key)
+                  .map(({ i }) => i);
+                if (same.length < 2) return null;
+                return (
+                  <p className="mt-2 text-sm text-amber-400">
+                    ⚠️ Same footage in {same.length} scenes:{" "}
+                    {same.map((i) => (
+                      <button key={i} className={`mx-0.5 rounded px-1.5 py-0.5 text-xs font-semibold ${i === browserIdx ? "bg-amber-400 text-black" : "bg-amber-400/20 text-amber-300 hover:bg-amber-400/40"}`} onClick={() => { setBrowserIdx(i); void loadBrowserAlts(i); }}>
+                        #{i + 1}
+                      </button>
+                    ))}
+                  </p>
+                );
+              })()}
+              {browserLoading && <p className="mt-3 text-sm text-muted-foreground">Loading alternatives…</p>}
+              {browserError && <p className="mt-3 text-sm text-destructive">{browserError}</p>}
+              {browserApplying && <p className="mt-3 text-sm text-muted-foreground">Re-rendering the video with the new visual…</p>}
+              <div className="mb-3 mt-4 flex flex-wrap items-center gap-2">
+                <input className="field min-w-0 flex-1" value={browserQuery} onChange={(e) => setBrowserQuery(e.target.value)} placeholder="Search query for this scene…" />
+                <button className="btn btn-primary btn-sm" disabled={browserLoading || !browserQuery.trim()} onClick={() => void loadBrowserAlts(browserIdx, browserQuery)}>🔍 Search</button>
+                <button className="btn btn-ghost btn-sm" title="Copy a prompt to generate this scene's footage with an AI tool, then upload it below" onClick={() => void copyBrowserPrompt()}>✨ Prompt for AI</button>
+              </div>
+              {browserCopied && <p className="mb-3 text-sm text-emerald-400">{browserCopied}</p>}
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
+                <p className="text-sm font-semibold">Or upload your own:</p>
+                <input type="file" accept="video/*,image/*" className="text-sm" onChange={(e) => setBrowserUploadFile(e.target.files?.[0] || null)} />
+                <button className="btn btn-primary btn-sm" disabled={browserApplying || !browserUploadFile} onClick={() => void uploadBrowserVisual()}>
+                  {browserApplying ? "Applying…" : "Upload & use"}
+                </button>
+                {browserUploadFile && <span className="text-xs text-muted-foreground">{browserUploadFile.name}</span>}
+              </div>
+              {browserAlts && (
+                <>
+                  {browserAlts.clips.length > 0 && (
+                    <>
+                      <p className="mb-2 text-sm font-semibold">🎬 Video clips</p>
+                      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {browserAlts.clips.map((c, i) => (
+                          <button key={`c${i}`} className="overflow-hidden rounded-xl border border-border text-left hover:border-primary" disabled={browserApplying} onClick={() => void applyBrowserVisual(c.url, "clip")}>
+                            {c.thumb ? (
+                              <img src={c.thumb} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+                            ) : (
+                              <video src={c.url} muted preload="metadata" className="aspect-video w-full object-cover" />
+                            )}
+                            <p className="truncate px-2 py-1 text-xs text-muted-foreground">{c.title || c.source}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {browserAlts.images.length > 0 && (
+                    <>
+                      <p className="mb-2 text-sm font-semibold">🖼️ Images</p>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {browserAlts.images.map((im, i) => (
+                          <button key={`i${i}`} className="overflow-hidden rounded-xl border border-border text-left hover:border-primary" disabled={browserApplying} onClick={() => void applyBrowserVisual(im.url, "image")}>
+                            <img src={im.thumb || im.url} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+                            <p className="truncate px-2 py-1 text-xs text-muted-foreground">{im.title || im.source}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {browserAlts.clips.length === 0 && browserAlts.images.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No alternatives found for this scene. Try a different search above, or generate the footage with AI (✨ Prompt for AI) and upload it.</p>
+                  )}
+                </>
+              )}
             </div>
-            {changeLoading && <p className="text-sm text-muted-foreground">Loading alternatives…</p>}
-            {changeError && <p className="text-sm text-destructive">{changeError}</p>}
-            {changeApplying && <p className="text-sm text-muted-foreground">Re-rendering the video with the new visual…</p>}
-            {changeAlts && (
-              <>
-                {changeAlts.clips.length > 0 && (
-                  <>
-                    <p className="mb-2 text-sm font-semibold">🎬 Video clips</p>
-                    <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {changeAlts.clips.map((c, i) => (
-                        <button key={`c${i}`} className="overflow-hidden rounded-xl border border-border text-left hover:border-primary" disabled={changeApplying} onClick={() => void applyVisual(c.url, "clip")}>
-                          {c.thumb ? (
-                            <img src={c.thumb} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                          ) : (
-                            <video src={c.url} muted preload="metadata" className="aspect-video w-full object-cover" />
-                          )}
-                          <p className="truncate px-2 py-1 text-xs text-muted-foreground">{c.title || c.source}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {changeAlts.images.length > 0 && (
-                  <>
-                    <p className="mb-2 text-sm font-semibold">🖼️ Images</p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {changeAlts.images.map((im, i) => (
-                        <button key={`i${i}`} className="overflow-hidden rounded-xl border border-border text-left hover:border-primary" disabled={changeApplying} onClick={() => void applyVisual(im.url, "image")}>
-                          <img src={im.thumb || im.url} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                          <p className="truncate px-2 py-1 text-xs text-muted-foreground">{im.title || im.source}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {changeAlts.clips.length === 0 && changeAlts.images.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No alternatives found for this scene. Try changing a different scene.</p>
-                )}
-              </>
-            )}
           </div>
         )}
-        {/* Change background music (user, 2026-11-09): load
-            tracks by mood, listen, pick one, set its volume. */}
-        <div className="glass mt-6 p-6">
-          <p className="font-semibold">🎵 Change background music</p>
-          <p className="mb-3 text-sm text-muted-foreground">Current music: {job.music || "none"}{job.music_volume !== undefined ? ` · volume ${Math.round((job.music_volume as number) * 100)}%` : ""}. Pick a mood, load tracks, listen, and apply one at the volume you want.</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <select className="field w-auto" value={musicMood || job.mood || "calm"} onChange={(e) => setMusicMood(e.target.value)}>
-              {(musicOpts?.moods || ["suspense", "wonder", "happy", "motivational", "sad", "epic", "calm"]).map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-            <button className="btn btn-ghost" disabled={musicLoading} onClick={() => void loadMusic()}>
-              {musicLoading ? "Loading…" : "Load music"}
-            </button>
-            <label className="flex items-center gap-2 text-sm">
-              Volume
-              <input type="range" min={0} max={100} value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value, 10))} className="w-32 accent-primary" />
-              <span className="w-10 text-right font-semibold">{musicVolume}%</span>
-            </label>
-          </div>
-          {musicError && <p className="mt-3 text-sm text-destructive">{musicError}</p>}
-          {musicApplied && <p className="mt-3 text-sm text-success">{musicApplied}</p>}
-          {musicOpts && musicOpts.options.length > 0 && (
-            <div className="mt-4 space-y-2">
-              {musicOpts.options.map((o) => (
-                <div key={o.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{o.name}</p>
-                    <p className="text-xs text-muted-foreground">{Math.round(o.duration_sec)}s · {o.license || "royalty-free"}</p>
-                  </div>
-                  <audio src={o.preview_url} controls preload="none" className="h-8 w-56 max-w-full" />
-                  <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyMusic(o.preview_url, o.name)}>
-                    {musicApplying ? "Applying…" : "Use this"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {musicOpts && musicOpts.options.length === 0 && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {musicOpts.status === "no_key"
-                ? "No Freesound key — add your free Freesound key in the form above (or the Stock tool) to load music."
-                : musicOpts.status === "key_rejected"
-                  ? "Freesound rejected the key — check it and try again."
-                  : "No tracks found for this mood — try another mood."}
-            </p>
-          )}
-        </div>
         </>
       )}
     </div>
   );
 }
 
-function SceneList({ count, current, scenes, done, onChange }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void }) {
+function SceneList({ count, current, scenes, done, onChange, activeScene }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number }) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // Scene sync (user, 2026-11-09): when the video reaches a
+  // scene, scroll that row into view in the panel.
+  useEffect(() => {
+    if (activeScene === undefined || activeScene < 0) return;
+    const el = listRef.current?.querySelector(`[data-scene-row="${activeScene}"]`);
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeScene]);
   return (
-    <div className="glass max-h-[640px] min-w-0 overflow-auto p-4">
+    <div ref={listRef} className="glass max-h-[640px] min-w-0 overflow-auto p-4">
       <h3 className="mb-3 px-2 font-semibold">Scenes</h3>
       <div className="space-y-2">
         {Array.from({ length: count }).map((_, i) => {
           const s = scenes?.[i];
           const isDone = done || i < current;
           const active = !done && i === current;
+          const playing = done && activeScene === i;
           const line = s?.caption || s?.narration || lines[i % lines.length];
+          // Duplicate footage badge (user, 2026-11-09): how many
+          // scenes share this scene's footage.
+          const dupCount = s?.visual_source
+            ? (scenes || []).filter((o) => (o.visual_source || "").trim() === (s.visual_source || "").trim()).length
+            : 0;
           return (
-            <div key={i} className={`flex items-center gap-3 rounded-xl p-2 ${active ? "bg-accent" : ""}`}>
+            <div key={i} data-scene-row={i} className={`flex items-center gap-3 rounded-xl p-2 ${playing ? "bg-primary/20 ring-1 ring-primary" : active ? "bg-accent" : ""}`}>
               <img src={imgs[i % 3]} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.visual_source ? ` · ${s.visual_source}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}</div>
+                <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.visual_source ? ` · ${s.visual_source}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}{dupCount > 1 ? ` · ⚠️ ×${dupCount} same` : ""}</div>
                 <div className="truncate text-xs text-muted-foreground">{line}</div>
               </div>
               {done && onChange && (
@@ -978,7 +1177,7 @@ function SceneList({ count, current, scenes, done, onChange }: { count: number; 
                   🔄 Change
                 </button>
               )}
-              <span className="text-sm">{isDone ? "✓" : active ? "⏳" : ""}</span>
+              <span className="text-sm">{playing ? "▶" : isDone ? "✓" : active ? "⏳" : ""}</span>
             </div>
           );
         })}

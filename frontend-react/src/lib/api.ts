@@ -439,16 +439,23 @@ export type AvAltVisual = {
 
 export type AvSceneAlternatives = {
   scene: number;
+  query?: string;
   clips: AvAltVisual[];
   images: AvAltVisual[];
 };
 
 export const autovideoSceneAlternatives = (
-  jobId: string, idx: number, pexelsKey = "", pixabayKey = "",
-) =>
-  api<AvSceneAlternatives>(
-    `/api/autovideo/${jobId}/scene/${idx}/alternatives?pexels_key=${encodeURIComponent(pexelsKey)}&pixabay_key=${encodeURIComponent(pixabayKey)}`,
+  jobId: string, idx: number, pexelsKey = "", pixabayKey = "", query = "",
+) => {
+  const qs = new URLSearchParams();
+  if (pexelsKey) qs.set("pexels_key", pexelsKey);
+  if (pixabayKey) qs.set("pixabay_key", pixabayKey);
+  if (query) qs.set("query", query);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return api<AvSceneAlternatives>(
+    `/api/autovideo/${jobId}/scene/${idx}/alternatives${suffix}`,
   );
+};
 
 export const autovideoSceneVisual = (jobId: string, idx: number, url: string, kind: "clip" | "image") =>
   api<{ scene: number; kind: string; video_url: string; final_duration_sec: number; join: string }>(
@@ -459,6 +466,17 @@ export const autovideoSceneVisual = (jobId: string, idx: number, url: string, ki
       body: JSON.stringify({ url, kind }),
     },
   );
+
+export const autovideoSceneUpload = async (
+  jobId: string, idx: number, file: File,
+) => {
+  const form = new FormData();
+  form.append("file", file);
+  return api<{ scene: number; kind: string; video_url: string; final_duration_sec: number; join: string }>(
+    `/api/autovideo/${jobId}/scene/${idx}/upload-visual`,
+    { method: "POST", body: form },
+  );
+};
 
 export type AvMusicOption = {
   id: number;
@@ -489,6 +507,16 @@ export const autovideoRemixMusic = (
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preview_url: previewUrl, name, volume }),
+    },
+  );
+
+export const autovideoRemixVolume = (jobId: string, volume: number) =>
+  api<{ video_url: string; final_duration_sec: number; music: string; volume: number }>(
+    `/api/autovideo/${jobId}/remix-volume`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volume }),
     },
   );
 

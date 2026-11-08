@@ -52,6 +52,7 @@ import youtube_upload  # noqa: E402
 import metadata as local_metadata  # noqa: E402
 import tts as tts_module  # noqa: E402
 import autovideo  # noqa: E402
+import autovideo2  # noqa: E402
 import licensing  # noqa: E402
 import tools_thumbnail  # noqa: E402
 import tools_shorts  # noqa: E402
@@ -2407,6 +2408,7 @@ def autovideo_trim(job_id: str, payload: AutoVideoTrimRequest) -> dict:
 def autovideo_scene_alternatives(
     job_id: str, idx: int,
     pexels_key: str = "", pixabay_key: str = "",
+    query: str = "",
 ) -> dict:
     """Alternative visuals for one scene (user, 2026-11-09 —
     scene change is his most important feature). Returns video
@@ -2414,14 +2416,17 @@ def autovideo_scene_alternatives(
     The search reuses the scene's visual text + the job title,
     the same way the original build searched. Each item carries
     a thumb (poster for clips) so the picker never streams full
-    clips just to preview them."""
+    clips just to preview them. The caller may pass his OWN
+    query (user, 2026-11-09) — the picker shows the query used
+    and lets him edit + re-search. The response echoes the query
+    so the picker always shows what was actually searched."""
     job = _av_read(job_id)
     scenes = job.get("scenes") or []
     if idx < 0 or idx >= len(scenes):
         raise HTTPException(404, "Scene not found.")
     scene = scenes[idx]
     title = job.get("title") or ""
-    search_text = f"{title} {scene.get('visual') or scene.get('narration', '')[:200]}"
+    search_text = (query or "").strip() or f"{title} {scene.get('visual') or scene.get('narration', '')[:200]}"
     found = autovideo.fetch_visuals(
         search_text, "both",
         pexels_key=(pexels_key or None),
@@ -2437,12 +2442,33 @@ def autovideo_scene_alternatives(
         }
     clips = [_item(it, "clip") for it in found.get("videos", [])[:12]]
     images = [_item(it, "image") for it in found.get("images", [])[:12]]
-    return {"scene": idx, "clips": clips, "images": images}
+    return {"scene": idx, "query": search_text, "clips": clips, "images": images}
 
 
 class AutoVideoSceneVisualRequest(BaseModel):
     url: str = Field(..., min_length=1, max_length=2000)
     kind: str = Field(..., pattern="^(clip|image)$")
+
+
+def _apply_scene_visual(job: dict, job_dir: Path, idx: int,
+                        visual_path: Path, kind: str) -> dict:
+    """Rebuild one scene's segment with the given local visual
+    file, then re-join all segments + re-mux the unchanged
+    audio. Shared by the URL-pick and the upload endpoints so
+    both go through the same re-render path."""
+    scenes = job.get("scenes") or []
+    scene = scenes[idx]
+    result = autovideo2.rebuild_scene_segment(
+        job_dir, idx, scene, visual_path, kind, len(scenes))
+    scene["kind"] = result["kind"]
+    scene["visual_source"] = f"changed: {visual_path.name}"
+    scene["duration_sec"] = result["duration_sec"]
+    rejoined = autovideo2.rebuild_video_after_scene_change(
+        job_dir, scenes, transitions=bool(job.get("transitions", True)))
+    job["final_minutes"] = round(rejoined["final_duration_sec"] / 60, 1)
+    job["scene_changed"] = idx
+    _av_write(job)
+    return rejoined
 
 
 @app.post("/api/autovideo/{job_id}/scene/{idx}/visual")
@@ -2464,7 +2490,6 @@ def autovideo_scene_visual(job_id: str, idx: int,
     job_dir = _av_job_dir(job_id)
     if not (job_dir / "final.mp4").exists():
         raise HTTPException(404, "Video not ready yet.")
-    scene = scenes[idx]
     kind = payload.kind
     suffix = ".webm" if "webm" in (payload.url or "").lower() else (".mp4" if kind == "clip" else ".jpg")
     visual_path = job_dir / f"scene-change-{idx:02d}{suffix}"
@@ -2477,20 +2502,66 @@ def autovideo_scene_visual(job_id: str, idx: int,
         else:
             if not autovideo._valid_image(visual_path):
                 raise HTTPException(502, "That image could not be read.")
-        result = autovideo2.rebuild_scene_segment(
-            job_dir, idx, scene, visual_path, kind, len(scenes))
-        scene["kind"] = result["kind"]
-        scene["visual_source"] = f"changed: {visual_path.name}"
-        scene["duration_sec"] = result["duration_sec"]
-        rejoined = autovideo2.rebuild_video_after_scene_change(
-            job_dir, scenes, transitions=bool(job.get("transitions", True)))
+        rejoined = _apply_scene_visual(job, job_dir, idx, visual_path, kind)
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(503, f"Scene change failed: {exc}")
-    job["final_minutes"] = round(rejoined["final_duration_sec"] / 60, 1)
-    job["scene_changed"] = idx
-    _av_write(job)
+    return {
+        "scene": idx,
+        "kind": kind,
+        "video_url": job.get("download_url") or f"/api/autovideo/download/{job_id}",
+        "final_duration_sec": rejoined["final_duration_sec"],
+        "join": rejoined["join"],
+    }
+
+
+@app.post("/api/autovideo/{job_id}/scene/{idx}/upload-visual")
+async def autovideo_scene_upload_visual(job_id: str, idx: int,
+                                        file: UploadFile = File(...)) -> dict:
+    """Upload the user's OWN clip/image for one scene (user,
+    2026-11-09): when the library has nothing he likes, he
+    generates the footage himself with an AI tool and uploads
+    it here. Same re-render as picking a library visual — only
+    that scene's footage changes. Accepts video (mp4/webm/mov)
+    and images (jpg/png/webp)."""
+    job = _av_read(job_id)
+    scenes = job.get("scenes") or []
+    if idx < 0 or idx >= len(scenes):
+        raise HTTPException(404, "Scene not found.")
+    if job.get("status") != "done":
+        raise HTTPException(400, "Video is not finished yet.")
+    job_dir = _av_job_dir(job_id)
+    if not (job_dir / "final.mp4").exists():
+        raise HTTPException(404, "Video not ready yet.")
+    name = (file.filename or "").lower()
+    if name.endswith((".mp4", ".webm", ".mov", ".mkv")):
+        kind = "clip"
+        suffix = ".webm" if name.endswith(".webm") else ".mp4"
+    elif name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+        kind = "image"
+        suffix = ".jpg"
+    else:
+        raise HTTPException(400, "Upload a video (mp4/webm/mov) or an image (jpg/png/webp).")
+    visual_path = job_dir / f"scene-change-{idx:02d}{suffix}"
+    try:
+        with open(visual_path, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+        if kind == "clip":
+            if not autovideo._ffprobe_duration(visual_path):
+                raise HTTPException(502, "That clip could not be read.")
+        else:
+            if not autovideo._valid_image(visual_path):
+                raise HTTPException(502, "That image could not be read.")
+        rejoined = _apply_scene_visual(job, job_dir, idx, visual_path, kind)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(503, f"Scene change failed: {exc}")
     return {
         "scene": idx,
         "kind": kind,
@@ -2527,7 +2598,7 @@ def autovideo_music_options(job_id: str, mood: str = "",
 class AutoVideoRemixMusicRequest(BaseModel):
     preview_url: str = Field(..., min_length=1, max_length=2000)
     name: str = ""
-    volume: float = Field(0.30, ge=0.0, le=1.0)
+    volume: float = Field(0.20, ge=0.0, le=1.0)
 
 
 @app.post("/api/autovideo/{job_id}/remix-music")
@@ -2574,6 +2645,47 @@ def autovideo_remix_music(job_id: str,
         "video_url": job.get("download_url") or f"/api/autovideo/download/{job_id}",
         "final_duration_sec": result["final_duration_sec"],
         "music": job["music"],
+        "volume": payload.volume,
+    }
+
+
+class AutoVideoRemixVolumeRequest(BaseModel):
+    volume: float = Field(..., ge=0.0, le=1.0)
+
+
+@app.post("/api/autovideo/{job_id}/remix-volume")
+def autovideo_remix_volume(job_id: str,
+                           payload: AutoVideoRemixVolumeRequest) -> dict:
+    """Change ONLY the background-music volume of a finished
+    video (user, 2026-11-09): he lowered the slider but nothing
+    changed, because the volume only took effect when picking a
+    NEW track. This re-mixes the video with the SAME current
+    music (mood-music.mp3) at the new volume — no new track
+    needed. 0 = music silent, 1 = full."""
+    job = _av_read(job_id)
+    if job.get("status") != "done":
+        raise HTTPException(400, "Video is not finished yet.")
+    job_dir = _av_job_dir(job_id)
+    if not (job_dir / "final.mp4").exists():
+        raise HTTPException(404, "Video not ready yet.")
+    music_path = job_dir / "mood-music.mp3"
+    if not music_path.exists():
+        raise HTTPException(400, "This video has no background music to adjust.")
+    total_voice = float(job.get("voice_duration_sec") or 0)
+    if total_voice <= 0:
+        raise HTTPException(400, "No voiceover duration on record.")
+    try:
+        result = autovideo2.remix_music(
+            job_dir, music_path, payload.volume, total_voice)
+    except Exception as exc:
+        raise HTTPException(503, f"Volume change failed: {exc}")
+    job["music_volume"] = payload.volume
+    job["final_minutes"] = round(result["final_duration_sec"] / 60, 1)
+    _av_write(job)
+    return {
+        "video_url": job.get("download_url") or f"/api/autovideo/download/{job_id}",
+        "final_duration_sec": result["final_duration_sec"],
+        "music": job.get("music") or "current track",
         "volume": payload.volume,
     }
 
