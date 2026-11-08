@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { api, ApiError } from "@/lib/api";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/channel")({
   component: ChannelWizard,
@@ -30,6 +31,7 @@ async function copyText(text: string): Promise<boolean> {
 const CREATE_CHANNEL_URL = "https://www.youtube.com/create_channel";
 
 function ChannelWizard() {
+  const { activeChannelId } = useApp();
   const [step, setStep] = useState(1);
   const [niche, setNiche] = useState("");
   const [keywords, setKeywords] = useState("");
@@ -63,6 +65,31 @@ function ChannelWizard() {
       setTimeout(() => setCopied((c) => (c === key ? null : c)), 2000);
     }
   };
+
+  // "Prompt for AI" (user, 2026-11-09): every item in the wizard gets a
+  // small icon that copies a ready-made prompt. Paste it into Gemini or
+  // any AI and it returns the thing itself (names, keywords, description,
+  // tags, banner or logo image). Prompts use the values already typed.
+  const aiPrompts = {
+    niche:
+      "Suggest 10 hot, evergreen YouTube channel niche ideas that get high search volume, rank fast, and stay relevant for years. For each niche, give the niche name and a one-line reason why it works. Focus on niches a single creator can run with faceless AI-generated videos.",
+    keywords: `Suggest 20 SEO keywords for a YouTube channel called "${pickedName || "my channel"}" about ${niche || "my niche"}. The keywords should help the channel rank in YouTube search and attract viewers interested in ${niche || "the topic"}. Return them as a comma-separated list only, no numbering, no extra text.`,
+    names: `Suggest 10 catchy, memorable, brandable YouTube channel names for a channel about ${niche || "my niche"}. Names should be short, easy to spell, and work well as a handle. Return only the names, one per line, no extra text.`,
+    description: `Write an engaging YouTube channel About description (120-150 words) for a channel called "${pickedName || "my channel"}" about ${niche || "my niche"}. Tell new visitors what the channel is about, what kind of videos they will find, how often new videos are uploaded, and end with a call to subscribe. Friendly, clear tone.`,
+    tags: `Suggest 15 YouTube channel tags for a channel called "${pickedName || "my channel"}" about ${niche || "my niche"}. Tags should cover the topic, related searches, and audience intent. Return them as a comma-separated list only, no numbering, no extra text.`,
+    banner: `Create a YouTube channel banner, 2560x1440 pixels, for a YouTube channel called "${pickedName || "my channel"}" about ${niche || "my niche"}.${tagline ? ` Tagline: "${tagline}".` : ""} Style: modern, ${style} color theme, clean gradient background with subtle shapes. The channel name "${pickedName || "my channel"}" in large, bold, clean text in the center, with the tagline below it in smaller text. Keep all text well inside the safe area so nothing is cut off on TV, desktop, or mobile. Professional, eye-catching, no watermark.`,
+    logo: `Create a clean, modern YouTube channel logo, 800x800 pixels, square, for a channel called "${pickedName || "my channel"}" about ${niche || "my niche"}. A bold monogram of the channel initials in white on a ${style}-themed gradient background with a subtle glow. Minimalist, flat design, easily readable even at small size. No text other than the initials. No watermark.`,
+  };
+
+  const promptBtn = (key: keyof typeof aiPrompts) => (
+    <button
+      className="btn btn-ghost btn-sm"
+      title="Prompt for AI — copy a ready-made prompt for Gemini or any AI"
+      onClick={() => void doCopy(`prompt-${key}`, aiPrompts[key])}
+    >
+      {copied === `prompt-${key}` ? "✓ Copied" : "✨ Prompt for AI"}
+    </button>
+  );
 
   const generate = async () => {
     if (!niche.trim() || loading) return;
@@ -112,7 +139,12 @@ function ChannelWizard() {
     try {
       const data = await api<StatusResult>("/api/channel/status");
       setStatus(data);
-      const firstChannel = data.channels[0];
+      // Prefer the channel picked in the TopBar switcher; fall back to
+      // the first connected channel.
+      const preferred = activeChannelId
+        ? data.channels.find((c) => c.id === activeChannelId)
+        : undefined;
+      const firstChannel = preferred ?? data.channels[0];
       if (firstChannel) setChannelId(firstChannel.id);
     } catch {
       setStatus({ connected: false, channels: [], message: "Could not check the YouTube connection." });
@@ -211,7 +243,10 @@ function ChannelWizard() {
         <div className="mx-auto max-w-2xl space-y-6">
           <div className="glass space-y-5 p-8">
             <div>
-              <label className="mb-2 block font-semibold">Your niche</label>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="font-semibold">Your niche</label>
+                {promptBtn("niche")}
+              </div>
               <input
                 className="field text-lg"
                 value={niche}
@@ -221,7 +256,10 @@ function ChannelWizard() {
               />
             </div>
             <div>
-              <label className="mb-2 block font-semibold">Keywords <span className="text-muted-foreground">(optional, comma separated)</span></label>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="font-semibold">Keywords <span className="text-muted-foreground">(optional, comma separated)</span></label>
+                {promptBtn("keywords")}
+              </div>
               <input
                 className="field"
                 value={keywords}
@@ -239,7 +277,10 @@ function ChannelWizard() {
           {gen && (
             <>
               <div className="glass p-6">
-                <h3 className="mb-4 font-semibold">Channel names — click to pick one</h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-semibold">Channel names — click to pick one</h3>
+                  {promptBtn("names")}
+                </div>
                 <div className="space-y-2">
                   {gen.names.map((n) => (
                     <button
@@ -261,9 +302,12 @@ function ChannelWizard() {
               <div className="glass p-6">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="font-semibold">About / Description</h3>
-                  <button className="btn btn-ghost btn-sm" onClick={() => doCopy("desc", gen.description)}>
-                    {copied === "desc" ? "✓ Copied" : "⧉ Copy description"}
-                  </button>
+                  <div className="flex gap-2">
+                    {promptBtn("description")}
+                    <button className="btn btn-ghost btn-sm" onClick={() => doCopy("desc", gen.description)}>
+                      {copied === "desc" ? "✓ Copied" : "⧉ Copy description"}
+                    </button>
+                  </div>
                 </div>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{gen.description}</p>
               </div>
@@ -271,9 +315,12 @@ function ChannelWizard() {
               <div className="glass p-6">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="font-semibold">Tags</h3>
-                  <button className="btn btn-amber btn-sm" onClick={() => doCopy("tags", gen.tags.join(", "))}>
-                    {copied === "tags" ? "✓ Copied" : "⧉ Copy all tags"}
-                  </button>
+                  <div className="flex gap-2">
+                    {promptBtn("tags")}
+                    <button className="btn btn-amber btn-sm" onClick={() => doCopy("tags", gen.tags.join(", "))}>
+                      {copied === "tags" ? "✓ Copied" : "⧉ Copy all tags"}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {gen.tags.map((tag) => (
@@ -326,14 +373,20 @@ function ChannelWizard() {
           {brand && (
             <>
               <div className="glass p-6">
-                <h3 className="mb-4 font-semibold">Banner (2560×1440)</h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-semibold">Banner (2560×1440)</h3>
+                  {promptBtn("banner")}
+                </div>
                 <img src={brand.banner_url} alt="Channel banner" className="w-full rounded-xl" />
                 <a href={brand.banner_url} download={brand.banner_file} className="btn btn-amber mt-4 w-full">
                   ⬇ Download banner
                 </a>
               </div>
               <div className="glass p-6">
-                <h3 className="mb-4 font-semibold">Logo (800×800)</h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-semibold">Logo (800×800)</h3>
+                  {promptBtn("logo")}
+                </div>
                 <img src={brand.logo_url} alt="Channel logo" className="mx-auto w-48 rounded-xl" />
                 <p className="mt-3 text-sm text-muted-foreground">
                   YouTube&apos;s API cannot set a channel logo — download the logo and upload it yourself

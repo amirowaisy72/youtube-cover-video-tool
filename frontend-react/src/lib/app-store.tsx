@@ -143,6 +143,7 @@ async function fetchJobStatus(tool: string, jobId: string): Promise<{
 }
 
 const JOBS_STORAGE_KEY = "ytguru-active-jobs";
+const ACTIVE_CHANNEL_KEY = "ytguru-active-channel";
 
 type Store = {
   /** Credit balance from the license server; null when not activated / unknown. */
@@ -152,6 +153,10 @@ type Store = {
   installed: boolean;
   /** True once the first /api/license/status read has landed (or failed). */
   licenseChecked: boolean;
+  /** The channel uploads and channel operations target by default.
+      Persisted locally; the TopBar channel switcher changes it. */
+  activeChannelId: string | null;
+  setActiveChannelId: (id: string | null) => void;
   /** Tools are usable only in the installed setup with an active license. */
   unlocked: boolean;
   licenseKey: string | null;
@@ -180,6 +185,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [licensed, setLicensed] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [licenseChecked, setLicenseChecked] = useState(false);
+  const [activeChannelId, setActiveChannelIdState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(ACTIVE_CHANNEL_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const setActiveChannelId = useCallback((id: string | null) => {
+    setActiveChannelIdState(id);
+    try {
+      if (id) localStorage.setItem(ACTIVE_CHANNEL_KEY, id);
+      else localStorage.removeItem(ACTIVE_CHANNEL_KEY);
+    } catch {
+      // Storage blocked: the active channel still works in memory.
+    }
+  }, []);
   const [licenseKey, setKey] = useState<string | null>(null);
   const [licenseError, setLicenseError] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -357,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider
       value={{
         credits, licensed, installed, licenseChecked, unlocked: installed && licensed,
+        activeChannelId, setActiveChannelId,
         licenseKey, licenseError, activate, refreshLicense,
         presets, setPresets, activePresetId, setActivePresetId,
         settings, refreshSettings,

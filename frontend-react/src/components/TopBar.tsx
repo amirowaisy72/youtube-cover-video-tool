@@ -5,7 +5,7 @@ import { connectYoutubeFlow, saveYoutubeCredentials, youtubeStatus } from "@/lib
 import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 
 export function TopBar() {
-  const { credits, licensed, installed, licenseKey, licenseError, activate } = useApp();
+  const { credits, licensed, installed, licenseKey, licenseError, activate, activeChannelId, setActiveChannelId } = useApp();
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [err, setErr] = useState("");
@@ -15,6 +15,11 @@ export function TopBar() {
   // it lives up here. Connected state comes from /api/youtube/status.
   const [ytConnected, setYtConnected] = useState<boolean | null>(null);
   const [ytChannel, setYtChannel] = useState("");
+  const [ytChannels, setYtChannels] = useState<{ id: string; title: string }[]>([]);
+  // Channel switcher (user, 2026-11-09): the chip opens a menu with
+  // every connected channel plus "Connect another channel", so any
+  // channel can be added and picked for uploads and other tools.
+  const [ytMenuOpen, setYtMenuOpen] = useState(false);
   const [ytBusy, setYtBusy] = useState(false);
   const [ytError, setYtError] = useState("");
   // First-time YouTube setup (user, 2026-11-08): a fresh install has
@@ -30,14 +35,18 @@ export function TopBar() {
   const [ytSetupMsg, setYtSetupMsg] = useState("");
   const [ytSetupBusy, setYtSetupBusy] = useState(false);
 
-  const refreshYt = async () => {
+  const refreshYt = async (): Promise<{ id: string; title: string }[]> => {
     try {
       const s = await youtubeStatus();
       setYtConnected(s.connected);
-      setYtChannel(s.channels?.[0]?.title ?? "");
+      const chans = s.channels ?? [];
+      setYtChannels(chans);
+      setYtChannel(chans[0]?.title ?? "");
       setYtSecretsPresent(s.client_secrets_present ?? null);
+      return chans;
     } catch {
       setYtConnected(false);
+      return [];
     }
   };
 
@@ -45,15 +54,31 @@ export function TopBar() {
     void refreshYt();
   }, []);
 
+  // Default the active channel to the first connected one when
+  // nothing is picked yet (or the picked one is gone).
+  useEffect(() => {
+    if (ytChannels.length && (!activeChannelId || !ytChannels.some((c) => c.id === activeChannelId))) {
+      setActiveChannelId(ytChannels[0]!.id);
+    }
+  }, [ytChannels, activeChannelId, setActiveChannelId]);
+
+  const activeChannelTitle =
+    ytChannels.find((c) => c.id === activeChannelId)?.title ?? ytChannel;
+
   const connectYt = async () => {
     if (ytBusy) return;
     setYtBusy(true);
     setYtError("");
+    const beforeIds = new Set(ytChannels.map((c) => c.id));
     try {
       const ok = await connectYoutubeFlow();
       if (ok) {
-        await refreshYt();
+        const fresh = await refreshYt();
         setYtSetupOpen(false);
+        setYtMenuOpen(false);
+        // Make the just-connected channel the active one.
+        const added = fresh.find((c) => !beforeIds.has(c.id));
+        if (added) setActiveChannelId(added.id);
       } else {
         setYtError("Sign-in did not finish. Try again.");
         setYtSetupOpen(true);
@@ -99,11 +124,44 @@ export function TopBar() {
             here are gone. Every tool, including Presets, is reached
             from Home, and each page has a ← Home button. */}
         <div className="ml-auto flex items-center gap-3">
-          {installed && (ytConnected === true ? (
-            <span className="chip" title={ytChannel || "YouTube connected"}>
-              <span className="text-red-500">▶</span>
-              {ytChannel ? ` ${ytChannel}` : " YouTube"}
-            </span>
+          {ytConnected === true ? (
+            <div className="relative">
+              <button
+                className="chip"
+                onClick={() => setYtMenuOpen((v) => !v)}
+                title="Switch YouTube channel — click to see all your channels or add another"
+              >
+                <span className="text-red-500">▶</span>
+                {activeChannelTitle ? ` ${activeChannelTitle}` : " YouTube"} ▾
+              </button>
+              {ytMenuOpen && (
+                <div className="glass absolute right-0 mt-3 w-72 p-3 shadow-2xl">
+                  <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your channels</p>
+                  {ytChannels.map((c) => (
+                    <button
+                      key={c.id}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-primary/10"
+                      onClick={() => { setActiveChannelId(c.id); setYtMenuOpen(false); }}
+                    >
+                      <span className="text-red-500">▶</span>
+                      <span className="flex-1 truncate font-medium">{c.title}</span>
+                      {c.id === activeChannelId && <span className="text-primary">✓</span>}
+                    </button>
+                  ))}
+                  <button
+                    className="btn btn-ghost mt-2 w-full"
+                    disabled={ytBusy}
+                    onClick={() => void connectYt()}
+                  >
+                    {ytBusy ? "Waiting for Google sign-in…" : "＋ Connect another channel"}
+                  </button>
+                  {ytError && <p className="mt-2 text-xs text-destructive">{ytError}</p>}
+                  <p className="mt-2 px-2 text-xs text-muted-foreground">
+                    Uploads and channel tools use the selected channel.
+                  </p>
+                </div>
+              )}
+            </div>
           ) : ytConnected === false ? (
             <div className="relative">
               <button
@@ -158,7 +216,7 @@ export function TopBar() {
                 </div>
               )}
             </div>
-          ) : null)}
+          ) : null}
           {!installed && (
             <a className="btn btn-sm btn-primary" href={SETUP_DOWNLOAD_URL} title="Download the Windows setup — installing it unlocks all tools">⬇ Install Setup</a>
           )}

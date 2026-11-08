@@ -56,7 +56,7 @@ function fmtDur(sec: number) {
 }
 
 function Cover() {
-  const { presets, activePresetId, settings, refreshSettings, jobs, registerJob, updateJob, removeJob } = useApp();
+  const { presets, activePresetId, settings, refreshSettings, jobs, registerJob, updateJob, removeJob, activeChannelId } = useApp();
   const [mode, setMode] = useState<"wizard" | "auto" | "group">("wizard");
   const [step, setStep] = useState(0);
   const [url, setUrl] = useState("");
@@ -165,6 +165,15 @@ function Cover() {
     youtubeStatus().then((s) => { setYtConnected(s.connected); setYtChannels(s.channels ?? []); }).catch(() => setYtConnected(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, jobId]);
+
+  // Upload targets the channel picked in the TopBar switcher. When the
+  // channels load (or the picked channel changes), default the upload
+  // dropdown to it; the user can still pick another channel here.
+  useEffect(() => {
+    if (activeChannelId && ytChannels.some((c) => c.id === activeChannelId)) {
+      setYtChannelId(activeChannelId);
+    }
+  }, [ytChannels, activeChannelId]);
 
   // Load the real cover library once.
   useEffect(() => {
