@@ -176,8 +176,29 @@ function AutoVideo() {
   // the review stops where the user changes things before the
   // next step. "done" is the finished video (still editable).
   const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "done">("form");
-  const step = phase === "form" ? 1 : phase === "footage" ? 2 : phase === "audio" ? 3 : 4;
   const [job, setJob] = useState<AvJob | null>(null);
+  // The stepper must show the step the backend is ACTUALLY on
+  // (user, 2026-11-09): during the plan step the backend is
+  // collecting footage (Step 2), but the frontend phase is
+  // "build" which mapped to Step 4 (Render) — so it looked like
+  // the video was already rendering while it was still
+  // collecting footage. Prefer the backend job's phase/stage
+  // when present; the old one-click flow has no job.phase, so
+  // its stage text decides.
+  const step = (() => {
+    const jp = job?.phase || "";
+    if (jp === "planning" || jp === "planned") return 2;
+    if (jp === "audio" || jp === "audio-ready") return 3;
+    if (jp === "rendering" || jp === "done") return 4;
+    if (phase === "build" && job?.stage) {
+      const s = job.stage.toLowerCase();
+      if (s.includes("footage") || s.includes("clip")) return 2;
+      if (s.includes("voic")) return 3;
+      if (s.includes("script")) return 1;
+      return 4;
+    }
+    return phase === "form" ? 1 : phase === "footage" ? 2 : phase === "audio" ? 3 : 4;
+  })();
   // Trim the start (user, 2026-11-09): cut the first seconds off
   // the finished video (often an unwanted "Hook").
   const [trimSeconds, setTrimSeconds] = useState("5");
@@ -589,11 +610,16 @@ function AutoVideo() {
 
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
 
-  const sceneCount = job?.scene_total || job?.scenes?.length || dur * 3;
+  // Scene count (user, 2026-11-09): ONLY the real count from the
+  // backend. The old fallback (dur*3) showed a made-up number
+  // (e.g. 25) before the script was built, then "dropped" to
+  // the real count (12) — the user rightly read that as scenes
+  // vanishing. No count is known until the backend reports one.
+  const sceneCount = job?.scene_total || job?.scenes?.length || 0;
   const pct = job?.progress ?? 0;
-  const current = Math.min(sceneCount - 1, Math.floor((pct / 100) * sceneCount));
+  const current = sceneCount > 0 ? Math.min(sceneCount - 1, Math.floor((pct / 100) * sceneCount)) : -1;
   const stageIdx = stageIndex(job);
-  const caption = job?.scenes?.[current]?.caption || job?.scenes?.[current]?.narration || lines[current % lines.length];
+  const caption = current >= 0 ? (job?.scenes?.[current]?.caption || job?.scenes?.[current]?.narration || lines[current % lines.length]) : "";
 
   // Step 2 (user, 2026-11-09): collect the footage first —
   // script + scenes, one visual per scene. No voice, no render
@@ -951,7 +977,7 @@ function AutoVideo() {
                 being built, not just the scene count. */}
             <h3 className="mb-1 text-lg font-bold">{title}</h3>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xl font-bold">Building scene {current + 1} of {sceneCount}</h3>
+              <h3 className="text-xl font-bold">{sceneCount > 0 ? `Building scene ${current + 1} of ${sceneCount}` : "Building scenes…"}</h3>
               <span className="font-display text-3xl font-bold text-gradient">{Math.round(pct)}%</span>
             </div>
             <div className="bar mb-5"><div style={{ width: `${pct}%` }} /></div>
