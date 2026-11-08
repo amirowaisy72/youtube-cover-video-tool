@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useApp } from "@/lib/app-store";
+import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 import coverImg from "@/assets/cover-template.jpg";
 import scene1 from "@/assets/scene-1.jpg";
 import scene2 from "@/assets/scene-2.jpg";
@@ -47,6 +49,10 @@ const tools = [
 ] as const;
 
 function Home() {
+  // Locked until the installed setup (with an active license) is
+  // running: the public demo and plain run.bat both show the lock.
+  const { unlocked } = useApp();
+  const locked = !unlocked;
   return (
     <div>
       <section className="mb-12 text-center">
@@ -56,6 +62,13 @@ function Home() {
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">Pick a tool below. Each one walks you through, one simple step at a time.</p>
       </section>
+      {locked && (
+        <div className="glass mx-auto mb-8 max-w-2xl p-6 text-center">
+          <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
+          <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 17 tools.</p>
+          <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
+        </div>
+      )}
       <div className="grid gap-6 md:grid-cols-3">
         {tools.map((t) => (
           <Link key={t.to} to={t.to} className="glass group overflow-hidden transition hover:-translate-y-1 hover:shadow-[var(--shadow-glow)]">
@@ -63,11 +76,12 @@ function Home() {
               <img src={t.img} alt="" width={1280} height={720} className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
               <span className="absolute left-4 top-4 font-display text-4xl font-bold text-gradient">{t.n}</span>
+              {locked && (<span className="absolute right-4 top-4 chip">🔒 Locked</span>)}
             </div>
             <div className="p-6">
               <h2 className="text-2xl font-bold">{t.title}</h2>
               <p className="mt-2 text-muted-foreground">{t.desc}</p>
-              <span className="btn btn-primary mt-6 w-full">{t.cta} →</span>
+              <span className="btn btn-primary mt-6 w-full">{locked ? "🔒 Locked — Install Setup" : `${t.cta} →`}</span>
             </div>
           </Link>
         ))}

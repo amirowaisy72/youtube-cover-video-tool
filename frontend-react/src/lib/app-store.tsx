@@ -148,6 +148,12 @@ type Store = {
   /** Credit balance from the license server; null when not activated / unknown. */
   credits: number | null;
   licensed: boolean;
+  /** True only when the backend is the frozen .exe (installed setup). */
+  installed: boolean;
+  /** True once the first /api/license/status read has landed (or failed). */
+  licenseChecked: boolean;
+  /** Tools are usable only in the installed setup with an active license. */
+  unlocked: boolean;
   licenseKey: string | null;
   licenseError: string;
   activate: (k: string) => Promise<boolean>;
@@ -172,6 +178,8 @@ const Ctx = createContext<Store | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [credits, setCredits] = useState<number | null>(null);
   const [licensed, setLicensed] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [licenseChecked, setLicenseChecked] = useState(false);
   const [licenseKey, setKey] = useState<string | null>(null);
   const [licenseError, setLicenseError] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -260,13 +268,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const d = await licenseStatus();
       setLicensed(!!d.activated);
+      setInstalled(!!d.installed);
       setCredits(d.activated ? (d.balance ?? null) : null);
       setLicenseError("");
     } catch (e) {
-      // License server unreachable (offline): keep the tool usable.
+      // No backend (public demo) or license server unreachable:
+      // not installed, not licensed — the tools stay locked.
       setLicensed(false);
+      setInstalled(false);
       setCredits(null);
       setLicenseError(e instanceof Error ? e.message : "License server unreachable.");
+    } finally {
+      setLicenseChecked(true);
     }
   }, []);
 
@@ -343,7 +356,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider
       value={{
-        credits, licensed, licenseKey, licenseError, activate, refreshLicense,
+        credits, licensed, installed, licenseChecked, unlocked: installed && licensed,
+        licenseKey, licenseError, activate, refreshLicense,
         presets, setPresets, activePresetId, setActivePresetId,
         settings, refreshSettings,
         jobs, registerJob, updateJob, removeJob,

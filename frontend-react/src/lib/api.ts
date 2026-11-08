@@ -85,6 +85,8 @@ export type Settings = {
 
 export type LicenseStatus = {
   activated: boolean;
+  /** True only when the backend is the frozen .exe (installed setup). */
+  installed?: boolean;
   balance: number | null;
   costs: { cover_video?: number; tts?: number; autovideo?: number } | null;
   [key: string]: unknown;

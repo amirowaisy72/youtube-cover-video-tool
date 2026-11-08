@@ -2,9 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useApp } from "@/lib/app-store";
 import { connectYoutubeFlow, youtubeStatus } from "@/lib/api";
+import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 
 export function TopBar() {
-  const { credits, licensed, licenseKey, licenseError, activate } = useApp();
+  const { credits, licensed, installed, licenseKey, licenseError, activate } = useApp();
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [err, setErr] = useState("");
@@ -57,7 +58,7 @@ export function TopBar() {
             here are gone. Every tool, including Presets, is reached
             from Home, and each page has a ← Home button. */}
         <div className="ml-auto flex items-center gap-3">
-          {ytConnected === true ? (
+          {installed && (ytConnected === true ? (
             <span className="chip" title={ytChannel || "YouTube connected"}>
               <span className="text-red-500">▶</span>
               {ytChannel ? ` ${ytChannel}` : " YouTube"}
@@ -66,11 +67,14 @@ export function TopBar() {
             <button className="btn btn-sm btn-ghost" disabled={ytBusy} onClick={() => void connectYt()} title={ytError || "Connect your YouTube channel — needed to upload videos"}>
               {ytBusy ? "Waiting for Google sign-in…" : "🔗 Connect YouTube"}
             </button>
-          ) : null}
+          ) : null)}
+          {!installed && (
+            <a className="btn btn-sm btn-primary" href={SETUP_DOWNLOAD_URL} title="Download the Windows setup — installing it unlocks all tools">⬇ Install Setup</a>
+          )}
           {licensed && credits !== null && (
             <span className="chip"><span className="text-amber">◆</span>{credits} credits</span>
           )}
-          <div className="relative">
+          {installed && (<div className="relative">
             <button className={`btn btn-sm ${licensed ? "btn-ghost" : "btn-amber"}`} onClick={() => setOpen(!open)}>
               {licensed ? "✓ Licensed" : "Activate"}
             </button>
@@ -101,7 +105,7 @@ export function TopBar() {
                 )}
               </div>
             )}
-          </div>
+          </div>)}
         </div>
       </div>
     </header>

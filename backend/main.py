@@ -104,11 +104,11 @@ GROUPS_DIR.mkdir(exist_ok=True)
 TTS_DIR.mkdir(exist_ok=True)
 AV_DIR.mkdir(exist_ok=True)
 
-# License/credit system (YT Guru commercial, v1.0.0): the installed
+# License/credit system (YT Guru commercial, v1.0.1): the installed
 # tool charges 1 credit per video/voiceover through the license
 # server. CLIENT_VERSION is sent with every license call so the
 # server can refuse old builds.
-CLIENT_VERSION = "1.0.0"
+CLIENT_VERSION = "1.0.1"
 
 # Retry any license reports/refunds that failed while offline.
 threading.Thread(target=licensing.flush_outbox, daemon=True).start()
@@ -2370,14 +2370,21 @@ def license_activate(payload: LicenseActivateRequest) -> dict:
 @app.get("/api/license/status")
 def license_status() -> dict:
     """Balance + costs from the license server, or activated=False
-    when no key is stored yet (the home page shows the box)."""
+    when no key is stored yet (the home page shows the box).
+
+    installed=True only when running from the frozen .exe
+    (PyInstaller sets sys.frozen); run.bat / plain python is NOT
+    the installed setup, and the public demo has no backend at
+    all — the frontend locks the tools unless installed+activated.
+    """
+    installed = bool(getattr(sys, "frozen", False))
     try:
         data = licensing.balance()
     except licensing.LicenseError as exc:
         if str(exc).startswith("No license key"):
-            return {"activated": False, "balance": None, "costs": None}
+            return {"activated": False, "balance": None, "costs": None, "installed": installed}
         raise HTTPException(503, str(exc)) from exc
-    return {"activated": True, **data}
+    return {"activated": True, "installed": installed, **data}
 
 
 # Frontend (registered last so /api/* routes win): serve the built

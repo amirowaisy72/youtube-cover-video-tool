@@ -4,11 +4,13 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
-import { AppProvider } from "@/lib/app-store";
+import { AppProvider, useApp } from "@/lib/app-store";
+import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 import { TopBar } from "@/components/TopBar";
 import { ActiveJobsBar } from "@/components/ActiveJobsBar";
 
@@ -78,6 +80,36 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+function LockScreen() {
+  return (
+    <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="text-6xl">🔒</div>
+      <h1 className="mt-4 text-3xl font-bold">This tool is locked</h1>
+      <p className="mt-2 text-muted-foreground">
+        Install YT Guru Setup on your computer to unlock all 17 tools.
+      </p>
+      <a className="btn btn-primary mt-6" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
+      <p className="mt-4 text-sm text-muted-foreground">
+        Already installed? Open YT Guru from your computer — or activate your license from the top bar.
+      </p>
+      <Link to="/" className="btn btn-ghost btn-sm mt-6">← Home</Link>
+    </div>
+  );
+}
+
+/** Tool pages are locked unless the installed setup (with an
+    active license) is running. Before the first license check
+    lands, pages render normally: the check is a fast same-origin
+    call, and the gate engages the moment it lands. */
+function LockGate({ children }: { children: ReactNode }) {
+  const { unlocked, licenseChecked } = useApp();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (licenseChecked && !unlocked && pathname !== "/") {
+    return <LockScreen />;
+  }
+  return <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -88,7 +120,9 @@ function RootComponent() {
         <TopBar />
         <ActiveJobsBar />
         <main className="mx-auto max-w-6xl px-6 py-10">
-          <Outlet />
+          <LockGate>
+            <Outlet />
+          </LockGate>
         </main>
       </AppProvider>
     </QueryClientProvider>
