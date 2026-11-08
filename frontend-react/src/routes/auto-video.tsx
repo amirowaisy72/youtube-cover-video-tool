@@ -4,8 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene, validateStockKey } from "@/lib/api";
-import { getFreesoundKey, getPexelsKey, getPixabayKey, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
+import { ApiError, autovideoCreate, autovideoJob, type AvJob, type AvScene, validateStockKey, youtubeStatus } from "@/lib/api";
+import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
 import s3 from "@/assets/scene-3.jpg";
@@ -45,8 +45,36 @@ function stageIndex(job: AvJob | null): number {
 }
 
 function AutoVideo() {
-  const { jobs, registerJob, updateJob, removeJob } = useApp();
+  const { jobs, registerJob, updateJob, removeJob, activeChannelId } = useApp();
   const [title, setTitle] = useState("10 Mind-Blowing Facts About Our World");
+  // Prompt for AI (user, 2026-11-09): a button next to the title
+  // that copies a prompt for Gemini/AI to suggest video title ideas
+  // matching the channel selected in the TopBar. The channel's
+  // topic comes from the Setup Wizard when it was created, or the
+  // user types it once here and it is remembered per channel.
+  const [activeChannelTitle, setActiveChannelTitle] = useState("");
+  const [niche, setNiche] = useState("");
+  const [copied, setCopied] = useState(false);
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
+  useEffect(() => {
+    youtubeStatus()
+      .then((s) => {
+        const chans = s.channels ?? [];
+        const active = activeChannelId ? chans.find((c) => c.id === activeChannelId) : undefined;
+        setActiveChannelTitle((active ?? chans[0])?.title ?? "");
+      })
+      .catch(() => undefined);
+    if (activeChannelId) setNiche(getChannelNiche(activeChannelId));
+  }, [activeChannelId]);
+  const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}. The titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
   const [subtitles, setSubtitles] = useState(true);
@@ -187,8 +215,29 @@ function AutoVideo() {
       {phase === "form" && (
         <div className="glass mx-auto max-w-2xl space-y-6 p-8">
           <div>
-            <label className="mb-2 block font-semibold">Video title</label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="font-semibold">Video title</label>
+              <button
+                className="btn btn-ghost btn-sm"
+                title="Prompt for AI — copy a prompt for Gemini or any AI to get video title ideas for the selected channel"
+                onClick={() => void copyText(titleIdeasPrompt)}
+              >
+                {copied ? "✓ Copied" : "✨ Prompt for AI"}
+              </button>
+            </div>
             <input className="field text-lg" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 5 Secrets of the Ocean" />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold">Channel topic / niche <span className="text-muted-foreground">(used by Prompt for AI — set once per channel)</span></label>
+            <input
+              className="field"
+              value={niche}
+              onChange={(e) => {
+                setNiche(e.target.value);
+                if (activeChannelId) setChannelNiche(activeChannelId, e.target.value);
+              }}
+              placeholder="e.g. personal finance, amazing facts"
+            />
           </div>
           <div>
             <label className="mb-2 block font-semibold">Length</label>

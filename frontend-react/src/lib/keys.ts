@@ -13,6 +13,33 @@ export const PIXABAY_KEY_STORAGE = "ytguru-pixabay-key";
 export const PEXELS_KEY_STORAGE = "ytguru-pexels-key";
 export const FREESOUND_KEY_STORAGE = "ytguru-freesound-key";
 
+/** Per-channel niche / topic (user, 2026-11-09): the Channel
+    Setup Wizard saves the niche it was given for a channel, and
+    the Auto Video tool reads it so its "Prompt for AI" suggests
+    video titles that match the selected channel. Stored only in
+    this browser, keyed by YouTube channel id. */
+const CHANNEL_NICHE_STORAGE = "ytguru-channel-niches";
+
+export function getChannelNiche(channelId: string): string {
+  try {
+    const map = JSON.parse(localStorage.getItem(CHANNEL_NICHE_STORAGE) || "{}") as Record<string, string>;
+    return map[channelId] || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setChannelNiche(channelId: string, niche: string): void {
+  try {
+    const map = JSON.parse(localStorage.getItem(CHANNEL_NICHE_STORAGE) || "{}") as Record<string, string>;
+    if (niche.trim()) map[channelId] = niche.trim();
+    else delete map[channelId];
+    localStorage.setItem(CHANNEL_NICHE_STORAGE, JSON.stringify(map));
+  } catch {
+    // Storage blocked: the niche just won't persist.
+  }
+}
+
 export function getPixabayKey(): string {
   try {
     return localStorage.getItem(PIXABAY_KEY_STORAGE) ?? "";

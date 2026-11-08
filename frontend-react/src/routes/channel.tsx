@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { api, ApiError } from "@/lib/api";
 import { useApp } from "@/lib/app-store";
+import { setChannelNiche } from "@/lib/keys";
 
 export const Route = createFileRoute("/channel")({
   component: ChannelWizard,
@@ -205,6 +206,10 @@ function ChannelWizard() {
         }),
       });
       setApplyResult(data);
+      // Remember which niche belongs to this channel, so other tools
+      // (e.g. Auto Video's Prompt for AI) can suggest ideas that
+      // match the selected channel.
+      if (channelId && niche.trim()) setChannelNiche(channelId, niche.trim());
     } catch (e) {
       setApplyError(e instanceof ApiError ? e.message : "Could not apply the settings. Please try again.");
     } finally {
