@@ -4,6 +4,6 @@
 // bump SETUP_VERSION (and CLIENT_VERSION in backend/main.py) for
 // each new release, then publish the release with exactly this
 // tag + asset name.
-export const SETUP_VERSION = "1.0.3";
+export const SETUP_VERSION = "1.0.4";
 export const SETUP_DOWNLOAD_URL =
-  "https://github.com/amirowaisy72/youtube-cover-video-tool/releases/download/v1.0.3/YT-Guru-Setup-1.0.3.exe";
+  "https://github.com/amirowaisy72/youtube-cover-video-tool/releases/download/v1.0.4/YT-Guru-Setup-1.0.4.exe";

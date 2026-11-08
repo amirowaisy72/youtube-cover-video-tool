@@ -136,11 +136,13 @@ function ChannelWizard() {
           setConnectError(st.error);
           break;
         }
-        if (st.connected) {
-          await loadStatus();
+        // Wait until THIS sign-in finishes — "connected" is already true
+        // when another channel is connected, so it alone cannot mean
+        // this sign-in is done.
+        if (!st.in_progress) {
+          if (st.connected) await loadStatus();
           break;
         }
-        if (!st.in_progress) break;
       }
     } catch (e) {
       setConnectError(e instanceof ApiError ? e.message : "Could not start the YouTube sign-in. Please try again.");
@@ -415,6 +417,16 @@ function ChannelWizard() {
                       default sign-in; disconnect and connect again if the channel list stays empty.
                     </p>
                   )}
+                </div>
+                <div>
+                  <button className="btn btn-ghost btn-sm" disabled={connectLoading} onClick={() => void connectYoutube()}>
+                    {connectLoading ? "Waiting for Google sign-in…" : "🔗 Connect another channel"}
+                  </button>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Your new channel is not listed yet? Connect it here — sign in with Google and pick the new
+                    channel, then it appears in the list above.
+                  </p>
+                  {connectError && <p className="mt-2 text-sm text-amber">{connectError}</p>}
                 </div>
                 <div>
                   <label className="mb-2 block font-semibold">About / Description</label>

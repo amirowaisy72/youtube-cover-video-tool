@@ -108,7 +108,7 @@ AV_DIR.mkdir(exist_ok=True)
 # tool charges 1 credit per video/voiceover through the license
 # server. CLIENT_VERSION is sent with every license call so the
 # server can refuse old builds.
-CLIENT_VERSION = "1.0.3"
+CLIENT_VERSION = "1.0.4"
 
 # Retry any license reports/refunds that failed while offline.
 threading.Thread(target=licensing.flush_outbox, daemon=True).start()
