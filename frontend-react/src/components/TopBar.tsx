@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useApp } from "@/lib/app-store";
-import { connectYoutubeFlow, youtubeStatus } from "@/lib/api";
+import { connectYoutubeFlow, saveYoutubeCredentials, youtubeStatus } from "@/lib/api";
 import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 
 export function TopBar() {
@@ -17,12 +17,25 @@ export function TopBar() {
   const [ytChannel, setYtChannel] = useState("");
   const [ytBusy, setYtBusy] = useState(false);
   const [ytError, setYtError] = useState("");
+  // First-time YouTube setup (user, 2026-11-08): a fresh install has
+  // NO client_secrets.json, so Connect failed with a 400 — and the
+  // error only lived in the button's hover tooltip, so the user saw
+  // "nothing happens". The setup panel below shows the error IN the
+  // UI and lets anyone paste their Google OAuth Client ID + Secret
+  // (free, one-time) instead of hunting for a file to copy.
+  const [ytSecretsPresent, setYtSecretsPresent] = useState<boolean | null>(null);
+  const [ytSetupOpen, setYtSetupOpen] = useState(false);
+  const [ytClientId, setYtClientId] = useState("");
+  const [ytClientSecret, setYtClientSecret] = useState("");
+  const [ytSetupMsg, setYtSetupMsg] = useState("");
+  const [ytSetupBusy, setYtSetupBusy] = useState(false);
 
   const refreshYt = async () => {
     try {
       const s = await youtubeStatus();
       setYtConnected(s.connected);
       setYtChannel(s.channels?.[0]?.title ?? "");
+      setYtSecretsPresent(s.client_secrets_present ?? null);
     } catch {
       setYtConnected(false);
     }
@@ -38,12 +51,40 @@ export function TopBar() {
     setYtError("");
     try {
       const ok = await connectYoutubeFlow();
-      if (ok) await refreshYt();
-      else setYtError("Sign-in did not finish. Try again.");
+      if (ok) {
+        await refreshYt();
+        setYtSetupOpen(false);
+      } else {
+        setYtError("Sign-in did not finish. Try again.");
+        setYtSetupOpen(true);
+      }
     } catch (e) {
-      setYtError(e instanceof Error ? e.message : "Could not start the YouTube sign-in.");
+      const msg = e instanceof Error ? e.message : "Could not start the YouTube sign-in.";
+      setYtError(msg);
+      // Any connect failure opens the setup panel, so the error is
+      // VISIBLE in the UI instead of hidden in a hover tooltip.
+      setYtSetupOpen(true);
     } finally {
       setYtBusy(false);
+    }
+  };
+
+  const saveYtCredentials = async () => {
+    if (!ytClientId.trim() || !ytClientSecret.trim()) {
+      setYtError("Paste both the Client ID and the Client Secret first.");
+      return;
+    }
+    setYtSetupBusy(true);
+    setYtSetupMsg("");
+    setYtError("");
+    try {
+      await saveYoutubeCredentials(ytClientId.trim(), ytClientSecret.trim());
+      setYtSecretsPresent(true);
+      setYtSetupMsg("✓ Saved on this computer. Now press Connect YouTube and sign in with Google.");
+    } catch (e) {
+      setYtError(e instanceof Error ? e.message : "Could not save. Check both values and try again.");
+    } finally {
+      setYtSetupBusy(false);
     }
   };
 
@@ -64,9 +105,59 @@ export function TopBar() {
               {ytChannel ? ` ${ytChannel}` : " YouTube"}
             </span>
           ) : ytConnected === false ? (
-            <button className="btn btn-sm btn-ghost" disabled={ytBusy} onClick={() => void connectYt()} title={ytError || "Connect your YouTube channel — needed to upload videos"}>
-              {ytBusy ? "Waiting for Google sign-in…" : "🔗 Connect YouTube"}
-            </button>
+            <div className="relative">
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={ytBusy}
+                onClick={() => {
+                  // No credentials yet: open the setup panel instead of
+                  // failing silently — a first-time user has no file to
+                  // copy and needs the form, not a hidden tooltip.
+                  if (ytSecretsPresent === false) setYtSetupOpen(true);
+                  else void connectYt();
+                }}
+                title="Connect your YouTube channel — needed to upload videos"
+              >
+                {ytBusy ? "Waiting for Google sign-in…" : "🔗 Connect YouTube"}
+              </button>
+              {ytSetupOpen && (
+                <div className="glass absolute right-0 mt-3 w-80 p-5 shadow-2xl">
+                  <h4 className="font-semibold">Connect YouTube</h4>
+                  {ytError && <p className="mt-2 text-xs text-destructive">{ytError}</p>}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    YouTube needs your Google OAuth Client ID and Secret — free, one-time setup.
+                    In Google Cloud Console: create a project, enable YouTube Data API v3, then
+                    create an OAuth client (Desktop app) and copy the ID and Secret here.
+                  </p>
+                  <a className="mt-1 block text-xs text-primary underline" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">
+                    Open Google Cloud Console →
+                  </a>
+                  <input
+                    className="field mt-3 font-mono"
+                    placeholder="Client ID (…apps.googleusercontent.com)"
+                    value={ytClientId}
+                    onChange={(e) => { setYtClientId(e.target.value); setYtError(""); setYtSetupMsg(""); }}
+                  />
+                  <input
+                    className="field mt-3 font-mono"
+                    type="password"
+                    placeholder="Client Secret"
+                    value={ytClientSecret}
+                    onChange={(e) => { setYtClientSecret(e.target.value); setYtError(""); setYtSetupMsg(""); }}
+                  />
+                  {ytSetupMsg && <p className="mt-2 text-xs text-success">{ytSetupMsg}</p>}
+                  <button className="btn btn-primary mt-3 w-full" disabled={ytSetupBusy} onClick={() => void saveYtCredentials()}>
+                    {ytSetupBusy ? "Saving…" : "Save credentials"}
+                  </button>
+                  <button className="btn btn-ghost mt-2 w-full" disabled={ytBusy || ytSecretsPresent !== true} onClick={() => void connectYt()}>
+                    {ytBusy ? "Waiting for Google sign-in…" : "🔗 Connect YouTube"}
+                  </button>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Saved only on your computer — never sent anywhere except Google.
+                  </p>
+                </div>
+              )}
+            </div>
           ) : null)}
           {!installed && (
             <a className="btn btn-sm btn-primary" href={SETUP_DOWNLOAD_URL} title="Download the Windows setup — installing it unlocks all tools">⬇ Install Setup</a>

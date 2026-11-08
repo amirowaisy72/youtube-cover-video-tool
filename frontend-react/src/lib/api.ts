@@ -290,7 +290,24 @@ export const retryGroup = (id: string) =>
 export const listGroups = async () => (await api<{ groups: GroupListItem[] }>("/api/groups")).groups;
 
 export const youtubeStatus = () =>
-  api<{ connected: boolean; channels?: { id: string; title: string }[] }>("/api/youtube/status");
+  api<{
+    connected: boolean;
+    channels?: { id: string; title: string }[];
+    client_secrets_present?: boolean;
+    token_present?: boolean;
+    library_present?: boolean;
+    message?: string;
+  }>("/api/youtube/status");
+
+/** Save Google OAuth Client ID + Secret (first-time YouTube setup).
+    The backend writes client_secrets.json on this computer only;
+    the user pastes them in the TopBar YouTube panel. */
+export const saveYoutubeCredentials = (clientId: string, clientSecret: string) =>
+  api<{ saved: boolean; path: string }>("/api/youtube/credentials", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+  });
 
 // YouTube sign-in, shared by the top bar and the Cover upload step:
 // opens Google sign-in, then polls until it finishes. Returns true
