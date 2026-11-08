@@ -297,6 +297,15 @@ function ChannelWizard() {
                     </button>
                   ))}
                 </div>
+                <div className="mt-3">
+                  <label className="mb-2 block text-sm font-semibold">Or use your own name (e.g. from AI)</label>
+                  <input
+                    className="field"
+                    value={pickedName}
+                    onChange={(e) => setPickedName(e.target.value)}
+                    placeholder="Type or paste a channel name"
+                  />
+                </div>
               </div>
 
               <div className="glass p-6">
@@ -309,7 +318,16 @@ function ChannelWizard() {
                     </button>
                   </div>
                 </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{gen.description}</p>
+                <textarea
+                  className="field w-full text-sm leading-relaxed"
+                  rows={6}
+                  value={gen.description}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setGen((g) => (g ? { ...g, description: v } : g));
+                    setApplyDesc(v);
+                  }}
+                />
               </div>
 
               <div className="glass p-6">
@@ -322,13 +340,17 @@ function ChannelWizard() {
                     </button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {gen.tags.map((tag) => (
-                    <button key={tag} className="chip" onClick={() => doCopy(`tag-${tag}`, tag)}>
-                      {copied === `tag-${tag}` ? "✓ " : ""}{tag}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  className="field"
+                  value={applyTags}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setApplyTags(v);
+                    const arr = v.split(",").map((s) => s.trim()).filter(Boolean);
+                    setGen((g) => (g ? { ...g, tags: arr } : g));
+                  }}
+                  placeholder="tag one, tag two, tag three"
+                />
               </div>
 
               <button className="btn btn-primary w-full py-4 text-lg" onClick={() => setStep(2)}>
