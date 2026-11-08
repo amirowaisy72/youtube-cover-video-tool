@@ -93,6 +93,11 @@ STOPWORDS = {
     "sometimes", "usually", "actually", "basically", "literally",
     "probably", "maybe", "perhaps", "quite", "rather", "pretty",
     "almost", "nearly", "exactly", "especially", "particularly",
+    # Greeting words (user, 2026-11-09): a narration that opens
+    # "Hey there, wonderer!" made the default search "hey
+    # wonderer" — a greeting, not a visual subject — and returned
+    # almost nothing. Greetings are never search words.
+    "hey", "hello", "hi", "welcome",
     # More narration junk seen in generated scene keywords
     # (2026-11-09): verbs/adjectives that are not visual subjects.
     "because", "next", "last", "small", "called", "wonder",
@@ -609,7 +614,8 @@ def generate_script(title: str, minutes: int) -> tuple[str, str]:
     return script, "template"
 
 
-def _commons_search(query: str, filetype: str, limit: int = 20) -> list[dict]:
+def _commons_search(query: str, filetype: str, limit: int = 20,
+                    offset: int = 0) -> list[dict]:
     params = {
         "action": "query", "format": "json", "generator": "search",
         "gsrsearch": f"{query} filetype:{filetype}",
@@ -617,6 +623,11 @@ def _commons_search(query: str, filetype: str, limit: int = 20) -> list[dict]:
         "prop": "imageinfo", "iiprop": "url|mime|size",
         "iiurlwidth": 1280,
     }
+    # Pagination (user, 2026-11-09 — Load more): Commons
+    # supports gsroffset, so the picker can fetch the NEXT page
+    # of results instead of only ever showing the first batch.
+    if offset > 0:
+        params["gsroffset"] = offset
     data = _http_json(
         "https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode(params),
         timeout=30,
@@ -760,7 +771,8 @@ def short_query(title: str, visual_text: str = "") -> str:
 
 def fetch_visuals(title: str, visuals: str,
                   pexels_key: str | None = None,
-                  pixabay_key: str | None = None) -> dict:
+                  pixabay_key: str | None = None,
+                  offset: int = 0) -> dict:
     """Search Commons for images and/or videos, phrase-first.
 
     Queries are ONLY short phrases built from the core words
@@ -840,12 +852,12 @@ def fetch_visuals(title: str, visuals: str,
     for query in queries:
         if visuals in ("images", "both") and len(images) < 30:
             try:
-                _add(images, _commons_search(query, "bitmap", 30), 30)
+                _add(images, _commons_search(query, "bitmap", 30, offset), 30)
             except Exception:
                 pass
         if visuals in ("videos", "both") and len(videos) < 30:
             try:
-                _add(videos, _commons_search(query, "video", 30), 30)
+                _add(videos, _commons_search(query, "video", 30, offset), 30)
             except Exception:
                 pass
         if len(images) >= 12 and len(videos) >= 10:
@@ -859,12 +871,12 @@ def fetch_visuals(title: str, visuals: str,
         for word in core:
             if visuals in ("images", "both") and len(images) < 30:
                 try:
-                    _add(images, _commons_search(word, "bitmap", 30), 30)
+                    _add(images, _commons_search(word, "bitmap", 30, offset), 30)
                 except Exception:
                     pass
             if visuals in ("videos", "both") and len(videos) < 30:
                 try:
-                    _add(videos, _commons_search(word, "video", 30), 30)
+                    _add(videos, _commons_search(word, "video", 30, offset), 30)
                 except Exception:
                     pass
             if len(images) >= 12 and len(videos) >= 10:
@@ -880,7 +892,7 @@ def fetch_visuals(title: str, visuals: str,
         for query in queries[:2]:
             if visuals in ("images", "both"):
                 try:
-                    for item in _commons_search(query, "bitmap", 12):
+                    for item in _commons_search(query, "bitmap", 12, offset):
                         if item["url"] not in seen_urls:
                             seen_urls.add(item["url"])
                             images.append(item)
@@ -890,7 +902,7 @@ def fetch_visuals(title: str, visuals: str,
                     pass
             if visuals in ("videos", "both"):
                 try:
-                    for item in _commons_search(query, "video", 12):
+                    for item in _commons_search(query, "video", 12, offset):
                         if item["url"] not in seen_urls:
                             seen_urls.add(item["url"])
                             videos.append(item)

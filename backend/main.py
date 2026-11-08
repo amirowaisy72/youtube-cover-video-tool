@@ -2701,6 +2701,7 @@ def autovideo_scene_alternatives(
     job_id: str, idx: int,
     pexels_key: str = "", pixabay_key: str = "",
     query: str = "",
+    offset: int = 0,
 ) -> dict:
     """Alternative visuals for one scene (user, 2026-11-09 —
     scene change is his most important feature). Returns video
@@ -2729,7 +2730,8 @@ def autovideo_scene_alternatives(
     found = autovideo.fetch_visuals(
         search_text, "both",
         pexels_key=(pexels_key or None),
-        pixabay_key=(pixabay_key or None))
+        pixabay_key=(pixabay_key or None),
+        offset=max(0, offset))
     def _item(it: dict, kind: str) -> dict:
         return {
             "url": it.get("url", ""),
@@ -2741,7 +2743,10 @@ def autovideo_scene_alternatives(
         }
     clips = [_item(it, "clip") for it in found.get("videos", [])[:20]]
     images = [_item(it, "image") for it in found.get("images", [])[:20]]
-    return {"scene": idx, "query": search_text, "clips": clips, "images": images}
+    # Load more (user, 2026-11-09): the picker pages through
+    # Commons with `offset`, so it can keep fetching fresh
+    # results instead of only ever showing the first batch.
+    return {"scene": idx, "query": search_text, "clips": clips, "images": images, "offset": max(0, offset)}
 
 
 class AutoVideoSceneVisualRequest(BaseModel):

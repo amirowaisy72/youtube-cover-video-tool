@@ -233,9 +233,13 @@ function AutoVideo() {
   const [lightbox, setLightbox] = useState<null | { kind: "clip" | "image"; src: string; title: string; onUse?: (() => void) | null }>(null);
   // Media filter + paging for the browser results (user,
   // 2026-11-09): pick Videos or Images for this scene, see the
-  // first 5, Load more for the rest.
+  // first 5, Load more for the rest — and when the loaded pool
+  // runs out, Load more fetches the NEXT page from Commons.
   const [browserMedia, setBrowserMedia] = useState<"both" | "clip" | "image">("both");
   const [browserShown, setBrowserShown] = useState(5);
+  const [browserOffset, setBrowserOffset] = useState(0);
+  const [browserLoadingMore, setBrowserLoadingMore] = useState(false);
+  const [browserNoMore, setBrowserNoMore] = useState(false);
   const browserVideoRef = useRef<HTMLVideoElement | null>(null);
   const browserTotal = job?.scenes?.length || 0;
   // Start time of a scene in the finished video (cumulative
@@ -252,6 +256,8 @@ function AutoVideo() {
     setBrowserCopied("");
     setBrowserUploadFile(null);
     setBrowserShown(5);
+    setBrowserOffset(0);
+    setBrowserNoMore(false);
     setBrowserLoading(true);
     try {
       const alts = await autovideoSceneAlternatives(job.id, idx, pexelsKey, pixabayKey, query);
@@ -261,6 +267,33 @@ function AutoVideo() {
       setBrowserError(e instanceof ApiError ? e.message : "Could not load alternatives.");
     } finally {
       setBrowserLoading(false);
+    }
+  };
+  // Load more (user, 2026-11-09): when the loaded pool runs
+  // out, fetch the NEXT page from Commons (offset) and append
+  // it — so Load more always brings fresh results, not just the
+  // first batch. Dedup by URL (a file can surface in several
+  // queries). A page with nothing new means the search is done.
+  const loadBrowserMore = async () => {
+    if (!job || browserIdx === null || browserLoadingMore) return;
+    setBrowserLoadingMore(true);
+    try {
+      const nextOffset = browserOffset + 20;
+      const alts = await autovideoSceneAlternatives(job.id, browserIdx, pexelsKey, pixabayKey, browserQuery, nextOffset);
+      const seen = new Set([...(browserAlts?.clips || []).map((c) => c.url), ...(browserAlts?.images || []).map((im) => im.url)]);
+      const newClips = alts.clips.filter((c) => !seen.has(c.url));
+      const newImages = alts.images.filter((im) => !seen.has(im.url));
+      if (newClips.length === 0 && newImages.length === 0) {
+        setBrowserNoMore(true);
+      } else {
+        setBrowserAlts((prev) => prev ? { ...prev, clips: [...prev.clips, ...newClips], images: [...prev.images, ...newImages] } : alts);
+        setBrowserOffset(nextOffset);
+        setBrowserShown((n) => n + 5);
+      }
+    } catch {
+      setBrowserError("Could not load more results.");
+    } finally {
+      setBrowserLoadingMore(false);
     }
   };
   const openBrowser = (idx: number) => {
@@ -1279,7 +1312,7 @@ function AutoVideo() {
           alternatives below are for THIS scene. Change it
           right here, then flip to the next. */}
       {browserIdx !== null && job?.scenes?.[browserIdx] && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black p-4" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>
           <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">Scene {browserIdx + 1} of {browserTotal}</p>
@@ -1392,6 +1425,7 @@ function AutoVideo() {
                   const shown = items.slice(0, browserShown);
                   return (
                     <>
+                      <p className="mb-2 text-xs text-muted-foreground">Showing {Math.min(browserShown, items.length)} of {items.length} results</p>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                         {shown.map((item, i) => (
                           <button
@@ -1419,10 +1453,16 @@ function AutoVideo() {
                           </button>
                         ))}
                       </div>
-                      {browserShown < items.length && (
+                      {browserShown < items.length ? (
                         <button className="btn btn-ghost mt-3" onClick={() => setBrowserShown((n) => n + 5)}>
                           Load more ({items.length - browserShown} left)
                         </button>
+                      ) : !browserNoMore ? (
+                        <button className="btn btn-ghost mt-3" disabled={browserLoadingMore} onClick={() => void loadBrowserMore()}>
+                          {browserLoadingMore ? "Loading more…" : "Load more results"}
+                        </button>
+                      ) : (
+                        <p className="mt-3 text-sm text-muted-foreground">No more results for this search — try a different word above.</p>
                       )}
                     </>
                   );
@@ -1436,7 +1476,7 @@ function AutoVideo() {
           see it BIG; videos play. "Use this footage" applies
           it (search results); a plain preview has no button. */}
       {lightbox && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black p-4" onClick={() => setLightbox(null)}>
           <div className="w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
             {lightbox.kind === "clip" ? (
               <video src={lightbox.src} controls autoPlay loop className="aspect-video w-full rounded-xl bg-black" />

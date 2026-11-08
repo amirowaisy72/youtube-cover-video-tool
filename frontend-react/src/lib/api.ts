@@ -483,15 +483,20 @@ export type AvSceneAlternatives = {
   query?: string;
   clips: AvAltVisual[];
   images: AvAltVisual[];
+  // Load more (user, 2026-11-09): the offset this page was
+  // fetched with, so the picker can ask for the next page.
+  offset?: number;
 };
 
 export const autovideoSceneAlternatives = (
   jobId: string, idx: number, pexelsKey = "", pixabayKey = "", query = "",
+  offset = 0,
 ) => {
   const qs = new URLSearchParams();
   if (pexelsKey) qs.set("pexels_key", pexelsKey);
   if (pixabayKey) qs.set("pixabay_key", pixabayKey);
   if (query) qs.set("query", query);
+  if (offset > 0) qs.set("offset", String(offset));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return api<AvSceneAlternatives>(
     `/api/autovideo/${jobId}/scene/${idx}/alternatives${suffix}`,
