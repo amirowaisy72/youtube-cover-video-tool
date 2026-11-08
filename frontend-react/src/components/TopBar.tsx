@@ -85,6 +85,10 @@ export function TopBar() {
                     <h4 className="font-semibold">License active</h4>
                     <p className="mt-1 font-mono text-sm text-muted-foreground">{licenseKey}</p>
                     {credits !== null && <p className="mt-2 text-sm">Balance: <b>{credits} credit(s)</b></p>}
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Buy more credits: WhatsApp{" "}
+                      <a className="underline" href="https://wa.me/923100668952" target="_blank" rel="noreferrer">03100668952</a>
+                    </p>
                   </>
                 ) : (
                   <>
@@ -101,6 +105,10 @@ export function TopBar() {
                       if (ok) setOpen(false);
                       else setErr("That key didn't work. Check it and try again.");
                     }}>{busy ? "Activating…" : "Activate"}</button>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Don&apos;t have a key? Get one on WhatsApp:{" "}
+                      <a className="underline" href="https://wa.me/923100668952" target="_blank" rel="noreferrer">03100668952</a>
+                    </p>
                   </>
                 )}
               </div>
