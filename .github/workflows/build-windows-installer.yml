@@ -35,7 +35,10 @@ on:
         required: true
         default: "1.0.0"
 
-jobs:
+permissions:
+  contents: write
+  
+  jobs:
   build:
     runs-on: windows-latest
     steps:
@@ -148,3 +151,9 @@ jobs:
         with:
           name: YT-Guru-Setup-${{ inputs.version }}
           path: ytguru-commercial/installer/installer-output/YT-Guru-Setup-*.exe
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" "ytguru-commercial/installer/installer-output/YT-Guru-Setup-${{ inputs.version }}.exe" --title "YT Guru ${{ inputs.version }}" --notes "Install Setup link in the topbar; tools stay locked until the setup is installed and the license is activated."
