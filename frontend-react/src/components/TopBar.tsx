@@ -128,7 +128,12 @@ export function TopBar() {
             <div className="relative">
               <button
                 className="chip"
-                onClick={() => setYtMenuOpen((v) => !v)}
+                onClick={() => {
+                  // Refresh the list every time the menu opens, so a
+                  // channel connected a moment ago shows up here.
+                  if (!ytMenuOpen) void refreshYt();
+                  setYtMenuOpen((v) => !v);
+                }}
                 title="Switch YouTube channel — click to see all your channels or add another"
               >
                 <span className="text-red-500">▶</span>

@@ -321,8 +321,11 @@ export async function connectYoutubeFlow(): Promise<boolean> {
       "/api/youtube/connect-status",
     );
     if (st.error) throw new Error(st.error);
-    if (st.connected) return true;
-    if (!st.in_progress) break;
+    // Wait until THIS sign-in finishes — "connected" is already true
+    // when another channel is connected, so returning on it alone
+    // ends the wait after 2s, before the new channel is saved.
+    // (Bug found 2026-11-09: a second channel never appeared.)
+    if (!st.in_progress) return st.connected;
   }
   return false;
 }
