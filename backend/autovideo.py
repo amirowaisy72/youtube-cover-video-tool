@@ -788,14 +788,14 @@ def fetch_visuals(title: str, visuals: str,
             target.append(item)
 
     for query in queries:
-        if visuals in ("images", "both") and len(images) < 20:
+        if visuals in ("images", "both") and len(images) < 30:
             try:
-                _add(images, _commons_search(query, "bitmap", 30), 20)
+                _add(images, _commons_search(query, "bitmap", 30), 30)
             except Exception:
                 pass
-        if visuals in ("videos", "both") and len(videos) < 20:
+        if visuals in ("videos", "both") and len(videos) < 30:
             try:
-                _add(videos, _commons_search(query, "video", 30), 20)
+                _add(videos, _commons_search(query, "video", 30), 30)
             except Exception:
                 pass
         if len(images) >= 12 and len(videos) >= 10:
@@ -807,14 +807,14 @@ def fetch_visuals(title: str, visuals: str,
     # still ranks the best-matching files first.
     if len(images) < 12 or (visuals in ("videos", "both") and len(videos) < 5):
         for word in core:
-            if visuals in ("images", "both") and len(images) < 20:
+            if visuals in ("images", "both") and len(images) < 30:
                 try:
-                    _add(images, _commons_search(word, "bitmap", 30), 20)
+                    _add(images, _commons_search(word, "bitmap", 30), 30)
                 except Exception:
                     pass
-            if visuals in ("videos", "both") and len(videos) < 20:
+            if visuals in ("videos", "both") and len(videos) < 30:
                 try:
-                    _add(videos, _commons_search(word, "video", 30), 20)
+                    _add(videos, _commons_search(word, "video", 30), 30)
                 except Exception:
                     pass
             if len(images) >= 12 and len(videos) >= 10:

@@ -767,6 +767,12 @@ function AutoVideo() {
               {job.ai_images ? ` · AI images: ${job.ai_images}` : ""}{job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: {job.voice_engine || ""}
               {job.visual_warning ? ` · ${job.visual_warning}` : ""}
             </p>
+            {/* Browse ALL footage (user, 2026-11-09): not just
+                one scene — flip through EVERY scene's footage
+                from scene 1 and fix any scene right there. */}
+            <button className="btn btn-primary mt-4" onClick={() => openBrowser(0)}>
+              🎬 Browse all footage — flip through every scene & fix any
+            </button>
             {/* Change background music (user, 2026-11-09): it
                 used to sit at the very bottom, below Upload —
                 moved up here, right under the video, where it
@@ -1025,7 +1031,7 @@ function AutoVideo() {
               <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); }}>Make another</button>
             </div>
           </div>
-          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} />
+          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} />
         </div>
         {/* QUICK FOOTAGE BROWSER (user, 2026-11-09): one scene
             at a time — ◀ ▶ arrows (or keyboard Left/Right) flip
@@ -1141,7 +1147,7 @@ function AutoVideo() {
   );
 }
 
-function SceneList({ count, current, scenes, done, onChange, activeScene }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number }) {
+function SceneList({ count, current, scenes, done, onChange, activeScene, onBrowseAll }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number; onBrowseAll?: () => void }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   // Scene sync (user, 2026-11-09): when the video reaches a
   // scene, scroll that row into view in the panel.
@@ -1152,7 +1158,14 @@ function SceneList({ count, current, scenes, done, onChange, activeScene }: { co
   }, [activeScene]);
   return (
     <div ref={listRef} className="glass max-h-[640px] min-w-0 overflow-auto p-4">
-      <h3 className="mb-3 px-2 font-semibold">Scenes</h3>
+      <div className="mb-3 flex items-center justify-between px-2">
+        <h3 className="font-semibold">Scenes</h3>
+        {done && onBrowseAll && (
+          <button className="btn btn-primary btn-sm" title="Flip through every scene's footage and fix any scene" onClick={onBrowseAll}>
+            🎬 Browse all
+          </button>
+        )}
+      </div>
       <div className="space-y-2">
         {Array.from({ length: count }).map((_, i) => {
           const s = scenes?.[i];

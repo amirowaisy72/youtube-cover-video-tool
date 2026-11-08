@@ -232,8 +232,16 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # Now two passes: on-topic clips first, then ANY clip from
     # the found list — a moving clip, even loosely related, keeps
     # viewers watching far better than a static image.
+    # LONG-VIDEO FIX (user, 2026-11-09): short videos looked
+    # great but long videos were mostly AI images. Root cause:
+    # only the FIRST 5 clips / FIRST 5 images were ever tried,
+    # and images had NO "any image" second pass — so once the
+    # first few scenes used up the top 5, every later scene
+    # fell straight to AI. Now ALL found candidates are tried
+    # (on-topic first, then any), so a long video uses the
+    # whole pool before ever touching AI.
     if visuals in ("videos", "both"):
-        for item in found["videos"][:5]:
+        for item in found["videos"]:
             if not _on_topic(item):
                 continue
             if not _reserve_url(used_urls, lock, item["url"]):
@@ -244,7 +252,7 @@ def _scene_visual(title: str, scene: dict, visuals: str,
                 if autovideo._ffprobe_duration(dest):
                     return dest, "clip", item["title"]
             _release_url(used_urls, lock, item["url"])
-        for item in found["videos"][:8]:
+        for item in found["videos"]:
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
@@ -254,9 +262,16 @@ def _scene_visual(title: str, scene: dict, visuals: str,
                     return dest, "clip", item["title"]
             _release_url(used_urls, lock, item["url"])
     if visuals in ("images", "both"):
-        for item in found["images"][:5]:
+        for item in found["images"]:
             if not _on_topic(item):
                 continue
+            if not _reserve_url(used_urls, lock, item["url"]):
+                continue
+            dest = work_dir / f"scene-{index:02d}.jpg"
+            if autovideo._download(item["url"], dest) and autovideo._valid_image(dest):
+                return dest, "image", item["title"]
+            _release_url(used_urls, lock, item["url"])
+        for item in found["images"]:
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             dest = work_dir / f"scene-{index:02d}.jpg"
