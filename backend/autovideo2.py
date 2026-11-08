@@ -211,7 +211,11 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # 'Franky Zapata COOLEST THING I HAVE EVER SEEN' and a
     # Great Wall scene showed an irrelevant clip.
     title_core = {autovideo._norm_word(w) for w in autovideo.core_words(title)}
-    search_text = f"{title} {visual_text}"
+    # SHORT QUERY (user, 2026-11-09): the old search_text was
+    # the full title + the full first sentence — a 25-word phrase
+    # that Commons answered with carbon-budget videos for a
+    # banking video. short_query keeps at most 5 topical words.
+    search_text = autovideo.short_query(title, visual_text)
     found = autovideo.fetch_visuals(search_text, visuals,
                                     pexels_key=pexels_key,
                                     pixabay_key=pixabay_key)
@@ -1493,6 +1497,11 @@ def plan_footage(title: str, minutes: int, script: str | None,
             "visual_file": visual_path.name,
             "visual_url": visual_source if visual_source.startswith("http") else "",
             "duration_sec": 0,
+            # Word suggestions (user, 2026-11-09): the scene's
+            # main words, one by one, as clickable search chips
+            # in the footage browser — each word searched on its
+            # own gives the most results.
+            "keywords": autovideo.core_words(scene["narration"])[:8],
         }
 
     workers = max(2, min(4, os.cpu_count() or 4))

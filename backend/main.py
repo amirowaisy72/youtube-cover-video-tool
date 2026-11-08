@@ -2718,7 +2718,14 @@ def autovideo_scene_alternatives(
         raise HTTPException(404, "Scene not found.")
     scene = scenes[idx]
     title = job.get("title") or ""
-    search_text = (query or "").strip() or f"{title} {scene.get('visual') or scene.get('narration', '')[:200]}"
+    # SHORT QUERY (user, 2026-11-09): the old search_text was the
+    # full title + the full scene visual — a 25-word phrase that
+    # Commons answered with irrelevant files. short_query keeps
+    # at most 5 topical words, so the alternatives are actually
+    # about this scene. A custom query from the picker is used
+    # as-is (the user typed it, so it is already focused).
+    search_text = (query or "").strip() or autovideo.short_query(
+        title, scene.get('visual') or scene.get('narration', '')[:200])
     found = autovideo.fetch_visuals(
         search_text, "both",
         pexels_key=(pexels_key or None),
@@ -2732,8 +2739,8 @@ def autovideo_scene_alternatives(
             "source": it.get("source") or ("commons" if "wikimedia" in it.get("url", "") else "stock"),
             "mime": it.get("mime", ""),
         }
-    clips = [_item(it, "clip") for it in found.get("videos", [])[:12]]
-    images = [_item(it, "image") for it in found.get("images", [])[:12]]
+    clips = [_item(it, "clip") for it in found.get("videos", [])[:20]]
+    images = [_item(it, "image") for it in found.get("images", [])[:20]]
     return {"scene": idx, "query": search_text, "clips": clips, "images": images}
 
 

@@ -71,6 +71,35 @@ STOPWORDS = {
     "starts", "begin", "begins", "let", "lets", "like", "want",
     "wants", "know", "knows", "think", "thinks", "feel", "feels",
     "ourselves", "yourself", "himself", "herself", "itself",
+    # Narration junk (user, 2026-11-09): words from the spoken
+    # sentences that are not visual subjects — they were
+    # polluting the search queries and the word suggestions
+    # ("ever", "noticed", "seems", "mysteriously", "swear",
+    # "haven", "been", "buying", "anything"). Topical nouns
+    # (money, bank, account, savings) are deliberately NOT here.
+    "ever", "noticed", "notice", "seems", "seem", "mysteriously",
+    "swear", "haven", "been", "buying", "anything", "while",
+    "quietly", "rely", "silent", "clever", "don", "makes",
+    "climbing", "uphill", "battle", "profit", "shrink", "single",
+    "month", "makes", "saving", "system", "traditional", "earned",
+    "deposits", "lend", "others", "hand", "beat", "set", "smart",
+    "rule", "exceeding", "weekly", "spending", "threshold",
+    "automatically", "sweeps", "simple", "forces", "idle", "work",
+    "around", "clock", "generating", "passive", "returns",
+    "completely", "bypass", "traps", "stop", "letting", "without",
+    "across", "between", "through", "under", "over", "off", "out",
+    "up", "down", "away", "along", "around", "behind", "beyond",
+    "again", "once", "twice", "never", "always", "often",
+    "sometimes", "usually", "actually", "basically", "literally",
+    "probably", "maybe", "perhaps", "quite", "rather", "pretty",
+    "almost", "nearly", "exactly", "especially", "particularly",
+    # More narration junk seen in generated scene keywords
+    # (2026-11-09): verbs/adjectives that are not visual subjects.
+    "because", "next", "last", "small", "called", "wonder",
+    "picture", "gleam", "dusty", "mastering", "creative",
+    "louder", "deserves", "voice", "turned", "buried",
+    "stylized", "pdf", "challenge", "calls", "receipt",
+    "expense", "disguise", "legitimate",
 }
 
 # Filler words that say nothing about the topic itself. Removing
@@ -711,31 +740,52 @@ def _search_stock_images(query: str, pexels_key: str | None,
     return items
 
 
+def short_query(title: str, visual_text: str = "") -> str:
+    """A SHORT search query for one scene (user, 2026-11-09 —
+    his words: searching the whole narration sentence finds
+    NOTHING; one word ('money') or a maximum two-word
+    combination finds good results. The old query was the full
+    title + the full first sentence, a 25-word phrase that
+    Commons answered with irrelevant files: carbon-budget
+    videos for a banking video, storm videos, brandy ads.
+    Now: the scene's first 2 core words (its main words), or
+    the title's first 2 when the scene has none — at most 2
+    words, e.g. 'checking account', 'banks money'. The word
+    chips in the browser search ONE word at a time."""
+    scene_core = core_words(visual_text) if visual_text else []
+    title_core = core_words(title)
+    words = scene_core[:2] or title_core[:2]
+    return " ".join(words) or title
+
+
 def fetch_visuals(title: str, visuals: str,
                   pexels_key: str | None = None,
                   pixabay_key: str | None = None) -> dict:
     """Search Commons for images and/or videos, phrase-first.
 
-    Queries are ONLY phrases: the full title, then the core
-    phrase ("Great Wall China"), then 2-3 word core combos.
-    Single generic words are never searched — that was the
-    bug that returned pattern images for "hidden" and "great".
+    Queries are ONLY short phrases built from the core words
+    (max 2 words — user, 2026-11-09: a whole sentence finds
+    nothing, one word or a two-word combination finds good
+    results): the core phrase, then the first core word alone.
+    The raw title is NEVER searched on its own (it used to be
+    the full title + narration sentence — a 25-word phrase
+    Commons answered with irrelevant files), and the tail combo
+    (core[-3:]) is gone (it was narration junk). Single generic
+    words are never searched — that was the bug that returned
+    pattern images for "hidden" and "great".
     Every candidate is then scored by how many core words
     appear in its FILE TITLE, and only scored candidates are
     kept, best first. A file whose title says nothing about
     the topic cannot rank, however well its description matches.
     Returns {"images": [...], "videos": [...]}."""
-    core = core_words(title)
+    core = core_words(title)[:2]
     core_phrase = " ".join(core)
     queries: list[str] = []
-    for query in [title, core_phrase]:
+    for query in [core_phrase]:
         if query and query not in queries:
             queries.append(query)
-    if len(core) >= 3:
-        for combo in (core[:3], core[-3:], core[:2]):
-            query = " ".join(combo)
-            if query not in queries:
-                queries.append(query)
+    if len(core) >= 2:
+        queries.append(core[0])
     if len(core) == 1:
         queries.append(core[0])
     images: list[dict] = []

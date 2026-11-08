@@ -116,6 +116,9 @@ export type AvScene = {
   // the job dir + its original URL.
   visual_file?: string;
   visual_url?: string;
+  // Word suggestions (user, 2026-11-09): the scene's main words
+  // as clickable search chips in the footage browser.
+  keywords?: string[];
 };
 
 export type AvTimelineEvent = { t: number; text: string };
