@@ -51,7 +51,7 @@ const tools = [
 function Home() {
   // Locked until the installed setup (with an active license) is
   // running: the public demo and plain run.bat both show the lock.
-  const { unlocked } = useApp();
+  const { unlocked, installed } = useApp();
   const locked = !unlocked;
   return (
     <div>
@@ -65,8 +65,17 @@ function Home() {
       {locked && (
         <div className="glass mx-auto mb-8 max-w-2xl p-6 text-center">
           <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
-          <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 17 tools.</p>
-          <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
+          {installed ? (
+            <>
+              <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all 17 tools.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Click <b>Activate</b> at the top right and enter your license key.</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 17 tools.</p>
+              <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
+            </>
+          )}
         </div>
       )}
       <div className="grid gap-6 md:grid-cols-3">
@@ -81,7 +90,7 @@ function Home() {
             <div className="p-6">
               <h2 className="text-2xl font-bold">{t.title}</h2>
               <p className="mt-2 text-muted-foreground">{t.desc}</p>
-              <span className="btn btn-primary mt-6 w-full">{locked ? "🔒 Locked — Install Setup" : `${t.cta} →`}</span>
+              <span className="btn btn-primary mt-6 w-full">{locked ? (installed ? "🔒 Locked — Activate license" : "🔒 Locked — Install Setup") : `${t.cta} →`}</span>
             </div>
           </Link>
         ))}
