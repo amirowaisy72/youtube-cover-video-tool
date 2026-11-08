@@ -2378,6 +2378,13 @@ def license_status() -> dict:
     all — the frontend locks the tools unless installed+activated.
     """
     installed = bool(getattr(sys, "frozen", False))
+    # Dev unlock (owner only, 2026-11-09): a local `.dev-unlock` file
+    # at the project root lets run.bat unlock for testing new
+    # features without building the .exe each time. The file is
+    # gitignored and never shipped in the installer, so customers
+    # never get it — only the owner's dev PC has it.
+    if not installed and (BASE_DIR / ".dev-unlock").exists():
+        installed = True
     try:
         data = licensing.balance()
     except licensing.LicenseError as exc:
