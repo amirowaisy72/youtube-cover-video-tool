@@ -857,9 +857,13 @@ def _valid_image(path: Path) -> bool:
     """True only for a complete, decodable image. Pollinations
     sometimes closes a connection early (urllib IncompleteRead),
     leaving a truncated file — that must be retried, never used,
-    or the video would show a broken frame."""
+    or the video would show a broken frame. The PIL open+load
+    below is the real check (it raises on truncated files); the
+    size floor is only 100 bytes to catch empty files. (Was
+    1000 bytes — that wrongly rejected small-but-valid user
+    uploads, e.g. a simple 777-byte PNG, user 2026-11-09.)"""
     try:
-        if not path.exists() or path.stat().st_size < 1000:
+        if not path.exists() or path.stat().st_size < 100:
             return False
         from PIL import Image
         with Image.open(path) as image:

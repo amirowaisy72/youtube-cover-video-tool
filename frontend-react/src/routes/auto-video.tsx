@@ -303,11 +303,10 @@ function AutoVideo() {
       const j = await autovideoJob(job.id);
       setJob(j);
       setBrowserUploadFile(null);
+      // The browser video remounts via its key (scene + version)
+      // with a cache-busted URL, so it loads the re-rendered
+      // file fresh and seeks to this scene — no manual load().
       setVideoVersion((v) => v + 1);
-      // Stay in the browser on the same scene — the preview
-      // re-loads the re-rendered video at this scene's start.
-      const v = browserVideoRef.current;
-      if (v) v.load();
     } catch (e) {
       setBrowserError(e instanceof ApiError ? e.message : "Upload failed.");
     } finally {
@@ -321,12 +320,11 @@ function AutoVideo() {
     try {
       await autovideoSceneVisual(job.id, browserIdx, url, kind);
       // Refresh the job (new scene kind/source) and stay in the
-      // browser on the same scene to see the result.
+      // browser on the same scene to see the result. The video
+      // remounts via its key with a fresh URL (see above).
       const j = await autovideoJob(job.id);
       setJob(j);
       setVideoVersion((v) => v + 1);
-      const v = browserVideoRef.current;
-      if (v) v.load();
     } catch (e) {
       setBrowserError(e instanceof ApiError ? e.message : "Scene change failed.");
     } finally {
@@ -1082,7 +1080,7 @@ function AutoVideo() {
               {/* Current footage: the finished video, seeked to
                   this scene's start. */}
               {job.download_url ? (
-                <video ref={browserVideoRef} src={job.download_url} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onLoadedMetadata={() => { const v = browserVideoRef.current; if (v) v.currentTime = sceneStart(browserIdx); }} />
+                <video key={`${browserIdx}-${videoVersion}`} ref={browserVideoRef} src={`${job.download_url}${job.download_url.includes("?") ? "&" : "?"}v=${videoVersion}`} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onLoadedMetadata={() => { const v = browserVideoRef.current; if (v) v.currentTime = sceneStart(browserIdx); }} />
               ) : (
                 <div className="aspect-video w-full rounded-xl bg-black" />
               )}
