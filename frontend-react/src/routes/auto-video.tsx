@@ -1271,195 +1271,195 @@ function AutoVideo() {
           </div>
           <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} />
         </div>
-        {/* QUICK FOOTAGE BROWSER (user, 2026-11-09): one scene
-            at a time — ◀ ▶ arrows (or keyboard Left/Right) flip
-            scenes, the preview seeks to that scene, and the
-            alternatives below are for THIS scene. Change it
-            right here, then flip to the next. */}
-        {browserIdx !== null && job?.scenes?.[browserIdx] && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>
-            <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold">Scene {browserIdx + 1} of {browserTotal}</p>
-                <div className="flex items-center gap-2">
-                  <button className="btn btn-ghost btn-sm" disabled={browserIdx <= 0} onClick={() => browserNav(-1)}>◀ Prev</button>
-                  <button className="btn btn-ghost btn-sm" disabled={browserIdx >= browserTotal - 1} onClick={() => browserNav(1)}>Next ▶</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>✕ Close</button>
-                </div>
-              </div>
-              {/* Current footage: the finished video, seeked to
-                  this scene's start — or, in the Footage step
-                  (no video yet), the scene's own footage file. */}
-              {job.download_url ? (
-                <video key={`${browserIdx}-${videoVersion}`} ref={browserVideoRef} src={`${job.download_url}${job.download_url.includes("?") ? "&" : "?"}v=${videoVersion}`} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onLoadedMetadata={() => { const v = browserVideoRef.current; if (v) v.currentTime = sceneStart(browserIdx); }} />
-              ) : job.scenes[browserIdx].visual_file ? (
-                job.scenes[browserIdx].kind === "clip" ? (
-                  <video key={`${browserIdx}-${videoVersion}`} src={autovideoSceneFileUrl(job.id, job.scenes[browserIdx].visual_file as string)} controls loop preload="metadata" className="aspect-video w-full rounded-xl bg-black" />
-                ) : (
-                  <img src={autovideoSceneFileUrl(job.id, job.scenes[browserIdx].visual_file as string)} alt="" className="aspect-video w-full rounded-xl bg-black object-cover" />
-                )
-              ) : (
-                <div className="aspect-video w-full rounded-xl bg-black" />
-              )}
-              <p className="mt-3 text-sm">{job.scenes[browserIdx].caption || job.scenes[browserIdx].narration || ""}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {job.scenes[browserIdx].kind || "?"} · {job.scenes[browserIdx].visual_source || "?"} · {job.scenes[browserIdx].duration_sec || "?"}s · starts at {Math.round(sceneStart(browserIdx))}s
-              </p>
-              {/* Duplicate footage (user, 2026-11-09): scenes
-                  sharing the same visual_source (same file,
-                  same AI prompt, or same title card) are the
-                  "same footage". Show how many, and let him
-                  jump to each one to fix them quickly. */}
-              {(() => {
-                const key = (job.scenes[browserIdx].visual_source || "").trim();
-                if (!key) return null;
-                const same = (job.scenes || [])
-                  .map((s, i) => ({ s, i }))
-                  .filter(({ s }) => (s.visual_source || "").trim() === key)
-                  .map(({ i }) => i);
-                if (same.length < 2) return null;
-                return (
-                  <p className="mt-2 text-sm text-amber-400">
-                    ⚠️ Same footage in {same.length} scenes:{" "}
-                    {same.map((i) => (
-                      <button key={i} className={`mx-0.5 rounded px-1.5 py-0.5 text-xs font-semibold ${i === browserIdx ? "bg-amber-400 text-black" : "bg-amber-400/20 text-amber-300 hover:bg-amber-400/40"}`} onClick={() => { setBrowserIdx(i); void loadBrowserAlts(i); }}>
-                        #{i + 1}
-                      </button>
-                    ))}
-                  </p>
-                );
-              })()}
-              {browserLoading && <p className="mt-3 text-sm text-muted-foreground">Loading alternatives…</p>}
-              {browserError && <p className="mt-3 text-sm text-destructive">{browserError}</p>}
-              {browserApplying && <p className="mt-3 text-sm text-muted-foreground">Re-rendering the video with the new visual…</p>}
-              {/* Word suggestions (user, 2026-11-09): the scene's
-                  main words, one by one — click a word to search
-                  just that word (one word, or at most two words,
-                  finds the good results; a whole sentence finds
-                  nothing). */}
-              {(() => {
-                const scene = job.scenes[browserIdx];
-                const keywords = scene.keywords && scene.keywords.length > 0
-                  ? scene.keywords
-                  : (scene.narration || "").split(/[^A-Za-z]+/).filter((w) => w.length > 3).slice(0, 8);
-                if (keywords.length === 0) return null;
-                return (
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold">Search by word:</span>
-                    {keywords.map((w) => (
-                      <button key={w} className="chip hover:border-primary" disabled={browserLoading} onClick={() => void loadBrowserAlts(browserIdx, w)}>
-                        {w}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-              <div className="mb-3 mt-4 flex flex-wrap items-center gap-2">
-                <input className="field min-w-0 flex-1" value={browserQuery} onChange={(e) => setBrowserQuery(e.target.value)} placeholder="Search query for this scene (1–2 words work best)…" />
-                <button className="btn btn-primary btn-sm" disabled={browserLoading || !browserQuery.trim()} onClick={() => void loadBrowserAlts(browserIdx, browserQuery)}>🔍 Search</button>
-                <button className="btn btn-ghost btn-sm" title="Copy a prompt to generate this scene's footage with an AI tool, then upload it below" onClick={() => void copyBrowserPrompt()}>✨ Prompt for AI</button>
-              </div>
-              {browserCopied && <p className="mb-3 text-sm text-emerald-400">{browserCopied}</p>}
-              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
-                <p className="text-sm font-semibold">Or upload your own:</p>
-                <input type="file" accept="video/*,image/*" className="text-sm" onChange={(e) => setBrowserUploadFile(e.target.files?.[0] || null)} />
-                <button className="btn btn-primary btn-sm" disabled={browserApplying || !browserUploadFile} onClick={() => void uploadBrowserVisual()}>
-                  {browserApplying ? "Applying…" : "Upload & use"}
-                </button>
-                {browserUploadFile && <span className="text-xs text-muted-foreground">{browserUploadFile.name}</span>}
-              </div>
-              {browserAlts && (
-                <>
-                  {/* Media type (user, 2026-11-09): choose video
-                      footage or image footage for this scene. */}
-                  <div className="mb-3 flex gap-2">
-                    {(["both", "clip", "image"] as const).map((m) => (
-                      <button key={m} className={`btn btn-sm ${browserMedia === m ? "btn-primary" : "btn-ghost"}`} onClick={() => { setBrowserMedia(m); setBrowserShown(5); }}>
-                        {m === "both" ? "🎬🖼️ Both" : m === "clip" ? "🎬 Videos" : "🖼️ Images"}
-                      </button>
-                    ))}
-                  </div>
-                  {(() => {
-                    const items = [
-                      ...(browserMedia !== "image" ? browserAlts.clips.map((c) => ({ ...c, kind: "clip" as const })) : []),
-                      ...(browserMedia !== "clip" ? browserAlts.images.map((im) => ({ ...im, kind: "image" as const })) : []),
-                    ];
-                    if (items.length === 0) {
-                      return <p className="text-sm text-muted-foreground">No alternatives found for this scene. Try a different word above, or generate the footage with AI (✨ Prompt for AI) and upload it.</p>;
-                    }
-                    const shown = items.slice(0, browserShown);
-                    return (
-                      <>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                          {shown.map((item, i) => (
-                            <button
-                              key={`${item.kind}${i}`}
-                              className="overflow-hidden rounded-xl border border-border text-left hover:border-primary"
-                              disabled={browserApplying}
-                              title="Click to preview big, then use it"
-                              onClick={() => setLightbox({
-                                kind: item.kind,
-                                src: item.kind === "clip" ? item.url : (item.thumb || item.url),
-                                title: item.title || item.source,
-                                onUse: () => void applyBrowserVisual(item.url, item.kind),
-                              })}
-                            >
-                              {item.kind === "clip" ? (
-                                item.thumb ? (
-                                  <img src={item.thumb} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                                ) : (
-                                  <video src={item.url} muted preload="metadata" className="aspect-video w-full object-cover" />
-                                )
-                              ) : (
-                                <img src={item.thumb || item.url} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                              )}
-                              <p className="truncate px-2 py-1 text-xs text-muted-foreground">{item.kind === "clip" ? "🎬 " : "🖼️ "}{item.title || item.source}</p>
-                            </button>
-                          ))}
-                        </div>
-                        {browserShown < items.length && (
-                          <button className="btn btn-ghost mt-3" onClick={() => setBrowserShown((n) => n + 5)}>
-                            Load more ({items.length - browserShown} left)
-                          </button>
-                        )}
-                      </>
-                    );
-                  })()}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        {/* Lightbox (user, 2026-11-09): click any image/video to
-            see it BIG; videos play. "Use this footage" applies
-            it (search results); a plain preview has no button. */}
-        {lightbox && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
-            <div className="w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
-              {lightbox.kind === "clip" ? (
-                <video src={lightbox.src} controls autoPlay loop className="aspect-video w-full rounded-xl bg-black" />
-              ) : (
-                <img src={lightbox.src} alt="" className="max-h-[75vh] w-full rounded-xl bg-black object-contain" />
-              )}
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{lightbox.title}</p>
-                <div className="flex gap-2">
-                  {lightbox.onUse && (
-                    <button
-                      className="btn btn-primary btn-sm"
-                      disabled={browserApplying}
-                      onClick={() => { const f = lightbox.onUse; setLightbox(null); if (f) void f(); }}
-                    >
-                      {browserApplying ? "Applying…" : "✓ Use this footage"}
-                    </button>
-                  )}
-                  <button className="btn btn-ghost btn-sm" onClick={() => setLightbox(null)}>✕ Close</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         </>
+      )}
+      {/* QUICK FOOTAGE BROWSER (user, 2026-11-09): one scene
+          at a time — ◀ ▶ arrows (or keyboard Left/Right) flip
+          scenes, the preview seeks to that scene, and the
+          alternatives below are for THIS scene. Change it
+          right here, then flip to the next. */}
+      {browserIdx !== null && job?.scenes?.[browserIdx] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold">Scene {browserIdx + 1} of {browserTotal}</p>
+              <div className="flex items-center gap-2">
+                <button className="btn btn-ghost btn-sm" disabled={browserIdx <= 0} onClick={() => browserNav(-1)}>◀ Prev</button>
+                <button className="btn btn-ghost btn-sm" disabled={browserIdx >= browserTotal - 1} onClick={() => browserNav(1)}>Next ▶</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setBrowserIdx(null); setBrowserAlts(null); setBrowserError(""); }}>✕ Close</button>
+              </div>
+            </div>
+            {/* Current footage: the finished video, seeked to
+                this scene's start — or, in the Footage step
+                (no video yet), the scene's own footage file. */}
+            {job.download_url ? (
+              <video key={`${browserIdx}-${videoVersion}`} ref={browserVideoRef} src={`${job.download_url}${job.download_url.includes("?") ? "&" : "?"}v=${videoVersion}`} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onLoadedMetadata={() => { const v = browserVideoRef.current; if (v) v.currentTime = sceneStart(browserIdx); }} />
+            ) : job.scenes[browserIdx].visual_file ? (
+              job.scenes[browserIdx].kind === "clip" ? (
+                <video key={`${browserIdx}-${videoVersion}`} src={autovideoSceneFileUrl(job.id, job.scenes[browserIdx].visual_file as string)} controls loop preload="metadata" className="aspect-video w-full rounded-xl bg-black" />
+              ) : (
+                <img src={autovideoSceneFileUrl(job.id, job.scenes[browserIdx].visual_file as string)} alt="" className="aspect-video w-full rounded-xl bg-black object-cover" />
+              )
+            ) : (
+              <div className="aspect-video w-full rounded-xl bg-black" />
+            )}
+            <p className="mt-3 text-sm">{job.scenes[browserIdx].caption || job.scenes[browserIdx].narration || ""}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {job.scenes[browserIdx].kind || "?"} · {job.scenes[browserIdx].visual_source || "?"} · {job.scenes[browserIdx].duration_sec || "?"}s · starts at {Math.round(sceneStart(browserIdx))}s
+            </p>
+            {/* Duplicate footage (user, 2026-11-09): scenes
+                sharing the same visual_source (same file,
+                same AI prompt, or same title card) are the
+                "same footage". Show how many, and let him
+                jump to each one to fix them quickly. */}
+            {(() => {
+              const key = (job.scenes[browserIdx].visual_source || "").trim();
+              if (!key) return null;
+              const same = (job.scenes || [])
+                .map((s, i) => ({ s, i }))
+                .filter(({ s }) => (s.visual_source || "").trim() === key)
+                .map(({ i }) => i);
+              if (same.length < 2) return null;
+              return (
+                <p className="mt-2 text-sm text-amber-400">
+                  ⚠️ Same footage in {same.length} scenes:{" "}
+                  {same.map((i) => (
+                    <button key={i} className={`mx-0.5 rounded px-1.5 py-0.5 text-xs font-semibold ${i === browserIdx ? "bg-amber-400 text-black" : "bg-amber-400/20 text-amber-300 hover:bg-amber-400/40"}`} onClick={() => { setBrowserIdx(i); void loadBrowserAlts(i); }}>
+                      #{i + 1}
+                    </button>
+                  ))}
+                </p>
+              );
+            })()}
+            {browserLoading && <p className="mt-3 text-sm text-muted-foreground">Loading alternatives…</p>}
+            {browserError && <p className="mt-3 text-sm text-destructive">{browserError}</p>}
+            {browserApplying && <p className="mt-3 text-sm text-muted-foreground">Re-rendering the video with the new visual…</p>}
+            {/* Word suggestions (user, 2026-11-09): the scene's
+                main words, one by one — click a word to search
+                just that word (one word, or at most two words,
+                finds the good results; a whole sentence finds
+                nothing). */}
+            {(() => {
+              const scene = job.scenes[browserIdx];
+              const keywords = scene.keywords && scene.keywords.length > 0
+                ? scene.keywords
+                : (scene.narration || "").split(/[^A-Za-z]+/).filter((w) => w.length > 3).slice(0, 8);
+              if (keywords.length === 0) return null;
+              return (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold">Search by word:</span>
+                  {keywords.map((w) => (
+                    <button key={w} className="chip hover:border-primary" disabled={browserLoading} onClick={() => void loadBrowserAlts(browserIdx, w)}>
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="mb-3 mt-4 flex flex-wrap items-center gap-2">
+              <input className="field min-w-0 flex-1" value={browserQuery} onChange={(e) => setBrowserQuery(e.target.value)} placeholder="Search query for this scene (1–2 words work best)…" />
+              <button className="btn btn-primary btn-sm" disabled={browserLoading || !browserQuery.trim()} onClick={() => void loadBrowserAlts(browserIdx, browserQuery)}>🔍 Search</button>
+              <button className="btn btn-ghost btn-sm" title="Copy a prompt to generate this scene's footage with an AI tool, then upload it below" onClick={() => void copyBrowserPrompt()}>✨ Prompt for AI</button>
+            </div>
+            {browserCopied && <p className="mb-3 text-sm text-emerald-400">{browserCopied}</p>}
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
+              <p className="text-sm font-semibold">Or upload your own:</p>
+              <input type="file" accept="video/*,image/*" className="text-sm" onChange={(e) => setBrowserUploadFile(e.target.files?.[0] || null)} />
+              <button className="btn btn-primary btn-sm" disabled={browserApplying || !browserUploadFile} onClick={() => void uploadBrowserVisual()}>
+                {browserApplying ? "Applying…" : "Upload & use"}
+              </button>
+              {browserUploadFile && <span className="text-xs text-muted-foreground">{browserUploadFile.name}</span>}
+            </div>
+            {browserAlts && (
+              <>
+                {/* Media type (user, 2026-11-09): choose video
+                    footage or image footage for this scene. */}
+                <div className="mb-3 flex gap-2">
+                  {(["both", "clip", "image"] as const).map((m) => (
+                    <button key={m} className={`btn btn-sm ${browserMedia === m ? "btn-primary" : "btn-ghost"}`} onClick={() => { setBrowserMedia(m); setBrowserShown(5); }}>
+                      {m === "both" ? "🎬🖼️ Both" : m === "clip" ? "🎬 Videos" : "🖼️ Images"}
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  const items = [
+                    ...(browserMedia !== "image" ? browserAlts.clips.map((c) => ({ ...c, kind: "clip" as const })) : []),
+                    ...(browserMedia !== "clip" ? browserAlts.images.map((im) => ({ ...im, kind: "image" as const })) : []),
+                  ];
+                  if (items.length === 0) {
+                    return <p className="text-sm text-muted-foreground">No alternatives found for this scene. Try a different word above, or generate the footage with AI (✨ Prompt for AI) and upload it.</p>;
+                  }
+                  const shown = items.slice(0, browserShown);
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {shown.map((item, i) => (
+                          <button
+                            key={`${item.kind}${i}`}
+                            className="overflow-hidden rounded-xl border border-border text-left hover:border-primary"
+                            disabled={browserApplying}
+                            title="Click to preview big, then use it"
+                            onClick={() => setLightbox({
+                              kind: item.kind,
+                              src: item.kind === "clip" ? item.url : (item.thumb || item.url),
+                              title: item.title || item.source,
+                              onUse: () => void applyBrowserVisual(item.url, item.kind),
+                            })}
+                          >
+                            {item.kind === "clip" ? (
+                              item.thumb ? (
+                                <img src={item.thumb} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+                              ) : (
+                                <video src={item.url} muted preload="metadata" className="aspect-video w-full object-cover" />
+                              )
+                            ) : (
+                              <img src={item.thumb || item.url} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+                            )}
+                            <p className="truncate px-2 py-1 text-xs text-muted-foreground">{item.kind === "clip" ? "🎬 " : "🖼️ "}{item.title || item.source}</p>
+                          </button>
+                        ))}
+                      </div>
+                      {browserShown < items.length && (
+                        <button className="btn btn-ghost mt-3" onClick={() => setBrowserShown((n) => n + 5)}>
+                          Load more ({items.length - browserShown} left)
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Lightbox (user, 2026-11-09): click any image/video to
+          see it BIG; videos play. "Use this footage" applies
+          it (search results); a plain preview has no button. */}
+      {lightbox && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
+          <div className="w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+            {lightbox.kind === "clip" ? (
+              <video src={lightbox.src} controls autoPlay loop className="aspect-video w-full rounded-xl bg-black" />
+            ) : (
+              <img src={lightbox.src} alt="" className="max-h-[75vh] w-full rounded-xl bg-black object-contain" />
+            )}
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{lightbox.title}</p>
+              <div className="flex gap-2">
+                {lightbox.onUse && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={browserApplying}
+                    onClick={() => { const f = lightbox.onUse; setLightbox(null); if (f) void f(); }}
+                  >
+                    {browserApplying ? "Applying…" : "✓ Use this footage"}
+                  </button>
+                )}
+                <button className="btn btn-ghost btn-sm" onClick={() => setLightbox(null)}>✕ Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
