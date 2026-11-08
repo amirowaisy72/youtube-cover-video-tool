@@ -124,51 +124,58 @@ export function TopBar() {
             here are gone. Every tool, including Presets, is reached
             from Home, and each page has a ← Home button. */}
         <div className="ml-auto flex items-center gap-3">
-          {ytConnected === true ? (
-            <div className="relative">
-              <button
-                className="chip"
-                onClick={() => {
-                  // Refresh the list every time the menu opens, so a
-                  // channel connected a moment ago shows up here.
-                  if (!ytMenuOpen) void refreshYt();
-                  setYtMenuOpen((v) => !v);
-                }}
-                title="Switch YouTube channel — click to see all your channels or add another"
-              >
-                <span className="text-red-500">▶</span>
-                {activeChannelTitle ? ` ${activeChannelTitle}` : " YouTube"} ▾
-              </button>
-              {ytMenuOpen && (
-                <div className="glass absolute right-0 mt-3 w-72 p-3 shadow-2xl">
-                  <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your channels</p>
-                  {ytChannels.map((c) => (
+          <div className="relative">
+            {ytConnected === true ? (
+              <>
+                <button
+                  className="chip"
+                  onClick={() => {
+                    // Refresh the list every time the menu opens, so a
+                    // channel connected a moment ago shows up here.
+                    if (!ytMenuOpen) void refreshYt();
+                    setYtMenuOpen((v) => !v);
+                  }}
+                  title="Switch YouTube channel — click to see all your channels or add another"
+                >
+                  <span className="text-red-500">▶</span>
+                  {activeChannelTitle ? ` ${activeChannelTitle}` : " YouTube"} ▾
+                </button>
+                {ytMenuOpen && (
+                  <div className="glass absolute right-0 mt-3 w-72 p-3 shadow-2xl">
+                    <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your channels</p>
+                    {ytChannels.map((c) => (
+                      <button
+                        key={c.id}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-primary/10"
+                        onClick={() => { setActiveChannelId(c.id); setYtMenuOpen(false); }}
+                      >
+                        <span className="text-red-500">▶</span>
+                        <span className="flex-1 truncate font-medium">{c.title}</span>
+                        {c.id === activeChannelId && <span className="text-primary">✓</span>}
+                      </button>
+                    ))}
                     <button
-                      key={c.id}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-primary/10"
-                      onClick={() => { setActiveChannelId(c.id); setYtMenuOpen(false); }}
+                      className="btn btn-ghost mt-2 w-full"
+                      disabled={ytBusy}
+                      onClick={() => void connectYt()}
                     >
-                      <span className="text-red-500">▶</span>
-                      <span className="flex-1 truncate font-medium">{c.title}</span>
-                      {c.id === activeChannelId && <span className="text-primary">✓</span>}
+                      {ytBusy ? "Waiting for Google sign-in…" : "＋ Connect another channel"}
                     </button>
-                  ))}
-                  <button
-                    className="btn btn-ghost mt-2 w-full"
-                    disabled={ytBusy}
-                    onClick={() => void connectYt()}
-                  >
-                    {ytBusy ? "Waiting for Google sign-in…" : "＋ Connect another channel"}
-                  </button>
-                  {ytError && <p className="mt-2 text-xs text-destructive">{ytError}</p>}
-                  <p className="mt-2 px-2 text-xs text-muted-foreground">
-                    Uploads and channel tools use the selected channel.
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : ytConnected === false ? (
-            <div className="relative">
+                    <button
+                      className="btn btn-ghost mt-2 w-full"
+                      onClick={() => { setYtMenuOpen(false); setYtError(""); setYtSetupMsg(""); setYtSetupOpen(true); }}
+                      title="Re-enter your Google OAuth Client ID and Secret — use this when sign-in fails with invalid_client"
+                    >
+                      ⚙️ Update YouTube credentials
+                    </button>
+                    {ytError && <p className="mt-2 text-xs text-destructive">{ytError}</p>}
+                    <p className="mt-2 px-2 text-xs text-muted-foreground">
+                      Uploads and channel tools use the selected channel.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : ytConnected === false ? (
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={ytBusy}
@@ -183,6 +190,7 @@ export function TopBar() {
               >
                 {ytBusy ? "Waiting for Google sign-in…" : "🔗 Connect YouTube"}
               </button>
+            ) : null}
               {ytSetupOpen && (
                 <div className="glass absolute right-0 mt-3 w-80 p-5 shadow-2xl">
                   <h4 className="font-semibold">Connect YouTube</h4>
@@ -220,8 +228,7 @@ export function TopBar() {
                   </p>
                 </div>
               )}
-            </div>
-          ) : null}
+          </div>
           {!installed && (
             <a className="btn btn-sm btn-primary" href={SETUP_DOWNLOAD_URL} title="Download the Windows setup — installing it unlocks all tools">⬇ Install Setup</a>
           )}
