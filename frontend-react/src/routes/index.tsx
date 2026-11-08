@@ -51,7 +51,9 @@ const tools = [
 function Home() {
   // Locked until the installed setup (with an active license) is
   // running: the public demo and plain run.bat both show the lock.
-  const { unlocked, installed } = useApp();
+  // Until the first license check lands, show a loader — not the
+  // lock — so an installed user is never told to install again.
+  const { unlocked, installed, licenseChecked } = useApp();
   const locked = !unlocked;
   return (
     <div>
@@ -62,6 +64,13 @@ function Home() {
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">Pick a tool below. Each one walks you through, one simple step at a time.</p>
       </section>
+      {!licenseChecked ? (
+        <div className="glass mx-auto mb-8 max-w-2xl p-10 text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+          <p className="mt-4 text-muted-foreground">Checking your setup…</p>
+        </div>
+      ) : (
+        <>
       {locked && (
         <div className="glass mx-auto mb-8 max-w-2xl p-6 text-center">
           <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
@@ -95,6 +104,8 @@ function Home() {
           </Link>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }
