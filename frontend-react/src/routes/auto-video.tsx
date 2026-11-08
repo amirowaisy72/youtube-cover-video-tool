@@ -303,6 +303,7 @@ function AutoVideo() {
       const j = await autovideoJob(job.id);
       setJob(j);
       setBrowserUploadFile(null);
+      setVideoVersion((v) => v + 1);
       // Stay in the browser on the same scene — the preview
       // re-loads the re-rendered video at this scene's start.
       const v = browserVideoRef.current;
@@ -323,6 +324,7 @@ function AutoVideo() {
       // browser on the same scene to see the result.
       const j = await autovideoJob(job.id);
       setJob(j);
+      setVideoVersion((v) => v + 1);
       const v = browserVideoRef.current;
       if (v) v.load();
     } catch (e) {
@@ -339,7 +341,16 @@ function AutoVideo() {
   const [musicError, setMusicError] = useState("");
   const [musicVolume, setMusicVolume] = useState(20);
   const [musicApplying, setMusicApplying] = useState(false);
+  // Which track is being applied (user, 2026-11-09): only THAT
+  // track's button may say "Applying…" — the old shared boolean
+  // made EVERY track's button say it at once.
+  const [applyingMusicId, setApplyingMusicId] = useState<string | null>(null);
   const [musicApplied, setMusicApplied] = useState("");
+  // Video reload key (user, 2026-11-09): after a music change
+  // the video would not load at all — the <video> kept the same
+  // src so it never refetched the rewritten final.mp4. Bumping
+  // this remounts the player with a cache-busted URL.
+  const [videoVersion, setVideoVersion] = useState(0);
   const loadMusic = async () => {
     if (!job) return;
     setMusicLoading(true);
@@ -358,6 +369,7 @@ function AutoVideo() {
   const applyMusic = async (previewUrl: string, name: string) => {
     if (!job || musicApplying) return;
     setMusicApplying(true);
+    setApplyingMusicId(previewUrl);
     setMusicError("");
     setMusicApplied("");
     try {
@@ -365,10 +377,15 @@ function AutoVideo() {
       setMusicApplied(`✓ Music changed to "${res.music}" at ${Math.round(res.volume * 100)}% volume.`);
       const j = await autovideoJob(job.id);
       setJob(j);
+      // Reload the player with the re-mixed video (see
+      // videoVersion above — without this the player keeps the
+      // stale file and shows a blank 0:00).
+      setVideoVersion((v) => v + 1);
     } catch (e) {
       setMusicError(e instanceof ApiError ? e.message : "Music change failed.");
     } finally {
       setMusicApplying(false);
+      setApplyingMusicId(null);
     }
   };
   // Volume only (user, 2026-11-09): the slider alone did
@@ -377,6 +394,7 @@ function AutoVideo() {
   const applyVolume = async () => {
     if (!job || musicApplying) return;
     setMusicApplying(true);
+    setApplyingMusicId("volume");
     setMusicError("");
     setMusicApplied("");
     try {
@@ -384,10 +402,12 @@ function AutoVideo() {
       setMusicApplied(`✓ Volume set to ${Math.round(res.volume * 100)}% on the current music.`);
       const j = await autovideoJob(job.id);
       setJob(j);
+      setVideoVersion((v) => v + 1);
     } catch (e) {
       setMusicError(e instanceof ApiError ? e.message : "Volume change failed.");
     } finally {
       setMusicApplying(false);
+      setApplyingMusicId(null);
     }
   };
   const descPrompt = `Write a YouTube video description for a video titled "${(upTitle || title).trim() || "my video"}"${activeChannelTitle ? ` on the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. 2-3 short paragraphs: what the video covers, why it matters, and a call to subscribe. Friendly, clear tone. End with 3-5 relevant hashtags on their own line.`;
@@ -756,7 +776,7 @@ function AutoVideo() {
             <span className="chip mb-3 text-success">✓ Your video is ready</span>
             <h3 className="mb-4 text-2xl font-bold">{job.title || title}</h3>
             {job.download_url ? (
-              <video ref={videoRef} src={job.download_url} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onTimeUpdate={syncSceneFromVideo} onSeeked={syncSceneFromVideo} onLoadedMetadata={syncSceneFromVideo} />
+              <video key={videoVersion} ref={videoRef} src={`${job.download_url}${job.download_url.includes("?") ? "&" : "?"}v=${videoVersion}`} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black" onTimeUpdate={syncSceneFromVideo} onSeeked={syncSceneFromVideo} onLoadedMetadata={syncSceneFromVideo} />
             ) : (
               <div className="relative aspect-video overflow-hidden rounded-xl">
                 <img src={imgs[0]} alt="" className="h-full w-full object-cover" />
@@ -796,9 +816,19 @@ function AutoVideo() {
                   <span className="w-10 text-right font-semibold">{musicVolume}%</span>
                 </label>
                 <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyVolume()}>
-                  {musicApplying ? "Applying…" : "Apply volume"}
+                  {applyingMusicId === "volume" ? "Applying…" : "Apply volume"}
                 </button>
               </div>
+              {/* Progress bar while a music re-mix runs (user,
+                  2026-11-09): the remix takes a few seconds with
+                  no percentage from the backend, so an animated
+                  indeterminate bar shows it is working. */}
+              {musicApplying && (
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full w-1/3 rounded-full bg-primary" style={{ animation: "music-progress 1.2s ease-in-out infinite" }} />
+                  <style>{`@keyframes music-progress { 0% { margin-left: 0; } 50% { margin-left: 66%; } 100% { margin-left: 0; } }`}</style>
+                </div>
+              )}
               {musicError && <p className="mt-3 text-sm text-destructive">{musicError}</p>}
               {musicApplied && <p className="mt-3 text-sm text-success">{musicApplied}</p>}
               {musicOpts && musicOpts.options.length > 0 && (
@@ -811,7 +841,7 @@ function AutoVideo() {
                       </div>
                       <audio src={o.preview_url} controls preload="none" className="h-8 w-56 max-w-full" />
                       <button className="btn btn-primary btn-sm" disabled={musicApplying} onClick={() => void applyMusic(o.preview_url, o.name)}>
-                        {musicApplying ? "Applying…" : "Use this"}
+                        {applyingMusicId === o.preview_url ? "Applying…" : "Use this"}
                       </button>
                     </div>
                   ))}
