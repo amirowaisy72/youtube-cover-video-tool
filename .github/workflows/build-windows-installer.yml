@@ -38,7 +38,7 @@ on:
 permissions:
   contents: write
   
-  jobs:
+jobs:
   build:
     runs-on: windows-latest
     steps:
