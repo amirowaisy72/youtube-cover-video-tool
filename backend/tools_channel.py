@@ -452,3 +452,106 @@ def apply_to_channel(payload: ApplyRequest) -> dict:
         "errors": errors,
         "scope_note": scope_note,
     }
+
+
+@router.get("/inspect")
+def inspect_channel(channel_id: str = "") -> dict:
+    """Read an existing connected channel's current details, for the
+    Channel Inspector tool (Tool 18). Returns everything the audit
+    needs: name, handle, description, keywords, banner/profile-pic
+    URLs, and public stats. Read-only — nothing is changed here;
+    fixes go through the existing /apply endpoint (description,
+    keywords, banner) or YouTube Studio (name, logo, handle).
+    """
+    youtube_upload = _youtube_helpers()
+    status = youtube_upload.youtube_status()
+    if not status.get("connected"):
+        raise HTTPException(
+            status_code=400,
+            detail="No YouTube account is connected yet. Connect YouTube first, then inspect.",
+        )
+    channels = youtube_upload.list_channels()
+    cid = (channel_id or "").strip()
+    token_file = None
+    if cid:
+        if not any(c.get("id") == cid for c in channels):
+            raise HTTPException(status_code=400, detail="That channel is not connected yet.")
+        token_file = youtube_upload.token_path_for_channel(cid)
+    else:
+        if channels:
+            cid = channels[0].get("id", "")
+            token_file = youtube_upload.token_path_for_channel(cid)
+        else:
+            token_file = youtube_upload.token_path()
+    if not token_file or not token_file.exists():
+        raise HTTPException(status_code=400, detail="No saved YouTube sign-in found for that channel.")
+
+    try:
+        youtube_upload.ensure_google_libraries()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+
+    try:
+        creds = Credentials.from_authorized_user_file(str(token_file))
+        youtube = build("youtube", "v3", credentials=creds)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Could not load the saved YouTube sign-in: {exc}")
+
+    if not cid:
+        try:
+            mine = youtube.channels().list(part="id", mine=True).execute()
+            items = mine.get("items") or []
+            cid = items[0].get("id", "") if items else ""
+        except Exception:
+            cid = ""
+    if not cid:
+        raise HTTPException(status_code=400, detail="Could not identify the connected channel.")
+
+    try:
+        resp = youtube.channels().list(
+            part="snippet,brandingSettings,statistics", id=cid
+        ).execute()
+    except HttpError as exc:
+        reason = ""
+        try:
+            reason = json.loads(exc.content.decode("utf-8", "ignore")).get("error", {}).get("message", "")
+        except Exception:
+            reason = str(exc)
+        raise HTTPException(status_code=503, detail=f"YouTube said: {reason or exc}")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    items = (resp or {}).get("items") or []
+    if not items:
+        raise HTTPException(status_code=404, detail="YouTube returned no channel for that id.")
+    ch = items[0]
+    snippet = ch.get("snippet") or {}
+    branding = ch.get("brandingSettings") or {}
+    image = branding.get("image") or {}
+    stats = ch.get("statistics") or {}
+    thumbs = snippet.get("thumbnails") or {}
+    # Profile pic: prefer the largest thumbnail YouTube returns.
+    pic_url = ""
+    for key in ("high", "medium", "default"):
+        if isinstance(thumbs.get(key), dict) and thumbs[key].get("url"):
+            pic_url = thumbs[key]["url"]
+            break
+    keywords = (branding.get("channel") or {}).get("keywords", "") or ""
+    return {
+        "id": ch.get("id", ""),
+        "title": snippet.get("title", ""),
+        "handle": snippet.get("customUrl", ""),
+        "description": (branding.get("channel") or {}).get("description", "") or "",
+        "keywords": keywords,
+        "profile_pic_url": pic_url,
+        "banner_url": image.get("bannerExternalUrl", "") or "",
+        "published_at": snippet.get("publishedAt", ""),
+        "country": snippet.get("country", ""),
+        "subscriber_count": stats.get("subscriberCount"),
+        "video_count": stats.get("videoCount"),
+        "view_count": stats.get("viewCount"),
+    }

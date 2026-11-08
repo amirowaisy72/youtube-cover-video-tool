@@ -6,7 +6,7 @@ import scene1 from "@/assets/scene-1.jpg";
 import scene2 from "@/assets/scene-2.jpg";
 import scene3 from "@/assets/scene-3.jpg";
 // One unique banner per tool (user, 2026-11-07): the 4 photos above
-// were repeated across all 17 tools. Each tool below now has its
+// were repeated across all 18 tools. Each tool below now has its
 // own image, so no two cards look the same. The images are embedded
 // as data URIs in .ts files because the GitHub push is text-only
 // and cannot carry .jpg binaries.
@@ -46,6 +46,7 @@ const tools = [
   { to: "/script", n: "15", title: "Script Generator", desc: "Type a topic — get a full ready-to-record script, hooks and description.", img: toolScript, cta: "Write a script" },
   { to: "/stock", n: "16", title: "Stock Video & B-Roll", desc: "Free stock footage for your YouTube videos — preview, then download.", img: toolStock, cta: "Find B-roll" },
   { to: "/channel", n: "17", title: "Channel Setup Wizard", desc: "Set up a new YouTube channel — SEO names, description, tags, banner and logo.", img: toolChannel, cta: "Set up a channel" },
+  { to: "/channel-inspect", n: "18", title: "Channel Inspector", desc: "Audit an existing channel — see what is missing, get fixes, and apply them to the channel.", img: toolChannel, cta: "Inspect a channel" },
 ] as const;
 
 function Home() {
@@ -58,7 +59,7 @@ function Home() {
   return (
     <div>
       <section className="mb-12 text-center">
-        <span className="chip mb-5">✦ 17 tools · zero learning curve</span>
+        <span className="chip mb-5">✦ 18 tools · zero learning curve</span>
         <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-tight md:text-6xl">
           Make YouTube magic in <span className="text-gradient">a few clicks</span>
         </h1>
@@ -76,12 +77,12 @@ function Home() {
           <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
           {installed ? (
             <>
-              <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all 17 tools.</p>
+              <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all 18 tools.</p>
               <p className="mt-1 text-sm text-muted-foreground">Click <b>Activate</b> at the top right and enter your license key.</p>
             </>
           ) : (
             <>
-              <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 17 tools.</p>
+              <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 18 tools.</p>
               <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
             </>
           )}

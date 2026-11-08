@@ -86,7 +86,7 @@ function LockScreen() {
       <div className="text-6xl">🔒</div>
       <h1 className="mt-4 text-3xl font-bold">This tool is locked</h1>
       <p className="mt-2 text-muted-foreground">
-        Install YT Guru Setup on your computer to unlock all 17 tools.
+        Install YT Guru Setup on your computer to unlock all 18 tools.
       </p>
       <a className="btn btn-primary mt-6" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
       <p className="mt-4 text-sm text-muted-foreground">
