@@ -63,6 +63,7 @@ function VoicePicker({ provider, voice, onChange }: {
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voicesError, setVoicesError] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
+  const [playError, setPlayError] = useState("");
   const [quota, setQuota] = useState<{ quota_api: boolean; remaining_chars: number | null; limit_chars: number | null; used_chars: number | null; note: string } | null>(null);
   const [quotaError, setQuotaError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -132,15 +133,26 @@ function VoicePicker({ provider, voice, onChange }: {
   const playSample = async (v: TtsVoiceOption) => {
     if (audioRef.current) audioRef.current.pause();
     setPlaying(v.id);
+    setPlayError("");
     try {
       const url = v.sample_url || (await ttsPreview(provider, v.id, key.trim())).sample_url;
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => setPlaying(null);
       await audio.play();
-    } catch {
+    } catch (e) {
       setPlaying(null);
+      setPlayError(e instanceof ApiError ? e.message : "Could not play this voice — check the API key and try again.");
     }
+  };
+
+  // Clicking a voice selects it AND plays it (user, 2026-11-09):
+  // he clicks a voice to hear it, so the card itself must play
+  // the sample — the small Listen button alone was too easy to
+  // miss, and a silent card click looked broken.
+  const selectAndPlay = (v: TtsVoiceOption) => {
+    onChange(provider, v.id);
+    void playSample(v);
   };
 
   return (
@@ -208,19 +220,17 @@ function VoicePicker({ provider, voice, onChange }: {
             <button
               key={v.id}
               className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm ${voice === v.id ? "border-primary bg-primary/10" : "border-border"}`}
-              onClick={() => onChange(provider, v.id)}
+              onClick={() => selectAndPlay(v)}
             >
               <span className="min-w-0 flex-1 truncate">{v.label}</span>
-              <span
-                className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs"
-                onClick={(e) => { e.stopPropagation(); void playSample(v); }}
-              >
+              <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs">
                 {playing === v.id ? "⏸ Playing…" : "▶ Listen"}
               </span>
             </button>
           ))}
         </div>
       )}
+      {playError && <p className="mt-2 text-sm text-destructive">{playError}</p>}
       {provider !== "edge" && voices.length === 0 && !loadingVoices && (
         <p className="mt-2 text-xs text-muted-foreground">Add your key above, then Load voices to hear and pick a variant.</p>
       )}
