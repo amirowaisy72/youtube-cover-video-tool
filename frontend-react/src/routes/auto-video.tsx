@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoJob, autovideoMusicOptions, autovideoPlan, autovideoPrepareAudio, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoPlan, autovideoPrepareAudio, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -205,6 +205,11 @@ function AutoVideo() {
   const [trimLoading, setTrimLoading] = useState(false);
   const [trimError, setTrimError] = useState("");
   const [trimmedUrl, setTrimmedUrl] = useState("");
+  // Compress (user, 2026-11-09): shrink the finished video
+  // without losing quality (HEVC CRF 22). The progress bar is
+  // mandatory — the job is polled while it runs.
+  const [compressing, setCompressing] = useState(false);
+  const [compressError, setCompressError] = useState("");
   // Upload to YouTube (user, 2026-11-09): title, description,
   // tags, privacy and thumbnail, to the selected channel.
   const [upTitle, setUpTitle] = useState("");
@@ -528,6 +533,30 @@ function AutoVideo() {
       setTrimError(e instanceof ApiError ? e.message : "Trim failed. Please try again.");
     } finally {
       setTrimLoading(false);
+    }
+  };
+  // Compress (user, 2026-11-09): start the background compress
+  // and poll the job for its progress — the progress bar is
+  // mandatory, so the poll runs until the job is done again.
+  const startCompress = async () => {
+    if (!job || compressing) return;
+    setCompressing(true);
+    setCompressError("");
+    try {
+      await autovideoCompress(job.id);
+      for (let i = 0; i < 600; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const j = await autovideoJob(job.id);
+        setJob(j);
+        if (j.status === "done" && j.phase === "done") break;
+      }
+      const j = await autovideoJob(job.id);
+      setJob(j);
+      if (j.compress_error) setCompressError(j.compress_error);
+    } catch (e) {
+      setCompressError(e instanceof ApiError ? e.message : "Compression failed. Please try again.");
+    } finally {
+      setCompressing(false);
     }
   };
   const [jobId, setJobId] = useState<string | null>(null);
@@ -1050,7 +1079,7 @@ function AutoVideo() {
               </div>
             )}
             <p className="mt-4 text-sm text-muted-foreground">
-              Finished in about {job.final_minutes ?? dur} minutes · Script: {job.script_words ?? "?"} words ({job.script_source ?? ""}) · Images used: {job.images_used ?? "?"}, Clips used: {job.clips_used ?? "?"} (found: {job.images_found ?? "?"} images, {job.clips_found ?? "?"} clips)
+              Finished in about {job.final_minutes ?? dur} minutes{job.final_size_mb ? ` · Size: ${job.final_size_mb} MB` : ""}{job.compressed && job.original_size_mb ? ` · Compressed from ${job.original_size_mb} MB (saved ${job.compress_saved_pct ?? "?"}%)` : ""} · Script: {job.script_words ?? "?"} words ({job.script_source ?? ""}) · Images used: {job.images_used ?? "?"}, Clips used: {job.clips_used ?? "?"} (found: {job.images_found ?? "?"} images, {job.clips_found ?? "?"} clips)
               {job.ai_images ? ` · AI images: ${job.ai_images}` : ""}{job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: {job.voice_engine || ""}
               {job.visual_warning ? ` · ${job.visual_warning}` : ""}
             </p>
@@ -1327,6 +1356,34 @@ function AutoVideo() {
               )}
               <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); }}>Make another</button>
             </div>
+            {/* Compress (user, 2026-11-09): shrink the finished
+                video without losing quality (HEVC CRF 22, same
+                look, ~half the size). The progress bar is
+                mandatory while it runs. */}
+            {!job.compressed && (
+              <div className="mt-4 rounded-xl border border-border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">🗜️ Compress size {job.final_size_mb ? `(${job.final_size_mb} MB)` : ""}</p>
+                  <button className="btn btn-primary btn-sm" disabled={compressing} onClick={() => void startCompress()}>
+                    {compressing ? "Compressing…" : "Compress without losing quality"}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Re-encodes to HEVC (same look, roughly half the size). The original is kept as a backup.</p>
+                {compressing && (
+                  <div className="mt-3">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${job.progress ?? 0}%` }} />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{job.stage || "Compressing video…"} · {Math.round(job.progress ?? 0)}%</p>
+                  </div>
+                )}
+                {compressError && <p className="mt-2 text-sm text-destructive">{compressError}</p>}
+                {job.compress_no_gain && job.compress_note && <p className="mt-2 text-sm text-muted-foreground">{job.compress_note}</p>}
+              </div>
+            )}
+            {job.compressed && job.original_size_mb && job.final_size_mb && (
+              <p className="mt-4 text-sm text-emerald-400">✓ Compressed: {job.original_size_mb} MB → {job.final_size_mb} MB (saved {job.compress_saved_pct ?? "?"}%, {job.compress_encoder === "libx265" ? "HEVC" : "H.264"} CRF {job.compress_crf ?? "?"}) — the Download button above serves the smaller file.</p>
+            )}
           </div>
           <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} />
         </div>

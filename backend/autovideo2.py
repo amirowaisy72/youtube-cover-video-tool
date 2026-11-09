@@ -244,27 +244,38 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # fell straight to AI. Now ALL found candidates are tried
     # (on-topic first, then any), so a long video uses the
     # whole pool before ever touching AI.
+    # SPEED FIX (user, 2026-11-09): each footage took ~1 minute
+    # even though the clip is only 5-8 seconds — because the
+    # download time depends on FILE SIZE, not length, and the app
+    # downloaded the full original (up to 50MB). Now small files
+    # are tried first (<=15MB, typically 720p or lower), so a
+    # clip downloads 2-3x faster; big files are only a fallback.
+    # Relevance still comes first (on-topic before any), size
+    # second — a small on-topic clip beats a big on-topic one.
+    _FAST_VIDEO_BYTES = 15 * 1024 * 1024
+    def _try_clips(candidates):
+        for item in candidates:
+            if not _reserve_url(used_urls, lock, item["url"]):
+                continue
+            suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
+            dest = work_dir / f"scene-{index:02d}{suffix}"
+            if autovideo._download(item["url"], dest):
+                if autovideo._ffprobe_duration(dest):
+                    return dest, "clip", item["title"]
+            _release_url(used_urls, lock, item["url"])
+        return None
     if visuals in ("videos", "both"):
-        for item in found["videos"]:
-            if not _on_topic(item):
-                continue
-            if not _reserve_url(used_urls, lock, item["url"]):
-                continue
-            suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
-            dest = work_dir / f"scene-{index:02d}{suffix}"
-            if autovideo._download(item["url"], dest):
-                if autovideo._ffprobe_duration(dest):
-                    return dest, "clip", item["title"]
-            _release_url(used_urls, lock, item["url"])
-        for item in found["videos"]:
-            if not _reserve_url(used_urls, lock, item["url"]):
-                continue
-            suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
-            dest = work_dir / f"scene-{index:02d}{suffix}"
-            if autovideo._download(item["url"], dest):
-                if autovideo._ffprobe_duration(dest):
-                    return dest, "clip", item["title"]
-            _release_url(used_urls, lock, item["url"])
+        on_topic = [it for it in found["videos"] if _on_topic(it)]
+        any_clip = list(found["videos"])
+        for pool in (
+            [it for it in on_topic if (it.get("size") or 0) <= _FAST_VIDEO_BYTES],
+            on_topic,
+            [it for it in any_clip if (it.get("size") or 0) <= _FAST_VIDEO_BYTES],
+            any_clip,
+        ):
+            got = _try_clips(pool)
+            if got:
+                return got
     if visuals in ("images", "both"):
         for item in found["images"]:
             if not _on_topic(item):

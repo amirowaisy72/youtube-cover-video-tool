@@ -2177,9 +2177,11 @@ def _run_autovideo_impl(job_id: str, title: str, minutes: int, visuals: str, voi
                 music=music, transitions=transitions,
                 script=script)
             kinds = report["kinds"]
+            _final = directory / "final.mp4"
             _set("done", 100, {
                 "status": "done",
                 "download_url": f"/api/autovideo/download/{job_id}",
+                "final_size_mb": round(_final.stat().st_size / 1024 / 1024, 1) if _final.exists() else None,
                 "script": report["script"],
                 "script_source": report["script_source"],
                 "script_words": report["script_words"],
@@ -2575,12 +2577,17 @@ def _run_autovideo_render(job_id: str, music_volume: float,
             subtitles=subtitles, progress_cb=_render_progress)
         kinds = result["kinds"]
         job = _av_read(job_id)
+        final_path = directory / "final.mp4"
+        # File size (user, 2026-11-09): show it in the done stats
+        # and as the before/after of the compress feature.
+        final_mb = round(final_path.stat().st_size / 1024 / 1024, 1) if final_path.exists() else None
         job.update({
             "status": "done", "phase": "done",
             "stage": "done", "progress": 100,
             "download_url": f"/api/autovideo/download/{job_id}",
             "final_duration_sec": result["final_duration_sec"],
             "final_minutes": round(result["final_duration_sec"] / 60, 1),
+            "final_size_mb": final_mb,
             "music_volume": music_volume,
             "transitions": transitions,
             "join": result["join"],
@@ -2621,6 +2628,129 @@ def autovideo_render(job_id: str,
               payload.music),
         daemon=True).start()
     return {"job_id": job_id, "status": "rendering", "phase": "rendering"}
+
+
+def _run_autovideo_compress(job_id: str) -> None:
+    """Compress the finished video WITHOUT losing quality (user,
+    2026-11-09). Reuses the Cover tool's compressor: HEVC
+    (libx265) CRF 22, preset medium — HEVC keeps the same look
+    as H.264 at roughly half the file size — falling back to
+    H.264 CRF 20 when this FFmpeg build has no libx265 (the
+    Cover tool's quality-first rule: never shrink the file by
+    dropping quality). The audio track is copied, never
+    re-encoded. The compressed file REPLACES final.mp4 (the
+    original is kept as final-original.mp4), so the Download
+    button and the YouTube upload both serve the smaller file.
+    Progress is written to the job (stage + progress) so the
+    frontend shows a real progress bar while it runs."""
+    import time as _time
+    import video as video_module
+    try:
+        directory = _av_job_dir(job_id)
+        final_path = directory / "final.mp4"
+        if not final_path.exists():
+            raise RuntimeError("No finished video yet — render first.")
+        job = _av_read(job_id)
+        original_mb = round(final_path.stat().st_size / 1024 / 1024, 1)
+        duration = video_module.get_duration(final_path)
+        encoder = "libx265"
+        crf = 22
+        preset = "medium"
+        if not video_module.encoder_available("libx265"):
+            encoder = "libx264"
+            crf = 20
+        job.update({"status": "compressing", "phase": "compressing",
+                    "stage": "Compressing video…", "progress": 0,
+                    "compress_encoder": encoder, "compress_crf": crf,
+                    "compress_started_at": _time.time()})
+        _av_write(job)
+
+        def _on_progress(pct: float, elapsed: float, eta) -> None:
+            j = _av_read(job_id)
+            j.update({"stage": f"Compressing video… {pct:.0f}%",
+                      "progress": round(pct, 1),
+                      "status": "compressing", "phase": "compressing"})
+            _av_write(j)
+
+        out_path = directory / "final-compressed.mp4"
+        cmd = ["ffmpeg", "-y", "-i", str(final_path),
+               "-c:v", encoder, "-crf", str(crf), "-preset", preset,
+               "-pix_fmt", "yuv420p", "-c:a", "copy",
+               "-movflags", "+faststart"]
+        if encoder == "libx265":
+            cmd += ["-tag:v", "hvc1"]
+        cmd += [str(out_path)]
+        ok, out = video_module.run_with_progress(
+            cmd, duration, 0, 100, on_progress=_on_progress)
+        if not ok or not out_path.exists():
+            raise RuntimeError(f"Compression failed: {out[-500:]}")
+        compressed_mb = round(out_path.stat().st_size / 1024 / 1024, 1)
+        # SAFEGUARD: re-encoding an already well-compressed video
+        # can come out BIGGER (generation loss on simple content).
+        # If the "compressed" file is not smaller, keep the
+        # original — the feature must never make the file worse.
+        if compressed_mb >= original_mb:
+            try:
+                out_path.unlink()
+            except OSError:
+                pass
+            job = _av_read(job_id)
+            job.update({"status": "done", "phase": "done",
+                        "stage": "done", "progress": 100,
+                        "compressed": False,
+                        "compress_no_gain": True,
+                        "compress_note": f"Already well compressed — the re-encoded file ({compressed_mb} MB) was not smaller than the original ({original_mb} MB), so the original was kept."})
+            _av_write(job)
+            return
+        # Keep the original as a backup, then make the compressed
+        # file the deliverable (same download URL, same upload).
+        backup_path = directory / "final-original.mp4"
+        try:
+            final_path.replace(backup_path)
+        except OSError:
+            pass
+        out_path.replace(final_path)
+        job = _av_read(job_id)
+        saved_pct = round(100 * (1 - compressed_mb / original_mb), 1) if original_mb else 0
+        job.update({"status": "done", "phase": "done",
+                    "stage": "done", "progress": 100,
+                    "final_size_mb": compressed_mb,
+                    "original_size_mb": original_mb,
+                    "compressed": True,
+                    "compress_encoder": encoder, "compress_crf": crf,
+                    "compress_saved_pct": saved_pct})
+        _av_write(job)
+    except Exception as exc:  # noqa: BLE001
+        job = _av_read(job_id)
+        job.update({"status": "done", "phase": "done",
+                    "stage": "done", "progress": 100,
+                    "compress_error": str(exc)[-500:]})
+        _av_write(job)
+
+
+@app.post("/api/autovideo/{job_id}/compress")
+def autovideo_compress(job_id: str) -> dict:
+    """Compress the finished video to a smaller file at the same
+    visual quality (HEVC CRF 22). Runs in the background; poll
+    the job for progress and the new size."""
+    import time as _time
+    job = _av_read(job_id)
+    # STALE RECOVERY: if a previous compress was killed mid-run
+    # (app restart), the job is stuck on "compressing". A compress
+    # older than 30 minutes is stale — reset it so the user can
+    # retry instead of being blocked forever.
+    if job.get("status") == "compressing":
+        started = job.get("compress_started_at") or 0
+        if _time.time() - started > 1800:
+            job.update({"status": "done", "phase": "done",
+                        "stage": "done", "progress": 100})
+            _av_write(job)
+        else:
+            raise HTTPException(400, "Compression already running.")
+    if job.get("status") != "done" or not (_av_job_dir(job_id) / "final.mp4").exists():
+        raise HTTPException(400, "Render the video first.")
+    threading.Thread(target=_run_autovideo_compress, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id, "status": "compressing"}
 
 
 @app.get("/api/autovideo/{job_id}")

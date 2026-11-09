@@ -149,6 +149,20 @@ export type AvJob = {
   title_cards?: number;
   visual_warning?: string;
   pipeline?: string;
+  // File size + compression (user, 2026-11-09): the finished
+  // video's size in MB, and after compressing, the original
+  // size + how much was saved.
+  final_size_mb?: number;
+  original_size_mb?: number;
+  compressed?: boolean;
+  compress_encoder?: string;
+  compress_crf?: number;
+  compress_saved_pct?: number;
+  compress_error?: string;
+  // Set when the re-encoded file was NOT smaller than the
+  // original — the original is kept and nothing is replaced.
+  compress_no_gain?: boolean;
+  compress_note?: string;
   // Trimmed version (user, 2026-11-09): cutting the first seconds
   // off the finished video (e.g. an unwanted Hook).
   trimmed_url?: string;
@@ -428,6 +442,14 @@ export const autovideoRender = (jobId: string, musicVolume = 0.2, transitions = 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ music_volume: musicVolume, music, transitions, subtitles }),
+  });
+
+// Compress the finished video to a smaller file at the same
+// visual quality (user, 2026-11-09 — HEVC CRF 22). Runs in the
+// background; poll the job for progress and the new size.
+export const autovideoCompress = (jobId: string) =>
+  api<{ job_id: string; status: string }>(`/api/autovideo/${jobId}/compress`, {
+    method: "POST",
   });
 
 // URL of one collected footage file (Step 2 preview).
