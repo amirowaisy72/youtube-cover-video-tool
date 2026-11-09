@@ -523,7 +523,10 @@ def _fetch_mood_music(mood: str, freesound_key: str | None,
                 continue
             dest = work_dir / "mood-music.mp3"
             try:
-                if autovideo._download(audio_url, dest):
+                # total_timeout=45 (user, 2026-11-09): a slow
+                # Freesound preview must fail fast, never trickle
+                # for minutes and hang the audio step.
+                if autovideo._download(audio_url, dest, total_timeout=45):
                     return dest, "ok"
             except Exception:
                 continue
@@ -572,7 +575,9 @@ def _fetch_transition_sfx(freesound_key: str | None, work_dir: Path,
                 continue
             dest = work_dir / f"sfx-{len(sfx)}.mp3"
             try:
-                if autovideo._download(audio_url, dest):
+                # total_timeout=45 (user, 2026-11-09): see
+                # _fetch_mood_music — a slow preview fails fast.
+                if autovideo._download(audio_url, dest, total_timeout=45):
                     sfx.append(dest)
                     seen_urls.add(audio_url)
                     break  # one track per query -> distinct sounds

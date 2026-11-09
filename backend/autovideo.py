@@ -1113,15 +1113,35 @@ def split_paragraphs(script: str, group_size: int = 3) -> list[str]:
     return [group for group in grouped if group]
 
 
-def _download(url: str, dest: Path, timeout: int = 120) -> bool:
+def _download(url: str, dest: Path, timeout: int = 120,
+              total_timeout: float | None = None) -> bool:
+    """Download a URL to dest. `timeout` is the per-read socket
+    timeout (a slow server can still trickle forever — each
+    chunk just has to arrive within `timeout`). `total_timeout`
+    (user, 2026-11-09) is a HARD cap on the whole download:
+    the audio step once sat at 'Fetching background music…'
+    for 10+ minutes because a Freesound preview trickled for
+    minutes without ever hitting the per-read timeout. Music
+    and SFX previews pass total_timeout=45 so a slow CDN fails
+    fast instead of hanging the step; footage downloads leave
+    it unset (large video files legitimately take longer)."""
+    import time as _time
     try:
         req = urllib.request.Request(url, headers=HEADERS)
+        started = _time.time()
+        # Small reads when a total cap is set: a single read()
+        # blocks until its chunk is full, so a big chunk would
+        # let a trickling server stall past the cap. 8KB reads
+        # keep the cap responsive.
+        chunk = 8192 if total_timeout is not None else 1024 * 256
         with urllib.request.urlopen(req, timeout=timeout) as resp, dest.open("wb") as out:
             while True:
-                chunk = resp.read(1024 * 256)
-                if not chunk:
+                if total_timeout is not None and _time.time() - started > total_timeout:
+                    return False
+                data = resp.read(chunk)
+                if not data:
                     break
-                out.write(chunk)
+                out.write(data)
         return dest.stat().st_size > 1000
     except Exception:
         return False
