@@ -176,6 +176,10 @@ export type AvJob = {
   // Realistic step (user, 2026-11-09): words picked to pop up
   // wherever they are spoken.
   realistic_words?: string[];
+  // Audio step start (user, 2026-11-09): epoch seconds when the
+  // audio worker started — the Retry button only shows 3 minutes
+  // after this, so it never invites a retry during a normal run.
+  audio_started_at?: number;
   // Voice provider (user, 2026-11-09): which TTS provider
   // voiced this video ("edge" default, "google", "unreal",
   // "elevenlabs"). Set when the user re-voices a finished video.

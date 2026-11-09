@@ -1401,9 +1401,10 @@ function AutoVideo() {
             <p className="mb-4 text-sm text-muted-foreground">{job?.stage || "Starting…"}</p>
             {/* Retry audio (user, 2026-11-09): the audio step once
                 sat at 90% for 10 minutes and could not be restarted
-                from the UI. If it looks stuck, this re-runs it — the
-                server allows a retry 3 minutes after the last start. */}
-            {job?.phase === "audio" && (
+                from the UI. The button ONLY appears 3 minutes after
+                the audio step started — never during a normal run,
+                so it can't be clicked too early by mistake. */}
+            {job?.phase === "audio" && (Date.now() / 1000 - (job.audio_started_at || 0) > 180) && (
               <button className="btn btn-ghost btn-sm mb-4" onClick={() => void startAudio()}>
                 ↻ Audio step stuck? Retry it
               </button>
