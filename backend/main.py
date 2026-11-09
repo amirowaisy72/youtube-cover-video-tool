@@ -2511,6 +2511,7 @@ def _run_autovideo_audio(job_id: str, voice: str,
                          tts_key: str | None = None) -> None:
     """Step 3 worker: voice every scene, join the voiceover,
     detect the mood, list music options, fetch SFX."""
+    import time as _time
     try:
         directory = _av_job_dir(job_id)
         job = _av_read(job_id)
@@ -2518,7 +2519,8 @@ def _run_autovideo_audio(job_id: str, voice: str,
         if not scenes:
             raise RuntimeError("No scenes — run the footage step first.")
         job.update({"status": "audio", "phase": "audio",
-                    "stage": "Voicing scenes…", "progress": 10})
+                    "stage": "Voicing scenes…", "progress": 10,
+                    "audio_started_at": _time.time()})
         _av_write(job)
 
         def _audio_progress(done: int, total: int, stage: str) -> None:
@@ -2571,10 +2573,21 @@ def autovideo_prepare_audio(job_id: str,
                             payload: AutoVideoPrepareAudioRequest) -> dict:
     """STEP 3 — Audio. Voices every scene, joins the voiceover,
     detects the mood and lists matching music tracks + SFX.
-    Runs after the footage step."""
+    Runs after the footage step. RE-RUN (user, 2026-11-09):
+    a job stuck in the "audio" phase can be re-run — the audio
+    step once sat at 90% for 10 minutes and could not be
+    restarted from the UI. A re-run within 3 minutes of the
+    last start is rejected (the step is still working, not
+    stuck); after 3 minutes it is the user's explicit retry."""
+    import time as _time
     job = _av_read(job_id)
-    if job.get("phase") != "planned":
+    if job.get("phase") not in ("planned", "audio"):
         raise HTTPException(400, "Run the footage step first.")
+    if job.get("phase") == "audio":
+        started = job.get("audio_started_at") or 0
+        if _time.time() - started < 180:
+            raise HTTPException(
+                400, "Audio step is still running — wait a moment before retrying.")
     token = job.get("job_token")
     # Voice comes from this request when the user picked one in
     # Step 1 (re-sent from the browser's stored keys); otherwise

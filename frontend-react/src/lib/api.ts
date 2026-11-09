@@ -547,6 +547,7 @@ export const autovideoRealisticWords = (jobId: string) =>
 export const autovideoSaveRealisticWords = (jobId: string, words: string[]) =>
   api<{ job_id: string; words: string[] }>(`/api/autovideo/${jobId}/realistic-words`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ words }),
   });
 

@@ -309,13 +309,20 @@ function AutoVideo() {
     }
   }, [activeChannelId]);
   const descSnippet = channelDesc.length > 400 ? `${channelDesc.slice(0, 400)}…` : channelDesc;
-  const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
-  const [dur, setDur] = useState(2);
-  const [durInput, setDurInput] = useState("2");
   // Video type (user, 2026-11-09): "long" (16:9) or "short"
   // (9:16 YouTube Short). shortSecs is the Short length.
+  // Declared here (before the prompts) because the prompts
+  // adapt to it — a Short gets a Short title/script prompt.
   const [videoType, setVideoType] = useState<"long" | "short">("long");
   const [shortSecs, setShortSecs] = useState(60);
+  // Short-aware (user, 2026-11-09): when Short is picked, the
+  // title prompt must say so — a Short's title is punchier and
+  // hook-first, not a long-video title.
+  const titleIdeasPrompt = videoType === "short"
+    ? `Suggest 10 catchy, clickable YouTube Short title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThese are for YouTube Shorts (vertical video, under 60 seconds) — the titles should be very short (under 50 characters), punchy, hook-first, and create instant curiosity. Return only the titles, one per line, no extra text.`
+    : `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
+  const [dur, setDur] = useState(2);
+  const [durInput, setDurInput] = useState("2");
   // Voice (user, 2026-11-09): the narration voice. Default is
   // Edge Aria (what all earlier videos used). The user can pick
   // Google Chirp 3 HD, Unreal Speech or ElevenLabs instead — the
@@ -331,7 +338,14 @@ function AutoVideo() {
   // written by another AI (e.g. Gemini) and the video is built
   // from it. Empty = the tool writes the script itself.
   const [customScript, setCustomScript] = useState("");
-  const scriptPrompt = `Write a YouTube video script for a video titled "${title.trim() || "my video"}"${activeChannelTitle ? ` for the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. The video should be about ${dur} minute(s) long (roughly ${dur * 150} words). Start with a strong hook in the first 15 seconds, then explain the topic in simple, clear language with interesting examples. Write it as plain spoken narration only — no scene directions, no headings, no bullet points. Separate paragraphs with a blank line, one idea per paragraph.`;
+  // Short-aware (user, 2026-11-09): when Short is picked, the
+  // script prompt must ask for a SHORT script (seconds, ~2.5
+  // words/sec) with an instant hook — not a minutes-long script.
+  // Before this fix it always asked for ${dur} minute(s), so a
+  // 30-second Short got a 150-word script.
+  const scriptPrompt = videoType === "short"
+    ? `Write a YouTube Short script for a video titled "${title.trim() || "my video"}"${activeChannelTitle ? ` for the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. This is a YouTube Short: only about ${shortSecs} seconds long (roughly ${Math.round(shortSecs * 2.5)} words). Start with a strong hook in the first 3 seconds, then make one single clear point in simple, punchy spoken language. Write it as plain spoken narration only — no scene directions, no headings, no bullet points. One short paragraph.`
+    : `Write a YouTube video script for a video titled "${title.trim() || "my video"}"${activeChannelTitle ? ` for the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. The video should be about ${dur} minute(s) long (roughly ${dur * 150} words). Start with a strong hook in the first 15 seconds, then explain the topic in simple, clear language with interesting examples. Write it as plain spoken narration only — no scene directions, no headings, no bullet points. Separate paragraphs with a blank line, one idea per paragraph.`;
   const [subtitles, setSubtitles] = useState(true);
   // Mood music + transitions (2026-11-08): a mood-matched
   // background track (needs the Freesound key below) and a
@@ -1385,6 +1399,15 @@ function AutoVideo() {
             </div>
             <div className="bar mb-5"><div style={{ width: `${pct}%` }} /></div>
             <p className="mb-4 text-sm text-muted-foreground">{job?.stage || "Starting…"}</p>
+            {/* Retry audio (user, 2026-11-09): the audio step once
+                sat at 90% for 10 minutes and could not be restarted
+                from the UI. If it looks stuck, this re-runs it — the
+                server allows a retry 3 minutes after the last start. */}
+            {job?.phase === "audio" && (
+              <button className="btn btn-ghost btn-sm mb-4" onClick={() => void startAudio()}>
+                ↻ Audio step stuck? Retry it
+              </button>
+            )}
             {/* Progress timeline (user, 2026-11-09): click to expand
                 and see everything that has happened so far and what
                 is running now, with the stock-footage source per

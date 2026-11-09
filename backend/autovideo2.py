@@ -47,6 +47,7 @@ import math
 import re
 import subprocess
 import threading
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -474,13 +475,17 @@ def _is_sfx_hit(hit: dict) -> bool:
 
 
 def _fetch_mood_music(mood: str, freesound_key: str | None,
-                      work_dir: Path) -> tuple[Path | None, str]:
+                      work_dir: Path, deadline: float | None = None) -> tuple[Path | None, str]:
     """Download a royalty-free background track matching the mood
     from Freesound. Returns (mp3 path or None, status) where
     status is "ok" | "no_key" | "key_rejected" | "no_results".
     The status is reported in the job result so a missing track
     is never silent (the user asked "how would I know if the key
-    is wrong" — the same applies here). Never raises."""
+    is wrong" — the same applies here). Never raises.
+    DEADLINE (user, 2026-11-09): the audio step once sat at 90%
+    for 10 minutes on slow Freesound fetches — a deadline (epoch
+    seconds) stops trying new queries/downloads once passed, so
+    the step finishes instead of hanging."""
     if not freesound_key or not freesound_key.strip():
         return None, "no_key"
     # Try the mood query first, then broader fallbacks — a
@@ -492,6 +497,8 @@ def _fetch_mood_music(mood: str, freesound_key: str | None,
     queries = [_MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient"),
                "ambient cinematic", "cinematic"]
     for query in queries:
+        if deadline is not None and time.time() > deadline:
+            return None, "no_results"
         hits, status = _freesound_search(query, freesound_key)
         if status == "auth":
             return None, "key_rejected"
@@ -500,6 +507,8 @@ def _fetch_mood_music(mood: str, freesound_key: str | None,
         if not hits:
             continue
         for hit in hits:
+            if deadline is not None and time.time() > deadline:
+                return None, "no_results"
             if not _is_music_hit(hit):
                 continue
             audio_url = _freesound_preview_url(hit)
@@ -515,12 +524,15 @@ def _fetch_mood_music(mood: str, freesound_key: str | None,
 
 
 def _fetch_transition_sfx(freesound_key: str | None, work_dir: Path,
-                          count: int = 6) -> tuple[list[Path], str]:
+                          count: int = 6, deadline: float | None = None) -> tuple[list[Path], str]:
     """Download DISTINCT royalty-free transition sounds from
     Freesound — one per query, so the library is genuinely
     different sounds. Returns (mp3 paths, status) where status
     is "ok" | "no_key" | "key_rejected" | "no_results" (same
-    visibility rule as the music fetch). Never raises."""
+    visibility rule as the music fetch). Never raises.
+    DEADLINE (user, 2026-11-09): see _fetch_mood_music — stops
+    trying new queries once passed, so the audio step finishes
+    instead of hanging on slow Freesound fetches."""
     if not freesound_key or not freesound_key.strip():
         return [], "no_key"
     sfx: list[Path] = []
@@ -528,6 +540,8 @@ def _fetch_transition_sfx(freesound_key: str | None, work_dir: Path,
     any_hit = False
     for query in _SFX_QUERIES:
         if len(sfx) >= count:
+            break
+        if deadline is not None and time.time() > deadline:
             break
         hits, status = _freesound_search(query, freesound_key,
                                          per_page=5)
@@ -540,6 +554,8 @@ def _fetch_transition_sfx(freesound_key: str | None, work_dir: Path,
         # Short sounds first (a transition sound is ~0.5-1s).
         hits.sort(key=lambda h: (h.get("duration") or 99))
         for hit in hits:
+            if deadline is not None and time.time() > deadline:
+                break
             if not _is_sfx_hit(hit):
                 continue
             audio_url = _freesound_preview_url(hit)
@@ -1259,14 +1275,16 @@ def _build_scene(index: int, scene: dict, title: str, visuals: str,
     }
 
 
-def list_mood_music(mood: str, freesound_key: str | None) -> tuple[list[dict], str]:
+def list_mood_music(mood: str, freesound_key: str | None,
+                    deadline: float | None = None) -> tuple[list[dict], str]:
     """Music-track options for a mood (user, 2026-11-09 — change
     the background music AFTER the video is built). Returns a
     list of {id, name, duration_sec, preview_url, license} the
     user can listen to and pick from, plus a status ("ok" |
     "no_key" | "key_rejected" | "no_results"). Only real music
     tracks (>= 20s, playable preview) — never SFX. Tries the
-    mood query first, then the generic fallbacks."""
+    mood query first, then the generic fallbacks.
+    DEADLINE (user, 2026-11-09): see _fetch_mood_music."""
     if not freesound_key or not freesound_key.strip():
         return [], "no_key"
     queries = [_MOOD_MUSIC_QUERY.get(mood, "calm relaxing ambient"),
@@ -1274,6 +1292,8 @@ def list_mood_music(mood: str, freesound_key: str | None) -> tuple[list[dict], s
     seen: set[int] = set()
     options: list[dict] = []
     for query in queries:
+        if deadline is not None and time.time() > deadline:
+            break
         hits, status = _freesound_search(query, freesound_key, per_page=10)
         if status == "auth":
             return [], "key_rejected"
@@ -1976,14 +1996,28 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
         raise RuntimeError(f"Voiceover assembly failed: {proc.stderr[-1000:]}")
     script_text = "\n\n".join(s["narration"] for s in scenes)
     mood = _detect_mood(title, script_text)
+    # Music + SFX fetch (user, 2026-11-09): this phase had NO
+    # progress updates, so the UI sat at 90% with a stale
+    # "Voicing scene X of Y…" while Freesound was slow — the
+    # user waited 10 minutes thinking it was frozen. Report
+    # each sub-step, and cap the whole phase at 150s so it can
+    # never hang for 10 minutes again (a missing track is fine;
+    # the video still renders).
+    fetch_deadline = time.time() + 150
+    if progress_cb:
+        progress_cb(len(scenes), len(scenes), "Fetching background music…")
     if music:
         music_path, music_status = _fetch_mood_music(
-            mood, freesound_key, work_dir)
-        options, options_status = list_mood_music(mood, freesound_key)
+            mood, freesound_key, work_dir, deadline=fetch_deadline)
+        options, options_status = list_mood_music(
+            mood, freesound_key, deadline=fetch_deadline)
     else:
         music_path, music_status = None, "off"
         options, options_status = [], "off"
-    sfx_paths, sfx_status = _fetch_transition_sfx(freesound_key, work_dir)
+    if progress_cb:
+        progress_cb(len(scenes), len(scenes), "Fetching transition sounds…")
+    sfx_paths, sfx_status = _fetch_transition_sfx(
+        freesound_key, work_dir, deadline=fetch_deadline)
     return {
         "durations": [round(d, 1) for d in durations],
         "voice_files": [p.name for p in voice_files],
