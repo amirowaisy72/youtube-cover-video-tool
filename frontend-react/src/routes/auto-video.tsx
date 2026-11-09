@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoPlan, autovideoPrepareAudio, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsProvider, type TtsVoice, type TtsVoiceOption, validateStockKey, youtubeStatus } from "@/lib/api";
+import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, validateStockKey, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, getTtsKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey, setTtsKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -312,6 +312,10 @@ function AutoVideo() {
   const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
+  // Video type (user, 2026-11-09): "long" (16:9) or "short"
+  // (9:16 YouTube Short). shortSecs is the Short length.
+  const [videoType, setVideoType] = useState<"long" | "short">("long");
+  const [shortSecs, setShortSecs] = useState(60);
   // Voice (user, 2026-11-09): the narration voice. Default is
   // Edge Aria (what all earlier videos used). The user can pick
   // Google Chirp 3 HD, Unreal Speech or ElevenLabs instead — the
@@ -366,10 +370,11 @@ function AutoVideo() {
   };
   // Step flow (user, 2026-11-09): Setup -> Footage -> Audio ->
   // Render & Review. "build" is the working state (collecting
-  // footage / voicing / rendering); "footage" and "audio" are
-  // the review stops where the user changes things before the
-  // next step. "done" is the finished video (still editable).
-  const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "done">("form");
+  // footage / voicing / rendering); "footage", "audio" and
+  // "realistic" are the review stops where the user changes
+  // things before the next step. "done" is the finished video
+  // (still editable).
+  const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "realistic" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
   // The stepper must show the step the backend is ACTUALLY on
   // (user, 2026-11-09): during the plan step the backend is
@@ -383,15 +388,16 @@ function AutoVideo() {
     const jp = job?.phase || "";
     if (jp === "planning" || jp === "planned") return 2;
     if (jp === "audio" || jp === "audio-ready") return 3;
-    if (jp === "rendering" || jp === "done") return 4;
+    if (jp === "realistic") return 4;
+    if (jp === "rendering" || jp === "done") return 5;
     if (phase === "build" && job?.stage) {
       const s = job.stage.toLowerCase();
       if (s.includes("footage") || s.includes("clip")) return 2;
       if (s.includes("voic")) return 3;
       if (s.includes("script")) return 1;
-      return 4;
+      return 5;
     }
-    return phase === "form" ? 1 : phase === "footage" ? 2 : phase === "audio" ? 3 : 4;
+    return phase === "form" ? 1 : phase === "footage" ? 2 : phase === "audio" ? 3 : phase === "realistic" ? 4 : 5;
   })();
   // Trim the start (user, 2026-11-09): cut the first seconds off
   // the finished video (often an unwanted "Hook").
@@ -404,6 +410,65 @@ function AutoVideo() {
   // mandatory — the job is polled while it runs.
   const [compressing, setCompressing] = useState(false);
   const [compressError, setCompressError] = useState("");
+  // Number pop-ups (user, 2026-11-09): figures the voiceover
+  // says pop up big on screen at that moment. Post-processing
+  // on the finished video — works on an already-rendered one.
+  const [popupsApplying, setPopupsApplying] = useState(false);
+  const [popupsError, setPopupsError] = useState("");
+  const startPopups = async () => {
+    if (!job || popupsApplying) return;
+    setPopupsApplying(true);
+    setPopupsError("");
+    try {
+      await autovideoNumberPopups(job.id);
+      for (let i = 0; i < 600; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const j = await autovideoJob(job.id);
+        setJob(j);
+        if (j.status === "done" && j.phase === "done") break;
+      }
+      const j = await autovideoJob(job.id);
+      setJob(j);
+      if (j.popups_error) setPopupsError(j.popups_error);
+    } catch (e) {
+      setPopupsError(e instanceof ApiError ? e.message : "Number pop-ups failed. Please try again.");
+    } finally {
+      setPopupsApplying(false);
+    }
+  };
+  // Realistic step (user, 2026-11-09): after the voiceover, pick
+  // the important words that pop up wherever they are spoken —
+  // every occurrence in a different random style. The backend
+  // suggests the words; the user picks (and can add his own).
+  const [realWords, setRealWords] = useState<RealisticWord[]>([]);
+  const [realChosen, setRealChosen] = useState<string[]>([]);
+  const [realCustom, setRealCustom] = useState("");
+  const [realLoading, setRealLoading] = useState(false);
+  const [realError, setRealError] = useState("");
+  const loadRealistic = async () => {
+    if (!job) return;
+    setRealLoading(true);
+    setRealError("");
+    try {
+      const data = await autovideoRealisticWords(job.id);
+      setRealWords(data.suggestions || []);
+      setRealChosen(data.chosen || []);
+    } catch (e) {
+      setRealError(e instanceof ApiError ? e.message : "Could not load the word suggestions.");
+    } finally {
+      setRealLoading(false);
+    }
+  };
+  const toggleRealWord = (word: string) => {
+    setRealChosen((prev) =>
+      prev.includes(word) ? prev.filter((w) => w !== word) : [...prev, word]);
+  };
+  const addRealCustom = () => {
+    const w = realCustom.trim().toLowerCase();
+    if (!w) return;
+    if (!realChosen.includes(w)) setRealChosen((prev) => [...prev, w]);
+    setRealCustom("");
+  };
   // Re-voice (user, 2026-11-09): change the voice of a finished
   // video from the done phase, without starting over.
   const [revoicing, setRevoicing] = useState(false);
@@ -899,7 +964,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoPlan(title.trim(), dur, voice, pexelsKey, pixabayKey, customScript, ttsProvider, getTtsKey(ttsProvider));
+      const data = await autovideoPlan(title.trim(), dur, voice, pexelsKey, pixabayKey, customScript, ttsProvider, getTtsKey(ttsProvider), videoType, shortSecs);
       setJobId(data.job_id);
       // Background job: the step keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -937,23 +1002,26 @@ function AutoVideo() {
     setError("");
     setPhase("build");
     try {
+      // Realistic step: save the picked words first, so the
+      // render applies them as pop-ups wherever they are spoken.
+      await autovideoSaveRealisticWords(job.id, realChosen);
       await autovideoRender(job.id, musicVolume / 100, transitions, subtitles, music);
       poll(job.id);
     } catch (e) {
-      setPhase("audio");
+      setPhase("realistic");
       setError("Failed: " + (e instanceof ApiError ? e.message : "Could not start the render."));
     }
   };
 
   return (
     <div data-tool="auto-video">
-      <PageHeader icon="🎬" title="Auto Video from Title" sub="Four steps: setup, footage, audio, then render — change anything before the video is built." />
+      <PageHeader icon="🎬" title="Auto Video from Title" sub="Five steps: setup, footage, audio, realistic, then render — change anything before the video is built." />
 
-      {/* Stepper (user, 2026-11-09): the four steps, with the
+      {/* Stepper (user, 2026-11-09): the five steps, with the
           current one highlighted. */}
       {phase !== "form" && (
         <div className="mx-auto mb-6 flex max-w-2xl items-center gap-2">
-          {["1 · Setup", "2 · Footage", "3 · Audio", "4 · Render"].map((label, i) => {
+          {["1 · Setup", "2 · Footage", "3 · Audio", "4 · Realistic", "5 · Render"].map((label, i) => {
             const n = i + 1;
             const done = n < step;
             const now = n === step;
@@ -1015,6 +1083,23 @@ function AutoVideo() {
             />
           </div>
           <div>
+            <label className="mb-2 block font-semibold">Video type</label>
+            <div className="seg">
+              <button data-on={videoType === "long"} onClick={() => setVideoType("long")}>🎬 Long video (16:9)</button>
+              <button data-on={videoType === "short"} onClick={() => setVideoType("short")}>📱 Short (9:16)</button>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{videoType === "short" ? "Vertical 9:16, up to 60 seconds — YouTube treats it as a Short. Footage prefers vertical clips; landscape clips are centre-cropped." : "Horizontal 16:9, the usual YouTube video."}</p>
+          </div>
+          {videoType === "short" ? (
+            <div>
+              <label className="mb-2 block font-semibold">Short length</label>
+              <div className="seg">
+                {[15, 30, 45, 60].map((s) => <button key={s} data-on={shortSecs === s} onClick={() => setShortSecs(s)}>{s} sec</button>)}
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">About {Math.max(1, Math.round(shortSecs / 20))}–{Math.max(2, Math.round(shortSecs / 15))} scenes · 1 credit · YouTube Shorts are vertical videos up to 60 seconds</p>
+            </div>
+          ) : (
+          <div>
             <label className="mb-2 block font-semibold">Length</label>
             <div className="seg">
               {[1, 2, 3, 5].map((d) => <button key={d} data-on={dur === d} onClick={() => { setDur(d); setDurInput(String(d)); }}>{d} min</button>)}
@@ -1039,6 +1124,7 @@ function AutoVideo() {
             </div>
             <p className="mt-2 text-sm text-muted-foreground">About {dur * 3} scenes · 1 credit · longer videos take longer to build, scene by scene</p>
           </div>
+          )}
           <div>
             <label className="mb-2 block font-semibold">Narration voice <span className="text-sm font-normal text-muted-foreground">(optional — who reads the script. No pick = the default Edge voice, Aria. Pick a provider below to hear each variant and choose.)</span></label>
             <VoicePicker provider={ttsProvider} voice={voice} onChange={handleVoiceChange} />
@@ -1228,6 +1314,59 @@ function AutoVideo() {
           </div>
           <div className="flex gap-3">
             <button className="btn btn-ghost" onClick={() => setPhase("footage")}>← Back to footage</button>
+            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => { setPhase("realistic"); void loadRealistic(); }}>✨ Realistic →</button>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+      )}
+
+      {/* Realistic step (user, 2026-11-09): pick the important
+          words that pop up wherever they are spoken — every
+          occurrence in a different random style, colour and
+          design, so the video feels alive. Optional: render
+          with no words picked for no pop-ups. */}
+      {phase === "realistic" && job && (
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div className="glass p-6">
+            <h3 className="text-xl font-bold">✨ Realistic — words that pop up</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tap the words you want. Each one pops up in written form every time the voiceover says it — a different style, colour and design every time, flying in from a random corner.
+            </p>
+            {realLoading && <p className="mt-3 text-sm text-muted-foreground">Finding the important words…</p>}
+            {realError && <p className="mt-3 text-sm text-destructive">{realError}</p>}
+            {!realLoading && realWords.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {realWords.map((w) => {
+                  const picked = realChosen.includes(w.word);
+                  return (
+                    <button
+                      key={w.word}
+                      onClick={() => toggleRealWord(w.word)}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${picked ? "border-primary bg-accent text-primary" : "border-border text-muted-foreground hover:border-primary"}`}
+                      title={w.count > 1 ? `Spoken ${w.count} times` : "Spoken once"}
+                    >
+                      {picked ? "✓ " : ""}{w.word}{w.count > 1 ? ` ×${w.count}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-4 flex gap-2">
+              <input
+                className="field flex-1"
+                placeholder="Add your own word…"
+                value={realCustom}
+                onChange={(e) => setRealCustom(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addRealCustom(); }}
+              />
+              <button className="btn btn-ghost" onClick={addRealCustom}>+ Add</button>
+            </div>
+            {realChosen.length > 0 && (
+              <p className="mt-3 text-sm text-emerald-400">✓ {realChosen.length} word{realChosen.length === 1 ? "" : "s"} picked: {realChosen.join(", ")}</p>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button className="btn btn-ghost" onClick={() => setPhase("audio")}>← Back to audio</button>
             <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startRender()}>🎬 Render video →</button>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -1314,7 +1453,7 @@ function AutoVideo() {
               </div>
             )}
             <p className="mt-4 text-sm text-muted-foreground">
-              Finished in about {job.final_minutes ?? dur} minutes{job.final_size_mb ? ` · Size: ${job.final_size_mb} MB` : ""}{job.compressed && job.original_size_mb ? ` · Compressed from ${job.original_size_mb} MB (saved ${job.compress_saved_pct ?? "?"}%)` : ""} · Script: {job.script_words ?? "?"} words ({job.script_source ?? ""}) · Images used: {job.images_used ?? "?"}, Clips used: {job.clips_used ?? "?"} (found: {job.images_found ?? "?"} images, {job.clips_found ?? "?"} clips)
+              Finished in about {job.final_minutes ?? dur} minutes{job.video_type === "short" ? " · 📱 Short (9:16 vertical)" : ""}{job.final_size_mb ? ` · Size: ${job.final_size_mb} MB` : ""}{job.compressed && job.original_size_mb ? ` · Compressed from ${job.original_size_mb} MB (saved ${job.compress_saved_pct ?? "?"}%)` : ""} · Script: {job.script_words ?? "?"} words ({job.script_source ?? ""}) · Images used: {job.images_used ?? "?"}, Clips used: {job.clips_used ?? "?"} (found: {job.images_found ?? "?"} images, {job.clips_found ?? "?"} clips)
               {job.ai_images ? ` · AI images: ${job.ai_images}` : ""}{job.title_cards ? ` · Title cards: ${job.title_cards}` : ""} · Voice: {job.voice_engine || ""}
               {job.visual_warning ? ` · ${job.visual_warning}` : ""}
             </p>
@@ -1630,6 +1769,33 @@ function AutoVideo() {
             {job.compressed && job.original_size_mb && job.final_size_mb && (
               <p className="mt-4 text-sm text-emerald-400">✓ Compressed: {job.original_size_mb} MB → {job.final_size_mb} MB (saved {job.compress_saved_pct ?? "?"}%, {job.compress_encoder === "libx265" ? "HEVC" : "H.264"} CRF {job.compress_crf ?? "?"}) — the Download button above serves the smaller file.</p>
             )}
+            {/* Number pop-ups (user, 2026-11-09): every figure
+                the voiceover says ($100, 50%…) pops up big on
+                screen at that exact moment, flying in from a
+                random corner. Post-processing — works on an
+                already-rendered video too. */}
+            <div className="mt-4 rounded-xl border border-border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">🔢 Number pop-ups</p>
+                <button className="btn btn-primary btn-sm" disabled={popupsApplying} onClick={() => void startPopups()}>
+                  {popupsApplying ? "Adding pop-ups…" : job.popups_applied ? "Re-apply pop-ups" : "Add number pop-ups"}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">When the voiceover says a figure, it pops up big on screen at that moment, flying in from a random corner. The original video is kept as a backup.</p>
+              {popupsApplying && (
+                <div className="mt-3">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${job.progress ?? 0}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{job.stage || "Adding number pop-ups…"} · {Math.round(job.progress ?? 0)}%</p>
+                </div>
+              )}
+              {popupsError && <p className="mt-2 text-sm text-destructive">{popupsError}</p>}
+              {job.popups_applied && job.popups_count != null && (
+                <p className="mt-2 text-sm text-emerald-400">✓ {job.popups_count} number pop-up{job.popups_count === 1 ? "" : "s"} added — watch the video above to see them fly in.</p>
+              )}
+              {job.popups_note && <p className="mt-2 text-sm text-muted-foreground">{job.popups_note}</p>}
+            </div>
             {/* Change voice (user, 2026-11-09): the same voice
                 options, here in the done phase, so a finished
                 video can be re-voiced without starting over. */}

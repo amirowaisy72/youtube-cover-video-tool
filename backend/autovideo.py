@@ -553,7 +553,8 @@ def _wikipedia_script(title: str) -> str:
     return ""
 
 
-def generate_script(title: str, minutes: int) -> tuple[str, str]:
+def generate_script(title: str, minutes: int,
+                    words_target: int | None = None) -> tuple[str, str]:
     """Return (script, source). Source is pollinations,
     pollinations-sections, wikipedia, or template — recorded so
     the UI can say honestly where the script came from.
@@ -566,8 +567,11 @@ def generate_script(title: str, minutes: int) -> tuple[str, str]:
     one call caps at ~650 words and can never fill 30 minutes.
     The generic template is the last resort only, and only when
     every free source failed — it must never replace a real
-    script just because one call came back short."""
-    words = target_words(minutes)
+    script just because one call came back short.
+    SHORTS (user, 2026-11-09): a Short is seconds, not minutes
+    — words_target overrides the minutes x 150 target (e.g. 60s
+    = 150 words, 30s = 75)."""
+    words = words_target if words_target else target_words(minutes)
     if words <= 600:
         script = _generate_script_single(title, words)
         if script and len(script.split()) >= max(120, words * 0.4):
@@ -655,6 +659,12 @@ def _commons_search(query: str, filetype: str, limit: int = 20,
             "url": url,
             "mime": info.get("mime", ""),
             "size": size,
+            # Dimensions (SHORTS, user 2026-11-09): imageinfo's
+            # size prop already returns width/height — a Short
+            # prefers vertical files (height > width), so the
+            # picker can sort them first. Absent = unknown.
+            "width": info.get("width") or 0,
+            "height": info.get("height") or 0,
             # Poster thumbnail for videos (a JPG, not the video):
             # the scene-change picker shows this so it never has
             # to stream full clips just to preview them.
@@ -664,7 +674,8 @@ def _commons_search(query: str, filetype: str, limit: int = 20,
 
 
 def _search_stock_videos(query: str, pexels_key: str | None,
-                         pixabay_key: str | None) -> list[dict]:
+                         pixabay_key: str | None,
+                         vertical: bool = False) -> list[dict]:
     """Search Pexels and Pixabay for stock video clips (user's
     own free API keys — the Stock tool already uses them, and
     the keys are shared via localStorage so entering one in any
@@ -672,7 +683,8 @@ def _search_stock_videos(query: str, pexels_key: str | None,
     shape as Commons results (url/title/mime), so the scene
     picker can try them first. A bad key, a rate limit or a
     network error just returns fewer (or no) results — the
-    caller falls back to Commons, never a failed job."""
+    caller falls back to Commons, never a failed job.
+    SHORTS: vertical=True asks both APIs for portrait clips."""
     items: list[dict] = []
     if not query:
         return items
@@ -682,7 +694,8 @@ def _search_stock_videos(query: str, pexels_key: str | None,
         return items
     if pexels_key:
         try:
-            data = tools_stock._search_pexels(query, 1, pexels_key)
+            data = tools_stock._search_pexels(query, 1, pexels_key,
+                                              orientation="portrait" if vertical else None)
             for r in (data.get("results") or [])[:5]:
                 if r.get("video_url"):
                     # Pexels returns no descriptive title, so the
@@ -697,7 +710,8 @@ def _search_stock_videos(query: str, pexels_key: str | None,
             pass
     if pixabay_key:
         try:
-            data = tools_stock._search_pixabay(query, 1, pixabay_key)
+            data = tools_stock._search_pixabay(query, 1, pixabay_key,
+                                               orientation="vertical" if vertical else None)
             for r in (data.get("results") or [])[:5]:
                 if r.get("video_url"):
                     items.append({
@@ -772,8 +786,16 @@ def short_query(title: str, visual_text: str = "") -> str:
 def fetch_visuals(title: str, visuals: str,
                   pexels_key: str | None = None,
                   pixabay_key: str | None = None,
-                  offset: int = 0) -> dict:
+                  offset: int = 0,
+                  vertical: bool = False) -> dict:
     """Search Commons for images and/or videos, phrase-first.
+
+    SHORTS (user, 2026-11-09): vertical=True prefers vertical
+    files (height > width) — true vertical clips from Pexels /
+    Pixabay (portrait orientation) and vertical Commons files
+    sort first; landscape files still fill the list and are
+    centre-cropped to 9:16 at render time, so a Short never
+    fails for lack of vertical stock.
 
     Queries are ONLY short phrases built from the core words
     (max 2 words — user, 2026-11-09: a whole sentence finds
@@ -812,7 +834,8 @@ def fetch_visuals(title: str, visuals: str,
     # A bad key or a failed search just means no stock clips;
     # Commons below still fills the video.
     if visuals in ("videos", "both") and (pexels_key or pixabay_key):
-        for item in _search_stock_videos(core_phrase, pexels_key, pixabay_key):
+        for item in _search_stock_videos(core_phrase, pexels_key, pixabay_key,
+                                         vertical=vertical):
             if item["url"] in seen_urls:
                 continue
             seen_urls.add(item["url"])
@@ -839,6 +862,10 @@ def fetch_visuals(title: str, visuals: str,
                 score += 2
             if score < 1:
                 continue
+            # SHORTS: a vertical file (height > width) sorts
+            # ahead of a landscape one with the same relevance.
+            if vertical and (item.get("height") or 0) > (item.get("width") or 0):
+                score += 3
             scored.append((score, item))
         scored.sort(key=lambda pair: -pair[0])
         for _, item in scored:

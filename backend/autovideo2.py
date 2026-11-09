@@ -89,7 +89,8 @@ def _clean_text(text: str) -> str:
     return autovideo._clean_script(text or "")
 
 
-def generate_scenes(title: str, minutes: int, script: str | None = None) -> tuple[list[dict], str]:
+def generate_scenes(title: str, minutes: int, script: str | None = None,
+                    words_target: int | None = None) -> tuple[list[dict], str]:
     """Return (scenes, source). Each scene: narration + visual.
     NOTE 2026-11-03: asking Pollinations for a SCENE/NARRATION/
     VISUAL format returns HTTP 400 (same filter that rejected
@@ -102,12 +103,15 @@ def generate_scenes(title: str, minutes: int, script: str | None = None) -> tupl
     CUSTOM SCRIPT (user, 2026-11-09): when the user pastes a
     script they wrote (e.g. from Gemini), use it as-is instead
     of generating one — the same paragraph split turns it into
-    scenes, so the video is built from their words."""
+    scenes, so the video is built from their words.
+    SHORTS (user, 2026-11-09): words_target overrides the
+    minutes x 150 target for a Short (seconds, not minutes)."""
     if script and script.strip():
         script = _clean_text(script.strip())
         source = "custom"
     else:
-        script, source = autovideo.generate_script(title, minutes)
+        script, source = autovideo.generate_script(title, minutes,
+                                                   words_target=words_target)
     scenes: list[dict] = []
     for paragraph in autovideo.split_paragraphs(script):
         paragraph = paragraph.strip()
@@ -191,7 +195,8 @@ def _scene_visual(title: str, scene: dict, visuals: str,
                   used_urls: set | None = None,
                   lock=None,
                   pexels_key: str | None = None,
-                  pixabay_key: str | None = None) -> tuple[Path, str, str]:
+                  pixabay_key: str | None = None,
+                  vertical: bool = False) -> tuple[Path, str, str]:
     """Best visual for one scene. Returns (path, kind, source).
     kind is 'clip', 'image', 'ai' or 'card'.
     DEDUP RULE: a Commons URL used in an earlier scene is never
@@ -218,7 +223,8 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     search_text = autovideo.short_query(title, visual_text)
     found = autovideo.fetch_visuals(search_text, visuals,
                                     pexels_key=pexels_key,
-                                    pixabay_key=pixabay_key)
+                                    pixabay_key=pixabay_key,
+                                    vertical=vertical)
 
     def _on_topic(item: dict) -> bool:
         if not title_core:
@@ -600,6 +606,316 @@ def _words_to_srt(words: list[dict]) -> str:
         lines.append(text)
         lines.append("")
     return "\n".join(lines)
+
+
+# ------------------------------------------------------- number pop-ups
+# (user, 2026-11-09): when the voiceover says a figure (like
+# $100 or 50%), it pops up big on screen at that exact moment,
+# flying in from a random corner to a random point — it makes
+# the video feel alive, the way finance YouTubers do it. This
+# is a POST-PROCESSING step on the finished video, so it works
+# on an already-rendered video too (no re-render from scratch).
+
+_NUMBER_RE = re.compile(
+    r"\$?\d[\d,]*(?:\.\d+)?\s*(?:million|billion|thousand|%)?",
+    re.IGNORECASE)
+_POPUP_SHOW_SEC = 1.2   # how long the number stays on screen
+_POPUP_FLY_SEC = 0.3    # fly-in duration from the corner
+_POPUP_MAX_PER_SCENE = 2
+
+
+def _popup_display(matched: str) -> str:
+    """Short punchy text for a pop-up: '$100' stays '$100',
+    '200 million' becomes '200M', '5 billion' becomes '5B',
+    '50%' stays '50%'."""
+    text = matched.strip()
+    low = text.lower()
+    digits = re.sub(r"[^0-9.]", "", text)
+    if not digits:
+        return text
+    if "billion" in low:
+        return digits.rstrip(".") + "B"
+    if "million" in low:
+        return digits.rstrip(".") + "M"
+    if "thousand" in low:
+        return digits.rstrip(".") + "K"
+    return text
+
+
+def _parse_srt_cues(srt_path: Path) -> list[dict]:
+    """Parse an SRT file into [{start, end, text}]."""
+    try:
+        raw = srt_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    cues: list[dict] = []
+    for block in raw.split("\n\n"):
+        lines = [ln.strip() for ln in block.strip().splitlines() if ln.strip()]
+        if len(lines) < 2:
+            continue
+        m = re.match(r"(\d+):(\d+):([\d.,]+)\s*-->\s*(\d+):(\d+):([\d.,]+)",
+                     lines[1] if len(lines) > 1 and "-->" in lines[1] else lines[0])
+        if not m:
+            continue
+        def _t(h, mi, s):
+            return int(h) * 3600 + int(mi) * 60 + float(s.replace(",", "."))
+        text = " ".join(lines[2:] if "-->" in lines[1] else lines[1:])
+        cues.append({"start": _t(m.group(1), m.group(2), m.group(3)),
+                     "end": _t(m.group(4), m.group(5), m.group(6)),
+                     "text": text})
+    return cues
+
+
+def find_number_popups(scenes: list[dict], work_dir: Path) -> list[dict]:
+    """Find every figure in the narration and WHEN it is spoken.
+    Returns [{text, start, end}] with ABSOLUTE times in the
+    finished video (scene offset + in-scene time). Timing comes
+    from the scene's Whisper SRT cue that contains the number
+    (interpolated by word position inside the cue); when the
+    SRT has no match (Whisper heard 'one hundred' instead of
+    '100'), it falls back to the number's position in the
+    narration, scaled to the scene length. Max 2 pop-ups per
+    scene, so a figure-heavy scene never turns into clutter."""
+    popups: list[dict] = []
+    offset = 0.0
+    for i, scene in enumerate(scenes):
+        duration = float(scene.get("duration_sec") or 0)
+        narration = scene.get("narration") or ""
+        if duration <= 0 or not narration:
+            offset += duration
+            continue
+        matches = list(_NUMBER_RE.finditer(narration))
+        if not matches:
+            offset += duration
+            continue
+        cues = _parse_srt_cues(work_dir / f"scene-{i:02d}.srt")
+        words = narration.split()
+        taken = 0
+        for m in matches:
+            if taken >= _POPUP_MAX_PER_SCENE:
+                break
+            display = _popup_display(m.group(0))
+            digits = re.sub(r"[^0-9]", "", m.group(0))
+            when: float | None = None
+            if digits and cues:
+                for cue in cues:
+                    cue_words = cue["text"].split()
+                    for wi, w in enumerate(cue_words):
+                        if digits and digits in re.sub(r"[^0-9]", "", w):
+                            frac = (wi + 0.5) / max(len(cue_words), 1)
+                            when = cue["start"] + frac * (cue["end"] - cue["start"])
+                            break
+                    if when is not None:
+                        break
+            if when is None:
+                # Fallback: the number's word position in the
+                # narration, scaled to the scene length.
+                before = narration[:m.start()].split()
+                frac = len(before) / max(len(words), 1)
+                when = frac * duration
+            when = max(0.0, min(when, max(duration - 0.5, 0.0)))
+            start = offset + when
+            popups.append({"text": display, "start": round(start, 2),
+                           "end": round(start + _POPUP_SHOW_SEC, 2),
+                           "scene": i})
+            taken += 1
+        offset += duration
+    return popups
+
+
+# Stopwords for the Realistic step's word suggestions (user,
+# 2026-11-09): the filler words that must never be suggested
+# as pop-up words — only content words carry meaning.
+_STOPWORDS = set(
+    """a an the and or but if then else when while of at by for with
+    about into through after over between out against during without
+    before under around among to from in on of is am are was were be
+    been being have has had having do does did doing would should
+    could ought i you he she it we they me him her us them my your
+    his its our their this that these those there here what which
+    who whom whose why how all any both each few more most other
+    some such no nor not only own same so than too very can will
+    just don should now""".split())
+
+
+def suggest_words(scenes: list[dict], limit: int = 30) -> list[dict]:
+    """Suggest the narration's important words for the Realistic
+    step (user, 2026-11-09): the user picks from these, and
+    every chosen word pops up wherever it is spoken. Ranked by
+    how often the word appears (a repeated word is a key topic),
+    then by length (longer words carry more meaning). Numbers
+    are always suggested first — a figure is always important.
+    Returns [{word, count}] (word in its spoken form)."""
+    from collections import Counter
+    counts: Counter = Counter()
+    numbers: Counter = Counter()
+    for scene in scenes:
+        narration = scene.get("narration") or ""
+        for m in _NUMBER_RE.finditer(narration):
+            display = _popup_display(m.group(0))
+            numbers[display] += 1
+        for w in re.findall(r"[a-zA-Z][a-zA-Z\-']*", narration):
+            low = w.lower().strip("-'")
+            if len(low) < 3 or low in _STOPWORDS:
+                continue
+            counts[low] += 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], -len(kv[0]), kv[0]))
+    out = [{"word": w, "count": c} for w, c in numbers.most_common()]
+    out += [{"word": w, "count": c} for w, c in ranked[:limit]]
+    return out
+
+
+def find_word_popups(scenes: list[dict], work_dir: Path,
+                     words: list[str]) -> list[dict]:
+    """Find EVERY occurrence of the user's chosen words and WHEN
+    each is spoken (user, 2026-11-09, Realistic step). Same
+    timing as find_number_popups (Whisper SRT cue, interpolated
+    by word position; narration-position fallback). A word that
+    is spoken 5 times gets 5 pop-ups, one per occurrence. Each
+    pop-up carries the word in its spoken form."""
+    wanted = {w.lower().strip() for w in words if w and w.strip()}
+    if not wanted:
+        return []
+    popups: list[dict] = []
+    offset = 0.0
+    for i, scene in enumerate(scenes):
+        duration = float(scene.get("duration_sec") or 0)
+        narration = scene.get("narration") or ""
+        if duration <= 0 or not narration:
+            offset += duration
+            continue
+        cues = _parse_srt_cues(work_dir / f"scene-{i:02d}.srt")
+        narr_words = narration.split()
+        # Every occurrence of every wanted word in this scene.
+        for wi, raw in enumerate(narr_words):
+            low = re.sub(r"[^a-z0-9]", "", raw.lower())
+            if low not in wanted:
+                continue
+            display = raw.strip(".,!?;:\"'()[]{}")
+            when: float | None = None
+            if cues:
+                for cue in cues:
+                    cue_words = cue["text"].split()
+                    for ci, cw in enumerate(cue_words):
+                        if re.sub(r"[^a-z0-9]", "", cw.lower()) == low:
+                            frac = (ci + 0.5) / max(len(cue_words), 1)
+                            when = cue["start"] + frac * (cue["end"] - cue["start"])
+                            break
+                    if when is not None:
+                        break
+            if when is None:
+                when = (wi / max(len(narr_words), 1)) * duration
+            when = max(0.0, min(when, max(duration - 0.5, 0.0)))
+            start = offset + when
+            popups.append({"text": display, "start": round(start, 2),
+                           "end": round(start + _POPUP_SHOW_SEC, 2),
+                           "scene": i})
+        offset += duration
+    return popups
+
+
+def _filter_font_path(work_dir: Path) -> str | None:
+    """A fontfile value that is safe inside an FFmpeg filter
+    graph (no drive-letter colon, no backslashes). Copies the
+    font into the job dir and returns its path relative to the
+    server's working directory (the project root, where run.bat
+    starts it). Falls back to the absolute path with the colon
+    escaped if the relative path is not clean."""
+    import os
+    import shutil
+    src = _find_font()
+    if not src:
+        return None
+    dst = work_dir / "popup-font.ttf"
+    try:
+        if not dst.exists():
+            shutil.copyfile(src, dst)
+    except OSError:
+        return None
+    rel = os.path.relpath(dst, os.getcwd()).replace(os.sep, "/")
+    if rel.startswith("..") or ":" in rel:
+        return src.replace("\\", "\\\\").replace(":", "\\:")
+    return rel
+
+
+# Pop-up styles (user, 2026-11-09, Realistic step): EVERY
+# occurrence gets a DIFFERENT style — a random colour, size
+# and box, flying in from a random corner to a random point —
+# so no two pop-ups in the video look the same.
+_POPUP_COLORS = ["#FFD60A", "#00E5FF", "#FF6B9D", "#7CFC00",
+                 "#FF9F1C", "#FFFFFF", "#C084FC"]
+
+
+def apply_popups(final_path: Path, popups: list[dict],
+                 work_dir: Path, duration: float | None,
+                 progress_cb=None) -> Path:
+    """Burn word/number pop-ups into a finished video with
+    FFmpeg drawtext. Each pop-up flies in from a random corner
+    over 0.3s, settles at a random point, and stays 1.2s — and
+    every one gets a different random style (colour, size,
+    background box) so the video never looks templated.
+    Returns the new file path (final-popups.mp4). The caller
+    swaps it in for final.mp4. Raises on failure (the caller
+    keeps the original)."""
+    import random
+    import subprocess
+    font = _filter_font_path(work_dir)
+    if not font:
+        raise RuntimeError("No font available for the pop-ups.")
+    width, height = 1280, 720
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "csv=p=0",
+         str(final_path)], capture_output=True, text=True,
+        **video_module.no_window_kwargs())
+    if probe.returncode == 0 and probe.stdout.strip():
+        try:
+            w, h = probe.stdout.strip().split(",")
+            width, height = int(w), int(h)
+        except ValueError:
+            pass
+    rng = random.Random(20261109)
+    corners = [(-500, -200), (width + 100, -200),
+               (-500, height + 100), (width + 100, height + 100)]
+    filters: list[str] = []
+    for p in popups:
+        t0 = p["start"]
+        sx, sy = rng.choice(corners)
+        ex = rng.randint(int(width * 0.15), int(width * 0.85))
+        ey = rng.randint(int(height * 0.2), int(height * 0.8))
+        # A different style every time: random colour, size
+        # (0.06–0.11 of the height) and background box on/off.
+        color = rng.choice(_POPUP_COLORS)
+        fontsize = max(40, int(height * rng.uniform(0.06, 0.11)))
+        boxed = rng.random() < 0.7
+        # Fly-in: x/y interpolate from the corner to the random
+        # point over _POPUP_FLY_SEC, then hold. text_w/text_h
+        # centre the word on the chosen point.
+        x = (f"({ex}+({sx}-{ex})*max(0,1-(t-{t0})/{_POPUP_FLY_SEC}))"
+             f"-text_w/2")
+        y = (f"({ey}+({sy}-{ey})*max(0,1-(t-{t0})/{_POPUP_FLY_SEC}))"
+             f"-text_h/2")
+        text = p["text"].replace("'", "").replace(":", "")
+        box = "box=1:boxcolor=black@0.65:boxborderw=24:" if boxed else ""
+        filters.append(
+            f"drawtext=fontfile={font}:text='{text}':"
+            f"fontsize={fontsize}:fontcolor={color}:"
+            f"{box}"
+            f"borderw=2:bordercolor=black:"
+            f"x='{x}':y='{y}':"
+            f"enable='between(t,{t0},{p['end']})'")
+    out_path = work_dir / "final-popups.mp4"
+    cmd = ["ffmpeg", "-y", "-i", str(final_path),
+           "-vf", ",".join(filters),
+           "-c:v", "libx264", "-preset", "veryfast",
+           "-pix_fmt", "yuv420p", "-c:a", "copy",
+           "-movflags", "+faststart", str(out_path)]
+    ok, out = video_module.run_with_progress(
+        cmd, duration, 0, 100,
+        on_progress=(lambda pct, el, eta: progress_cb(pct) if progress_cb else None))
+    if not ok or not out_path.exists():
+        raise RuntimeError(f"Pop-ups failed: {out[-500:]}")
+    return out_path
 
 
 _WHISPER_MODEL = None
@@ -1503,7 +1819,9 @@ def plan_footage(title: str, minutes: int, script: str | None,
                  visuals: str, work_dir: Path,
                  pexels_key: str | None = None,
                  pixabay_key: str | None = None,
-                 progress_cb=None) -> dict:
+                 progress_cb=None,
+                 video_type: str = "long",
+                 short_seconds: int = 60) -> dict:
     """STEP 2 — Footage collection. Generates the scene script,
     then collects one visual per scene (clip/image/AI/card,
     same picking + dedup as _scene_visual) and downloads it
@@ -1511,13 +1829,24 @@ def plan_footage(title: str, minutes: int, script: str | None,
     — so a scene's footage can be changed instantly afterwards.
     Returns {scenes, script, script_source, script_words} where
     each scene carries narration, visual, caption, kind,
-    visual_source, visual_file (local name) and visual_url."""
+    visual_source, visual_file (local name) and visual_url.
+    SHORTS (user, 2026-11-09): video_type "short" builds a
+    9:16 Short of short_seconds (15/30/45/60) — the script
+    target is seconds x 2.5 words (~150 for 60s) and footage
+    prefers vertical files; landscape files are centre-cropped
+    to 9:16 at render time."""
     import os
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     work_dir.mkdir(parents=True, exist_ok=True)
-    scenes, source = generate_scenes(title, minutes, script=script)
+    is_short = video_type == "short"
+    words_target = None
+    if is_short:
+        # ~150 words/minute of speech → seconds x 2.5 words.
+        words_target = max(30, round(short_seconds * 150 / 60))
+    scenes, source = generate_scenes(title, minutes, script=script,
+                                     words_target=words_target)
     if not scenes:
         raise RuntimeError("Could not build a scene script.")
     script_text = "\n\n".join(s["narration"] for s in scenes)
@@ -1528,7 +1857,8 @@ def plan_footage(title: str, minutes: int, script: str | None,
     def _collect(index: int, scene: dict) -> dict:
         visual_path, kind, visual_source = _scene_visual(
             title, scene, visuals, work_dir, index, used_urls, lock,
-            pexels_key=pexels_key, pixabay_key=pixabay_key)
+            pexels_key=pexels_key, pixabay_key=pixabay_key,
+            vertical=is_short)
         return {
             "index": index,
             "narration": scene["narration"],
@@ -1671,16 +2001,45 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     }
 
 
+def _to_vertical(final_path: Path, work_dir: Path) -> Path:
+    """SHORTS (user, 2026-11-09): convert a finished 16:9
+    final.mp4 to 9:16 (1080x1920) for a YouTube Short. The
+    scale covers the frame and the crop takes the centre, so
+    a landscape clip becomes a vertical one (sides cut) and a
+    true vertical clip passes through untouched. The original
+    is kept as final-landscape.mp4; the vertical file replaces
+    final.mp4 so the download + upload serve the Short."""
+    landscape = work_dir / "final-landscape.mp4"
+    if landscape.exists():
+        landscape.unlink()
+    final_path.rename(landscape)
+    cmd = ["ffmpeg", "-y", "-i", str(landscape),
+           "-vf", ("scale=1080:1920:force_original_aspect_ratio=increase,"
+                   "crop=1080:1920,format=yuv420p"),
+           "-r", "30", "-c:v", "libx264", "-preset", "veryfast",
+           "-c:a", "copy", str(final_path)]
+    proc = subprocess.run(cmd, capture_output=True, text=True,
+                          **video_module.no_window_kwargs())
+    if proc.returncode != 0 or not final_path.exists():
+        # Never lose the video over the conversion: restore it.
+        landscape.rename(final_path)
+        raise RuntimeError(
+            f"Vertical conversion failed: {proc.stderr[-500:]}")
+    return final_path
+
+
 def render_video(work_dir: Path, scenes: list[dict],
                  durations: list[float], voice_files: list[Path],
                  music_path: Path | None, music_volume: float,
                  sfx_paths: list[Path], transitions: bool = True,
                  subtitles: bool = True,
-                 progress_cb=None) -> dict:
+                 progress_cb=None,
+                 video_type: str = "long") -> dict:
     """STEP 4 — Render. Encodes every scene's segment from its
     chosen visual + voice length, then joins + muxes via
     join_and_mux. Returns {final_path, final_duration_sec,
-    join, kinds}."""
+    join, kinds}. SHORTS: video_type "short" converts the
+    finished video to 9:16 (1080x1920) before returning."""
     total_voice = sum(durations)
     segments: list[Path] = []
     kinds = {"clip": 0, "image": 0, "ai": 0, "card": 0}
@@ -1706,6 +2065,9 @@ def render_video(work_dir: Path, scenes: list[dict],
         work_dir, segments, voice_files, durations, total_voice,
         music_path, music_volume, sfx_paths, transitions,
         len(scenes), progress_cb=progress_cb)
+    if video_type == "short":
+        _to_vertical(final_path, work_dir)
+        final_duration = video_module.get_duration(final_path) or final_duration
     return {
         "final_path": final_path,
         "final_duration_sec": final_duration,

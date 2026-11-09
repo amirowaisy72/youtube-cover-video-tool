@@ -85,13 +85,18 @@ def _pick_pixabay_video(videos: dict) -> str | None:
     return None
 
 
-def _search_pixabay(q: str, page: int, key: str) -> dict:
+def _search_pixabay(q: str, page: int, key: str,
+                    orientation: str | None = None) -> dict:
     params = {
         "key": key,
         "q": q,
         "page": str(page),
         "per_page": str(PER_PAGE),
     }
+    # SHORTS (user, 2026-11-09): orientation="vertical" asks
+    # Pixabay for portrait clips (9:16) instead of landscape.
+    if orientation:
+        params["orientation"] = orientation
     url = f"{PIXABAY_VIDEOS_BASE}?{urllib.parse.urlencode(params)}"
     data = _get_json(url)
     results = []
@@ -131,12 +136,17 @@ def _pick_pexels_video(video_files: list) -> str | None:
     ]
 
 
-def _search_pexels(q: str, page: int, key: str) -> dict:
+def _search_pexels(q: str, page: int, key: str,
+                   orientation: str | None = None) -> dict:
     params = {
         "query": q,
         "page": str(page),
         "per_page": str(PER_PAGE),
     }
+    # SHORTS (user, 2026-11-09): orientation="portrait" asks
+    # Pexels for vertical clips (9:16) instead of landscape.
+    if orientation:
+        params["orientation"] = orientation
     url = f"{PEXELS_SEARCH_BASE}?{urllib.parse.urlencode(params)}"
     data = _get_json(url, headers={"Authorization": key})
     results = []

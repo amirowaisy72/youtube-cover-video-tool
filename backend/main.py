@@ -2379,7 +2379,12 @@ def autovideo_create(payload: AutoVideoRequest) -> dict:
 # the existing edit endpoints keep working on a finished video).
 class AutoVideoPlanRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
-    minutes: int = Field(..., ge=1, le=30)
+    minutes: int = Field(1, ge=1, le=30)
+    # Video type (user, 2026-11-09): "long" (16:9, minutes) or
+    # "short" (9:16 Short, short_seconds 15/30/45/60). For a
+    # Short the minutes field is ignored.
+    video_type: str = "long"
+    short_seconds: int = Field(60, ge=15, le=60)
     visuals: str = "both"  # images | videos | both
     voice: str = "en-US-AriaNeural"
     # Voice provider (user, 2026-11-09): "edge" (default, free, no
@@ -2396,7 +2401,9 @@ class AutoVideoPlanRequest(BaseModel):
 def _run_autovideo_plan(job_id: str, title: str, minutes: int,
                         visuals: str, voice: str, script: str | None,
                         pexels_key: str | None, pixabay_key: str | None,
-                        job_token: str | None) -> None:
+                        job_token: str | None,
+                        video_type: str = "long",
+                        short_seconds: int = 60) -> None:
     """Step 2 worker: collect footage scene by scene, no voice,
     no render. On failure the credit is refunded."""
     try:
@@ -2417,12 +2424,15 @@ def _run_autovideo_plan(job_id: str, title: str, minutes: int,
         plan = autovideo2.plan_footage(
             title, minutes, script, visuals, directory,
             pexels_key=pexels_key, pixabay_key=pixabay_key,
-            progress_cb=_plan_progress)
+            progress_cb=_plan_progress,
+            video_type=video_type, short_seconds=short_seconds)
         job = _av_read(job_id)
         job.update({
             "status": "planned", "phase": "planned",
             "stage": "Footage ready — review the scenes.",
             "progress": 100,
+            "video_type": video_type,
+            "short_seconds": short_seconds,
             "script": plan["script"],
             "script_source": plan["script_source"],
             "script_words": plan["script_words"],
@@ -2447,6 +2457,10 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
     voiceover, no rendering yet."""
     if payload.visuals not in ("images", "videos", "both"):
         raise HTTPException(400, "Visuals must be images, videos, or both.")
+    if payload.video_type not in ("long", "short"):
+        raise HTTPException(400, "Video type must be long or short.")
+    if payload.video_type == "short" and payload.short_seconds not in (15, 30, 45, 60):
+        raise HTTPException(400, "Short length must be 15, 30, 45 or 60 seconds.")
     if payload.tts_provider not in tts_module.PROVIDERS:
         raise HTTPException(400, "Unknown voice provider.")
     if payload.tts_provider == "edge":
@@ -2463,13 +2477,16 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
     _av_write({"id": job_id, "status": "planning", "phase": "planning",
                "stage": "Starting…", "progress": 0, "title": payload.title,
                "minutes": payload.minutes, "visuals": payload.visuals,
+               "video_type": payload.video_type,
+               "short_seconds": payload.short_seconds,
                "voice": payload.voice, "tts_provider": payload.tts_provider,
                "job_token": token})
     threading.Thread(
         target=_run_autovideo_plan,
         args=(job_id, payload.title, payload.minutes, payload.visuals,
               payload.voice, payload.script, payload.pexels_key,
-              payload.pixabay_key, token),
+              payload.pixabay_key, token, payload.video_type,
+              payload.short_seconds),
         daemon=True).start()
     return {"job_id": job_id, "status": "planning", "phase": "planning"}
 
@@ -2692,10 +2709,40 @@ def _run_autovideo_render(job_id: str, music_volume: float,
         result = autovideo2.render_video(
             directory, scenes, durations, voice_files,
             music_path, music_volume, sfx_paths, transitions,
-            subtitles=subtitles, progress_cb=_render_progress)
+            subtitles=subtitles, progress_cb=_render_progress,
+            video_type=job.get("video_type") or "long")
         kinds = result["kinds"]
         job = _av_read(job_id)
         final_path = directory / "final.mp4"
+        # Realistic step (user, 2026-11-09): the words he picked
+        # pop up wherever they are spoken. Applied right after
+        # the render, so the finished video already has them.
+        # A pop-up failure never fails the render — the video
+        # is done without them, and the error is recorded.
+        realistic_words = job.get("realistic_words") or []
+        if realistic_words and final_path.exists():
+            try:
+                import video as video_module
+                job.update({"stage": "Adding Realistic pop-ups…",
+                            "progress": 92, "status": "rendering",
+                            "phase": "rendering"})
+                _av_write(job)
+                word_popups = autovideo2.find_word_popups(
+                    scenes, directory, realistic_words)
+                if word_popups:
+                    import shutil
+                    backup_path = directory / "final-before-popups.mp4"
+                    shutil.copyfile(final_path, backup_path)
+                    duration = video_module.get_duration(final_path)
+                    out_path = autovideo2.apply_popups(
+                        final_path, word_popups, directory, duration)
+                    out_path.replace(final_path)
+                    job = _av_read(job_id)
+                    job.update({"popups_applied": True,
+                                "popups_count": len(word_popups)})
+            except Exception as pop_exc:  # noqa: BLE001
+                job = _av_read(job_id)
+                job.update({"popups_error": str(pop_exc)[-500:]})
         # File size (user, 2026-11-09): show it in the done stats
         # and as the before/after of the compress feature.
         final_mb = round(final_path.stat().st_size / 1024 / 1024, 1) if final_path.exists() else None
@@ -2871,6 +2918,112 @@ def autovideo_compress(job_id: str) -> dict:
     return {"job_id": job_id, "status": "compressing"}
 
 
+def _run_autovideo_popups(job_id: str) -> None:
+    """Add number pop-ups to a FINISHED video (user, 2026-11-09).
+    Works on an already-rendered video — no re-render from
+    scratch. Finds the figures in the narration, times them
+    from the Whisper SRTs, burns them in with FFmpeg drawtext
+    (fly in from a random corner, 1.2s on screen). The original
+    is kept as final-before-popups.mp4; the pop-up version
+    replaces final.mp4, so Download + Upload serve it. If a
+    trimmed.mp4 exists, it is re-cut from the new final.mp4 so
+    the trimmed upload gets the pop-ups too. Re-applying is
+    clean: the current final.mp4 is restored from the backup
+    first, so numbers never double up."""
+    import time as _time
+    import video as video_module
+    try:
+        directory = _av_job_dir(job_id)
+        final_path = directory / "final.mp4"
+        if not final_path.exists():
+            raise RuntimeError("No finished video yet — render first.")
+        job = _av_read(job_id)
+        scenes = job.get("scenes") or []
+        if not scenes:
+            raise RuntimeError("No scenes — this video has no narration to scan.")
+        job.update({"status": "applying-popups", "phase": "applying-popups",
+                    "stage": "Finding figures in the narration…", "progress": 5,
+                    "popups_started_at": _time.time()})
+        _av_write(job)
+        # Idempotent: restore the pre-pop-up original first.
+        backup_path = directory / "final-before-popups.mp4"
+        if job.get("popups_applied") and backup_path.exists():
+            import shutil
+            shutil.copyfile(backup_path, final_path)
+        popups = autovideo2.find_number_popups(scenes, directory)
+        if not popups:
+            job = _av_read(job_id)
+            job.update({"status": "done", "phase": "done",
+                        "stage": "done", "progress": 100,
+                        "popups_applied": False, "popups_count": 0,
+                        "popups_note": "No figures found in the narration — nothing to pop up."})
+            _av_write(job)
+            return
+        duration = video_module.get_duration(final_path)
+
+        def _on_progress(pct: float) -> None:
+            j = _av_read(job_id)
+            j.update({"stage": f"Adding number pop-ups… {pct:.0f}%",
+                      "progress": round(pct, 1),
+                      "status": "applying-popups", "phase": "applying-popups"})
+            _av_write(j)
+
+        out_path = autovideo2.apply_popups(
+            final_path, popups, directory, duration,
+            progress_cb=_on_progress)
+        original_mb = round(final_path.stat().st_size / 1024 / 1024, 1)
+        import shutil
+        shutil.copyfile(final_path, backup_path)
+        out_path.replace(final_path)
+        new_mb = round(final_path.stat().st_size / 1024 / 1024, 1)
+        # Re-cut the trimmed version (if any) from the new file.
+        trimmed = directory / "trimmed.mp4"
+        trim_seconds = job.get("trimmed_start_seconds")
+        if trimmed.exists() and trim_seconds:
+            proc = subprocess.run(
+                ["ffmpeg", "-y", "-ss", str(trim_seconds), "-i", str(final_path),
+                 "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", str(trimmed)],
+                capture_output=True, text=True, **video_module.no_window_kwargs())
+            if proc.returncode == 0 and trimmed.exists():
+                job = _av_read(job_id)
+                job["trimmed_duration_sec"] = round(
+                    video_module.get_duration(trimmed) or 0, 1)
+        job = _av_read(job_id)
+        job.update({"status": "done", "phase": "done",
+                    "stage": "done", "progress": 100,
+                    "final_size_mb": new_mb,
+                    "popups_applied": True, "popups_count": len(popups)})
+        _av_write(job)
+    except Exception as exc:  # noqa: BLE001
+        job = _av_read(job_id)
+        job.update({"status": "done", "phase": "done",
+                    "stage": "done", "progress": 100,
+                    "popups_error": str(exc)[-500:]})
+        _av_write(job)
+
+
+@app.post("/api/autovideo/{job_id}/number-popups")
+def autovideo_number_popups(job_id: str) -> dict:
+    """Add number pop-ups to a finished video: every figure the
+    voiceover says pops up big on screen at that moment, flying
+    in from a random corner. Runs in the background; poll the
+    job for progress. Works on an already-rendered video."""
+    import time as _time
+    job = _av_read(job_id)
+    if job.get("status") == "applying-popups":
+        started = job.get("popups_started_at") or 0
+        if _time.time() - started > 1800:
+            job.update({"status": "done", "phase": "done",
+                        "stage": "done", "progress": 100})
+            _av_write(job)
+        else:
+            raise HTTPException(400, "Number pop-ups already running.")
+    if job.get("status") != "done" or not (_av_job_dir(job_id) / "final.mp4").exists():
+        raise HTTPException(400, "Render the video first.")
+    threading.Thread(target=_run_autovideo_popups, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id, "status": "applying-popups"}
+
+
 def _run_autovideo_revoice(job_id: str, provider: str, voice: str,
                            key: str | None) -> None:
     """Re-voice a COMPLETED video with a different voice (user,
@@ -3007,6 +3160,39 @@ def autovideo_scene_file(job_id: str, filename: str) -> FileResponse:
 
 class AutoVideoTrimRequest(BaseModel):
     start_seconds: float = Field(..., gt=0, le=600)
+
+
+class AutoVideoRealisticWordsRequest(BaseModel):
+    words: list[str] = Field(default_factory=list)
+
+
+@app.get("/api/autovideo/{job_id}/realistic-words")
+def autovideo_realistic_words(job_id: str) -> dict:
+    """Realistic step (user, 2026-11-09): suggest the narration's
+    important words, so the user can pick which ones pop up
+    wherever they are spoken. Returns the suggestions plus any
+    words already chosen."""
+    job = _av_read(job_id)
+    scenes = job.get("scenes") or []
+    if not scenes:
+        raise HTTPException(400, "No scenes yet — collect the footage first.")
+    return {"job_id": job_id,
+            "suggestions": autovideo2.suggest_words(scenes),
+            "chosen": job.get("realistic_words") or []}
+
+
+@app.post("/api/autovideo/{job_id}/realistic-words")
+def autovideo_save_realistic_words(job_id: str,
+                                   payload: AutoVideoRealisticWordsRequest) -> dict:
+    """Save the words the user picked in the Realistic step.
+    The render applies them as pop-ups wherever they are
+    spoken (each occurrence a different random style). An
+    empty list means no pop-ups."""
+    job = _av_read(job_id)
+    words = [w.strip() for w in (payload.words or []) if w and w.strip()]
+    job["realistic_words"] = words[:50]
+    _av_write(job)
+    return {"job_id": job_id, "words": job["realistic_words"]}
 
 
 @app.post("/api/autovideo/{job_id}/trim")

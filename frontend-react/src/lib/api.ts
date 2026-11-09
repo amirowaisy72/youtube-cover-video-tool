@@ -163,6 +163,19 @@ export type AvJob = {
   // original — the original is kept and nothing is replaced.
   compress_no_gain?: boolean;
   compress_note?: string;
+  // Video type (user, 2026-11-09): "long" (16:9) or "short"
+  // (9:16 YouTube Short). short_seconds is the Short length.
+  video_type?: string;
+  short_seconds?: number;
+  // Number pop-ups (user, 2026-11-09): figures the voiceover
+  // says pop up big on screen at that moment.
+  popups_applied?: boolean;
+  popups_count?: number;
+  popups_error?: string;
+  popups_note?: string;
+  // Realistic step (user, 2026-11-09): words picked to pop up
+  // wherever they are spoken.
+  realistic_words?: string[];
   // Voice provider (user, 2026-11-09): which TTS provider
   // voiced this video ("edge" default, "google", "unreal",
   // "elevenlabs"). Set when the user re-voices a finished video.
@@ -440,11 +453,11 @@ export const autovideoCreate = (title: string, minutes: number, voice: string, s
 // Setup (Step 1) -> Footage (Step 2) -> Audio (Step 3) -> Render (Step 4).
 // The decisions happen BEFORE any rendering, so a scene's footage or the
 // music can be changed instantly until the final render.
-export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "", ttsProvider = "edge", ttsKey = "") =>
+export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "", ttsProvider = "edge", ttsKey = "", videoType = "long", shortSeconds = 60) =>
   api<{ job_id: string; status: string; phase: string }>("/api/autovideo/plan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null, tts_provider: ttsProvider, tts_key: ttsKey || null }),
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null, tts_provider: ttsProvider, tts_key: ttsKey || null, video_type: videoType, short_seconds: shortSeconds }),
   });
 
 export const autovideoPrepareAudio = (jobId: string, freesoundKey = "", music = true, ttsProvider = "", ttsVoice = "", ttsKey = "") =>
@@ -511,6 +524,30 @@ export const autovideoRender = (jobId: string, musicVolume = 0.2, transitions = 
 export const autovideoCompress = (jobId: string) =>
   api<{ job_id: string; status: string }>(`/api/autovideo/${jobId}/compress`, {
     method: "POST",
+  });
+
+// Number pop-ups (user, 2026-11-09): every figure the voiceover
+// says pops up big on screen at that moment, flying in from a
+// random corner. Post-processing on the finished video — works
+// on an already-rendered video too. Runs in the background;
+// poll the job for progress and the pop-up count.
+export const autovideoNumberPopups = (jobId: string) =>
+  api<{ job_id: string; status: string }>(`/api/autovideo/${jobId}/number-popups`, {
+    method: "POST",
+  });
+
+// Realistic step (user, 2026-11-09): the narration's important
+// words, so the user can pick which ones pop up wherever they
+// are spoken — every occurrence in a different random style.
+export type RealisticWord = { word: string; count: number };
+export const autovideoRealisticWords = (jobId: string) =>
+  api<{ job_id: string; suggestions: RealisticWord[]; chosen: string[] }>(
+    `/api/autovideo/${jobId}/realistic-words`,
+  );
+export const autovideoSaveRealisticWords = (jobId: string, words: string[]) =>
+  api<{ job_id: string; words: string[] }>(`/api/autovideo/${jobId}/realistic-words`, {
+    method: "POST",
+    body: JSON.stringify({ words }),
   });
 
 // URL of one collected footage file (Step 2 preview).
