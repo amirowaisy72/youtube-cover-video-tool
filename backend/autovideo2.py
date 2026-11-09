@@ -648,7 +648,14 @@ _NUMBER_RE = re.compile(
     r"\$?\d[\d,]*(?:\.\d+)?\s*(?:million|billion|thousand|%)?",
     re.IGNORECASE)
 _POPUP_SHOW_SEC = 1.2   # how long the number stays on screen
-_POPUP_FLY_SEC = 0.3    # fly-in duration from the corner
+_POPUP_FLY_SEC = 0.3    # (old) fly-in duration from the corner
+_POPUP_POP_SEC = 0.2    # scale-pop duration (40% -> 110% -> 100%)
+# Pop-up lead (user, 2026-11-09): the word must pop up AS it is
+# spoken (or just before), never after — the old timing put the
+# pop-up at the spoken instant, but the 0.3s fly-in meant it only
+# arrived after the word was already said. Start 0.4s early so
+# the pop completes right as the word is spoken.
+_POPUP_LEAD_SEC = 0.4
 _POPUP_MAX_PER_SCENE = 2
 
 
@@ -742,7 +749,9 @@ def find_number_popups(scenes: list[dict], work_dir: Path) -> list[dict]:
                 frac = len(before) / max(len(words), 1)
                 when = frac * duration
             when = max(0.0, min(when, max(duration - 0.5, 0.0)))
-            start = offset + when
+            # Lead: show 0.4s BEFORE the figure is spoken (user,
+            # 2026-11-09) so the pop lands as the word is said.
+            start = max(0.0, offset + when - _POPUP_LEAD_SEC)
             popups.append({"text": display, "start": round(start, 2),
                            "end": round(start + _POPUP_SHOW_SEC, 2),
                            "scene": i})
@@ -834,7 +843,11 @@ def find_word_popups(scenes: list[dict], work_dir: Path,
             if when is None:
                 when = (wi / max(len(narr_words), 1)) * duration
             when = max(0.0, min(when, max(duration - 0.5, 0.0)))
-            start = offset + when
+            # Lead + capital (user, 2026-11-09): show 0.4s BEFORE
+            # the word is spoken, and capitalise the first letter
+            # so the pop-up reads like a title, not a fragment.
+            start = max(0.0, offset + when - _POPUP_LEAD_SEC)
+            display = display[:1].upper() + display[1:] if display else display
             popups.append({"text": display, "start": round(start, 2),
                            "end": round(start + _POPUP_SHOW_SEC, 2),
                            "scene": i})
@@ -878,13 +891,15 @@ def apply_popups(final_path: Path, popups: list[dict],
                  work_dir: Path, duration: float | None,
                  progress_cb=None) -> Path:
     """Burn word/number pop-ups into a finished video with
-    FFmpeg drawtext. Each pop-up flies in from a random corner
-    over 0.3s, settles at a random point, and stays 1.2s — and
-    every one gets a different random style (colour, size,
-    background box) so the video never looks templated.
-    Returns the new file path (final-popups.mp4). The caller
-    swaps it in for final.mp4. Raises on failure (the caller
-    keeps the original)."""
+    FFmpeg drawtext. Each pop-up POPS in at a random point —
+    it scales up from 40% to 110% (a slight overshoot) over
+    0.2s, then settles at full size and stays 1.2s — and every
+    one gets a different random style (colour, size, background
+    box) so the video never looks templated. The old fly-in from
+    a corner (user, 2026-11-09) looked rough and mechanical; a
+    scale pop is the real pop-up effect. Returns the new file
+    path (final-popups.mp4). The caller swaps it in for final.mp4.
+    Raises on failure (the caller keeps the original)."""
     import random
     import subprocess
     font = _filter_font_path(work_dir)
@@ -903,8 +918,6 @@ def apply_popups(final_path: Path, popups: list[dict],
         except ValueError:
             pass
     rng = random.Random(20261109)
-    corners = [(-500, -200), (width + 100, -200),
-               (-500, height + 100), (width + 100, height + 100)]
     # SHORTS (user, 2026-11-09): the font was sized by HEIGHT —
     # for a 1080x1920 Short that made 115–211px words that filled
     # the frame and overlapped the captions. Size by the SMALLER
@@ -916,7 +929,6 @@ def apply_popups(final_path: Path, popups: list[dict],
     filters: list[str] = []
     for p in popups:
         t0 = p["start"]
-        sx, sy = rng.choice(corners)
         # A different style every time: random colour, size
         # (0.06–0.11 of the smaller side) and background box on/off.
         color = rng.choice(_POPUP_COLORS)
@@ -933,20 +945,21 @@ def apply_popups(final_path: Path, popups: list[dict],
         else:
             ex = rng.randint(lo, hi)
         ey = rng.randint(int(height * 0.2), int(height * 0.7))
-        # Fly-in: x/y interpolate from the corner to the random
-        # point over _POPUP_FLY_SEC, then hold. text_w/text_h
-        # centre the word on the chosen point.
-        x = (f"({ex}+({sx}-{ex})*max(0,1-(t-{t0})/{_POPUP_FLY_SEC}))"
-             f"-text_w/2")
-        y = (f"({ey}+({sy}-{ey})*max(0,1-(t-{t0})/{_POPUP_FLY_SEC}))"
-             f"-text_h/2")
+        # REAL POP (user, 2026-11-09): the word sits at its landing
+        # point and SCALES up — fontsize grows 40% -> 110% over
+        # 0.2s (a slight overshoot), then settles at 100%. The
+        # x/y stay centred on (ex, ey) via text_w/text_h, so the
+        # word grows outward from its centre. No corner fly-in.
+        pop = _POPUP_POP_SEC
+        size_expr = (f"'if(lt(t-{t0},{pop}),"
+                     f"{fontsize}*(0.4+0.7*(t-{t0})/{pop}),{fontsize})'")
         box = "box=1:boxcolor=black@0.65:boxborderw=24:" if boxed else ""
         filters.append(
             f"drawtext=fontfile={font}:text='{text}':"
-            f"fontsize={fontsize}:fontcolor={color}:"
+            f"fontsize={size_expr}:fontcolor={color}:"
             f"{box}"
             f"borderw=2:bordercolor=black:"
-            f"x='{x}':y='{y}':"
+            f"x='{ex}-text_w/2':y='{ey}-text_h/2':"
             f"enable='between(t,{t0},{p['end']})'")
     out_path = work_dir / "final-popups.mp4"
     cmd = ["ffmpeg", "-y", "-i", str(final_path),
