@@ -286,6 +286,15 @@ _GOOGLE_CHIRP_VOICES = [
     ("en-US-Chirp3-HD-Schedar", "Chirp 3 HD — Male, Schedar"),
 ]
 
+# Browser User-Agent for every provider call (user, 2026-11-09).
+# The APIs rejected the default Python-urllib agent with a 401/403
+# even for a VALID key — Unreal proved this (its 403 became a
+# proper 401 for a bad key once the agent was set), and ElevenLabs
+# was failing the same way. All urllib calls below use it.
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+       "AppleWebKit/537.36 (KHTML, like Gecko) "
+       "Chrome/120.0 Safari/537.36")
+
 # Unreal Speech (Kokoro) voices (curated English ones).
 _UNREAL_VOICES = [
     ("af_heart", "Kokoro — Female, Heart"),
@@ -363,7 +372,7 @@ def list_provider_voices(provider: str, api_key: str | None = None) -> list[dict
         import urllib.request
         req = urllib.request.Request(
             "https://api.elevenlabs.io/v1/voices",
-            headers={"xi-api-key": api_key})
+            headers={"xi-api-key": api_key, "User-Agent": _UA})
         with urllib.request.urlopen(req, timeout=30) as resp:
             import json as _json
             data = _json.loads(resp.read().decode("utf-8"))
@@ -398,7 +407,7 @@ def check_quota(provider: str, api_key: str | None = None) -> dict:
         import urllib.request
         req = urllib.request.Request(
             "https://api.elevenlabs.io/v1/user/subscription",
-            headers={"xi-api-key": api_key})
+            headers={"xi-api-key": api_key, "User-Agent": _UA})
         with urllib.request.urlopen(req, timeout=30) as resp:
             import json as _json
             data = _json.loads(resp.read().decode("utf-8"))
@@ -425,7 +434,8 @@ def _synthesize_google(text: str, voice: str, api_key: str, dest: Path) -> None:
     }).encode("utf-8")
     req = urllib.request.Request(
         f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
-        data=body, headers={"Content-Type": "application/json"})
+        data=body, headers={"Content-Type": "application/json",
+                            "User-Agent": _UA})
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             data = _json.loads(resp.read().decode("utf-8"))
@@ -459,9 +469,7 @@ def _synthesize_unreal(text: str, voice: str, api_key: str, dest: Path) -> None:
         data=body, headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
-            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                           "AppleWebKit/537.36 (KHTML, like Gecko) "
-                           "Chrome/120.0 Safari/537.36"),
+            "User-Agent": _UA,
         })
     try:
         with urllib.request.urlopen(req, timeout=120) as resp, dest.open("wb") as out:
@@ -488,7 +496,7 @@ def _synthesize_elevenlabs(text: str, voice: str, api_key: str, dest: Path) -> N
         f"https://api.elevenlabs.io/v1/text-to-speech/{voice}",
         data=body, headers={"Content-Type": "application/json",
                             "Accept": "audio/mpeg",
-                            "xi-api-key": api_key})
+                            "xi-api-key": api_key, "User-Agent": _UA})
     try:
         with urllib.request.urlopen(req, timeout=120) as resp, dest.open("wb") as out:
             while True:
