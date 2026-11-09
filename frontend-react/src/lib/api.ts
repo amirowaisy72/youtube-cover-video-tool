@@ -163,6 +163,11 @@ export type AvJob = {
   // original — the original is kept and nothing is replaced.
   compress_no_gain?: boolean;
   compress_note?: string;
+  // Voice provider (user, 2026-11-09): which TTS provider
+  // voiced this video ("edge" default, "google", "unreal",
+  // "elevenlabs"). Set when the user re-voices a finished video.
+  tts_provider?: string;
+  revoice_error?: string;
   // Trimmed version (user, 2026-11-09): cutting the first seconds
   // off the finished video (e.g. an unwanted Hook).
   trimmed_url?: string;
@@ -173,6 +178,14 @@ export type AvJob = {
   uploaded_video_id?: string;
   uploaded_url?: string;
   uploaded_privacy?: string;
+  // Upload progress (user, 2026-11-09): the YouTube upload runs
+  // in the background, so the job carries its live progress.
+  upload_status?: string;
+  upload_progress?: number;
+  upload_stage?: string;
+  upload_error?: string;
+  thumbnail_set?: boolean;
+  thumbnail_error?: string;
   // Mood music + transitions (2026-11-08): what actually got
   // added, so a missing track is never silent. music_status /
   // sfx_status: "ok" | "no_key" | "key_rejected" | "no_results" |
@@ -423,18 +436,62 @@ export const autovideoCreate = (title: string, minutes: number, voice: string, s
 // Setup (Step 1) -> Footage (Step 2) -> Audio (Step 3) -> Render (Step 4).
 // The decisions happen BEFORE any rendering, so a scene's footage or the
 // music can be changed instantly until the final render.
-export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "") =>
+export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "", ttsProvider = "edge", ttsKey = "") =>
   api<{ job_id: string; status: string; phase: string }>("/api/autovideo/plan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null }),
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null, tts_provider: ttsProvider, tts_key: ttsKey || null }),
   });
 
-export const autovideoPrepareAudio = (jobId: string, freesoundKey = "", music = true) =>
+export const autovideoPrepareAudio = (jobId: string, freesoundKey = "", music = true, ttsProvider = "", ttsVoice = "", ttsKey = "") =>
   api<{ job_id: string; status: string; phase: string }>(`/api/autovideo/${jobId}/prepare-audio`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ freesound_key: freesoundKey || null, music }),
+    body: JSON.stringify({ freesound_key: freesoundKey || null, music, tts_provider: ttsProvider || null, tts_voice: ttsVoice || null, tts_key: ttsKey || null }),
+  });
+
+// Re-voice a completed video with a different voice (user,
+// 2026-11-09). Runs in the background; poll the job.
+export const autovideoRevoice = (jobId: string, ttsProvider: string, ttsVoice: string, ttsKey = "") =>
+  api<{ job_id: string; status: string }>(`/api/autovideo/${jobId}/revoice`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tts_provider: ttsProvider, tts_voice: ttsVoice, tts_key: ttsKey || null }),
+  });
+
+// Voice providers (user, 2026-11-09): the narration voice can
+// come from Google Cloud TTS, Unreal Speech or ElevenLabs
+// instead of the default Edge voice.
+export type TtsProvider = {
+  id: string;
+  label: string;
+  key_name: string | null;
+  key_url: string | null;
+  key_help: string;
+  quota_api: boolean;
+  quota_note: string;
+};
+
+export type TtsVoiceOption = {
+  id: string;
+  label: string;
+  sample_url?: string | null;
+};
+
+export const ttsProviders = () =>
+  api<{ providers: TtsProvider[] }>("/api/tts/providers");
+
+export const ttsProviderVoices = (provider: string, key = "") =>
+  api<{ provider: string; voices: TtsVoiceOption[] }>(`/api/tts/voices?provider=${encodeURIComponent(provider)}${key ? `&key=${encodeURIComponent(key)}` : ""}`);
+
+export const ttsQuota = (provider: string, key = "") =>
+  api<{ quota_api: boolean; remaining_chars: number | null; limit_chars: number | null; used_chars: number | null; note: string }>(`/api/tts/quota?provider=${encodeURIComponent(provider)}${key ? `&key=${encodeURIComponent(key)}` : ""}`);
+
+export const ttsPreview = (provider: string, voice: string, key = "") =>
+  api<{ provider: string; voice: string; sample_url: string }>("/api/tts/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, voice, key: key || null }),
   });
 
 export const autovideoRender = (jobId: string, musicVolume = 0.2, transitions = true, subtitles = true, music = true) =>
@@ -475,7 +532,6 @@ export type AvUploadResult = {
   thumbnail_set: boolean;
   thumbnail_error: string;
 };
-
 export const autovideoUpload = (
   jobId: string,
   fields: { title: string; description: string; tags: string; privacy: string; channelId: string },
@@ -488,7 +544,10 @@ export const autovideoUpload = (
   form.append("privacy_status", fields.privacy);
   form.append("channel_id", fields.channelId);
   if (thumbnail) form.append("thumbnail", thumbnail);
-  return api<AvUploadResult>(`/api/autovideo/${jobId}/upload`, { method: "POST", body: form });
+  // Upload runs in the background (user, 2026-11-09) — the video
+  // is large, so the response only starts it; poll the job for
+  // upload_progress and the video URL when it finishes.
+  return api<{ job_id: string; status: string }>(`/api/autovideo/${jobId}/upload`, { method: "POST", body: form });
 };
 
 export type AvAltVisual = {

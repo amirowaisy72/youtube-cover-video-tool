@@ -4,8 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoPlan, autovideoPrepareAudio, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsVoices, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsVoice, validateStockKey, youtubeStatus } from "@/lib/api";
-import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey } from "@/lib/keys";
+import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoPlan, autovideoPrepareAudio, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type TtsProvider, type TtsVoice, type TtsVoiceOption, validateStockKey, youtubeStatus } from "@/lib/api";
+import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, getTtsKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey, setTtsKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
 import s3 from "@/assets/scene-3.jpg";
@@ -42,6 +42,190 @@ function stageIndex(job: AvJob | null): number {
   if (job?.status === "done") return 4;
   const p = job?.progress ?? 0;
   return p < 25 ? 0 : p < 50 ? 1 : p < 75 ? 2 : 3;
+}
+
+/** Voice picker (user, 2026-11-09): the narration voice is no
+    longer Edge-only. The user picks a provider (Default Edge is
+    free, no key; Google Chirp 3 HD, Unreal Speech, ElevenLabs
+    need their own key) and a variant, and can HEAR each variant
+    before choosing. The provider's key is the user's own, stored
+    only in this browser. Used in Step 1 (for a new video) and in
+    the done phase (to re-voice a finished video). */
+function VoicePicker({ provider, voice, onChange }: {
+  provider: string;
+  voice: string;
+  onChange: (provider: string, voice: string) => void;
+}) {
+  const [providers, setProviders] = useState<TtsProvider[]>([]);
+  const [voices, setVoices] = useState<TtsVoiceOption[]>([]);
+  const [key, setKey] = useState("");
+  const [keySaved, setKeySaved] = useState(false);
+  const [loadingVoices, setLoadingVoices] = useState(false);
+  const [voicesError, setVoicesError] = useState("");
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [quota, setQuota] = useState<{ quota_api: boolean; remaining_chars: number | null; limit_chars: number | null; used_chars: number | null; note: string } | null>(null);
+  const [quotaError, setQuotaError] = useState("");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const selected = providers.find((p) => p.id === provider);
+
+  useEffect(() => {
+    ttsProviders()
+      .then((d) => setProviders(d.providers || []))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    setKey(getTtsKey(provider));
+    setKeySaved(false);
+    setQuota(null);
+    setQuotaError("");
+    if (provider === "edge") {
+      setLoadingVoices(true);
+      setVoicesError("");
+      ttsProviderVoices("edge")
+        .then((d) => setVoices(d.voices || []))
+        .catch((e) => setVoicesError(e instanceof Error ? e.message : "Could not load voices."))
+        .finally(() => setLoadingVoices(false));
+      return;
+    }
+    setVoices([]);
+  }, [provider]);
+
+  const loadVoices = async () => {
+    if (!key.trim()) {
+      setVoicesError("Add your API key first (link above).");
+      return;
+    }
+    setLoadingVoices(true);
+    setVoicesError("");
+    try {
+      const d = await ttsProviderVoices(provider, key.trim());
+      setVoices(d.voices || []);
+      if ((d.voices || []).length === 0) setVoicesError("No voices returned — check the key.");
+    } catch (e) {
+      setVoicesError(e instanceof ApiError ? e.message : "Could not load voices.");
+    } finally {
+      setLoadingVoices(false);
+    }
+  };
+
+  const saveKey = () => {
+    setTtsKey(provider, key);
+    setKeySaved(true);
+  };
+
+  const checkQuota = async () => {
+    if (!key.trim()) {
+      setQuotaError("Add your API key first.");
+      return;
+    }
+    setQuotaError("");
+    try {
+      const q = await ttsQuota(provider, key.trim());
+      setQuota(q);
+    } catch (e) {
+      setQuotaError(e instanceof ApiError ? e.message : "Could not check quota.");
+    }
+  };
+
+  const playSample = async (v: TtsVoiceOption) => {
+    if (audioRef.current) audioRef.current.pause();
+    setPlaying(v.id);
+    try {
+      const url = v.sample_url || (await ttsPreview(provider, v.id, key.trim())).sample_url;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setPlaying(null);
+      await audio.play();
+    } catch {
+      setPlaying(null);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        {providers.map((p) => (
+          <button
+            key={p.id}
+            className={`btn btn-sm ${provider === p.id ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => onChange(p.id, p.id === "edge" ? "en-US-AriaNeural" : voice)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {selected && selected.key_name && (
+        <div className="mt-3">
+          <label className="mb-1 block text-sm font-semibold">{selected.key_name}</label>
+          <div className="flex gap-2">
+            <input
+              className="field flex-1"
+              type="password"
+              value={key}
+              autoComplete="off"
+              placeholder={`Paste your ${selected.key_name}`}
+              onChange={(e) => { setKey(e.target.value); setKeySaved(false); }}
+            />
+            <button className="btn btn-ghost btn-sm" onClick={saveKey}>Save</button>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {selected.key_help}{" "}
+            {selected.key_url && (
+              <a className="text-primary underline" href={selected.key_url} target="_blank" rel="noreferrer">Get the key →</a>
+            )}
+            {keySaved && <span className="text-emerald-400"> · Saved in this browser.</span>}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button className="btn btn-ghost btn-sm" disabled={loadingVoices} onClick={() => void loadVoices()}>
+              {loadingVoices ? "Loading voices…" : "Load voices"}
+            </button>
+            {selected.quota_api && (
+              <button className="btn btn-ghost btn-sm" onClick={() => void checkQuota()}>Check remaining quota</button>
+            )}
+          </div>
+          {voicesError && <p className="mt-2 text-sm text-destructive">{voicesError}</p>}
+          {quota && (
+            <p className="mt-2 text-sm">
+              {quota.quota_api && quota.remaining_chars !== null
+                ? <>Remaining: <b>{quota.remaining_chars.toLocaleString()}</b> / {quota.limit_chars?.toLocaleString()} characters this month.</>
+                : quota.note}
+            </p>
+          )}
+          {quotaError && <p className="mt-2 text-sm text-destructive">{quotaError}</p>}
+          {!selected.quota_api && (
+            <p className="mt-2 text-xs text-muted-foreground">{selected.quota_note}</p>
+          )}
+        </div>
+      )}
+      {selected && !selected.key_name && (
+        <p className="mt-2 text-xs text-muted-foreground">{selected.quota_note}</p>
+      )}
+      {voices.length > 0 && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {voices.map((v) => (
+            <button
+              key={v.id}
+              className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm ${voice === v.id ? "border-primary bg-primary/10" : "border-border"}`}
+              onClick={() => onChange(provider, v.id)}
+            >
+              <span className="min-w-0 flex-1 truncate">{v.label}</span>
+              <span
+                className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs"
+                onClick={(e) => { e.stopPropagation(); void playSample(v); }}
+              >
+                {playing === v.id ? "⏸ Playing…" : "▶ Listen"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {provider !== "edge" && voices.length === 0 && !loadingVoices && (
+        <p className="mt-2 text-xs text-muted-foreground">Add your key above, then Load voices to hear and pick a variant.</p>
+      )}
+    </div>
+  );
 }
 
 function AutoVideo() {
@@ -118,17 +302,17 @@ function AutoVideo() {
   const titleIdeasPrompt = `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
   const [dur, setDur] = useState(2);
   const [durInput, setDurInput] = useState("2");
-  // Voice (user, 2026-11-09): the narration voice. Was hardcoded
-  // to Aria — now the user picks. Aria is the default (what all
-  // earlier videos used). Each voice has its own natural tone;
-  // preview any of them in the Text to Voice tool first.
-  const [voiceList, setVoiceList] = useState<TtsVoice[]>([]);
+  // Voice (user, 2026-11-09): the narration voice. Default is
+  // Edge Aria (what all earlier videos used). The user can pick
+  // Google Chirp 3 HD, Unreal Speech or ElevenLabs instead — the
+  // provider + variant are chosen in the Voice section below,
+  // and the key is theirs, stored only in this browser.
+  const [ttsProvider, setTtsProvider] = useState("edge");
   const [voice, setVoice] = useState("en-US-AriaNeural");
-  useEffect(() => {
-    ttsVoices()
-      .then((d) => setVoiceList(d.voices || []))
-      .catch(() => undefined);
-  }, []);
+  const handleVoiceChange = (provider: string, voiceId: string) => {
+    setTtsProvider(provider);
+    setVoice(voiceId);
+  };
   // Custom script (user, 2026-11-09): the user can paste a script
   // written by another AI (e.g. Gemini) and the video is built
   // from it. Empty = the tool writes the script itself.
@@ -210,6 +394,31 @@ function AutoVideo() {
   // mandatory — the job is polled while it runs.
   const [compressing, setCompressing] = useState(false);
   const [compressError, setCompressError] = useState("");
+  // Re-voice (user, 2026-11-09): change the voice of a finished
+  // video from the done phase, without starting over.
+  const [revoicing, setRevoicing] = useState(false);
+  const [revoiceError, setRevoiceError] = useState("");
+  const startRevoice = async () => {
+    if (!job || revoicing) return;
+    setRevoicing(true);
+    setRevoiceError("");
+    try {
+      await autovideoRevoice(job.id, ttsProvider, voice, getTtsKey(ttsProvider));
+      for (let i = 0; i < 900; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const j = await autovideoJob(job.id);
+        setJob(j);
+        if (j.status === "done" && j.phase === "done") break;
+      }
+      const j = await autovideoJob(job.id);
+      setJob(j);
+      if (j.revoice_error) setRevoiceError(j.revoice_error);
+    } catch (e) {
+      setRevoiceError(e instanceof ApiError ? e.message : "Re-voice failed. Please try again.");
+    } finally {
+      setRevoicing(false);
+    }
+  };
   // Upload to YouTube (user, 2026-11-09): title, description,
   // tags, privacy and thumbnail, to the selected channel.
   const [upTitle, setUpTitle] = useState("");
@@ -505,12 +714,33 @@ function AutoVideo() {
     setUpError("");
     setUpResult(null);
     try {
-      const res = await autovideoUpload(
+      // Upload runs in the background (user, 2026-11-09) — the
+      // video is large, so the response only starts it. Poll the
+      // job for the live progress bar until it finishes.
+      await autovideoUpload(
         job.id,
         { title: t, description: upDesc, tags: upTags, privacy: upPrivacy, channelId: activeChannelId || "" },
         upThumb,
       );
-      setUpResult(res);
+      for (let i = 0; i < 1200; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const j = await autovideoJob(job.id);
+        setJob(j);
+        if (j.upload_status === "uploaded") {
+          setUpResult({
+            video_id: j.uploaded_video_id || "",
+            url: j.uploaded_url || "",
+            privacy_status: j.uploaded_privacy || upPrivacy,
+            thumbnail_set: j.thumbnail_set || false,
+            thumbnail_error: j.thumbnail_error || "",
+          });
+          break;
+        }
+        if (j.upload_status === "failed") {
+          setUpError(j.upload_error || "Upload failed. Please try again.");
+          break;
+        }
+      }
     } catch (e) {
       setUpError(e instanceof ApiError ? e.message : "Upload failed. Please try again.");
     } finally {
@@ -659,7 +889,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoPlan(title.trim(), dur, voice, pexelsKey, pixabayKey, customScript);
+      const data = await autovideoPlan(title.trim(), dur, voice, pexelsKey, pixabayKey, customScript, ttsProvider, getTtsKey(ttsProvider));
       setJobId(data.job_id);
       // Background job: the step keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -683,7 +913,7 @@ function AutoVideo() {
     setError("");
     setPhase("build");
     try {
-      await autovideoPrepareAudio(job.id, freesoundKey, music);
+      await autovideoPrepareAudio(job.id, freesoundKey, music, ttsProvider, voice, getTtsKey(ttsProvider));
       poll(job.id);
     } catch (e) {
       setPhase("footage");
@@ -800,16 +1030,8 @@ function AutoVideo() {
             <p className="mt-2 text-sm text-muted-foreground">About {dur * 3} scenes · 1 credit · longer videos take longer to build, scene by scene</p>
           </div>
           <div>
-            <label className="mb-2 block font-semibold">Narration voice <span className="text-sm font-normal text-muted-foreground">(who reads the script — each voice has its own tone; preview them in Text to Voice)</span></label>
-            <select className="field" value={voice} onChange={(e) => setVoice(e.target.value)}>
-              {voiceList.length > 0 ? (
-                voiceList.map((v) => (
-                  <option key={v.id} value={v.id}>{v.label}</option>
-                ))
-              ) : (
-                <option value="en-US-AriaNeural">English (US) — Female, Aria</option>
-              )}
-            </select>
+            <label className="mb-2 block font-semibold">Narration voice <span className="text-sm font-normal text-muted-foreground">(optional — who reads the script. No pick = the default Edge voice, Aria. Pick a provider below to hear each variant and choose.)</span></label>
+            <VoicePicker provider={ttsProvider} voice={voice} onChange={handleVoiceChange} />
           </div>
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={subtitles} onChange={(e) => setSubtitles(e.target.checked)} />
@@ -1273,6 +1495,17 @@ function AutoVideo() {
               <button className="btn btn-primary w-full py-3" disabled={upLoading} onClick={() => void doUpload()}>
                 {upLoading ? "Uploading to YouTube…" : "⬆ Upload to YouTube"}
               </button>
+              {/* Upload progress bar (user, 2026-11-09): the video
+                  is large, so the upload takes a while — show the
+                  live percent and MBs so he knows how far it is. */}
+              {upLoading && job.upload_status === "uploading" && (
+                <div className="mt-3">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${job.upload_progress ?? 0}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{job.upload_stage || "Uploading to YouTube…"} · {Math.round(job.upload_progress ?? 0)}%</p>
+                </div>
+              )}
               {upResult && (
                 <div className="rounded-xl border border-border p-3 text-sm">
                   <p className="text-success">✓ Uploaded ({upResult.privacy_status}).</p>
@@ -1384,6 +1617,29 @@ function AutoVideo() {
             {job.compressed && job.original_size_mb && job.final_size_mb && (
               <p className="mt-4 text-sm text-emerald-400">✓ Compressed: {job.original_size_mb} MB → {job.final_size_mb} MB (saved {job.compress_saved_pct ?? "?"}%, {job.compress_encoder === "libx265" ? "HEVC" : "H.264"} CRF {job.compress_crf ?? "?"}) — the Download button above serves the smaller file.</p>
             )}
+            {/* Change voice (user, 2026-11-09): the same voice
+                options, here in the done phase, so a finished
+                video can be re-voiced without starting over. */}
+            <div className="mt-4 rounded-xl border border-border p-4">
+              <p className="text-sm font-semibold">🎙️ Change voice {job.voice_engine ? `(${job.voice_engine})` : ""}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Pick a different voice and apply it — every scene is re-voiced and the video is re-rendered from the same footage and music.</p>
+              <div className="mt-3">
+                <VoicePicker provider={ttsProvider} voice={voice} onChange={handleVoiceChange} />
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <button className="btn btn-primary btn-sm" disabled={revoicing} onClick={() => void startRevoice()}>
+                  {revoicing ? "Re-voicing…" : "Apply this voice"}
+                </button>
+                {revoicing && <span className="text-xs text-muted-foreground">{job.stage || "Re-voicing…"} · {Math.round(job.progress ?? 0)}%</span>}
+              </div>
+              {revoicing && (
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${job.progress ?? 0}%` }} />
+                </div>
+              )}
+              {revoiceError && <p className="mt-2 text-sm text-destructive">{revoiceError}</p>}
+              {job.revoice_error && !revoiceError && <p className="mt-2 text-sm text-destructive">{job.revoice_error}</p>}
+            </div>
           </div>
           <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} />
         </div>

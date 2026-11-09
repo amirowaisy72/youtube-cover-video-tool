@@ -249,3 +249,290 @@ def synthesize(text: str, voice: str, rate: str, out_dir: Path,
             part.unlink(missing_ok=True)
         work_dir.rmdir()
     return final_path, engine
+
+
+# ---------------------------------------------------------------------------
+# Voice providers (user, 2026-11-09): the narration voice is no longer
+# Edge-only. The user picks a provider in Step 1 (optional — no pick
+# means the default Edge voice, Aria) and a variant, and can hear
+# each variant before choosing. API keys are the user's own, stored
+# in the browser (localStorage) like the other stock keys, never on
+# the server.
+#
+# QUOTA CHECK — HONEST LIMIT (user, 2026-11-09): before voicing a
+# script, the app must know from the PROVIDER'S OWN API whether the
+# free limit can cover the whole script, so the voice never stops
+# mid-way. Only ElevenLabs exposes a quota API (GET /v1/user/
+# subscription -> character_count + character_limit). Google Cloud
+# and Unreal Speech expose NO quota endpoint (usage is dashboard-
+# only), so for them the app CANNOT check upfront — it instead
+# catches their quota errors live during synthesis and falls back
+# to the default voice with a clear message. The app NEVER
+# estimates the limit by counting words itself.
+# ---------------------------------------------------------------------------
+
+# Google Chirp 3 HD voices (curated). Sample URLs are Google's own
+# public demo files — hearing a variant costs nothing, no key.
+_GOOGLE_CHIRP_VOICES = [
+    ("en-US-Chirp3-HD-Achernar", "Chirp 3 HD — Female, Achernar"),
+    ("en-US-Chirp3-HD-Aoede", "Chirp 3 HD — Female, Aoede"),
+    ("en-US-Chirp3-HD-Autonoe", "Chirp 3 HD — Female, Autonoe"),
+    ("en-US-Chirp3-HD-Callirrhoe", "Chirp 3 HD — Female, Callirrhoe"),
+    ("en-US-Chirp3-HD-Despina", "Chirp 3 HD — Female, Despina"),
+    ("en-US-Chirp3-HD-Leda", "Chirp 3 HD — Female, Leda"),
+    ("en-US-Chirp3-HD-Achird", "Chirp 3 HD — Male, Achird"),
+    ("en-US-Chirp3-HD-Algenib", "Chirp 3 HD — Male, Algenib"),
+    ("en-US-Chirp3-HD-Charon", "Chirp 3 HD — Male, Charon"),
+    ("en-US-Chirp3-HD-Schedar", "Chirp 3 HD — Male, Schedar"),
+]
+
+# Unreal Speech (Kokoro) voices (curated English ones).
+_UNREAL_VOICES = [
+    ("af_heart", "Kokoro — Female, Heart"),
+    ("af_bella", "Kokoro — Female, Bella"),
+    ("af_sarah", "Kokoro — Female, Sarah"),
+    ("af_nicole", "Kokoro — Female, Nicole"),
+    ("af_sky", "Kokoro — Female, Sky"),
+    ("am_adam", "Kokoro — Male, Adam"),
+    ("am_michael", "Kokoro — Male, Michael"),
+    ("am_eric", "Kokoro — Male, Eric"),
+    ("am_liam", "Kokoro — Male, Liam"),
+    ("bf_emma", "Kokoro — Female, Emma (UK)"),
+    ("bm_george", "Kokoro — Male, George (UK)"),
+]
+
+PROVIDERS = {
+    "edge": {
+        "label": "Default — Edge (free, no key)",
+        "key_name": None,
+        "key_url": None,
+        "key_help": "No key needed. Free and unlimited.",
+        "quota_api": False,
+        "quota_note": "Edge TTS has no key and no quota — it just works.",
+    },
+    "google": {
+        "label": "Google Cloud TTS — Chirp 3 HD",
+        "key_name": "Google Cloud API key",
+        "key_url": "https://console.cloud.google.com/apis/library/texttospeech.googleapis.com",
+        "key_help": "Enable the Cloud Text-to-Speech API, then create an API key (Credentials). Free: 1M Chirp 3 HD chars/month.",
+        "quota_api": False,
+        "quota_note": "Google does not expose a quota API for an API key, so the remaining free limit cannot be checked upfront. The free tier is 1M Chirp 3 HD characters/month — far above one video.",
+    },
+    "unreal": {
+        "label": "Unreal Speech (Kokoro)",
+        "key_name": "Unreal Speech API key",
+        "key_url": "https://unrealspeech.com",
+        "key_help": "Sign up (no card), open the dashboard and copy your API key. Free: 250,000 chars/month.",
+        "quota_api": False,
+        "quota_note": "Unreal Speech does not expose a quota API — usage is dashboard-only. Free: 250,000 chars/month. Note: overage is billed automatically if a card is on file.",
+    },
+    "elevenlabs": {
+        "label": "ElevenLabs",
+        "key_name": "ElevenLabs API key",
+        "key_url": "https://elevenlabs.io",
+        "key_help": "Sign up, go to your Profile and copy the API key. Free: 10,000 chars/month (about 1 video).",
+        "quota_api": True,
+        "quota_note": "Quota is checked live from ElevenLabs' own API before voicing.",
+    },
+}
+
+
+def google_sample_url(voice_id: str) -> str | None:
+    """Public demo audio for a Chirp 3 HD voice (no key, no cost)."""
+    name = voice_id.rsplit("-", 1)[-1].lower()
+    if voice_id.startswith("en-US-Chirp3-HD-"):
+        return (f"https://cloud.google.com/static/text-to-speech/docs/audio/"
+                f"chirp3-hd-{name}.wav")
+    return None
+
+
+def list_provider_voices(provider: str, api_key: str | None = None) -> list[dict]:
+    """Voice variants for a provider. Each item: {id, label, sample_url?}.
+    ElevenLabs fetches live from its API (needs the key); the others
+    are curated lists with Google's public sample files."""
+    if provider == "edge":
+        return [{"id": v, "label": l} for v, l in VOICES]
+    if provider == "google":
+        return [{"id": v, "label": l, "sample_url": google_sample_url(v)}
+                for v, l in _GOOGLE_CHIRP_VOICES]
+    if provider == "unreal":
+        return [{"id": v, "label": l} for v, l in _UNREAL_VOICES]
+    if provider == "elevenlabs":
+        if not api_key:
+            raise ValueError("ElevenLabs API key is needed to list voices.")
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.elevenlabs.io/v1/voices",
+            headers={"xi-api-key": api_key})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            import json as _json
+            data = _json.loads(resp.read().decode("utf-8"))
+        out = []
+        for v in data.get("voices", []):
+            labels = v.get("labels") or {}
+            gender = labels.get("gender", "")
+            out.append({"id": v["voice_id"],
+                        "label": f"{v.get('name', v['voice_id'])}"
+                                 + (f" ({gender})" if gender else ""),
+                        "sample_url": (v.get("preview_url") or None)})
+        return out
+    raise ValueError(f"Unknown voice provider: {provider}")
+
+
+def check_quota(provider: str, api_key: str | None = None) -> dict:
+    """Remaining free quota from the PROVIDER'S OWN API (user,
+    2026-11-09). Returns {quota_api, remaining_chars, limit_chars,
+    used_chars, note}. Only ElevenLabs exposes this; for Google
+    and Unreal quota_api is False and the note explains why — the
+    app never guesses the limit by counting words."""
+    info = PROVIDERS.get(provider)
+    if info is None:
+        raise ValueError(f"Unknown voice provider: {provider}")
+    if provider == "edge":
+        return {"quota_api": False, "remaining_chars": None,
+                "limit_chars": None, "used_chars": None,
+                "note": info["quota_note"]}
+    if provider == "elevenlabs":
+        if not api_key:
+            raise ValueError("ElevenLabs API key is needed to check quota.")
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.elevenlabs.io/v1/user/subscription",
+            headers={"xi-api-key": api_key})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            import json as _json
+            data = _json.loads(resp.read().decode("utf-8"))
+        used = int(data.get("character_count") or 0)
+        limit = int(data.get("character_limit") or 0)
+        return {"quota_api": True,
+                "remaining_chars": max(limit - used, 0),
+                "limit_chars": limit, "used_chars": used,
+                "note": info["quota_note"]}
+    return {"quota_api": False, "remaining_chars": None,
+            "limit_chars": None, "used_chars": None,
+            "note": info["quota_note"]}
+
+
+def _synthesize_google(text: str, voice: str, api_key: str, dest: Path) -> None:
+    """Google Cloud TTS (Chirp 3 HD). REST with an API key."""
+    import json as _json
+    import urllib.request
+    lang = voice.split("-Chirp3-HD-")[0] if "-Chirp3-HD-" in voice else "en-US"
+    body = _json.dumps({
+        "input": {"text": text},
+        "voice": {"languageCode": lang, "name": voice},
+        "audioConfig": {"audioEncoding": "MP3"},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
+        data=body, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"Google Cloud TTS failed: {exc}") from exc
+    import base64
+    audio = data.get("audioContent")
+    if not audio:
+        err = data.get("error", {}).get("message", "no audio returned")
+        raise RuntimeError(f"Google Cloud TTS failed: {err}")
+    dest.write_bytes(base64.b64decode(audio))
+
+
+def _synthesize_unreal(text: str, voice: str, api_key: str, dest: Path) -> None:
+    """Unreal Speech (Kokoro). /speech returns an MP3 URL to download."""
+    import json as _json
+    import urllib.request
+    body = _json.dumps({
+        "Text": text, "VoiceId": voice, "Bitrate": "192k",
+        "Speed": "0", "Pitch": "1", "TimestampType": "sentence",
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.v8.unrealspeech.com/speech",
+        data=body, headers={"Content-Type": "application/json",
+                            "Authorization": f"Bearer {api_key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"Unreal Speech failed: {exc}") from exc
+    url = data.get("OutputUri")
+    if not url:
+        raise RuntimeError(f"Unreal Speech failed: {data}")
+    req2 = urllib.request.Request(url)
+    with urllib.request.urlopen(req2, timeout=120) as resp, dest.open("wb") as out:
+        while True:
+            chunk = resp.read(1024 * 256)
+            if not chunk:
+                break
+            out.write(chunk)
+    if dest.stat().st_size < 1000:
+        raise RuntimeError("Unreal Speech returned an empty audio file.")
+
+
+def _synthesize_elevenlabs(text: str, voice: str, api_key: str, dest: Path) -> None:
+    """ElevenLabs TTS. Returns raw MP3 bytes."""
+    import json as _json
+    import urllib.request
+    body = _json.dumps({
+        "text": text, "model_id": "eleven_multilingual_v2",
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice}",
+        data=body, headers={"Content-Type": "application/json",
+                            "Accept": "audio/mpeg",
+                            "xi-api-key": api_key})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp, dest.open("wb") as out:
+            while True:
+                chunk = resp.read(1024 * 256)
+                if not chunk:
+                    break
+                out.write(chunk)
+    except Exception as exc:
+        raise RuntimeError(f"ElevenLabs failed: {exc}") from exc
+    if dest.stat().st_size < 1000:
+        raise RuntimeError("ElevenLabs returned an empty audio file.")
+
+
+def synthesize_provider(text: str, provider: str, voice: str,
+                        api_key: str | None, rate: str, out_dir: Path,
+                        ) -> tuple[Path, str]:
+    """Synthesize with the chosen provider. Returns (final MP3, engine).
+    Raises RuntimeError with the provider's own error message when it
+    fails (quota, bad key, network) — the caller reports it verbatim
+    so the user knows exactly why, instead of a silent fallback."""
+    if provider == "edge":
+        return synthesize(text, voice, rate, out_dir)
+    if provider in ("google", "unreal", "elevenlabs") and not api_key:
+        raise ValueError(
+            f"{PROVIDERS[provider]['label']} needs an API key. "
+            "Add it in the Voice section (Step 1).")
+    chunks = split_text(text)
+    if not chunks:
+        raise ValueError("Text is empty.")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tts_id = uuid.uuid4().hex[:12]
+    work_dir = out_dir / tts_id
+    work_dir.mkdir(parents=True, exist_ok=True)
+    final_path = out_dir / f"{tts_id}.mp3"
+    engine = {"google": "google-chirp3", "unreal": "unreal-kokoro",
+              "elevenlabs": "elevenlabs"}[provider]
+    try:
+        parts = []
+        for index, chunk in enumerate(chunks):
+            part = work_dir / f"part-{index:03d}.mp3"
+            if provider == "google":
+                _synthesize_google(chunk, voice, api_key, part)
+            elif provider == "unreal":
+                _synthesize_unreal(chunk, voice, api_key, part)
+            else:
+                _synthesize_elevenlabs(chunk, voice, api_key, part)
+            parts.append(part)
+        _merge_mp3(parts, final_path)
+    finally:
+        for part in work_dir.iterdir():
+            part.unlink(missing_ok=True)
+        work_dir.rmdir()
+    return final_path, engine

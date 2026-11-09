@@ -13,6 +13,35 @@ export const PIXABAY_KEY_STORAGE = "ytguru-pixabay-key";
 export const PEXELS_KEY_STORAGE = "ytguru-pexels-key";
 export const FREESOUND_KEY_STORAGE = "ytguru-freesound-key";
 
+/** Voice provider API keys (user, 2026-11-09): the narration
+    voice can come from Google Cloud TTS (Chirp 3 HD), Unreal
+    Speech (Kokoro) or ElevenLabs instead of the default Edge
+    voice. Each key is the user's own, stored only in this
+    browser, never on a server — same rule as the stock keys. */
+export const TTS_KEY_STORAGE: Record<string, string> = {
+  google: "ytguru-google-tts-key",
+  unreal: "ytguru-unreal-speech-key",
+  elevenlabs: "ytguru-elevenlabs-key",
+};
+
+export function getTtsKey(provider: string): string {
+  try {
+    const k = TTS_KEY_STORAGE[provider];
+    return k ? localStorage.getItem(k) ?? "" : "";
+  } catch {
+    return "";
+  }
+}
+
+export function setTtsKey(provider: string, key: string): void {
+  try {
+    const k = TTS_KEY_STORAGE[provider];
+    if (k) localStorage.setItem(k, key.trim());
+  } catch {
+    // Storage blocked: the key just won't persist.
+  }
+}
+
 /** Per-channel niche / topic (user, 2026-11-09): the Channel
     Setup Wizard saves the niche it was given for a channel, and
     the Auto Video tool reads it so its "Prompt for AI" suggests

@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -2008,13 +2009,23 @@ class TtsRequest(BaseModel):
 
 
 @app.get("/api/tts/voices")
-def tts_voices() -> dict:
-    return {
-        "voices": [
-            {"id": voice, "label": label} for voice, label in tts_module.VOICES
-        ],
-        "max_text_chars": tts_module.MAX_TEXT_CHARS,
-    }
+def tts_voices(provider: str = "edge", key: str | None = None) -> dict:
+    """Voice variants. No provider = the Edge voices for the Text
+    to Voice tool (backward compatible). With a provider, that
+    provider's variants (Google Chirp 3 HD, Unreal Kokoro,
+    ElevenLabs — the last needs the key)."""
+    if provider == "edge":
+        return {
+            "voices": [
+                {"id": voice, "label": label} for voice, label in tts_module.VOICES
+            ],
+            "max_text_chars": tts_module.MAX_TEXT_CHARS,
+        }
+    try:
+        voices = tts_module.list_provider_voices(provider, key)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, str(exc)[-500:])
+    return {"provider": provider, "voices": voices}
 
 
 @app.post("/api/tts")
@@ -2371,6 +2382,12 @@ class AutoVideoPlanRequest(BaseModel):
     minutes: int = Field(..., ge=1, le=30)
     visuals: str = "both"  # images | videos | both
     voice: str = "en-US-AriaNeural"
+    # Voice provider (user, 2026-11-09): "edge" (default, free, no
+    # key), "google" (Chirp 3 HD), "unreal" (Kokoro), "elevenlabs".
+    # tts_key is the user's own key, passed through, never stored
+    # on the server (the job only keeps the provider + voice id).
+    tts_provider: str = "edge"
+    tts_key: str | None = None
     script: str | None = None
     pexels_key: str | None = None
     pixabay_key: str | None = None
@@ -2430,14 +2447,24 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
     voiceover, no rendering yet."""
     if payload.visuals not in ("images", "videos", "both"):
         raise HTTPException(400, "Visuals must be images, videos, or both.")
-    if payload.voice not in tts_module.VOICE_IDS:
-        raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
+    if payload.tts_provider not in tts_module.PROVIDERS:
+        raise HTTPException(400, "Unknown voice provider.")
+    if payload.tts_provider == "edge":
+        if payload.voice not in tts_module.VOICE_IDS:
+            raise HTTPException(400, "Unknown voice. Pick one from the voice list.")
+    elif payload.tts_provider in ("google", "unreal"):
+        valid = {v["id"] for v in tts_module.list_provider_voices(payload.tts_provider)}
+        if payload.voice not in valid:
+            raise HTTPException(400, "Unknown voice for this provider.")
+    elif payload.tts_provider == "elevenlabs" and not payload.tts_key:
+        raise HTTPException(400, "ElevenLabs needs an API key.")
     job_id = uuid.uuid4().hex[:12]
     token = _consume_or_402("autovideo", job_id)
     _av_write({"id": job_id, "status": "planning", "phase": "planning",
                "stage": "Starting…", "progress": 0, "title": payload.title,
                "minutes": payload.minutes, "visuals": payload.visuals,
-               "voice": payload.voice, "job_token": token})
+               "voice": payload.voice, "tts_provider": payload.tts_provider,
+               "job_token": token})
     threading.Thread(
         target=_run_autovideo_plan,
         args=(job_id, payload.title, payload.minutes, payload.visuals,
@@ -2450,12 +2477,21 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
 class AutoVideoPrepareAudioRequest(BaseModel):
     freesound_key: str | None = None
     music: bool = True
+    # Voice (user, 2026-11-09): the provider + voice + key the user
+    # picked in Step 1 (sent again here from the browser's stored
+    # keys — the key is never saved on the server). Falls back to
+    # the job's stored provider/voice when not sent.
+    tts_provider: str | None = None
+    tts_voice: str | None = None
+    tts_key: str | None = None
 
 
 def _run_autovideo_audio(job_id: str, voice: str,
                          freesound_key: str | None,
                          job_token: str | None,
-                         music: bool = True) -> None:
+                         music: bool = True,
+                         tts_provider: str = "edge",
+                         tts_key: str | None = None) -> None:
     """Step 3 worker: voice every scene, join the voiceover,
     detect the mood, list music options, fetch SFX."""
     try:
@@ -2478,7 +2514,8 @@ def _run_autovideo_audio(job_id: str, voice: str,
         audio = autovideo2.prepare_audio(
             job.get("title") or "", scenes, voice, directory,
             freesound_key=freesound_key, music=music,
-            progress_cb=_audio_progress)
+            progress_cb=_audio_progress,
+            tts_provider=tts_provider, tts_key=tts_key)
         job = _av_read(job_id)
         for i, d in enumerate(audio["durations"]):
             if i < len(job["scenes"]):
@@ -2520,12 +2557,91 @@ def autovideo_prepare_audio(job_id: str,
     if job.get("phase") != "planned":
         raise HTTPException(400, "Run the footage step first.")
     token = job.get("job_token")
+    # Voice comes from this request when the user picked one in
+    # Step 1 (re-sent from the browser's stored keys); otherwise
+    # fall back to the job's stored provider/voice.
+    provider = payload.tts_provider or job.get("tts_provider") or "edge"
+    voice = payload.tts_voice or job.get("voice") or "en-US-AriaNeural"
     threading.Thread(
         target=_run_autovideo_audio,
-        args=(job_id, job.get("voice") or "en-US-AriaNeural",
-              payload.freesound_key, token, payload.music),
+        args=(job_id, voice,
+              payload.freesound_key, token, payload.music,
+              provider, payload.tts_key),
         daemon=True).start()
     return {"job_id": job_id, "status": "audio", "phase": "audio"}
+
+
+# --- Voice providers (user, 2026-11-09) ---
+@app.get("/api/tts/providers")
+def tts_providers() -> dict:
+    """The voice providers the Auto Video voice picker offers,
+    with each one's key name, where to get the key, and whether
+    its free limit can be checked from its own API."""
+    return {"providers": [
+        {"id": pid, "label": info["label"], "key_name": info["key_name"],
+         "key_url": info["key_url"], "key_help": info["key_help"],
+         "quota_api": info["quota_api"], "quota_note": info["quota_note"]}
+        for pid, info in tts_module.PROVIDERS.items()]}
+
+
+@app.get("/api/tts/quota")
+def tts_quota(provider: str = "edge", key: str | None = None) -> dict:
+    """Remaining free quota from the PROVIDER'S OWN API (user,
+    2026-11-09). Only ElevenLabs exposes this; for Google and
+    Unreal the answer is quota_api=False with the reason — the
+    app never guesses the limit by counting words."""
+    try:
+        return tts_module.check_quota(provider, key)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, str(exc)[-500:])
+
+
+class TtsPreviewRequest(BaseModel):
+    provider: str = "edge"
+    voice: str = "en-US-AriaNeural"
+    key: str | None = None
+    text: str = "Hello, this is a sample of my voice for your video."
+
+
+@app.post("/api/tts/preview")
+def tts_preview(payload: TtsPreviewRequest) -> dict:
+    """Hear one voice variant before choosing it. Synthesizes a
+    short sample (about 50 characters — a negligible use of any
+    paid quota) and returns its audio URL. Google voices use
+    Google's own public sample files instead (no key, no cost)."""
+    if payload.provider == "google":
+        url = tts_module.google_sample_url(payload.voice)
+        if not url:
+            raise HTTPException(400, "No sample for this Google voice.")
+        return {"provider": payload.provider, "voice": payload.voice,
+                "sample_url": url}
+    if payload.provider not in tts_module.PROVIDERS:
+        raise HTTPException(400, "Unknown voice provider.")
+    preview_dir = Path("tts-previews")
+    preview_dir.mkdir(exist_ok=True)
+    # One cached sample per voice: a preview is the same sentence
+    # every time, so re-generating it would waste quota.
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", f"{payload.provider}-{payload.voice}")[:80]
+    out_path = preview_dir / f"{safe}.mp3"
+    if not out_path.exists():
+        try:
+            path, _engine = tts_module.synthesize_provider(
+                payload.text, payload.provider, payload.voice,
+                payload.key, "+0%", preview_dir)
+            path.replace(out_path)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(400, str(exc)[-500:])
+    return {"provider": payload.provider, "voice": payload.voice,
+            "sample_url": f"/api/tts/preview-audio/{out_path.name}"}
+
+
+@app.get("/api/tts/preview-audio/{filename}")
+def tts_preview_audio(filename: str) -> FileResponse:
+    path = Path("tts-previews") / filename
+    if not path.exists() or path.suffix.lower() != ".mp3":
+        raise HTTPException(404, "Preview not found.")
+    return FileResponse(path, media_type="audio/mpeg",
+                        filename=filename)
 
 
 class AutoVideoRenderRequest(BaseModel):
@@ -2751,6 +2867,104 @@ def autovideo_compress(job_id: str) -> dict:
         raise HTTPException(400, "Render the video first.")
     threading.Thread(target=_run_autovideo_compress, args=(job_id,), daemon=True).start()
     return {"job_id": job_id, "status": "compressing"}
+
+
+def _run_autovideo_revoice(job_id: str, provider: str, voice: str,
+                           key: str | None) -> None:
+    """Re-voice a COMPLETED video with a different voice (user,
+    2026-11-09). The user picks a new voice in the done phase and
+    applies it without starting over: every scene is re-voiced
+    with the new provider/voice, then the video is re-rendered
+    from the SAME footage + music. Only the voiceover is new.
+    No extra license credit (job_token=None) — it is the same
+    video. The old final.mp4 is backed up first; on failure it
+    is restored and the job goes back to done."""
+    try:
+        directory = _av_job_dir(job_id)
+        job = _av_read(job_id)
+        scenes = job.get("scenes") or []
+        if not scenes:
+            raise RuntimeError("No scenes — this video has no footage to re-voice.")
+        final_path = directory / "final.mp4"
+        backup_path = directory / "final-before-revoice.mp4"
+        if final_path.exists():
+            import shutil
+            shutil.copyfile(final_path, backup_path)
+        job.update({"status": "revoicing", "phase": "revoicing",
+                    "stage": "Re-voicing scenes…", "progress": 5})
+        _av_write(job)
+
+        def _revoice_progress(done: int, total: int, stage: str) -> None:
+            pct = 5 + (40 * done / max(total, 1)) if total else 5
+            j = _av_read(job_id)
+            j.update({"stage": stage, "progress": round(pct, 1),
+                      "status": "revoicing", "phase": "revoicing"})
+            _av_write(j)
+
+        # Re-voice (the quota pre-check inside prepare_audio
+        # applies here too — the new voice must cover the script).
+        audio = autovideo2.prepare_audio(
+            job.get("title") or "", scenes, voice, directory,
+            freesound_key=None, music=bool(job.get("music", True)),
+            progress_cb=_revoice_progress,
+            tts_provider=provider, tts_key=key)
+        job = _av_read(job_id)
+        for i, d in enumerate(audio["durations"]):
+            if i < len(job["scenes"]):
+                job["scenes"][i]["duration_sec"] = d
+        job.update({"voice": voice, "tts_provider": provider,
+                    "voice_duration_sec": audio["total_voice"],
+                    "voice_engine": audio["voice_engine"],
+                    "voice_files": audio["voice_files"],
+                    "final_minutes": round(audio["total_voice"] / 60, 1)})
+        _av_write(job)
+        # Re-render with the new voiceover (no new license credit).
+        _run_autovideo_render(
+            job_id, float(job.get("music_volume", 0.20)),
+            bool(job.get("transitions", True)), True, None,
+            job.get("title") or "", bool(job.get("music", True)))
+    except Exception as exc:  # noqa: BLE001
+        # Restore the old video and go back to done.
+        try:
+            directory = _av_job_dir(job_id)
+            backup_path = directory / "final-before-revoice.mp4"
+            final_path = directory / "final.mp4"
+            if backup_path.exists():
+                import shutil
+                shutil.copyfile(backup_path, final_path)
+        except Exception:
+            pass
+        job = _av_read(job_id)
+        job.update({"status": "done", "phase": "done",
+                    "stage": "done", "progress": 100,
+                    "revoice_error": str(exc)[-500:]})
+        _av_write(job)
+
+
+class AutoVideoRevoiceRequest(BaseModel):
+    tts_provider: str = "edge"
+    tts_voice: str = "en-US-AriaNeural"
+    tts_key: str | None = None
+
+
+@app.post("/api/autovideo/{job_id}/revoice")
+def autovideo_revoice(job_id: str, payload: AutoVideoRevoiceRequest) -> dict:
+    """Change the voice of a COMPLETED video (user, 2026-11-09).
+    Re-voices every scene with the new provider/voice and
+    re-renders from the same footage + music. Runs in the
+    background; poll the job for progress."""
+    job = _av_read(job_id)
+    if job.get("status") != "done" or not (_av_job_dir(job_id) / "final.mp4").exists():
+        raise HTTPException(400, "Render the video first.")
+    if payload.tts_provider not in tts_module.PROVIDERS:
+        raise HTTPException(400, "Unknown voice provider.")
+    if payload.tts_provider != "edge" and not payload.tts_key:
+        raise HTTPException(400, "This provider needs an API key.")
+    threading.Thread(
+        target=_run_autovideo_revoice,
+        args=(job_id, payload.tts_provider, payload.tts_voice, payload.tts_key),
+        daemon=True).start()
+    return {"job_id": job_id, "status": "revoicing"}
 
 
 @app.get("/api/autovideo/{job_id}")
@@ -3171,6 +3385,94 @@ def autovideo_download_trimmed(job_id: str) -> FileResponse:
     return FileResponse(path, media_type="video/mp4", filename=f"autovideo-{job_id}-trimmed.mp4")
 
 
+def _run_autovideo_upload(job_id: str, title: str, description: str,
+                          tags: str, privacy_status: str, channel_id: str,
+                          thumb_path: Path | None) -> None:
+    """Upload a finished Auto Video to YouTube in the background
+    (user, 2026-11-09). The video is large (often 100+ MB), so a
+    synchronous upload left the button stuck on 'Uploading…' with
+    no idea how far it had got. Now the resumable upload's
+    on_progress callback writes upload_progress to the job, and
+    the frontend shows a real progress bar while it runs."""
+    try:
+        job_dir = _av_job_dir(job_id)
+        trimmed = job_dir / "trimmed.mp4"
+        src = trimmed if trimmed.exists() else job_dir / "final.mp4"
+        job = _av_read(job_id)
+        job.update({"upload_status": "uploading", "upload_progress": 0,
+                    "upload_stage": "Uploading to YouTube… 0%",
+                    "upload_error": ""})
+        _av_write(job)
+
+        def _on_progress(pct: float, uploaded: int, total: int) -> None:
+            j = _av_read(job_id)
+            mb_up = uploaded / 1024 / 1024
+            mb_total = total / 1024 / 1024
+            j.update({"upload_status": "uploading",
+                      "upload_progress": round(pct, 1),
+                      "upload_stage": f"Uploading to YouTube… {pct:.0f}% ({mb_up:.1f} / {mb_total:.1f} MB)"})
+            _av_write(j)
+
+        result = youtube_upload.upload_video(
+            src, title.strip(), description=description,
+            tags=tags, privacy_status=privacy_status,
+            channel_id=channel_id,
+            on_progress=_on_progress,
+        )
+        video_id = result.get("video_id", "")
+        thumb_ok = False
+        thumb_error = ""
+        if thumb_path is not None and thumb_path.exists() and video_id:
+            try:
+                from google.oauth2.credentials import Credentials
+                from googleapiclient.discovery import build
+                from googleapiclient.http import MediaFileUpload
+                token_file = (
+                    youtube_upload.token_path_for_channel(channel_id)
+                    if channel_id
+                    else youtube_upload.token_path()
+                )
+                creds = Credentials.from_authorized_user_file(str(token_file))
+                youtube = build("youtube", "v3", credentials=creds)
+                youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(
+                        str(thumb_path),
+                        mimetype="image/png" if thumb_path.suffix.lower() == ".png" else "image/jpeg"),
+                ).execute()
+                thumb_ok = True
+            except Exception as exc:  # noqa: BLE001
+                # The raw HttpError is a wall of JSON. The common
+                # cause is a 403: the channel is not phone-verified
+                # (YouTube requires verification for custom
+                # thumbnails). Say that plainly instead.
+                err = str(exc)
+                if "doesn't have permissions to upload and set custom video thumbnails" in err:
+                    thumb_error = (
+                        "Thumbnail was not set — this channel needs phone verification "
+                        "before YouTube allows custom thumbnails. Verify it at "
+                        "youtube.com/verify (phone + SMS, ~2 min), then set the "
+                        "thumbnail for this video in YouTube Studio (Content → video → "
+                        "Thumbnail). The video itself uploaded fine.")
+                else:
+                    thumb_error = f"Thumbnail was not set ({err[-300:]})."
+        job = _av_read(job_id)
+        job.update({"upload_status": "uploaded", "upload_progress": 100,
+                    "upload_stage": "Uploaded.",
+                    "uploaded_video_id": video_id,
+                    "uploaded_url": result.get("url", ""),
+                    "uploaded_privacy": privacy_status,
+                    "thumbnail_set": thumb_ok,
+                    "thumbnail_error": thumb_error})
+        _av_write(job)
+    except Exception as exc:  # noqa: BLE001
+        job = _av_read(job_id)
+        job.update({"upload_status": "failed", "upload_progress": 0,
+                    "upload_stage": "Upload failed.",
+                    "upload_error": f"Upload failed: {exc}"})
+        _av_write(job)
+
+
 @app.post("/api/autovideo/{job_id}/upload")
 async def autovideo_upload(
     job_id: str,
@@ -3186,7 +3488,8 @@ async def autovideo_upload(
     from the form, to the selected connected channel. Uses the
     trimmed video when one exists, else the final video. An
     optional thumbnail image (JPG/PNG) is set on the video after
-    the upload. Returns the YouTube video id + watch URL."""
+    the upload. Runs in the background — poll the job for
+    upload_progress and the video URL when it finishes."""
     if privacy_status not in ("public", "unlisted", "private"):
         raise HTTPException(400, "privacy_status must be public, unlisted or private.")
     job_dir = _av_job_dir(job_id)
@@ -3197,54 +3500,21 @@ async def autovideo_upload(
     job = _av_read(job_id)
     if job.get("status") != "done":
         raise HTTPException(400, "Video is not finished yet — wait for the build to complete.")
-    try:
-        result = youtube_upload.upload_video(
-            src, title.strip(), description=description,
-            tags=tags, privacy_status=privacy_status,
-            channel_id=(channel_id or "").strip(),
-        )
-    except Exception as exc:
-        raise HTTPException(503, f"Upload failed: {exc}")
-    video_id = result.get("video_id", "")
-    thumb_ok = False
-    thumb_error = ""
-    if thumbnail is not None and video_id:
-        try:
-            ext = (Path(thumbnail.filename or "").suffix or ".jpg").lower()
-            if ext not in (".jpg", ".jpeg", ".png"):
-                ext = ".jpg"
-            thumb_path = job_dir / f"upload-thumb{ext}"
-            thumb_path.write_bytes(await thumbnail.read())
-            from google.oauth2.credentials import Credentials
-            from googleapiclient.discovery import build
-            from googleapiclient.http import MediaFileUpload
-            token_file = (
-                youtube_upload.token_path_for_channel(channel_id.strip())
-                if (channel_id or "").strip()
-                else youtube_upload.token_path()
-            )
-            creds = Credentials.from_authorized_user_file(str(token_file))
-            youtube = build("youtube", "v3", credentials=creds)
-            youtube.thumbnails().set(
-                videoId=video_id,
-                media_body=MediaFileUpload(
-                    str(thumb_path),
-                    mimetype="image/png" if ext == ".png" else "image/jpeg"),
-            ).execute()
-            thumb_ok = True
-        except Exception as exc:
-            thumb_error = f"Thumbnail was not set ({exc})."
-    job["uploaded_video_id"] = video_id
-    job["uploaded_url"] = result.get("url", "")
-    job["uploaded_privacy"] = privacy_status
-    _av_write(job)
-    return {
-        "video_id": video_id,
-        "url": result.get("url", ""),
-        "privacy_status": privacy_status,
-        "thumbnail_set": thumb_ok,
-        "thumbnail_error": thumb_error,
-    }
+    # Save the thumbnail now (the request's file data is only
+    # available during this call); the worker picks it up later.
+    thumb_path: Path | None = None
+    if thumbnail is not None:
+        ext = (Path(thumbnail.filename or "").suffix or ".jpg").lower()
+        if ext not in (".jpg", ".jpeg", ".png"):
+            ext = ".jpg"
+        thumb_path = job_dir / f"upload-thumb{ext}"
+        thumb_path.write_bytes(await thumbnail.read())
+    threading.Thread(
+        target=_run_autovideo_upload,
+        args=(job_id, title.strip(), description, tags, privacy_status,
+              (channel_id or "").strip(), thumb_path),
+        daemon=True).start()
+    return {"job_id": job_id, "status": "uploading"}
 
 
 @app.get("/api/health")

@@ -1247,12 +1247,20 @@ def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
 # old one-click path) is kept working and now calls join_and_mux
 # so the join/mux code has a single home.
 def synthesize_scene_voice(index: int, narration: str, voice: str,
-                           work_dir: Path) -> tuple[Path | None, str, float]:
+                           work_dir: Path, tts_provider: str = "edge",
+                           tts_key: str | None = None
+                           ) -> tuple[Path | None, str, float]:
     """TTS for ONE scene (plain voice — SSML is banned: it slowed
     speech 3x). Returns (voice_path, engine, duration_sec); the
-    path is None when the voice could not be measured."""
-    voice_path, engine = tts_module.synthesize(
-        narration, voice, "+0%", work_dir, expressive=False)
+    path is None when the voice could not be measured. The provider
+    (edge/google/unreal/elevenlabs) is the one the user picked in
+    Step 1; the key is theirs, passed through, never stored here."""
+    if tts_provider and tts_provider != "edge":
+        voice_path, engine = tts_module.synthesize_provider(
+            narration, tts_provider, voice, tts_key, "+0%", work_dir)
+    else:
+        voice_path, engine = tts_module.synthesize(
+            narration, voice, "+0%", work_dir, expressive=False)
     duration = video_module.get_duration(voice_path) or 0
     if not duration or duration <= 0:
         return None, engine, 0.0
@@ -1541,7 +1549,8 @@ def plan_footage(title: str, minutes: int, script: str | None,
 def prepare_audio(title: str, scenes: list[dict], voice: str,
                   work_dir: Path, freesound_key: str | None = None,
                   music: bool = True,
-                  progress_cb=None) -> dict:
+                  progress_cb=None, tts_provider: str = "edge",
+                  tts_key: str | None = None) -> dict:
     """STEP 3 — Audio. Voices every scene (parallel), joins the
     voiceover into master-voice.mp3, detects the mood and lists
     the matching Freesound tracks, and fetches transition SFX.
@@ -1550,6 +1559,21 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     Returns {durations, voice_files, voice_engine, total_voice,
     mood, music, music_status, music_options, music_options_status,
     transition_sfx, sfx_status}."""
+    # QUOTA PRE-CHECK (user, 2026-11-09): before voicing ANY
+    # scene, ask the PROVIDER'S OWN API whether its free limit
+    # covers the whole script — so the voice never stops mid-way.
+    # Only providers with a quota API are checked (ElevenLabs);
+    # for the others the check is skipped, not faked by counting.
+    if tts_provider and tts_provider != "edge":
+        quota = tts_module.check_quota(tts_provider, tts_key)
+        if quota.get("quota_api") and quota.get("remaining_chars") is not None:
+            script_chars = sum(len(s.get("narration", "")) for s in scenes)
+            if quota["remaining_chars"] < script_chars:
+                raise RuntimeError(
+                    f"{tts_module.PROVIDERS[tts_provider]['label']} free limit is "
+                    f"finished — {quota['remaining_chars']:,} characters left, but the "
+                    f"script needs {script_chars:,}. The voice would stop mid-way. "
+                    "Pick another voice or use the default.")
     import os
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -1558,7 +1582,8 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(synthesize_scene_voice, i,
-                        s["narration"], voice, work_dir): i
+                        s["narration"], voice, work_dir,
+                        tts_provider, tts_key): i
             for i, s in enumerate(scenes)
         }
         done = 0
