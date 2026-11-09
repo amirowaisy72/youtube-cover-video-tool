@@ -1246,6 +1246,29 @@ def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
 # The three phase functions below are the steps; run_master (the
 # old one-click path) is kept working and now calls join_and_mux
 # so the join/mux code has a single home.
+def _voice_scene_with_fallback(index: int, narration: str, voice: str,
+                               work_dir: Path, tts_provider: str = "edge",
+                               tts_key: str | None = None
+                               ) -> tuple[Path | None, str, float, bool, str]:
+    """Voice ONE scene with the chosen provider; if that provider
+    fails (bad key, free limit finished, network), fall back to
+    the default Edge voice (Aria) so the video never gets stuck
+    mid-way (user, 2026-11-09). Returns (path, engine, duration,
+    fell_back, error). The fallback is reported, never silent —
+    the job records it so the user knows his chosen voice was
+    not the one used."""
+    try:
+        path, engine, duration = synthesize_scene_voice(
+            index, narration, voice, work_dir, tts_provider, tts_key)
+        return path, engine, duration, False, ""
+    except Exception as exc:  # noqa: BLE001
+        if not tts_provider or tts_provider == "edge":
+            raise
+        path, engine, duration = synthesize_scene_voice(
+            index, narration, "en-US-AriaNeural", work_dir, "edge", None)
+        return path, engine, duration, True, str(exc)[-200:]
+
+
 def synthesize_scene_voice(index: int, narration: str, voice: str,
                            work_dir: Path, tts_provider: str = "edge",
                            tts_key: str | None = None
@@ -1579,19 +1602,25 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
 
     workers = max(2, min(4, os.cpu_count() or 4))
     results: dict[int, dict] = {}
+    fallback_note = ""
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(synthesize_scene_voice, i,
+            pool.submit(_voice_scene_with_fallback, i,
                         s["narration"], voice, work_dir,
                         tts_provider, tts_key): i
             for i, s in enumerate(scenes)
         }
         done = 0
         for future in as_completed(futures):
-            voice_path, engine, duration = future.result()
+            voice_path, engine, duration, fell_back, err = future.result()
             idx = futures[future]
             results[idx] = {"voice_path": voice_path, "engine": engine,
                             "duration": duration}
+            if fell_back and not fallback_note:
+                fallback_note = (
+                    f"{tts_module.PROVIDERS[tts_provider]['label']} failed "
+                    f"({err}) — the default Edge voice (Aria) was used "
+                    "instead, so the video still completed.")
             done += 1
             if progress_cb:
                 progress_cb(done, len(scenes),
@@ -1629,6 +1658,8 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
         "durations": [round(d, 1) for d in durations],
         "voice_files": [p.name for p in voice_files],
         "voice_engine": engine,
+        "voice_fallback": bool(fallback_note),
+        "voice_fallback_note": fallback_note,
         "total_voice": round(total_voice, 1),
         "mood": mood,
         "music": music_path.name if music_path is not None else None,

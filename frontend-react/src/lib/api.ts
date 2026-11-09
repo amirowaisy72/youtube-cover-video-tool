@@ -168,6 +168,10 @@ export type AvJob = {
   // "elevenlabs"). Set when the user re-voices a finished video.
   tts_provider?: string;
   revoice_error?: string;
+  // Set when the chosen voice provider failed and the default
+  // Edge voice was used instead, so the video still completed.
+  voice_fallback?: boolean;
+  voice_fallback_note?: string;
   // Trimmed version (user, 2026-11-09): cutting the first seconds
   // off the finished video (e.g. an unwanted Hook).
   trimmed_url?: string;

@@ -1172,6 +1172,9 @@ function AutoVideo() {
             <p className="mt-1 text-sm text-muted-foreground">
               Voiceover: {job.voice_duration_sec ? `${Math.round(job.voice_duration_sec)}s` : "?"} · {job.voice_engine || ""} · Mood: {job.mood || "?"} · {job.transition_sfx ? `${job.transition_sfx} transition sound(s)` : "no transition sounds (needs a Freesound key)"}
             </p>
+            {job.voice_fallback && job.voice_fallback_note && (
+              <p className="mt-1 text-sm text-amber-400">⚠️ {job.voice_fallback_note}</p>
+            )}
           </div>
           <div className="glass p-6">
             <p className="font-semibold">🎵 Background music</p>
