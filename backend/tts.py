@@ -440,36 +440,38 @@ def _synthesize_google(text: str, voice: str, api_key: str, dest: Path) -> None:
 
 
 def _synthesize_unreal(text: str, voice: str, api_key: str, dest: Path) -> None:
-    """Unreal Speech (Kokoro). /speech returns an MP3 URL to download.
-    NOTE (user, 2026-11-09): Speed and Pitch are NUMBERS in the V8
-    API (Speed is a float, default 0) — sending them as strings
-    ("0"/"1") made the API reject the request with a 400, which
-    is why the voice preview failed even with a valid key."""
+    """Unreal Speech (Kokoro) via /stream — returns the MP3 audio
+    directly (up to 1,000 chars per call; scenes are chunked to
+    ~900 chars, so this covers them). Two fixes (user, 2026-11-09):
+    (1) the API rejected the default Python-urllib User-Agent with
+    a 403 even for a valid key, so a browser User-Agent is sent;
+    (2) /stream is the primary documented endpoint and needs no
+    URL download step. Speed/Pitch are strings, exactly as the
+    official code sample sends them."""
     import json as _json
     import urllib.request
     body = _json.dumps({
         "Text": text, "VoiceId": voice, "Bitrate": "192k",
-        "Speed": 0, "Pitch": 1, "TimestampType": "sentence",
+        "Speed": "0", "Pitch": "1", "Codec": "libmp3lame",
     }).encode("utf-8")
     req = urllib.request.Request(
-        "https://api.v8.unrealspeech.com/speech",
-        data=body, headers={"Content-Type": "application/json",
-                            "Authorization": f"Bearer {api_key}"})
+        "https://api.v8.unrealspeech.com/stream",
+        data=body, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/120.0 Safari/537.36"),
+        })
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = _json.loads(resp.read().decode("utf-8"))
+        with urllib.request.urlopen(req, timeout=120) as resp, dest.open("wb") as out:
+            while True:
+                chunk = resp.read(1024 * 256)
+                if not chunk:
+                    break
+                out.write(chunk)
     except Exception as exc:
         raise RuntimeError(f"Unreal Speech failed: {exc}") from exc
-    url = data.get("OutputUri")
-    if not url:
-        raise RuntimeError(f"Unreal Speech failed: {data}")
-    req2 = urllib.request.Request(url)
-    with urllib.request.urlopen(req2, timeout=120) as resp, dest.open("wb") as out:
-        while True:
-            chunk = resp.read(1024 * 256)
-            if not chunk:
-                break
-            out.write(chunk)
     if dest.stat().st_size < 1000:
         raise RuntimeError("Unreal Speech returned an empty audio file.")
 
