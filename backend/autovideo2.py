@@ -905,17 +905,34 @@ def apply_popups(final_path: Path, popups: list[dict],
     rng = random.Random(20261109)
     corners = [(-500, -200), (width + 100, -200),
                (-500, height + 100), (width + 100, height + 100)]
+    # SHORTS (user, 2026-11-09): the font was sized by HEIGHT —
+    # for a 1080x1920 Short that made 115–211px words that filled
+    # the frame and overlapped the captions. Size by the SMALLER
+    # side instead (same for 1280x720 landscape, sane for
+    # vertical), keep pop-ups out of the bottom caption zone
+    # (ey 20–70% of height), and clamp the landing x so the word
+    # never runs off the left/right edge.
+    ref = min(width, height)
     filters: list[str] = []
     for p in popups:
         t0 = p["start"]
         sx, sy = rng.choice(corners)
-        ex = rng.randint(int(width * 0.15), int(width * 0.85))
-        ey = rng.randint(int(height * 0.2), int(height * 0.8))
         # A different style every time: random colour, size
-        # (0.06–0.11 of the height) and background box on/off.
+        # (0.06–0.11 of the smaller side) and background box on/off.
         color = rng.choice(_POPUP_COLORS)
-        fontsize = max(40, int(height * rng.uniform(0.06, 0.11)))
+        fontsize = max(40, int(ref * rng.uniform(0.06, 0.11)))
         boxed = rng.random() < 0.7
+        text = p["text"].replace("'", "").replace(":", "")
+        # Estimated word width (~0.6 x fontsize per char); keep
+        # the centred word inside the frame with a 20px margin.
+        est_w = max(1.0, len(text) * fontsize * 0.6)
+        lo = int(max(est_w / 2 + 20, width * 0.15))
+        hi = int(min(width - est_w / 2 - 20, width * 0.85))
+        if hi <= lo:
+            ex = width // 2
+        else:
+            ex = rng.randint(lo, hi)
+        ey = rng.randint(int(height * 0.2), int(height * 0.7))
         # Fly-in: x/y interpolate from the corner to the random
         # point over _POPUP_FLY_SEC, then hold. text_w/text_h
         # centre the word on the chosen point.
@@ -923,7 +940,6 @@ def apply_popups(final_path: Path, popups: list[dict],
              f"-text_w/2")
         y = (f"({ey}+({sy}-{ey})*max(0,1-(t-{t0})/{_POPUP_FLY_SEC}))"
              f"-text_h/2")
-        text = p["text"].replace("'", "").replace(":", "")
         box = "box=1:boxcolor=black@0.65:boxborderw=24:" if boxed else ""
         filters.append(
             f"drawtext=fontfile={font}:text='{text}':"
@@ -1049,13 +1065,25 @@ _SUBTITLE_STYLE = (
     "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
     "Alignment=2,MarginV=25"
 )
+# SHORTS (user, 2026-11-09): subtitles for a 9:16 vertical
+# frame. The old flow burned captions into a 1280x720 segment
+# and THEN scaled the whole video 2.67x to vertical — so the
+# captions came out 64px and cut off at both edges. Shorts now
+# render directly in 1080x1920, so the caption font is sized
+# for that width (32px fits a 5-word cue on one line).
+_SUBTITLE_STYLE_VERTICAL = (
+    "FontName=Arial,FontSize=32,PrimaryColour=&HFFFFFF,"
+    "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
+    "Alignment=2,MarginV=40"
+)
 
 
 def _segment_scene_image(image_path: Path, caption: str, duration: float,
                          dest: Path, pan_right: bool,
                          subtitles_srt: Path | None = None,
                          fade_in: bool = True,
-                         fade_out: bool = True) -> bool:
+                         fade_out: bool = True,
+                         vertical: bool = False) -> bool:
     """Still image -> moving segment: slow horizontal pan
     (so a photo feels like video) + fade in/out + caption.
     When subtitles_srt is given, the live word-by-word captions
@@ -1064,30 +1092,45 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
     in with the subtitles filter. The SRT filename is passed
     bare and FFmpeg runs with cwd=work_dir, so no path escaping
     is needed (Windows drive letters contain ':' which the
-    filter graph would misread)."""
+    filter graph would misread).
+    SHORTS (user, 2026-11-09): vertical=True renders the segment
+    directly in 1080x1920 (slow VERTICAL pan + vertical caption
+    style) instead of a 1280x720 segment that gets scaled 2.67x
+    and cropped — that magnification is what cut the captions
+    off at both edges."""
     if subtitles_srt is not None:
         shown = image_path
     else:
         captioned = dest.with_suffix(".cap.jpg")
         shown = _burn_caption(image_path, caption, captioned)
-    # Pan: scale up, then crop a 1280x720 window sliding
-    # across. x goes 0 -> (in_w - out_w) or the reverse.
+    # Pan: scale up, then crop a window sliding across. x goes
+    # 0 -> (in_w - out_w) or the reverse (landscape); for a
+    # vertical Short the pan is vertical instead (y slides).
     # FFmpeg's crop filter has NO `duration` variable — the scene
     # length must be substituted as a number, or the filter fails
     # ("Undefined constant ... 'duration'") and the scene falls
     # back to a plain still. (That was a real bug: the pan never
     # worked, so image scenes lost their motion + caption.)
     direction = "t" if pan_right else f"({duration}-t)"
-    vf = (
-        "scale=1920:1080:force_original_aspect_ratio=increase,"
-        "crop=1280:720:"
-        f"x='(in_w-out_w)*({direction}/{duration})':y='(in_h-out_h)/2',"
-        "format=yuv420p,"
-    )
+    if vertical:
+        vf = (
+            "scale=1080:1920:force_original_aspect_ratio=increase,"
+            "crop=1080:1920:"
+            f"x='(in_w-out_w)/2':y='(in_h-out_h)*({direction}/{duration})',"
+            "format=yuv420p,"
+        )
+    else:
+        vf = (
+            "scale=1920:1080:force_original_aspect_ratio=increase,"
+            "crop=1280:720:"
+            f"x='(in_w-out_w)*({direction}/{duration})':y='(in_h-out_h)/2',"
+            "format=yuv420p,"
+        )
+    style = _SUBTITLE_STYLE_VERTICAL if vertical else _SUBTITLE_STYLE
     if subtitles_srt is not None:
         vf += (
             f"subtitles='{subtitles_srt.name}':"
-            f"force_style='{_SUBTITLE_STYLE}',"
+            f"force_style='{style}',"
         )
     # Fades: with xfade transitions the join IS the transition,
     # so middle scenes have no fade (first scene fades in, last
@@ -1121,7 +1164,8 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
 def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
                         dest: Path, subtitles_srt: Path | None = None,
                         fade_in: bool = True,
-                        fade_out: bool = True) -> bool:
+                        fade_out: bool = True,
+                        vertical: bool = False) -> bool:
     """Clip -> scene segment, with the scene's caption burned
     in as a bottom bar (same first-sentence caption as image
     scenes, via drawtext + a text file so punctuation in the
@@ -1138,11 +1182,31 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
     master test.
     A caption/subtitle failure must never break the scene: if
     the captioned/subtitled encode fails, the plain
-    (uncaptioned) segment is built instead."""
-    base_vf = (
-        "scale=1280:720:force_original_aspect_ratio=decrease,"
-        "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p"
-    )
+    (uncaptioned) segment is built instead.
+    SHORTS (user, 2026-11-09): vertical=True renders the segment
+    directly in 1080x1920. A landscape clip is NOT centre-cropped
+    (that threw away 70% of the picture) — it is shown whole,
+    fitted to the 1080 width, over a blurred + darkened copy of
+    itself filling the frame (the standard Shorts look). A true
+    vertical clip fills the frame, so its background is hidden.
+    Captions use the vertical subtitle style."""
+    if vertical:
+        # Blurred-background fill: split the clip, blur+darken one
+        # copy to fill 1080x1920, fit the other to the 1080 width
+        # and centre it. format after the overlay keeps the chain
+        # in yuv420p for the encoder.
+        base_vf = (
+            "split[a][b];"
+            "[a]scale=1080:1920:force_original_aspect_ratio=increase,"
+            "crop=1080:1920,gblur=sigma=30,eq=brightness=-0.3[bg];"
+            "[b]scale=1080:-1[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p"
+        )
+    else:
+        base_vf = (
+            "scale=1280:720:force_original_aspect_ratio=decrease,"
+            "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p"
+        )
     clip_dur = autovideo._ffprobe_duration(clip_path) or duration
     loop_args: list[str] = []
     if clip_dur < duration:
@@ -1170,11 +1234,12 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
     fade = ",".join(fade_parts)
     fade_sfx = f",{fade}" if fade else ""
+    style = _SUBTITLE_STYLE_VERTICAL if vertical else _SUBTITLE_STYLE
     if subtitles_srt is not None:
         subtitled_vf = (
             f"{base_vf},"
             f"subtitles='{subtitles_srt.name}':"
-            f"force_style='{_SUBTITLE_STYLE}'"
+            f"force_style='{style}'"
             f"{fade_sfx}"
         )
         if _encode(subtitled_vf):
@@ -1397,7 +1462,8 @@ def remix_music(work_dir: Path, music_path: Path, volume: float,
 
 
 def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
-                                     transitions: bool = True) -> dict:
+                                     transitions: bool = True,
+                                     vertical: bool = False) -> dict:
     """Re-join + re-mux a finished Auto Video after ONE scene's
     visual changed (user, 2026-11-09 — scene change is his most
     important feature: he changes MANY scenes). Only the VIDEO
@@ -1408,7 +1474,10 @@ def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
     rebuilt the changed one first. The join is the same xfade
     chain run_master uses (same transition rotation, same
     offsets from the voice durations), with the same stream-copy
-    fallbacks. Returns {final_path, final_duration_sec, join}."""
+    fallbacks. Returns {final_path, final_duration_sec, join}.
+    SHORTS (user, 2026-11-09): vertical=True makes the last-resort
+    re-encode fallback 1080x1920 (the xfade/copy paths keep the
+    segments' vertical resolution)."""
     segments = [work_dir / f"master-seg-{i:02d}.mp4" for i in range(len(scenes))]
     for seg in segments:
         if not seg.exists():
@@ -1469,10 +1538,11 @@ def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
     if not joined_ok:
         if video_only.exists():
             video_only.unlink(missing_ok=True)
+        fallback_scale = "1080:1920" if vertical else "1280:720"
         proc = subprocess.run(
             ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
              "-i", str(list_file),
-             "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
+             "-vf", f"scale={fallback_scale},format=yuv420p", "-r", "30",
              "-c:v", "libx264", "-preset", "veryfast",
              "-pix_fmt", "yuv420p", str(video_only)],
             capture_output=True, text=True,
@@ -1536,7 +1606,8 @@ def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
 
 def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
                           visual_path: Path, kind: str,
-                          total_scenes: int) -> dict:
+                          total_scenes: int,
+                          vertical: bool = False) -> dict:
     """Rebuild ONE scene's segment with a new visual (user,
     2026-11-09 — scene change). The narration, voiceover and
     captions are unchanged, so no TTS and no Whisper run: the
@@ -1545,7 +1616,9 @@ def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
     voice+transition_sec long (except the last scene), exactly
     as the original build made it, so the re-join lands on the
     same total duration. Returns the updated scene report
-    fields (kind, visual_source, duration_sec)."""
+    fields (kind, visual_source, duration_sec).
+    SHORTS (user, 2026-11-09): vertical=True rebuilds the segment
+    in 1080x1920 so a changed scene stays vertical."""
     duration = float(scene.get("duration_sec") or 0)
     if duration <= 0:
         raise RuntimeError("Scene has no duration — cannot rebuild.")
@@ -1560,14 +1633,16 @@ def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
     if kind == "clip":
         ok = _segment_scene_clip(visual_path, caption, seg_duration,
                                  dest, subtitles_srt=subtitles_srt,
-                                 fade_in=fade_in, fade_out=fade_out)
+                                 fade_in=fade_in, fade_out=fade_out,
+                                 vertical=vertical)
         if not ok:
             ok = autovideo._segment_clip(visual_path, dest, seg_duration)
     else:
         ok = _segment_scene_image(visual_path, caption, seg_duration,
                                   dest, pan_right=(index % 2 == 0),
                                   subtitles_srt=subtitles_srt,
-                                  fade_in=fade_in, fade_out=fade_out)
+                                  fade_in=fade_in, fade_out=fade_out,
+                                  vertical=vertical)
         if not ok:
             ok = autovideo._segment_image(visual_path, dest, seg_duration)
     if not ok:
@@ -1642,12 +1717,15 @@ def encode_scene_segment(index: int, visual_path: Path, kind: str,
                          caption: str, voice_duration: float,
                          work_dir: Path, voice_path: Path,
                          subtitles: bool = True, total_scenes: int = 1,
-                         transition_sec: float = _TRANSITION_SEC
+                         transition_sec: float = _TRANSITION_SEC,
+                         vertical: bool = False
                          ) -> Path | None:
     """Encode ONE scene's segment from its chosen visual + voice
     length. Word-by-word Whisper subtitles are burned in when
     they transcribe; a subtitle failure falls back to the static
-    caption. Returns the segment path, or None on failure."""
+    caption. Returns the segment path, or None on failure.
+    SHORTS (user, 2026-11-09): vertical=True renders the segment
+    directly in 1080x1920 (see _segment_scene_clip/image)."""
     subtitles_srt: Path | None = None
     if subtitles:
         subtitles_srt = _transcribe_scene_voice(voice_path, work_dir, index)
@@ -1659,12 +1737,14 @@ def encode_scene_segment(index: int, visual_path: Path, kind: str,
     if kind == "clip":
         ok = _segment_scene_clip(visual_path, caption, seg_duration,
                                  dest, subtitles_srt=subtitles_srt,
-                                 fade_in=fade_in, fade_out=fade_out)
+                                 fade_in=fade_in, fade_out=fade_out,
+                                 vertical=vertical)
     else:
         ok = _segment_scene_image(visual_path, caption, seg_duration,
                                   dest, pan_right=(index % 2 == 0),
                                   subtitles_srt=subtitles_srt,
-                                  fade_in=fade_in, fade_out=fade_out)
+                                  fade_in=fade_in, fade_out=fade_out,
+                                  vertical=vertical)
     if not ok:
         # Segment encode failed: fall back to the old plain
         # segment builders for this scene.
@@ -1680,14 +1760,17 @@ def join_and_mux(work_dir: Path, segments: list[Path],
                  total_voice: float, music_path: Path | None,
                  music_volume: float, sfx_paths: list[Path],
                  transitions: bool, total_scenes: int,
-                 progress_cb=None) -> tuple[Path, float, str]:
+                 progress_cb=None, vertical: bool = False) -> tuple[Path, float, str]:
     """Join scene segments (xfade chain when transitions are on,
     stream-copy fallback, re-encode last resort), join the
     voiceover, build the SFX track at the scene boundaries, and
     mux voice + music + SFX into final.mp4. The music volume is
     a parameter (the step flow lets the user pick it; the old
     flow passes _MUSIC_VOLUME). Returns (final_path,
-    final_duration_sec, join_method). Raises on failure."""
+    final_duration_sec, join_method). Raises on failure.
+    SHORTS (user, 2026-11-09): vertical=True makes the last-resort
+    re-encode fallback 1080x1920 instead of 1280x720 (the xfade
+    and stream-copy paths already keep the segments' resolution)."""
     video_only = work_dir / "master-video-only.mp4"
     joined_ok = False
     join_method = "copy"
@@ -1737,10 +1820,11 @@ def join_and_mux(work_dir: Path, segments: list[Path],
     if not joined_ok:
         if video_only.exists():
             video_only.unlink(missing_ok=True)
+        fallback_scale = "1080:1920" if vertical else "1280:720"
         proc = subprocess.run(
             ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
              "-i", str(list_file),
-             "-vf", "scale=1280:720,format=yuv420p", "-r", "30",
+             "-vf", f"scale={fallback_scale},format=yuv420p", "-r", "30",
              "-c:v", "libx264", "-preset", "veryfast",
              "-pix_fmt", "yuv420p", str(video_only)],
             capture_output=True, text=True,
@@ -2085,9 +2169,15 @@ def render_video(work_dir: Path, scenes: list[dict],
     """STEP 4 — Render. Encodes every scene's segment from its
     chosen visual + voice length, then joins + muxes via
     join_and_mux. Returns {final_path, final_duration_sec,
-    join, kinds}. SHORTS: video_type "short" converts the
-    finished video to 9:16 (1080x1920) before returning."""
+    join, kinds}. SHORTS (user, 2026-11-09): video_type "short"
+    renders every segment DIRECTLY in 1080x1920 (vertical
+    subtitles, blurred-background footage) — the old flow rendered
+    1280x720 and then scaled the whole video 2.67x to vertical,
+    which magnified the captions to 64px and cut them off at
+    both edges, and centre-cropped the footage. _to_vertical is
+    no longer called."""
     total_voice = sum(durations)
+    vertical = video_type == "short"
     segments: list[Path] = []
     kinds = {"clip": 0, "image": 0, "ai": 0, "card": 0}
     for i, scene in enumerate(scenes):
@@ -2100,7 +2190,7 @@ def render_video(work_dir: Path, scenes: list[dict],
         dest = encode_scene_segment(
             i, visual_path, scene["kind"], caption, durations[i],
             work_dir, voice_path, subtitles=subtitles,
-            total_scenes=len(scenes))
+            total_scenes=len(scenes), vertical=vertical)
         if dest is None:
             raise RuntimeError(f"Scene {i + 1} segment failed to encode.")
         segments.append(dest)
@@ -2111,10 +2201,7 @@ def render_video(work_dir: Path, scenes: list[dict],
     final_path, final_duration, join_method = join_and_mux(
         work_dir, segments, voice_files, durations, total_voice,
         music_path, music_volume, sfx_paths, transitions,
-        len(scenes), progress_cb=progress_cb)
-    if video_type == "short":
-        _to_vertical(final_path, work_dir)
-        final_duration = video_module.get_duration(final_path) or final_duration
+        len(scenes), progress_cb=progress_cb, vertical=vertical)
     return {
         "final_path": final_path,
         "final_duration_sec": final_duration,

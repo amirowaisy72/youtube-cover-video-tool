@@ -1487,6 +1487,14 @@ function AutoVideo() {
             <button className="btn btn-primary mt-4" onClick={() => openBrowser(0)}>
               🎬 Browse all footage — flip through every scene & fix any
             </button>
+            {/* Re-render (user, 2026-11-09): rebuilds the finished
+                video from the SAME voiceover, music and footage —
+                no audio step, no extra credit. Use it after a fix
+                (e.g. the Shorts vertical fix) to get the corrected
+                video without rebuilding the audio. */}
+            <button className="btn btn-ghost mt-4 ml-2" onClick={() => void startRender()}>
+              ↻ Re-render video (same audio, no extra credit)
+            </button>
             {/* Change background music (user, 2026-11-09): it
                 used to sit at the very bottom, below Upload —
                 moved up here, right under the video, where it

@@ -2794,11 +2794,18 @@ def autovideo_render(job_id: str,
                      payload: AutoVideoRenderRequest) -> dict:
     """STEP 4 — Render. Edits the video from the chosen footage
     + audio and produces final.mp4. Runs after the audio step.
-    The finished video stays editable (scene/music change)."""
+    The finished video stays editable (scene/music change).
+    RE-RENDER (user, 2026-11-09): a job that is already "done"
+    may be rendered again — it reuses the existing voiceover,
+    music and footage from disk, so NO audio step and NO extra
+    license credit (token=None, like the revoice worker). This
+    is how a finished video gets fixed (e.g. the Shorts vertical
+    fix) without rebuilding the audio."""
     job = _av_read(job_id)
-    if job.get("phase") != "audio-ready":
+    if job.get("phase") not in ("audio-ready", "done"):
         raise HTTPException(400, "Run the audio step first.")
-    token = job.get("job_token")
+    # A re-render of a finished video costs no credit.
+    token = None if job.get("phase") == "done" else job.get("job_token")
     threading.Thread(
         target=_run_autovideo_render,
         args=(job_id, payload.music_volume, payload.transitions,
@@ -3325,13 +3332,16 @@ def _apply_scene_visual(job: dict, job_dir: Path, idx: int,
     both go through the same re-render path."""
     scenes = job.get("scenes") or []
     scene = scenes[idx]
+    vertical = (job.get("video_type") or "long") == "short"
     result = autovideo2.rebuild_scene_segment(
-        job_dir, idx, scene, visual_path, kind, len(scenes))
+        job_dir, idx, scene, visual_path, kind, len(scenes),
+        vertical=vertical)
     scene["kind"] = result["kind"]
     scene["visual_source"] = f"changed: {visual_path.name}"
     scene["duration_sec"] = result["duration_sec"]
     rejoined = autovideo2.rebuild_video_after_scene_change(
-        job_dir, scenes, transitions=bool(job.get("transitions", True)))
+        job_dir, scenes, transitions=bool(job.get("transitions", True)),
+        vertical=vertical)
     job["final_minutes"] = round(rejoined["final_duration_sec"] / 60, 1)
     job["scene_changed"] = idx
     _av_write(job)
