@@ -1080,13 +1080,17 @@ def generate_fallback_visuals(title: str, paragraphs: list[str],
     return visuals
 
 
-def split_paragraphs(script: str) -> list[str]:
+def split_paragraphs(script: str, group_size: int = 3) -> list[str]:
     """Paragraphs from the script; if it is one long paragraph,
-    group its sentences three at a time so visuals can still
-    change with the narration. Safety net: any heading line
-    that survived _clean_script is dropped here, and a paragraph
-    that is only a heading is dropped entirely — it must never
-    become a scene, or the voiceover would read it aloud."""
+    group its sentences group_size at a time so visuals can
+    still change with the narration. Safety net: any heading
+    line that survived _clean_script is dropped here, and a
+    paragraph that is only a heading is dropped entirely — it
+    must never become a scene, or the voiceover would read it
+    aloud. SHORTS (user, 2026-11-09): group_size 2, so a
+    single-paragraph Short script still cuts to a new visual
+    every couple of sentences instead of one clip for the
+    whole Short."""
     paragraphs = [para.strip() for para in re.split(r"\n\s*\n", script) if para.strip()]
     cleaned: list[str] = []
     for para in paragraphs:
@@ -1098,14 +1102,14 @@ def split_paragraphs(script: str) -> list[str]:
     paragraphs = cleaned
     if len(paragraphs) > 1:
         return paragraphs
-    # One long paragraph: group its sentences three at a time.
-    # Use the cleaned text (headings already dropped), not the
-    # raw script, or a surviving heading would be spoken.
+    # One long paragraph: group its sentences group_size at a
+    # time. Use the cleaned text (headings already dropped),
+    # not the raw script, or a surviving heading would be spoken.
     text = " ".join(paragraphs)
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     grouped: list[str] = []
-    for i in range(0, len(sentences), 3):
-        grouped.append(" ".join(sentences[i:i + 3]).strip())
+    for i in range(0, len(sentences), group_size):
+        grouped.append(" ".join(sentences[i:i + group_size]).strip())
     return [group for group in grouped if group]
 
 

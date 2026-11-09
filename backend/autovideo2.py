@@ -91,7 +91,8 @@ def _clean_text(text: str) -> str:
 
 
 def generate_scenes(title: str, minutes: int, script: str | None = None,
-                    words_target: int | None = None) -> tuple[list[dict], str]:
+                    words_target: int | None = None,
+                    is_short: bool = False) -> tuple[list[dict], str]:
     """Return (scenes, source). Each scene: narration + visual.
     NOTE 2026-11-03: asking Pollinations for a SCENE/NARRATION/
     VISUAL format returns HTTP 400 (same filter that rejected
@@ -106,15 +107,21 @@ def generate_scenes(title: str, minutes: int, script: str | None = None,
     of generating one — the same paragraph split turns it into
     scenes, so the video is built from their words.
     SHORTS (user, 2026-11-09): words_target overrides the
-    minutes x 150 target for a Short (seconds, not minutes)."""
+    minutes x 150 target for a Short (seconds, not minutes).
+    A Short also splits FINER — 2 sentences per group (not 3)
+    and a 10-word minimum scene (not 20) — so a single-paragraph
+    Short script still cuts to a new visual every couple of
+    sentences instead of one clip for the whole Short."""
     if script and script.strip():
         script = _clean_text(script.strip())
         source = "custom"
     else:
         script, source = autovideo.generate_script(title, minutes,
                                                    words_target=words_target)
+    group_size = 2 if is_short else 3
+    min_scene_words = 10 if is_short else 20
     scenes: list[dict] = []
-    for paragraph in autovideo.split_paragraphs(script):
+    for paragraph in autovideo.split_paragraphs(script, group_size=group_size):
         paragraph = paragraph.strip()
         if not paragraph:
             continue
@@ -123,10 +130,10 @@ def generate_scenes(title: str, minutes: int, script: str | None = None,
         # Tiny fragments (e.g. a trailing 'Hidden layers of
         # intrigue?') are not scenes: merge them into the
         # previous scene instead of shipping a 2-second scene.
-        if len(paragraph.split()) < 20 and scenes:
+        if len(paragraph.split()) < min_scene_words and scenes:
             scenes[-1]["narration"] += " " + paragraph
             continue
-        if len(paragraph.split()) < 20 and not scenes:
+        if len(paragraph.split()) < min_scene_words and not scenes:
             continue
         scenes.append({"narration": paragraph, "visual": visual})
     if not scenes:
@@ -1866,7 +1873,8 @@ def plan_footage(title: str, minutes: int, script: str | None,
         # ~150 words/minute of speech → seconds x 2.5 words.
         words_target = max(30, round(short_seconds * 150 / 60))
     scenes, source = generate_scenes(title, minutes, script=script,
-                                     words_target=words_target)
+                                     words_target=words_target,
+                                     is_short=is_short)
     if not scenes:
         raise RuntimeError("Could not build a scene script.")
     script_text = "\n\n".join(s["narration"] for s in scenes)
