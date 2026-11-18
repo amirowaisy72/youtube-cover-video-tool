@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:01,300
+When I close my eyes
+
+2
+00:00:01,300 --> 00:00:02,620
+and think of Mars, I
+
+3
+00:00:02,620 --> 00:00:03,820
+see not a distant point,
+
+4
+00:00:04,080 --> 00:00:05,680
+but a dusty, hopeful horizon.

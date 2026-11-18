@@ -1,0 +1,123 @@
+{
+  "id": "cd6f7722dca1",
+  "status": "planned",
+  "phase": "planned",
+  "stage": "Footage ready \u2014 review the scenes.",
+  "progress": 100,
+  "title": "The Budget Hack Banks Are Hiding",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NDE4MDc3NS42NDcxMDkzLCJqb2JfcmVmIjoiY2Q2Zjc3MjJkY2ExIiwibm9uY2UiOiJiY2IzOWI4OWMyYTFiODBiIn0=.47b7a2a90b5efde785862e0f462c53069bc7ec050eafdc3a3e8b5fa7e15a9795",
+  "scene_total": 5,
+  "script": "Hey there, friends! Imagine you just found a secret door in your bank\u2019s dusty filing cabinet\u2014one that opens up a world of money you never even knew existed. Would you pull it open? Well, I\u2019ve just discovered that very door, and it\u2019s so smug, it could give a chameleon a run for its money. The budget hack banks are hiding\u2026 and it\u2019s a game changer!\n\nFirst, let\u2019s set the scene. Banks are like those heavyset old librarians who keep all the treasure but never let you touch it. They stack your money on shelves that look safe, but behind each shelf lies a vault of untapped interest. Do you hear the whisper? It says, \u201cTrust me, put your savings where the star\u2011shining dividends wait.\u201d Yet, while most of us trust the traditional rate, a sweet spot for higher returns is humming quietly under those tables.\n\nNow, get ready for the juicy part\u2014fees. Banks have etched a secret highway: they\u2019re funneling your dough into fee\u2011laden accounts that kinda look like savings. And, oh! The value of the amounts you lose? It\u2019s like invisible mittens stealing warmth from your winter pocket. You\u2019d think a bank, a financial caretaker, would be transparent, but the only transparency I see is the glare from the bruise on the spare.\n\nLastly, let\u2019s talk about clarity. Imagine a magician pulling a rabbit out of a hat, except the rabbit is your future wealth, and the hat is your bank\u2019s tangled jargon. The hack? Open your eyes, ask \u201cWhat is the real rate of return?\u201d and demand a plain\u2011spoken answer. I\u2019ve been navigating the labyrinth, and my one truth is: the more normally I sweep, the less I find. When you\u2019ve seen the hidden tiers, you become the cartographer of your own savings.\n\nSo here\u2019s the final kicker: your money deserves a clear path. Grab the clipboard, slice through those fees, and watch your budget flourish like a sunflower in midday sun. Go out there, ask the question, uncover the hidden treasure\u2014and let your heart sing with the undeniable power of knowledge!",
+  "script_source": "pollinations-scenes",
+  "script_words": 344,
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "Hey there, friends! Imagine you just found a secret door in your bank\u2019s dusty filing cabinet\u2014one that opens up a world of money you never even knew existed. Would you pull it open? Well, I\u2019ve just discovered that very door, and it\u2019s so smug, it could give a chameleon a run for its money. The budget hack banks are hiding\u2026 and it\u2019s a game changer!",
+      "visual": "Hey there, friends!",
+      "caption": "Hey there, friends!",
+      "kind": "clip",
+      "visual_source": "motivation, motivational, inspiration, friends",
+      "visual_file": "scene-00.mp4",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "hey",
+        "friends",
+        "imagine",
+        "found",
+        "door",
+        "bank",
+        "filing",
+        "cabinet"
+      ]
+    },
+    {
+      "index": 1,
+      "narration": "First, let\u2019s set the scene. Banks are like those heavyset old librarians who keep all the treasure but never let you touch it. They stack your money on shelves that look safe, but behind each shelf lies a vault of untapped interest. Do you hear the whisper? It says, \u201cTrust me, put your savings where the star\u2011shining dividends wait.\u201d Yet, while most of us trust the traditional rate, a sweet spot for higher returns is humming quietly under those tables.",
+      "visual": "First, let\u2019s set the scene.",
+      "caption": "First, let\u2019s set the scene.",
+      "kind": "clip",
+      "visual_source": "sun, seascape, water, sunset, sea, horizon, red, ocean, reflection, calm, tranquil scene, peaceful, calmness, calming, peace",
+      "visual_file": "scene-01.mp4",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "scene",
+        "banks",
+        "heavyset",
+        "old",
+        "librarians",
+        "treasure",
+        "but",
+        "touch"
+      ]
+    },
+    {
+      "index": 2,
+      "narration": "Now, get ready for the juicy part\u2014fees. Banks have etched a secret highway: they\u2019re funneling your dough into fee\u2011laden accounts that kinda look like savings. And, oh! The value of the amounts you lose? It\u2019s like invisible mittens stealing warmth from your winter pocket. You\u2019d think a bank, a financial caretaker, would be transparent, but the only transparency I see is the glare from the bruise on the spare.",
+      "visual": "Now, get ready for the juicy part\u2014fees.",
+      "caption": "Now, get ready for the juicy part\u2014fees.",
+      "kind": "clip",
+      "visual_source": "strawberry, fruit, organic, juicy",
+      "visual_file": "scene-02.mp4",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "ready",
+        "juicy",
+        "part",
+        "fees",
+        "banks",
+        "etched",
+        "highway",
+        "funneling"
+      ]
+    },
+    {
+      "index": 3,
+      "narration": "Lastly, let\u2019s talk about clarity. Imagine a magician pulling a rabbit out of a hat, except the rabbit is your future wealth, and the hat is your bank\u2019s tangled jargon. The hack? Open your eyes, ask \u201cWhat is the real rate of return?\u201d and demand a plain\u2011spoken answer. I\u2019ve been navigating the labyrinth, and my one truth is: the more normally I sweep, the less I find. When you\u2019ve seen the hidden tiers, you become the cartographer of your own savings.",
+      "visual": "Lastly, let\u2019s talk about clarity.",
+      "caption": "Lastly, let\u2019s talk about clarity.",
+      "kind": "clip",
+      "visual_source": "conversation, talk, dialogue, coffee, colleagues, discussion, discuss",
+      "visual_file": "scene-03.mp4",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "lastly",
+        "talk",
+        "clarity",
+        "imagine",
+        "magician",
+        "pulling",
+        "rabbit",
+        "hat"
+      ]
+    },
+    {
+      "index": 4,
+      "narration": "So here\u2019s the final kicker: your money deserves a clear path. Grab the clipboard, slice through those fees, and watch your budget flourish like a sunflower in midday sun. Go out there, ask the question, uncover the hidden treasure\u2014and let your heart sing with the undeniable power of knowledge!",
+      "visual": "So here\u2019s the final kicker: your money deserves a clear path.",
+      "caption": "So here\u2019s the final kicker: your money deserves a clear path.",
+      "kind": "clip",
+      "visual_source": "fractal, multicoloured, art, abstract, beautiful wallpaper, template, decorative, screen saver, optically, vision, illusion, digital, fog, foggy, cloudy, final emergence, background",
+      "visual_file": "scene-04.mp4",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "final",
+        "kicker",
+        "money",
+        "clear",
+        "path",
+        "grab",
+        "clipboard",
+        "slice"
+      ]
+    }
+  ]
+}

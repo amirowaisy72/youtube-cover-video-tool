@@ -1,0 +1,2391 @@
+{
+  "title": "Teddy and Peddy’s Magic Frog Picnic",
+  "scenes": [
+    {
+      "place": "bedroom",
+      "sitting": true,
+      "location": "bedroom",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "bedroom",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{wake} {stretch} Peddy, wake up! Today is our big *picnic* day!",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "ding",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "wake"
+            },
+            {
+              "act": "stretch"
+            },
+            {
+              "say": "Peddy, wake up! Today is our big *picnic* day!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{rub-eyes} {yawn} Five more minutes… wait, picnic? {jump} I'm up!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "rub-eyes"
+            },
+            {
+              "act": "yawn"
+            },
+            {
+              "say": "Five more minutes… wait, picnic?"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "I'm up!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{idea} Sandwiches, juice, cake… we pack everything!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "idea"
+            },
+            {
+              "say": "Sandwiches, juice, cake… we pack everything!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{hmm} And cookies. Lots of cookies. A mountain of cookies!",
+          "expression": "happy",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "And cookies. Lots of cookies. A mountain of cookies!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} Okay, okay, cookies too. Let's go raid the kitchen!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Okay, okay, cookies too. Let's go raid the kitchen!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{yay} Picnic, picnic, picnic! {dance}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "yay"
+            },
+            {
+              "say": "Picnic, picnic, picnic!"
+            },
+            {
+              "act": "dance"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "kitchen",
+      "sitting": false,
+      "location": "kitchen",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "kitchen",
+      "characters": [
+        "auto-mom",
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "auto-mom",
+          "text": "{walk-to} Good morning, my little picnic monsters! {smile}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "walk-to"
+            },
+            {
+              "say": "Good morning, my little picnic monsters!"
+            },
+            {
+              "act": "smile"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hug} Good morning, Mom! We need food. All the food.",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hug"
+            },
+            {
+              "say": "Good morning, Mom! We need food. All the food."
+            }
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "{laugh} The normal sandwiches are on the table. Take those.",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "The normal sandwiches are on the table. Take those."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{open:fridge} {sniff} Mom, what is this green sandwich glowing in here?",
+          "expression": "suspicious",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "open",
+              "obj": "fridge"
+            },
+            {
+              "act": "sniff"
+            },
+            {
+              "say": "Mom, what is this green sandwich glowing in here?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "{shock} Don't touch that! It's Grandpa's *magic sandwich*!",
+          "expression": "surprised",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "shock"
+            },
+            {
+              "say": "Don't touch that! It's Grandpa's *magic sandwich*!"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{haan} Magic? What does it do?",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "haan"
+            },
+            {
+              "say": "Magic? What does it do?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "Nobody knows. Grandpa ate one and croaked all week! {shake-head}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "Nobody knows. Grandpa ate one and croaked all week!"
+            },
+            {
+              "act": "shake-head"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{gasp} Croaked? Like a frog?",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "Croaked? Like a frog?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "{nod} Like a very loud frog. So leave it alone, okay?",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "say": "Like a very loud frog. So leave it alone, okay?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "{walk-out} I'm going to water the plants. Be good!",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "footsteps",
+          "tone": "",
+          "segments": [
+            {
+              "act": "walk-out"
+            },
+            {
+              "say": "I'm going to water the plants. Be good!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{tiptoe} {pick:sandwich} Just one tiny bite later… for science.",
+          "expression": "suspicious",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "tiptoe"
+            },
+            {
+              "wact": "pick",
+              "obj": "sandwich"
+            },
+            {
+              "say": "Just one tiny bite later… for science."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{facepalm} Peddy, no! That is a terrible idea.",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "slap",
+          "tone": "",
+          "segments": [
+            {
+              "act": "facepalm"
+            },
+            {
+              "say": "Peddy, no! That is a terrible idea."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} Relax! I'll only look at it. Promise.",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "giggle",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "Relax! I'll only look at it. Promise."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "home",
+      "sitting": false,
+      "location": "living room",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "living room",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{carry:basket} Okay, basket is full. Juice, cake, normal sandwiches.",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "carry",
+              "obj": "basket"
+            },
+            {
+              "say": "Okay, basket is full. Juice, cake, normal sandwiches."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{look-around} {hide} Shh! Is Mom watching?",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "act": "hide"
+            },
+            {
+              "say": "Shh! Is Mom watching?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hmm} Why are you hiding behind the sofa?",
+          "expression": "suspicious",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "Why are you hiding behind the sofa?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "No reason! Totally normal hiding. {smile}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "No reason! Totally normal hiding."
+            },
+            {
+              "act": "smile"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sigh} You took the green sandwich, didn't you?",
+          "expression": "sad",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "sigh"
+            },
+            {
+              "say": "You took the green sandwich, didn't you?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} Maybe. A little. It's in the basket.",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "say": "Maybe. A little. It's in the basket."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{uff} If you turn into a frog, I'm not carrying you!",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "say": "If you turn into a frog, I'm not carrying you!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "custom",
+      "sitting": false,
+      "location": "neighbourhood",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "neighbourhood",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb",
+        "auto-dog"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{carry:basket} This basket is heavier than me! {sweat}",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "footsteps",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "carry",
+              "obj": "basket"
+            },
+            {
+              "say": "This basket is heavier than me!"
+            },
+            {
+              "act": "sweat"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{look-around} Walk faster before Mom sees us!",
+          "expression": "suspicious",
+          "pose": "point",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Walk faster before Mom sees us!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-dog",
+          "text": "{show:dog} {bark} Woof! I smell something magic!",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "show": "dog"
+            },
+            {
+              "act": "bark"
+            },
+            {
+              "say": "Woof! I smell something magic!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{step-back} {scared} Nice doggy… go away, doggy!",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "step-back"
+            },
+            {
+              "act": "scared"
+            },
+            {
+              "say": "Nice doggy… go away, doggy!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-dog",
+          "text": "{sniff} Hmm, green bread? No thanks, I like bones. {walk-out}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "sniff"
+            },
+            {
+              "say": "Hmm, green bread? No thanks, I like bones."
+            },
+            {
+              "act": "walk-out"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} Even the dog is scared of it!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Even the dog is scared of it!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{shake-head} That's not funny. That's a warning!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "That's not funny. That's a warning!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "park",
+      "sitting": true,
+      "location": "park",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "Ten minutes later…",
+      "holding": {},
+      "background": "park",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{wow} Look at this place! Trees, birds, and a pond!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "wact": "look",
+              "obj": "place"
+            },
+            {
+              "act": "wow"
+            },
+            {
+              "say": "Look at this place! Trees, birds, and a pond!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{drop:basket} {uff} Finally! My arms are noodles now.",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "drop",
+              "obj": "basket"
+            },
+            {
+              "act": "uff"
+            },
+            {
+              "say": "Finally! My arms are noodles now."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{eat:sandwich} Mmm! Normal sandwich number one, done!",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "eat",
+              "obj": "sandwich"
+            },
+            {
+              "say": "Mmm! Normal sandwich number one, done!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{drink} Ahh, cold juice. This is the best day ever!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "sip",
+          "tone": "",
+          "segments": [
+            {
+              "act": "drink"
+            },
+            {
+              "say": "Ahh, cold juice. This is the best day ever!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{hmm} Now… for dessert. {show:sandwich} The glowing one!",
+          "expression": "suspicious",
+          "pose": "point",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "Now… for dessert."
+            },
+            {
+              "hold": "sandwich"
+            },
+            {
+              "say": "The glowing one!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{shake-head} Peddy, Mom said NO!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "Peddy, Mom said NO!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "Just one bite. What could go wrong? {smile}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "Just one bite. What could go wrong?"
+            },
+            {
+              "act": "smile"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{facepalm} Everything! Everything could go wrong!",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "facepalm"
+            },
+            {
+              "say": "Everything! Everything could go wrong!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} Too late! {eat} Crunch!",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "say": "Too late!"
+            },
+            {
+              "act": "eat"
+            },
+            {
+              "say": "Crunch!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "park",
+      "sitting": false,
+      "location": "park",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "park",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd",
+        "auto-cat"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{dizzy} Teddy… why is everything so… big?",
+          "expression": "surprised",
+          "pose": "think",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "dizzy"
+            },
+            {
+              "say": "Teddy… why is everything so… big?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{gasp} PEDDY! {turn:Peddy:frog}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "PEDDY!"
+            },
+            {
+              "morph": "frog",
+              "who": "peddy"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{ribbit} Ribbit?! Why is my voice so croaky?",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "ribbit"
+            },
+            {
+              "say": "Ribbit?! Why is my voice so croaky?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{aah} You are a FROG! A green, jumpy frog!",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "aah"
+            },
+            {
+              "say": "You are a FROG! A green, jumpy frog!"
+            },
+            {
+              "act": "scared"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{cry} I don't want to eat flies forever!",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "cry",
+          "segments": [
+            {
+              "act": "cry"
+            },
+            {
+              "say": "I don't want to eat flies forever!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{pace} Don't panic. Think, Teddy, think! {think}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "pace"
+            },
+            {
+              "say": "Don't panic. Think, Teddy, think!"
+            },
+            {
+              "act": "think"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{jump} I can't stop jumping! Boing! Boing!",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "jump"
+            },
+            {
+              "say": "I can't stop jumping! Boing! Boing!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} Sorry… sorry, it's a little bit funny.",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Sorry… sorry, it's a little bit funny."
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{angry} It is NOT funny! Ribbit!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "It is NOT funny! Ribbit!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-cat",
+          "text": "{show:cat} {meow} Ooh, a juicy little frog for my breakfast!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "show": "cat"
+            },
+            {
+              "act": "meow"
+            },
+            {
+              "say": "Ooh, a juicy little frog for my breakfast!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{scared} {hide} Teddy, help! The cat wants to eat me!",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "scream",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "scared"
+            },
+            {
+              "act": "hide"
+            },
+            {
+              "say": "Teddy, help! The cat wants to eat me!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{run} Shoo, cat! That frog is my best friend! {chase}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "footsteps",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "say": "Shoo, cat! That frog is my best friend!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-cat",
+          "text": "{hiss} Fine, fine! Nobody shares anything anymore. {walk-out}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hiss"
+            },
+            {
+              "say": "Fine, fine! Nobody shares anything anymore."
+            },
+            {
+              "act": "walk-out"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{sigh} Thank you, Teddy. Now how do I turn back?",
+          "expression": "sad",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "sigh"
+            },
+            {
+              "say": "Thank you, Teddy. Now how do I turn back?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{idea} Maybe the pond knows! Frogs love ponds!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "ding",
+          "tone": "",
+          "segments": [
+            {
+              "act": "idea"
+            },
+            {
+              "say": "Maybe the pond knows! Frogs love ponds!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "park",
+      "sitting": false,
+      "location": "park by the pond",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "park by the pond",
+      "characters": [
+        "auto-duck",
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "auto-duck",
+          "text": "{show:duck} {quack} Hello! Why is that little frog crying?",
+          "expression": "suspicious",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "show": "duck"
+            },
+            {
+              "act": "quack"
+            },
+            {
+              "say": "Hello! Why is that little frog crying?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{walk-to} She ate a magic sandwich. Can you help us?",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "walk-to"
+            },
+            {
+              "say": "She ate a magic sandwich. Can you help us?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{laugh} Easy! Magic washes off in water. Jump in!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Easy! Magic washes off in water. Jump in!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{jump} Here I go! {swim:pond}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "splash",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Here I go!"
+            },
+            {
+              "wact": "swim",
+              "obj": "pond"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{look-around} Still a frog! Still croaky! Ribbit!",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Still a frog! Still croaky! Ribbit!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{oops} Oh, pond water is too lazy. You need waterfall water!",
+          "expression": "surprised",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "say": "Oh, pond water is too lazy. You need waterfall water!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{shock} A waterfall? Where do we find one?",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "shock"
+            },
+            {
+              "say": "A waterfall? Where do we find one?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{point} Past the farm, through the forest, over the bridge.",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "point"
+            },
+            {
+              "say": "Past the farm, through the forest, over the bridge."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{uff} That sounds very far for tiny frog legs.",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "say": "That sounds very far for tiny frog legs."
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{walk-to} Don't worry. I'll show you the way. Quack!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "walk-to"
+            },
+            {
+              "say": "Don't worry. I'll show you the way. Quack!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "farm",
+      "sitting": false,
+      "location": "farm",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "Half an hour later…",
+      "holding": {},
+      "background": "farm",
+      "characters": [
+        "auto-cow",
+        "6d7bf361b7fd",
+        "8f31b59119cb",
+        "auto-pig"
+      ],
+      "lines": [
+        {
+          "speaker": "auto-cow",
+          "text": "{show:cow} {moo} Mooo! Who is stepping on my grass?",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "show": "cow"
+            },
+            {
+              "act": "moo"
+            },
+            {
+              "say": "Mooo! Who is stepping on my grass?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{step-back} Sorry, Mrs. Cow! We're looking for the waterfall.",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "step-back"
+            },
+            {
+              "say": "Sorry, Mrs. Cow! We're looking for the waterfall."
+            }
+          ]
+        },
+        {
+          "speaker": "auto-cow",
+          "text": "{hmm} The waterfall? Why does a boy need a waterfall?",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "The waterfall? Why does a boy need a waterfall?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{ribbit} Not him. Me! I'm a frog by accident!",
+          "expression": "sad",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "ribbit"
+            },
+            {
+              "say": "Not him. Me! I'm a frog by accident!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-cow",
+          "text": "{laugh} By accident? Let me guess. The green sandwich?",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "By accident? Let me guess. The green sandwich?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{gasp} How did you know?!",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "How did you know?!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-cow",
+          "text": "{nod} Grandpa came here last year. Croaking. Very loud.",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "say": "Grandpa came here last year. Croaking. Very loud."
+            }
+          ]
+        },
+        {
+          "speaker": "auto-pig",
+          "text": "{show:pig} {oink} He jumped in my mud puddle! Twice!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "show": "pig"
+            },
+            {
+              "act": "oink"
+            },
+            {
+              "say": "He jumped in my mud puddle! Twice!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{facepalm} Grandpa, what were you doing?",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "facepalm"
+            },
+            {
+              "say": "Grandpa, what were you doing?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-cow",
+          "text": "{point} Go through the forest. Follow the river. You'll hear the waterfall.",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "point"
+            },
+            {
+              "say": "Go through the forest. Follow the river. You'll hear the waterfall."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{wave} Thank you, Mrs. Cow! Thank you, Mr. Pig!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "wave"
+            },
+            {
+              "say": "Thank you, Mrs. Cow! Thank you, Mr. Pig!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "forest",
+      "sitting": false,
+      "location": "forest by the river",
+      "world": "World of Wonders",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "forest by the river",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb",
+        "auto-monkey",
+        "auto-duck"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{carry:log} {sweat} Why am I carrying a log?",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "thud",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "carry",
+              "obj": "log"
+            },
+            {
+              "act": "sweat"
+            },
+            {
+              "say": "Why am I carrying a log?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{croak} To cross the river, silly!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "croak"
+            },
+            {
+              "say": "To cross the river, silly!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{drop:log} Oh wait, there is a bridge. {facepalm}",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "slap",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "drop",
+              "obj": "log"
+            },
+            {
+              "say": "Oh wait, there is a bridge."
+            },
+            {
+              "act": "facepalm"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} Frogs are smarter than boys today!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "giggle",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "Frogs are smarter than boys today!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{cross:bridge} Okay, smarty frog, hop on!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "footsteps",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "cross",
+              "obj": "bridge"
+            },
+            {
+              "say": "Okay, smarty frog, hop on!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-monkey",
+          "text": "{show:monkey} {climb:tree} Hey! Nobody passes without paying!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "show": "monkey"
+            },
+            {
+              "wact": "climb",
+              "obj": "tree"
+            },
+            {
+              "say": "Hey! Nobody passes without paying!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{gasp} Paying? We only have… sandwiches.",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "Paying? We only have… sandwiches."
+            }
+          ]
+        },
+        {
+          "speaker": "auto-monkey",
+          "text": "{haan} Sandwiches? {nod} Okay, one sandwich, you may pass.",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "haan"
+            },
+            {
+              "say": "Sandwiches?"
+            },
+            {
+              "act": "nod"
+            },
+            {
+              "say": "Okay, one sandwich, you may pass."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{hmm} Give him the normal one, Teddy! Not the green one!",
+          "expression": "suspicious",
+          "pose": "point",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "Give him the normal one, Teddy! Not the green one!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{give:sandwich} Here. A normal one, I promise.",
+          "expression": "normal",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "give",
+              "obj": "sandwich"
+            },
+            {
+              "say": "Here. A normal one, I promise."
+            }
+          ]
+        },
+        {
+          "speaker": "auto-monkey",
+          "text": "{eat:sandwich} {yay} Delicious! The waterfall is right ahead!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "eat",
+              "obj": "sandwich"
+            },
+            {
+              "act": "yay"
+            },
+            {
+              "say": "Delicious! The waterfall is right ahead!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{quack} See? Almost there! Keep going!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "quack"
+            },
+            {
+              "say": "See? Almost there! Keep going!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "custom",
+      "sitting": false,
+      "location": "waterfall",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "holding": {},
+      "background": "waterfall",
+      "characters": [
+        "8f31b59119cb",
+        "auto-duck",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{wow} Look! The *waterfall*! It's sparkling!",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "wow"
+            },
+            {
+              "say": "Look! The *waterfall*! It's sparkling!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{quack} {walk-to} Told you! Now jump in, little frog!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "quack"
+            },
+            {
+              "act": "walk-to"
+            },
+            {
+              "say": "Told you! Now jump in, little frog!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{scared} What if it's too cold? What if I sink?",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "scared"
+            },
+            {
+              "say": "What if it's too cold? What if I sink?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hug} You can do it. Frogs are great swimmers!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hug"
+            },
+            {
+              "say": "You can do it. Frogs are great swimmers!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{jump} Wish me luck! {swim:waterfall}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "splash",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Wish me luck!"
+            },
+            {
+              "wact": "swim",
+              "obj": "waterfall"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sweat} {look-around} Peddy? Peddy! Are you okay?",
+          "expression": "surprised",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "sweat"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Peddy? Peddy! Are you okay?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{turn:Peddy:back} {yay} I'm ME again! No more ribbits!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "shout",
+          "segments": [
+            {
+              "morph": "back",
+              "who": "peddy"
+            },
+            {
+              "act": "yay"
+            },
+            {
+              "say": "I'm ME again! No more ribbits!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hug} {cry} I was so worried about you!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "cry",
+          "segments": [
+            {
+              "act": "hug"
+            },
+            {
+              "act": "cry"
+            },
+            {
+              "say": "I was so worried about you!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{clap} Hooray! Magic washed away!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "clap"
+            },
+            {
+              "say": "Hooray! Magic washed away!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hmm} So… that sandwich really was magic.",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "So… that sandwich really was magic."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{nod} Very magic. Never eating green bread again!",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "say": "Very magic. Never eating green bread again!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{show:sandwich} Wait… there's still half left in the basket.",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "hold": "sandwich"
+            },
+            {
+              "say": "Wait… there's still half left in the basket."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{shock} Throw it away, Teddy!",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "shock"
+            },
+            {
+              "say": "Throw it away, Teddy!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{think} But… it smells so good. Like cookies and pizza together.",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "think"
+            },
+            {
+              "say": "But… it smells so good. Like cookies and pizza together."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{angry} TEDDY. Don't you dare!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "TEDDY. Don't you dare!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{oops} {eat} Oops… I was hungry!",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "act": "eat"
+            },
+            {
+              "say": "Oops… I was hungry!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{facepalm} Oh no, not again!",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "slap",
+          "tone": "",
+          "segments": [
+            {
+              "act": "facepalm"
+            },
+            {
+              "say": "Oh no, not again!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{dizzy} {become:frog} Ribbit?!",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "dizzy"
+            },
+            {
+              "morph": "frog",
+              "who": ""
+            },
+            {
+              "say": "Ribbit?!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} Now YOU are the frog!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Now YOU are the frog!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{quack} {laugh} The waterfall is right there, froggy!",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "quack"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "The waterfall is right there, froggy!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{croak} This is so embarrassing. Don't tell anyone!",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "croak"
+            },
+            {
+              "say": "This is so embarrassing. Don't tell anyone!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} I'm telling everyone.",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "giggle",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "I'm telling everyone."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{jump} {swim:waterfall} Here I go!",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "splash",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "jump"
+            },
+            {
+              "wact": "swim",
+              "obj": "waterfall"
+            },
+            {
+              "say": "Here I go!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{turn:Teddy:back} {wow} Back to normal! Ha!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "morph": "back",
+              "who": "teddy"
+            },
+            {
+              "act": "wow"
+            },
+            {
+              "say": "Back to normal! Ha!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{high-five} Best picnic ever!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Best picnic ever!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-duck",
+          "text": "{wave} Bye, frogs! I mean, bye, friends! {walk-out}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "wave"
+            },
+            {
+              "say": "Bye, frogs! I mean, bye, friends!"
+            },
+            {
+              "act": "walk-out"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "kitchen",
+      "sitting": false,
+      "location": "kitchen",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "That evening…",
+      "holding": {},
+      "background": "kitchen",
+      "characters": [
+        "auto-mom",
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "auto-mom",
+          "text": "{hmm} So… where is Grandpa's magic sandwich?",
+          "expression": "suspicious",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "So… where is Grandpa's magic sandwich?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sweat} {look-around} Sandwich? What sandwich?",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "sweat"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Sandwich? What sandwich?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{smile} We… gave it to a monkey?",
+          "expression": "suspicious",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "smile"
+            },
+            {
+              "say": "We… gave it to a monkey?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "{angry} You ATE it, didn't you?!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "You ATE it, didn't you?!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} Just a little. And we turned into frogs.",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "say": "Just a little. And we turned into frogs."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "But the waterfall fixed us! Good as new! {smile} {fix}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "But the waterfall fixed us! Good as new!"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "wact": "fix",
+              "obj": "",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{fix}"
+          ]
+        },
+        {
+          "speaker": "auto-mom",
+          "text": "{sigh} Then you two can wash all the picnic plates.",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "sigh"
+            },
+            {
+              "say": "Then you two can wash all the picnic plates."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{uff} Being a frog was easier!",
+          "expression": "sad",
+          "pose": "idle",
+          "sfx": "fail",
+          "tone": "",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "say": "Being a frog was easier!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} Ribbit!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Ribbit!"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

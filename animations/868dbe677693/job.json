@@ -1,0 +1,61 @@
+{
+  "id": "868dbe677693",
+  "status": "done",
+  "progress": 100,
+  "message": "Your video is ready!",
+  "title": "The Exam Night Disaster",
+  "minutes": 1.0,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "# Scene: bedroom (sitting, books)\nPeddy: {aah} Teddy! The *exam* is TOMORROW and I know nothing! [surprised, wave, shout, scream]\nTeddy: {hmm} Relax. We have the whole *night*. [normal, idle, calm]\nPeddy: {read} Okay… chapter one. {turn-page} {uff} Why are there so many *pages*? [sad, think]\nTeddy: {phone} Just five minutes on my *phone*. Then we study. [happy, shrug, whisper]\nPeddy: {haan} Five minutes? You said that an *hour* ago! [angry, point, shout, boing]\n# Time skip: Three hours later…\n# Scene: bedroom (sitting, phones)\nTeddy: {giggle} Look, a *cat* playing piano! {laugh} [happy, point, excited]\nPeddy: {wow} So cute! {gasp} Wait… what *time* is it? [surprised, wave, gasp]\nTeddy: {look-around} Only… *four* in the morning. {sweat} [surprised, shrug, whisper]\nPeddy: FOUR?! {facepalm} We read *zero* pages! [angry, hips, shout, fail]\nTeddy: {ohoo} Don't worry. {idea} I have a *genius* plan! [suspicious, think, ding]\n# Scene: classroom (sitting, books)\nPeddy: {hmm} So what is your *plan*? [suspicious, hips, whisper]\nTeddy: {nod} I prayed the exam gets *cancelled*! [happy, wave, excited]\nPeddy: {oops} Teddy… today is *Sunday*. [surprised, shrug, calm]\nTeddy: {yay} No exam! {dance} Time to *sleep*! {sleep} [happy, wave, excited, applause]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-16T06:36:44",
+  "story_source": "custom",
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\sfx_cache\\music-544910.mp3",
+  "music_credit": "Music: \"Satanic music\" from Freesound (check its license on freesound.org)",
+  "sound_effects": [
+    "applause",
+    "boing",
+    "ding",
+    "fail",
+    "gasp",
+    "page",
+    "phone",
+    "pop",
+    "slap",
+    "snore",
+    "tick",
+    "tock",
+    "whoosh"
+  ],
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 138,
+  "duration": 57.9,
+  "background_sources": [],
+  "finished_at": "2026-11-16T07:19:57",
+  "video_url": "/api/animator/jobs/868dbe677693/video?v=1794795597"
+}

@@ -1,0 +1,130 @@
+{
+  "id": "a88dfcd335da",
+  "status": "done",
+  "progress": 100,
+  "message": "Your video is ready!",
+  "title": "The Mango Thief of the Village",
+  "minutes": 10.0,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd",
+    "auto-farmer",
+    "auto-villager",
+    "auto-goat",
+    "auto-dog"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "# Scene: Village\nPeddy: {look-around} Look at those golden *mangoes* shining in the sun! {point} [excited, point, wow]\nTeddy: {hmm} My stomach is already singing a *song* of hunger. {rub-belly} [happy, think, giggle]\nPeddy: {walk-to} Let's grab them before someone else beats us to it! {run} [excited, run, shout]\nTeddy: {shake:tree} Wait for me! I am the ultimate *thief*! {jump} [excited, jump, yay]\n# Scene: Village\nPeddy: {climb:mango tree} I'm at the top! Look at this massive *fruit*! {point} [excited, point, wow]\nTeddy: {shake:tree} Shake the branch! Make it *rain* mangoes! {shout} [excited, wave, shout]\nPeddy: {pick:mango} Catch this giant one, Teddy! {throw:mango} [happy, throw, whoosh]\nTeddy: {eat:mango} {yay} Oh, pure heaven! So sweet and *juicy*! [happy, idle, eat, yum]\n# Time skip: Ten minutes later…\n# Scene: Village\nFarmer: {angry} Hey! Who is stealing my prize *mangoes*?! {shout} [angry, hips, shout, horn]\nPeddy: {shock} Run! It's the angry *farmer*! {run} [surprised, run, gasp, footsteps]\nTeddy: {hide:bush} {uff} My life flashed before my *eyes*! {sweat} [scared, shrug, uff]\nFarmer: {look-around} I will find whoever touched my *tree*! {angry} [angry, point, shout]\n# Scene: Village\nPeddy: {whisper} That was way too close for *comfort*. {gasp} [surprised, think, whisper]\nTeddy: {idea} But I still have one *mango* in my pocket! {gasp} [excited, point, ding]\nPeddy: {haan} Give it here! We need to share our *loot*! {grab} [happy, point, haan]\nTeddy: {eat:mango} {oops} Oops, I just dropped it in the *river*! {facepalm} [sad, shrug, oops]\n# Scene: Village\nPeddy: {go:river} Oh no! The river stole our *breakfast*! {cry} [sad, cry, splash]\nTeddy: {swim:river} I'll dive in and rescue that *mango*! {jump} [excited, swim, splash]\nPeddy: {shout} Watch out for the giant *fish* down there! {fear} [surprised, point, shout]\nTeddy: {look:fish} Eek! That fish looks like a *monster*! {scared} [surprised, step-back, gasp]\n# Time skip: Five minutes later…\n# Scene: Village\nTeddy: {cross:bridge} {huff} I survived the river of *doom*. {sweat} [sad, shrug, phew]\nPeddy: {sit:bench} Look, there is a basket of *apples* by the well! {point} [surprised, point, ding]\nTeddy: {sniff} Apples? But we are on a *mango* mission! {shake-head} [suspicious, think]\nPeddy: {eat} A thief cannot be too *choosy*, my friend. {laugh} [happy, idle, munch]\n# Scene: Village\nVillager: {angry} Hey thieves! Those apples are for the village *fair*! {shout} [angry, hips, shout, slap]\nTeddy: {run} Run away! The whole village is *chasing* us! {run} [surprised, run, scream, footsteps]\nPeddy: {hide:box} Quick, hide inside this wooden *box*! {push} [surprised, hide, push]\nVillager: {look-around} Where did those little *rascals* go?! {angry} [angry, look-around, shout]\n# Time skip: Two minutes later…\n# Scene: Village\nTeddy: {wake} I think the coast is *clear* now. {gasp} [calm, idle, phew]\nPeddy: {facepalm} We came for mangoes and got chased by a *mob*. {sigh} [sad, shrug, fail]\nTeddy: {idea} {light-fire} Let's build a campfire and make *tea* instead. {clap} [excited, point, ding]\nPeddy: {drink} Ah, warm tea heals a broken *thief* heart. {sip} [happy, idle, sip]\n# Scene: Village\nGoat: {look:goat} {show:goat} Baa! You are sitting on my favorite *rock*! {shout} [surprised, point, shout]\nTeddy: {shock} Since when do goats speak *human*?! {gasp} [surprised, point, gasp]\nGoat: {kick} Move before I headbutt your *pants* off! {fight} [angry, kick, punch]\nPeddy: {run} Even the animals are against our *heist*! {run} [surprised, run, scream, footsteps]\n# Time skip: A few moments later…\n# Scene: Village\nTeddy: {climb:tree} Up here, the goats cannot reach our *feet*! {yay} [happy, wave, yay]\nPeddy: {look-around} Look back at the farmer's *tree*! {point} [surprised, point, wow]\nTeddy: {gasp} The farmer is eating our stolen *mangoes* himself! {shock} [surprised, point, gasp]\nPeddy: {laugh} He stole them back from us by *accident*! {giggle} [happy, wave, laugh]\n# Scene: Village\nFarmer: {eat:mango} Ah, these mangoes taste like sweet *justice*! {shout} [happy, idle, yum]\nTeddy: {whisper} Well, at least someone is enjoying the *fruit*. {smile} [calm, think, whisper]\nPeddy: {sit:log} Next time, we buy our fruit from the *store*. {nod} [calm, idle, nod]\nTeddy: {laugh} Where is the fun in *buying* things, Peddy? {wink} [happy, wave, laugh]\n# Scene: Village\nDog: {show:dog} Woof! I found another hidden *mango* right here! {bark} [excited, idle, shout, horn]\nPeddy: {jump} A bonus mango?! Our luck has *changed*! {yay} [happy, jump, yay, boing]\nTeddy: {eat:mango} {yay} Best worst heist *ever*! {cheer} [happy, wave, applause]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "acting": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-17T07:08:21",
+  "story_source": "custom",
+  "auto_chars": [
+    {
+      "id": "auto-farmer",
+      "name": "Farmer",
+      "auto": true,
+      "species": "",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    },
+    {
+      "id": "auto-villager",
+      "name": "Villager",
+      "auto": true,
+      "species": "",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    },
+    {
+      "id": "auto-goat",
+      "name": "Goat",
+      "auto": true,
+      "species": "goat",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    },
+    {
+      "id": "auto-dog",
+      "name": "Dog",
+      "auto": true,
+      "species": "dog",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    }
+  ],
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\sfx_cache\\music-832440.mp3",
+  "music_credit": "Music: \"SON OF PSYCHO\" from Freesound (check its license on freesound.org) · Drawings: OpenMoji (openmoji.org), CC BY-SA 4.0",
+  "sound_effects": [
+    "ambience",
+    "applause",
+    "boing",
+    "ding",
+    "eat",
+    "fail",
+    "footsteps",
+    "gasp",
+    "horn",
+    "laugh",
+    "magic",
+    "pop",
+    "punch",
+    "rustle",
+    "sip",
+    "slap",
+    "sniff",
+    "splash",
+    "thud",
+    "tick",
+    "tock",
+    "whoosh"
+  ],
+  "mix_file": "mix.m4a",
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 436,
+  "duration": 234.8,
+  "background_sources": [],
+  "finished_at": "2026-11-17T07:58:52",
+  "video_url": "/api/animator/jobs/a88dfcd335da/video?v=1794884332"
+}

@@ -1,0 +1,73 @@
+{
+  "id": "2394cb73118a",
+  "status": "done",
+  "progress": 100,
+  "message": "Your video is ready!",
+  "title": "The Monkey Who Stole The Phone",
+  "minutes": 0.5,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd",
+    "auto-monkey"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "# Scene: jungle\nTeddy: {yay} Look, Peddy! Perfect *selfie* spot! {phone} [happy, wave, excited]\nMonkey: {giggle} Ooh, shiny *phone*! {walk-to} [happy, point]\nPeddy: {gasp} Teddy, the monkey took your phone! [surprised, point, shout]\nTeddy: {aah} Come back, you *thief*! {chase} [angry, point, shout, footsteps]\nMonkey: {climb} Catch me if you can! {laugh} [happy, wave, laugh]\n# Scene: jungle\nPeddy: {hmm} Wait… he is taking *selfies*! [suspicious, think, whisper]\nMonkey: {wow} I look *beautiful*! [happy, wave, excited]\nTeddy: {facepalm} He has more *likes* than me. [sad, shrug, fail]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "acting": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-16T22:09:13",
+  "story_source": "custom",
+  "auto_chars": [
+    {
+      "id": "auto-monkey",
+      "name": "Monkey",
+      "auto": true,
+      "species": "monkey",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    }
+  ],
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\sfx_cache\\music-518206.mp3",
+  "music_credit": "Music: \"Biking The West Side [full tune]\" from Freesound (check its license on freesound.org) · Drawings: OpenMoji (openmoji.org), CC BY-SA 4.0",
+  "sound_effects": [
+    "fail",
+    "footsteps",
+    "laugh",
+    "phone",
+    "pop",
+    "slap",
+    "whoosh"
+  ],
+  "mix_file": "mix.m4a",
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 118,
+  "duration": 29.9,
+  "background_sources": [],
+  "finished_at": "2026-11-16T22:19:14",
+  "video_url": "/api/animator/jobs/2394cb73118a/video?v=1794849554"
+}

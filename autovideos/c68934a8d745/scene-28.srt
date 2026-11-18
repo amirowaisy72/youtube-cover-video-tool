@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:01,600
+Waiting for cash to start
+
+2
+00:00:01,600 --> 00:00:03,420
+investing is often a subconscious
+
+3
+00:00:03,420 --> 00:00:05,260
+excuse to avoid the discomfort
+
+4
+00:00:05,260 --> 00:00:07,200
+of learning new skills, facing
+
+5
+00:00:07,200 --> 00:00:09,100
+potential failure, and putting in
+
+6
+00:00:09,100 --> 00:00:09,620
+hard work.

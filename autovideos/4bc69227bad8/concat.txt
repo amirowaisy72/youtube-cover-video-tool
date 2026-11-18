@@ -1,0 +1,8 @@
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\e87568943e3d.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\974753e78293.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\b6e426749002.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\dc01f2359b71.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\91f3bd177710.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\fd660ccfcbec.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\f98cc1deaada.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\4bc69227bad8\a69dc520c2ec.mp3'

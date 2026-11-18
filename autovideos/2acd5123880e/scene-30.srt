@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:02,140
+You deposit that $20 ,000
+
+2
+00:00:02,140 --> 00:00:03,600
+into a standard high street
+
+3
+00:00:03,600 --> 00:00:05,460
+bank savings account yielding 0
+
+4
+00:00:05,460 --> 00:00:07,480
+.5 % annual interest.

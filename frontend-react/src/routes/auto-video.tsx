@@ -4,7 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
-import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, validateStockKey, youtubeStatus } from "@/lib/api";
+import { StudioPresenter } from "@/components/StudioPresenter";
+import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, validateStockKey, voiceCloneList, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, getTtsKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey, setTtsKey } from "@/lib/keys";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
@@ -16,16 +17,10 @@ export const Route = createFileRoute("/auto-video")({
 
 const STAGES = ["Script", "Voiceover", "Video clip", "Captions"] as const;
 const imgs = [s1, s2, s3];
-const lines = [
-  "Did you know the universe is still expanding right now?",
-  "Cities of the future may glow brighter than the stars.",
-  "Ancient builders aligned their monuments with the sky.",
-  "Some mountains are still growing every single year.",
-  "Light from distant stars is older than our planet.",
-  "Rain in neon cities paints the streets with color.",
-  "Deserts hide secrets that are thousands of years old.",
-  "Nature's golden hour lasts only a few minutes.",
-];
+// While the real scenes are still being prepared, the list shows a plain
+// "preparing" line — never made-up example sentences (user, 2026-11-18:
+// "which script is this?" — they were demo lines, not his script).
+const lines = ["Preparing this scene — its text and footage appear here when ready."];
 
 /** Backend stage text -> which of the 4 build stages is current.
     The master pipeline reports per-scene progress ("Building
@@ -51,6 +46,20 @@ function stageIndex(job: AvJob | null): number {
     before choosing. The provider's key is the user's own, stored
     only in this browser. Used in Step 1 (for a new video) and in
     the done phase (to re-voice a finished video). */
+/** A stock clip in the results: a light card first; the video loads only
+ * when you point at it (user, 2026-11-18: searching blinked and hung while
+ * every clip loaded at once). */
+function LazyClip({ url }: { url: string }) {
+  const [on, setOn] = useState(false);
+  return (
+    <div className="relative aspect-video w-full bg-gradient-to-br from-slate-800 to-slate-900" onMouseEnter={() => setOn(true)}>
+      {on
+        ? <video src={url} muted autoPlay loop playsInline preload="auto" className="absolute inset-0 h-full w-full object-cover" />
+        : <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-70">▶</span>}
+    </div>
+  );
+}
+
 function VoicePicker({ provider, voice, onChange }: {
   provider: string;
   voice: string;
@@ -69,6 +78,11 @@ function VoicePicker({ provider, voice, onChange }: {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const selected = providers.find((p) => p.id === provider);
+  // your own cloned voices (Voice Cloner) — spoken like a studio presenter too (user, 2026-11-18)
+  const [clones, setClones] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    voiceCloneList().then((l) => setClones((l || []).map((v: { id: string; name: string }) => ({ id: v.id, name: v.name })))).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     ttsProviders()
@@ -168,6 +182,20 @@ function VoicePicker({ provider, voice, onChange }: {
           </button>
         ))}
       </div>
+      {clones.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1 text-sm font-semibold">🧬 Your cloned voices</p>
+          <div className="flex flex-wrap gap-2">
+            {clones.map((c) => (
+              <button key={c.id} className={`btn btn-sm ${voice === `clone:${c.id}` ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => onChange("edge", `clone:${c.id}`)}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+          {voice.startsWith("clone:") && <p className="mt-1 text-xs text-muted-foreground">Your cloned voice speaks the whole video like a studio presenter (slower on a CPU-only PC).</p>}
+        </div>
+      )}
       {selected && selected.key_name && (
         <div className="mt-3">
           <label className="mb-1 block text-sm font-semibold">{selected.key_name}</label>
@@ -337,7 +365,9 @@ function AutoVideo() {
   // Custom script (user, 2026-11-09): the user can paste a script
   // written by another AI (e.g. Gemini) and the video is built
   // from it. Empty = the tool writes the script itself.
-  const [customScript, setCustomScript] = useState("");
+  // your script survives a refresh (user, 2026-11-18: it was lost and the app wrote its own)
+  const [customScript, setCustomScriptRaw] = useState(() => { try { return localStorage.getItem("ytguru-av-script") || ""; } catch { return ""; } });
+  const setCustomScript = (v: string) => { setCustomScriptRaw(v); try { localStorage.setItem("ytguru-av-script", v); } catch { /* full */ } };
   // Short-aware (user, 2026-11-09): when Short is picked, the
   // script prompt must ask for a SHORT script (seconds, ~2.5
   // words/sec) with an instant hook — not a minutes-long script.
@@ -388,6 +418,7 @@ function AutoVideo() {
   // "realistic" are the review stops where the user changes
   // things before the next step. "done" is the finished video
   // (still editable).
+  const [studioBusy, setStudioBusy] = useState(false);
   const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "realistic" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
   // The stepper must show the step the backend is ACTUALLY on
@@ -456,6 +487,8 @@ function AutoVideo() {
   // suggests the words; the user picks (and can add his own).
   const [realWords, setRealWords] = useState<RealisticWord[]>([]);
   const [realChosen, setRealChosen] = useState<string[]>([]);
+  // pop-ups are chosen by the app (user, 2026-11-18): on/off + how many
+  const [popAuto, setPopAuto] = useState<"off" | "fewer" | "normal" | "more">("normal");
   const [realCustom, setRealCustom] = useState("");
   const [realLoading, setRealLoading] = useState(false);
   const [realError, setRealError] = useState("");
@@ -575,7 +608,7 @@ function AutoVideo() {
   };
   const loadBrowserAlts = async (idx: number, query = "") => {
     if (!job) return;
-    setBrowserAlts(null);
+    if (!query) setBrowserAlts(null); // a new search keeps the old results on screen until the new ones arrive
     setBrowserError("");
     setBrowserCopied("");
     setBrowserUploadFile(null);
@@ -978,7 +1011,7 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoPlan(title.trim(), dur, voice, pexelsKey, pixabayKey, customScript, ttsProvider, getTtsKey(ttsProvider), videoType, shortSecs);
+      const data = await autovideoPlan(title.trim(), dur, voice.startsWith("clone:") ? "en-US-AriaNeural" : voice, pexelsKey, pixabayKey, customScript, ttsProvider, getTtsKey(ttsProvider), videoType, shortSecs);
       setJobId(data.job_id);
       // Background job: the step keeps running if the user
       // leaves this page, and the top bar shows its progress.
@@ -1018,7 +1051,7 @@ function AutoVideo() {
     try {
       // Realistic step: save the picked words first, so the
       // render applies them as pop-ups wherever they are spoken.
-      await autovideoSaveRealisticWords(job.id, realChosen);
+      await autovideoSaveRealisticWords(job.id, popAuto === "off" ? [] : [`__auto__:${popAuto}`]);
       await autovideoRender(job.id, musicVolume / 100, transitions, subtitles, music);
       poll(job.id);
     } catch (e) {
@@ -1095,6 +1128,9 @@ function AutoVideo() {
               onChange={(e) => setCustomScript(e.target.value)}
               placeholder="Paste a script here (e.g. written by Gemini) — the video will be built from your words. Leave empty and the tool writes the script itself."
             />
+            {customScript.trim()
+              ? <p className="mt-1 text-xs text-emerald-400">✓ Your script: {customScript.trim().split(/\s+/).length} words — it will be spoken word for word. <button className="underline" onClick={() => setCustomScript("")}>Clear</button></p>
+              : <p className="mt-1 text-xs text-muted-foreground">Empty — the app will write the script itself.</p>}
           </div>
           <div>
             <label className="mb-2 block font-semibold">Video type</label>
@@ -1216,7 +1252,7 @@ function AutoVideo() {
           <div className="glass p-6">
             <h3 className="text-xl font-bold">{job.title || title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Script: {job.script_words ?? "?"} words ({job.script_source ?? ""}) · {job.scenes?.length ?? "?"} scenes · Check every scene's footage below — change any you don't like, then go to the audio step.
+              Script: {job.script_words ?? "?"} words ({String(job.script_source ?? "").startsWith("custom") ? "✓ your script" : "written by the app"}) · {job.scenes?.length ?? "?"} scenes · Check every scene's footage below — change any you don't like, then go to the audio step.
             </p>
           </div>
           {(job.scenes || []).map((s, i) => (
@@ -1342,46 +1378,22 @@ function AutoVideo() {
       {phase === "realistic" && job && (
         <div className="mx-auto max-w-2xl space-y-4">
           <div className="glass p-6">
-            <h3 className="text-xl font-bold">✨ Realistic — words that pop up</h3>
+            <h3 className="text-xl font-bold">✨ Pop-ups</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Tap the words you want. Each one pops up in written form every time the voiceover says it — a different style, colour and design every time, flying in from a random corner.
+              The app picks what pops up by itself: the key words of each scene, the big figures (with what they mean), and lists
+              that are counted out — each item stacks under the one before. One idea at a time, never a rush; on Reels every card
+              fits the narrow screen; in studio scenes the word appears beside your presenter and he looks at it.
             </p>
-            {realLoading && <p className="mt-3 text-sm text-muted-foreground">Finding the important words…</p>}
-            {realError && <p className="mt-3 text-sm text-destructive">{realError}</p>}
-            {!realLoading && realWords.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {realWords.map((w) => {
-                  const picked = realChosen.includes(w.word);
-                  return (
-                    <button
-                      key={w.word}
-                      onClick={() => toggleRealWord(w.word)}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${picked ? "border-primary bg-accent text-primary" : "border-border text-muted-foreground hover:border-primary"}`}
-                      title={w.count > 1 ? `Spoken ${w.count} times` : "Spoken once"}
-                    >
-                      {picked ? "✓ " : ""}{w.word}{w.count > 1 ? ` ×${w.count}` : ""}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <div className="mt-4 flex gap-2">
-              <input
-                className="field flex-1"
-                placeholder="Add your own word…"
-                value={realCustom}
-                onChange={(e) => setRealCustom(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addRealCustom(); }}
-              />
-              <button className="btn btn-ghost" onClick={addRealCustom}>+ Add</button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {([["off", "Off"], ["fewer", "Fewer"], ["normal", "Normal (recommended)"], ["more", "More"]] as const).map(([v, label]) => (
+                <button key={v} className={`btn btn-sm ${popAuto === v ? "btn-primary" : "btn-ghost"}`} onClick={() => setPopAuto(v)}>{label}</button>
+              ))}
             </div>
-            {realChosen.length > 0 && (
-              <p className="mt-3 text-sm text-emerald-400">✓ {realChosen.length} word{realChosen.length === 1 ? "" : "s"} picked: {realChosen.join(", ")}</p>
-            )}
           </div>
+          <StudioPresenter jobId={job.id} sceneCount={(job.scenes || []).length} onBusy={setStudioBusy} />
           <div className="flex gap-3">
-            <button className="btn btn-ghost" onClick={() => setPhase("audio")}>← Back to audio</button>
-            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startRender()}>🎬 Render video →</button>
+            <button className="btn btn-ghost" onClick={() => setPhase("audio")} disabled={studioBusy}>← Back to audio</button>
+            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startRender()} disabled={studioBusy}>🎬 Render video →</button>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
@@ -1442,7 +1454,11 @@ function AutoVideo() {
               </details>
             )}
             <div className="relative aspect-video overflow-hidden rounded-xl">
-              <img src={imgs[current % 3]} alt="" className="h-full w-full object-cover animate-kenburns" />
+              {job?.scenes?.[current]?.visual_file
+                ? (/\.(mp4|webm|mov)$/i.test(job.scenes[current].visual_file as string)
+                  ? <video src={autovideoSceneFileUrl(job.id, job.scenes[current].visual_file as string)} muted autoPlay loop playsInline className="h-full w-full object-cover" />
+                  : <img src={autovideoSceneFileUrl(job.id, job.scenes[current].visual_file as string)} alt="" className="h-full w-full object-cover animate-kenburns" />)
+                : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-sm text-muted-foreground">🔎 Finding footage that matches each scene of your script…</div>}
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background p-5">
                 <p className="text-lg font-semibold">{stageIdx >= 3 ? caption : "…"}</p>
               </div>
@@ -1459,7 +1475,7 @@ function AutoVideo() {
               })}
             </div>
           </div>
-          <SceneList count={sceneCount} current={current} scenes={job?.scenes} done={false} />
+          <SceneList count={sceneCount} current={current} scenes={job?.scenes} done={false} jobId={job?.id} />
         </div>
       )}
 
@@ -1816,7 +1832,7 @@ function AutoVideo() {
               )}
               {popupsError && <p className="mt-2 text-sm text-destructive">{popupsError}</p>}
               {job.popups_applied && job.popups_count != null && (
-                <p className="mt-2 text-sm text-emerald-400">✓ {job.popups_count} number pop-up{job.popups_count === 1 ? "" : "s"} added — watch the video above to see them fly in.</p>
+                <p className="mt-2 text-sm text-emerald-400">✓ {job.popups_count} pop-up{job.popups_count === 1 ? "" : "s"} added — watch the video above to see them.</p>
               )}
               {job.popups_note && <p className="mt-2 text-sm text-muted-foreground">{job.popups_note}</p>}
             </div>
@@ -1844,7 +1860,7 @@ function AutoVideo() {
               {job.revoice_error && !revoiceError && <p className="mt-2 text-sm text-destructive">{job.revoice_error}</p>}
             </div>
           </div>
-          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} />
+          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} jobId={job.id} />
         </div>
         </>
       )}
@@ -1878,7 +1894,7 @@ function AutoVideo() {
             ) : (
               <div className="aspect-video w-full rounded-xl bg-black" />
             )}
-            <p className="mt-3 text-sm">{job.scenes[browserIdx].caption || job.scenes[browserIdx].narration || ""}</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{job.scenes[browserIdx].narration || job.scenes[browserIdx].caption || ""}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {job.scenes[browserIdx].kind || "?"} · {job.scenes[browserIdx].visual_source || "?"} · {job.scenes[browserIdx].duration_sec || "?"}s · starts at {Math.round(sceneStart(browserIdx))}s
             </p>
@@ -1968,7 +1984,7 @@ function AutoVideo() {
                   return (
                     <>
                       <p className="mb-2 text-xs text-muted-foreground">Showing {Math.min(browserShown, items.length)} of {items.length} results</p>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      <div className={`grid grid-cols-2 gap-3 transition-opacity sm:grid-cols-3 lg:grid-cols-4 ${browserLoading ? "pointer-events-none opacity-40" : ""}`}>
                         {shown.map((item, i) => (
                           <button
                             key={`${item.kind}${i}`}
@@ -1986,7 +2002,7 @@ function AutoVideo() {
                               item.thumb ? (
                                 <img src={item.thumb} alt="" className="aspect-video w-full object-cover" loading="lazy" />
                               ) : (
-                                <video src={item.url} muted preload="metadata" className="aspect-video w-full object-cover" />
+                                <LazyClip url={item.url} />
                               )
                             ) : (
                               <img src={item.thumb || item.url} alt="" className="aspect-video w-full object-cover" loading="lazy" />
@@ -2047,7 +2063,7 @@ function AutoVideo() {
   );
 }
 
-function SceneList({ count, current, scenes, done, onChange, activeScene, onBrowseAll }: { count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number; onBrowseAll?: () => void }) {
+function SceneList({ count, current, scenes, done, onChange, activeScene, onBrowseAll, jobId }: { jobId?: string; count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number; onBrowseAll?: () => void }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   // Scene sync (user, 2026-11-09): when the video reaches a
   // scene, scroll that row into view in the panel.
@@ -2080,7 +2096,11 @@ function SceneList({ count, current, scenes, done, onChange, activeScene, onBrow
             : 0;
           return (
             <div key={i} data-scene-row={i} className={`flex items-center gap-3 rounded-xl p-2 ${playing ? "bg-primary/20 ring-1 ring-primary" : active ? "bg-accent" : ""}`}>
-              <img src={imgs[i % 3]} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
+              {s?.visual_file && jobId ? (/\.(mp4|webm|mov)$/i.test(s.visual_file as string)
+                ? <video src={autovideoSceneFileUrl(jobId, s.visual_file as string)} muted playsInline preload="metadata" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
+                : <img src={autovideoSceneFileUrl(jobId, s.visual_file as string)} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />)
+                : s ? <img src={imgs[i % 3]} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
+                : <div className="h-12 w-20 rounded-lg bg-slate-800" />}
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.visual_source ? ` · ${s.visual_source}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}{dupCount > 1 ? ` · ⚠️ ×${dupCount} same` : ""}</div>
                 <div className="truncate text-xs text-muted-foreground">{line}</div>

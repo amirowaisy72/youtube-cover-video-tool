@@ -1,0 +1,1045 @@
+{
+  "title": "The Train That Wouldn’t Wait",
+  "scenes": [
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "Hurry up, Teddy! The *train* is leaving in two minutes! {run}",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "horn",
+          "tone": "shout",
+          "segments": [
+            {
+              "say": "Hurry up, Teddy! The *train* is leaving in two minutes!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ohoo} Relax! My shoe lace was *untied*. {pace}",
+          "expression": "normal",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "calm",
+          "segments": [
+            {
+              "act": "ohoo"
+            },
+            {
+              "say": "Relax! My shoe lace was *untied*."
+            },
+            {
+              "act": "pace"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{gasp} Look at the *clock*! It's moving too fast! {point}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "ding",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "Look at the *clock*! It's moving too fast!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hmm} Impossible. Clocks don't have *legs*. {shake-head}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "Impossible. Clocks don't have *legs*."
+            },
+            {
+              "act": "shake-head"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{look:clock} It literally just winked at us! {shock}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "look",
+              "obj": "clock"
+            },
+            {
+              "say": "It literally just winked at us!"
+            },
+            {
+              "act": "shock"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb",
+        "auto-station-master"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{walk-to} Let's ask the *station master* over there. {point}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "",
+          "tone": "calm",
+          "segments": [
+            {
+              "act": "walk-to"
+            },
+            {
+              "say": "Let's ask the *station master* over there."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{wave} Excuse us! When does this *train* depart? {shout}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "say": "Excuse us! When does this *train* depart?"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-station-master",
+          "text": "{angry} Right now! And you missed it by *ten* seconds! {point}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "horn",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "Right now! And you missed it by *ten* seconds!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ohoo} No way! We have our *tickets* right here! {show:basket}",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "ohoo"
+            },
+            {
+              "say": "No way! We have our *tickets* right here!"
+            },
+            {
+              "show": "basket"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-station-master",
+          "text": "{laugh} Tickets don't matter if the *train* is already flying! {point}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Tickets don't matter if the *train* is already flying!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{shock} Flying?! Since when do *trains* fly?! {gasp}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "gasp",
+          "tone": "",
+          "segments": [
+            {
+              "act": "shock"
+            },
+            {
+              "say": "Flying?! Since when do *trains* fly?!"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "Five minutes later…",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb",
+        "auto-shopkeeper"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sit:bench} Well, that's great. Now we're stuck at the *station*. {sigh}",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "fail",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "sit",
+              "obj": "bench"
+            },
+            {
+              "say": "Well, that's great. Now we're stuck at the *station*."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{pace} We cannot just sit here! We have a *journey* to finish! {angry}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "pace"
+            },
+            {
+              "say": "We cannot just sit here! We have a *journey* to finish!"
+            },
+            {
+              "act": "angry"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{idea} {light-fire} Let's make *tea* using the station khokha! {clap}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "ding",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "idea"
+            },
+            {
+              "act": "light-fire"
+            },
+            {
+              "say": "Let's make *tea* using the station khokha!"
+            },
+            {
+              "act": "clap"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-shopkeeper",
+          "text": "{angry} Hey! That's my private *stove*! {point}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "slap",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "Hey! That's my private *stove*!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} Sorry, mister! We are just desperate *travelers*! {sweat}",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "say": "Sorry, mister! We are just desperate *travelers*!"
+            },
+            {
+              "act": "sweat"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb",
+        "auto-shopkeeper"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{drink} Ah, this tea is actually quite *good*. {smile}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "sip",
+          "tone": "",
+          "segments": [
+            {
+              "act": "drink"
+            },
+            {
+              "say": "Ah, this tea is actually quite *good*."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{angry} Stop drinking and help me push this *crate*! {push}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "Stop drinking and help me push this *crate*!"
+            },
+            {
+              "act": "push"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ha} Push it where? The *tracks* are empty! {shout}",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "Push it where? The *tracks* are empty!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{look-around} Wait… where did the *train* go? {gasp}",
+          "expression": "surprised",
+          "pose": "idle",
+          "sfx": "gasp",
+          "tone": "",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Wait… where did the *train* go?"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-shopkeeper",
+          "text": "{laugh} It left for the *mountains* an hour ago! {point}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "It left for the *mountains* an hour ago!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "6d7bf361b7fd",
+        "auto-station-master",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{facepalm} An hour ago?! But you said *ten* seconds! {cry}",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "fail",
+          "tone": "cry",
+          "segments": [
+            {
+              "act": "facepalm"
+            },
+            {
+              "say": "An hour ago?! But you said *ten* seconds!"
+            },
+            {
+              "act": "cry"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-station-master",
+          "text": "{wink} Time flies when you're having *fun* at the station! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "say": "Time flies when you're having *fun* at the station!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{angry} This isn't fun, this is a *nightmare*! {shout}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "angry"
+            },
+            {
+              "say": "This isn't fun, this is a *nightmare*!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{idea} Look, a stray *dog* is sleeping on the platform! {point}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "ding",
+          "tone": "",
+          "segments": [
+            {
+              "act": "idea"
+            },
+            {
+              "say": "Look, a stray *dog* is sleeping on the platform!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{sniff} What does a sleeping *dog* have to do with our train? {hmm}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "sniff"
+            },
+            {
+              "say": "What does a sleeping *dog* have to do with our train?"
+            },
+            {
+              "act": "hmm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "6d7bf361b7fd",
+        "auto-dog",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{wake} Maybe he knows the *shortcut* through the hills! {jump}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "boing",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "wake"
+            },
+            {
+              "say": "Maybe he knows the *shortcut* through the hills!"
+            },
+            {
+              "act": "jump"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-dog",
+          "text": "{bark} Woof! Follow me, you *fools*! {run}",
+          "expression": "normal",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "say": "Woof! Follow me, you *fools*!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{gasp} Did that *dog* just speak English?! {shock}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "gasp",
+          "tone": "",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "Did that *dog* just speak English?!"
+            },
+            {
+              "act": "shock"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{run} Who cares! Run after the *dog*! {chase}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "footsteps",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "say": "Who cares! Run after the *dog*!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{huff} I'm too out of shape for this *adventure*! {sweat}",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "I'm too out of shape for this *adventure*!"
+            },
+            {
+              "act": "sweat"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "Ten minutes later…",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{climb:water tank} I can see the whole *village* from up here! {point}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "wact": "climb",
+              "obj": "water tank"
+            },
+            {
+              "say": "I can see the whole *village* from up here!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{shout} Get down before you fall off that *tank*! {fear}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "say": "Get down before you fall off that *tank*!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{slip} Whoops! I'm slipping on the *metal*! {fall}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "crash",
+          "tone": "",
+          "segments": [
+            {
+              "say": "Whoops! I'm slipping on the *metal*!"
+            },
+            {
+              "act": "fall"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{catch} I got you! Grab my *hand*! {pull}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "pick",
+              "obj": ""
+            },
+            {
+              "say": "I got you! Grab my *hand*!"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{yay} Safe! Thanks for not letting me *crash*. {hug}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "yay"
+            },
+            {
+              "say": "Safe! Thanks for not letting me *crash*."
+            },
+            {
+              "act": "hug"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "auto-shopkeeper",
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "auto-shopkeeper",
+          "text": "{give:mango} Here, take this *mango* and stop making noise. {smile}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "sip",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "give",
+              "obj": "mango"
+            },
+            {
+              "say": "Here, take this *mango* and stop making noise."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{eat:mango} Mmm, surprisingly delicious! Free *food* is the best. {yum}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "eat",
+              "obj": "mango"
+            },
+            {
+              "say": "Mmm, surprisingly delicious! Free *food* is the best."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{look-around} Wait, listen… do you hear that *sound*? {hmm}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Wait, listen… do you hear that *sound*?"
+            },
+            {
+              "act": "hmm"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{gasp} It's the *train* coming back! {point}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "horn",
+          "tone": "",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "It's the *train* coming back!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{jump} Quick, grab our *bags*! {run}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "boing",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Quick, grab our *bags*!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "8f31b59119cb",
+        "auto-train",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{open:door} Open the coach *door*, it's stopping! {push}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "door",
+          "tone": "shout",
+          "segments": [
+            {
+              "wact": "open",
+              "obj": "door"
+            },
+            {
+              "say": "Open the coach *door*, it's stopping!"
+            },
+            {
+              "act": "push"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-train",
+          "text": "{horn} Toot toot! All aboard the *express*! {shout}",
+          "expression": "normal",
+          "pose": "idle",
+          "sfx": "horn",
+          "tone": "excited",
+          "segments": [
+            {
+              "say": "Toot toot! All aboard the *express*!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{enter:hut} We made it! Inside the *train* at last! {yay}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "enter",
+              "obj": "hut"
+            },
+            {
+              "say": "We made it! Inside the *train* at last!"
+            },
+            {
+              "act": "yay"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{sit} Never running for a *train* ever again. {sigh}",
+          "expression": "normal",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "calm",
+          "segments": [
+            {
+              "wact": "sit",
+              "obj": ""
+            },
+            {
+              "say": "Never running for a *train* ever again."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} Until the next *episode*, anyway! {wink}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Until the next *episode*, anyway!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Railway Station",
+      "world": "Railway Station",
+      "time_skip": "",
+      "holding": {},
+      "background": "Railway Station",
+      "characters": [
+        "auto-dog",
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "auto-dog",
+          "text": "{bark} Don't leave me behind, *guys*! {run}",
+          "expression": "normal",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "say": "Don't leave me behind, *guys*!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} Oh look, our favorite *dog* wants to come too! {point}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "say": "Oh look, our favorite *dog* wants to come too!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{pull} Quick, pull him inside the *window*! {help}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "slap",
+          "tone": "excited",
+          "segments": [
+            {
+              "say": "Quick, pull him inside the *window*!"
+            }
+          ]
+        },
+        {
+          "speaker": "auto-dog",
+          "text": "{smile} Thanks, humans! This *train* is awesome! {yay}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "say": "Thanks, humans! This *train* is awesome!"
+            },
+            {
+              "act": "yay"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} Best *railway station* trip ever! {cheer}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Best *railway station* trip ever!"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

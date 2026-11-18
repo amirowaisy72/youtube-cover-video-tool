@@ -1,0 +1,64 @@
+{
+  "id": "11944179110b",
+  "status": "ready",
+  "progress": 75,
+  "message": "Preview ready — watch it, then press Render final video.",
+  "title": "Peddy got turned into a FROG?",
+  "minutes": 1.0,
+  "format": "reel",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "# Scene: World of Wonders\nPeddy: {wow} Look at these glowing *mushrooms* near the river bank! {pick:mushroom} [excited, point, excited, pop]\nTeddy: {sniff} Wait! Do not eat those, they look *weird*! {step-back} [scared, think, whisper, rustle]\nPeddy: {eat} {gasp} {oops} Oh no, my hands are turning green! {shock} [surprised, fall, shout, splash]\n# Time skip: Three seconds later…\n# Scene: World of Wonders\nTeddy: {haan} Peddy?! Where did you go?! You are a tiny *frog* now! {gasp} [surprised, point, shout, gasp]\nPeddy: {jump} {frog} Ribbit ribbit! Help me, Teddy! {cry} [sad, dance, excited, boing]\nTeddy: {facepalm} I told you not to eat *magic* things! {sigh} [sad, shrug, calm, fail]\n# Time skip: Meanwhile by the pond…\n# Scene: World of Wonders\nPeddy: {jump} {pond} Look out, I am jumping into the *pond*! {swim:pond} [happy, jump, excited, splash]\nTeddy: {run} Wait for me! Do not catch any *flies* without me! {chase} [surprised, run, excited, footsteps]\nPeddy: {laugh} {frog} Ribbit! Being a *frog* is actually super fun! {yay} [happy, dance, excited, boing]\nTeddy: {catch:frog} {hug} Okay, but you are walking home on two *legs* later! {smile} [happy, hug, excited, magic]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "acting": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-17T23:07:26",
+  "story_source": "custom",
+  "auto_chars": [],
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\animations\\11944179110b\\music-made.wav",
+  "music_credit": "Drawings: OpenMoji (openmoji.org), CC BY-SA 4.0",
+  "sound_effects": [
+    "ambience",
+    "boing",
+    "eat",
+    "fail",
+    "footsteps",
+    "gasp",
+    "magic",
+    "pop",
+    "rustle",
+    "slap",
+    "sniff",
+    "splash",
+    "tick",
+    "tock",
+    "whoosh"
+  ],
+  "mix_file": "mix.m4a",
+  "geometry": {
+    "width": 720,
+    "height": 1280,
+    "unit": 1.3425,
+    "floorY": 1006.5,
+    "seatY": 948.8
+  },
+  "sprite_size": [
+    268,
+    537
+  ],
+  "sprite_count": 155,
+  "duration": 63.8,
+  "background_sources": []
+}

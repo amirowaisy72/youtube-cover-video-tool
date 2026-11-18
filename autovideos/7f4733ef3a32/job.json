@@ -1,0 +1,127 @@
+{
+  "id": "7f4733ef3a32",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Budget Hack Banks Are Hiding",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-GuyNeural",
+  "timeline": [
+    {
+      "t": 0,
+      "text": "Building scenes\u2026"
+    },
+    {
+      "t": 0,
+      "text": "Script ready \u2014 building scenes\u2026"
+    },
+    {
+      "t": 24,
+      "text": "Building scene 1 of 6\u2026 \u2014 scene 1: ai from ai:Have you ever noticed how your checking account balance seems to mysteriously sh"
+    },
+    {
+      "t": 25,
+      "text": "Building scene 2 of 6\u2026 \u2014 scene 2: ai from ai:Banks rely on a silent, clever system that makes saving money feel like climbing"
+    },
+    {
+      "t": 25,
+      "text": "Building scene 3 of 6\u2026 \u2014 scene 4: ai from ai:Traditional banks take your hard-earned deposits, lend them out to others at hig"
+    },
+    {
+      "t": 27,
+      "text": "Building scene 4 of 6\u2026 \u2014 scene 3: ai from ai:The hidden hack they don\u2019t want you to know about is automated sweep and fractio"
+    },
+    {
+      "t": 39,
+      "text": "Building scene 5 of 6\u2026 \u2014 scene 5: card from card:To beat this system, you need to set up a smart routing rule where every dollar "
+    },
+    {
+      "t": 47,
+      "text": "Building scene 6 of 6\u2026 \u2014 scene 6: ai from ai:This simple automation forces your idle cash to work around the clock, generatin"
+    },
+    {
+      "t": 178,
+      "text": "Joining scenes\u2026"
+    },
+    {
+      "t": 180,
+      "text": "done"
+    }
+  ],
+  "scene_total": 6,
+  "download_url": "/api/autovideo/download/7f4733ef3a32",
+  "script": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?\n\nBanks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.\n\nThe hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.\n\nTraditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.\n\nTo beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.\n\nThis simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps. Stop letting commercial banks profit off your hard work for free. Hit subscribe to PocketIQ and let us master your money together.",
+  "script_source": "custom-scenes",
+  "script_words": 185,
+  "voice_duration_sec": 63.1,
+  "voice_engine": "edge-tts",
+  "mood": "suspense",
+  "music": "mood-music.mp3",
+  "music_status": "ok",
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "transitions": true,
+  "join": "xfade",
+  "final_minutes": 1.1,
+  "scenes": [
+    {
+      "narration": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?",
+      "visual": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?",
+      "caption": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even\u2026",
+      "kind": "clip",
+      "visual_source": "changed: scene-change-00.mp4",
+      "duration_sec": 8.7
+    },
+    {
+      "narration": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.",
+      "visual": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.",
+      "caption": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they\u2026",
+      "kind": "clip",
+      "visual_source": "changed: scene-change-01.mp4",
+      "duration_sec": 7.8
+    },
+    {
+      "narration": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.",
+      "visual": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.",
+      "caption": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which\u2026",
+      "kind": "ai",
+      "visual_source": "ai:The hidden hack they don\u2019t want you to know about is automated sweep and fractio",
+      "duration_sec": 10.5
+    },
+    {
+      "narration": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.",
+      "visual": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.",
+      "caption": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand\u2026",
+      "kind": "ai",
+      "visual_source": "ai:Traditional banks take your hard-earned deposits, lend them out to others at hig",
+      "duration_sec": 8.8
+    },
+    {
+      "narration": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.",
+      "visual": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.",
+      "caption": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly\u2026",
+      "kind": "card",
+      "visual_source": "card:To beat this system, you need to set up a smart routing rule where every dollar ",
+      "duration_sec": 10.1
+    },
+    {
+      "narration": "This simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps. Stop letting commercial banks profit off your hard work for free. Hit subscribe to PocketIQ and let us master your money together.",
+      "visual": "This simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps.",
+      "caption": "This simple automation forces your idle cash to work around the clock, generating passive returns that\u2026",
+      "kind": "ai",
+      "visual_source": "ai:This simple automation forces your idle cash to work around the clock, generatin",
+      "duration_sec": 17.3
+    }
+  ],
+  "distinct_commons_visuals": 0,
+  "images_found": 6,
+  "clips_found": 0,
+  "images_used": 6,
+  "clips_used": 0,
+  "ai_images": 5,
+  "title_cards": 1,
+  "visual_warning": "",
+  "pipeline": "master-scenes",
+  "scene_changed": 1
+}

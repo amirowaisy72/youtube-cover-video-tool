@@ -1,0 +1,322 @@
+{
+  "title": "The Exam Night Disaster",
+  "scenes": [
+    {
+      "place": "bedroom",
+      "sitting": true,
+      "location": "bedroom",
+      "time_skip": "",
+      "holding": {
+        "8f31b59119cb": "book",
+        "6d7bf361b7fd": "book"
+      },
+      "background": "bedroom",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{aah} Teddy! The *exam* is TOMORROW and I know nothing!",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "aah"
+            },
+            {
+              "say": "Teddy! The *exam* is TOMORROW and I know nothing!"
+            },
+            {
+              "act": "scared"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{hmm} Relax. We have the whole *night*.",
+          "expression": "normal",
+          "pose": "idle",
+          "sfx": "",
+          "tone": "calm",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "Relax. We have the whole *night*."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{read} Okay… chapter one. {turn-page} {uff} Why are there so many *pages*?",
+          "expression": "sad",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "read"
+            },
+            {
+              "say": "Okay… chapter one."
+            },
+            {
+              "act": "turn-page"
+            },
+            {
+              "act": "uff"
+            },
+            {
+              "say": "Why are there so many *pages*?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{phone} Just five minutes on my *phone*. Then we study.",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "phone"
+            },
+            {
+              "say": "Just five minutes on my *phone*. Then we study."
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{haan} Five minutes? You said that an *hour* ago!",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "boing",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "haan"
+            },
+            {
+              "say": "Five minutes? You said that an *hour* ago!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "bedroom",
+      "sitting": true,
+      "location": "bedroom",
+      "time_skip": "Three hours later…",
+      "holding": {
+        "6d7bf361b7fd": "phone",
+        "8f31b59119cb": "phone"
+      },
+      "background": "bedroom",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{giggle} Look, a *cat* playing piano! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "Look, a *cat* playing piano!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{wow} So cute! {gasp} Wait… what *time* is it?",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "gasp",
+          "tone": "",
+          "segments": [
+            {
+              "act": "wow"
+            },
+            {
+              "say": "So cute!"
+            },
+            {
+              "act": "gasp"
+            },
+            {
+              "say": "Wait… what *time* is it?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{look-around} Only… *four* in the morning. {sweat}",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Only… *four* in the morning."
+            },
+            {
+              "act": "sweat"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "FOUR?! {facepalm} We read *zero* pages!",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "fail",
+          "tone": "shout",
+          "segments": [
+            {
+              "say": "FOUR?!"
+            },
+            {
+              "act": "facepalm"
+            },
+            {
+              "say": "We read *zero* pages!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ohoo} Don't worry. {idea} I have a *genius* plan!",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "ding",
+          "tone": "",
+          "segments": [
+            {
+              "act": "ohoo"
+            },
+            {
+              "say": "Don't worry."
+            },
+            {
+              "act": "idea"
+            },
+            {
+              "say": "I have a *genius* plan!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "classroom",
+      "sitting": true,
+      "location": "classroom",
+      "time_skip": "",
+      "holding": {
+        "8f31b59119cb": "book",
+        "6d7bf361b7fd": "book"
+      },
+      "background": "classroom",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{hmm} So what is your *plan*?",
+          "expression": "suspicious",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "whisper",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "say": "So what is your *plan*?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} I prayed the exam gets *cancelled*!",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "say": "I prayed the exam gets *cancelled*!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} Teddy… today is *Sunday*.",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "calm",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "say": "Teddy… today is *Sunday*."
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{yay} No exam! {dance} Time to *sleep*! {sleep}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "yay"
+            },
+            {
+              "say": "No exam!"
+            },
+            {
+              "act": "dance"
+            },
+            {
+              "say": "Time to *sleep*!"
+            },
+            {
+              "act": "sleep"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,333 @@
+{
+ "season": "spring",
+ "fog": 0.0,
+ "models": {
+  "train_seat": {
+   "label": "train seat for two",
+   "aliases": [
+    "train seat",
+    "bus seat",
+    "seat",
+    "berth"
+   ],
+   "abilities": [
+    "solid",
+    "sittable"
+   ],
+   "seat_height": 0.48,
+   "parts": [
+    {
+     "shape": "box",
+     "size": [
+      1.1,
+      0.12,
+      0.55
+     ],
+     "pos": [
+      0,
+      0.45,
+      0
+     ],
+     "color": "#1d4ed8"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.1,
+      0.75,
+      0.12
+     ],
+     "pos": [
+      0,
+      0.85,
+      -0.25
+     ],
+     "color": "#1e40af"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.08,
+      0.45,
+      0.5
+     ],
+     "pos": [
+      -0.5,
+      0.22,
+      0
+     ],
+     "color": "#374151"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.08,
+      0.45,
+      0.5
+     ],
+     "pos": [
+      0.5,
+      0.22,
+      0
+     ],
+     "color": "#374151"
+    }
+   ]
+  }
+ },
+ "room": {
+  "width": 14,
+  "depth": 4,
+  "height": 2.8,
+  "wall": "#ffffff",
+  "floor": "#6b7280",
+  "ceiling": "#e5e7eb",
+  "windows": 6,
+  "moving": true,
+  "outside": "trees"
+ },
+ "recipe": {
+  "name": "Train Interior",
+  "place": "village",
+  "ground": "dirt",
+  "time": "day",
+  "season": "spring",
+  "weather": "clear",
+  "wind": 0.1,
+  "room": {
+   "width": 14,
+   "depth": 4,
+   "height": 2.8,
+   "wall": "#ffffff",
+   "floor": "#6b7280",
+   "ceiling": "#e5e7eb",
+   "windows": 6,
+   "moving": true,
+   "outside": "trees"
+  },
+  "things": [
+   {
+    "what": "model:train_seat",
+    "x": -4,
+    "z": -1.5
+   },
+   {
+    "what": "model:train_seat",
+    "x": -1,
+    "z": -1.5
+   },
+   {
+    "what": "model:train_seat",
+    "x": 2,
+    "z": -1.5
+   },
+   {
+    "what": "model:train_seat",
+    "x": 5,
+    "z": -1.5
+   },
+   {
+    "what": "basket",
+    "count": 1,
+    "where": "stage"
+   }
+  ],
+  "animals": [],
+  "people": [
+   {
+    "who": "villager",
+    "count": 1,
+    "where": "stage",
+    "doing": "sit",
+    "female": false
+   },
+   {
+    "who": "ticket checker",
+    "count": 1,
+    "where": "stage",
+    "doing": "walk",
+    "female": false
+   }
+  ],
+  "models": {
+   "train_seat": {
+    "label": "blue train seat",
+    "abilities": [
+     "solid",
+     "sittable"
+    ],
+    "seat_height": 0.45,
+    "parts": [
+     {
+      "shape": "box",
+      "size": [
+       1.2,
+       0.45,
+       0.8
+      ],
+      "pos": [
+       0,
+       0.22,
+       0
+      ],
+      "color": "#2563eb"
+     },
+     {
+      "shape": "box",
+      "size": [
+       1.2,
+       0.9,
+       0.2
+      ],
+      "pos": [
+       0,
+       0.7,
+       -0.3
+      ],
+      "color": "#2563eb"
+     },
+     {
+      "shape": "box",
+      "size": [
+       0.1,
+       0.8,
+       0.8
+      ],
+      "pos": [
+       -0.55,
+       0.4,
+       0
+      ],
+      "color": "#9ca3af"
+     },
+     {
+      "shape": "box",
+      "size": [
+       0.1,
+       0.8,
+       0.8
+      ],
+      "pos": [
+       0.55,
+       0.4,
+       0
+      ],
+      "color": "#9ca3af"
+     }
+    ]
+   }
+  }
+ },
+ "version": 1,
+ "name": "Train Interior",
+ "kind": "village",
+ "ground": "dirt",
+ "time": "day",
+ "wind": 0.1,
+ "weather": "",
+ "grass": 0.0,
+ "objects": [
+  {
+   "id": "model-266176-0",
+   "type": "model",
+   "x": -4.0,
+   "z": -1.5,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true,
+    "sittable": true
+   },
+   "opts": {
+    "model": "train_seat"
+   }
+  },
+  {
+   "id": "model-266176-1",
+   "type": "model",
+   "x": -1.19,
+   "z": -1.41,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true,
+    "sittable": true
+   },
+   "opts": {
+    "model": "train_seat"
+   }
+  },
+  {
+   "id": "model-266176-2",
+   "type": "model",
+   "x": 2.0,
+   "z": -1.5,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true,
+    "sittable": true
+   },
+   "opts": {
+    "model": "train_seat"
+   }
+  },
+  {
+   "id": "model-266176-3",
+   "type": "model",
+   "x": 5.0,
+   "z": -1.5,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true,
+    "sittable": true
+   },
+   "opts": {
+    "model": "train_seat"
+   }
+  },
+  {
+   "id": "basket-266176-4",
+   "type": "basket",
+   "x": -5.42,
+   "z": -1.53,
+   "rot": -0.24296643994748593,
+   "scale": 0.8987031083088368
+  },
+  {
+   "id": "person-266176-5",
+   "type": "person",
+   "x": 0.56,
+   "z": -1.75,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "villager",
+    "doing": "sit",
+    "female": false,
+    "radius": 0.8
+   }
+  },
+  {
+   "id": "person-266176-6",
+   "type": "person",
+   "x": 3.52,
+   "z": -1.47,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "ticket checker",
+    "doing": "walk",
+    "female": false,
+    "radius": 0.8
+   }
+  }
+ ],
+ "stage": {
+  "x": 0.0,
+  "z": 0.0,
+  "rot": 0.0
+ },
+ "updated": "2026-11-17T07:04:18"
+}

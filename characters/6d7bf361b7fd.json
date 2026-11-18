@@ -1,0 +1,27 @@
+{
+  "id": "6d7bf361b7fd",
+  "name": "Teddy",
+  "voice": {
+    "type": "provider",
+    "id": "am_eric",
+    "label": "\u2b50 Unreal Speech \u2014 Kokoro \u2014 Male, Eric",
+    "provider": "unreal"
+  },
+  "config": {
+    "skin": "#f6d7b8",
+    "hair": "spiky",
+    "hairColor": "#1b1b1b",
+    "hat": "none",
+    "hatColor": "#222831",
+    "top": "tshirt",
+    "topColor": "#e8643c",
+    "top2Color": "#ffffff",
+    "bottom": "jeans",
+    "bottomColor": "#2f3640",
+    "shoes": "sneakers",
+    "shoeColor": "#ffffff",
+    "accessories": []
+  },
+  "created_at": "2026-11-16T02:22:57",
+  "updated_at": "2026-11-16T20:37:48"
+}

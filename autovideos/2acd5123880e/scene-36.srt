@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:02,120
+For centuries, society taught
+
+2
+00:00:02,120 --> 00:00:03,120
+us that the ant is
+
+3
+00:00:03,120 --> 00:00:04,440
+wise for saving grain for
+
+4
+00:00:04,440 --> 00:00:05,920
+the winter while the grasshopper
+
+5
+00:00:05,920 --> 00:00:07,080
+starks for living day -to
+
+6
+00:00:07,080 --> 00:00:07,340
+-day.

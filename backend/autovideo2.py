@@ -43,6 +43,7 @@ break the copyright-safe promise of this tool.
 from __future__ import annotations
 
 import json
+import sys
 import math
 import re
 import subprocess
@@ -112,8 +113,13 @@ def generate_scenes(title: str, minutes: int, script: str | None = None,
     and a 10-word minimum scene (not 20) — so a single-paragraph
     Short script still cuts to a new visual every couple of
     sentences instead of one clip for the whole Short."""
-    if script and script.strip():
-        script = _clean_text(script.strip())
+    custom = bool(script and script.strip())
+    if custom:
+        # YOUR script is spoken word for word (user, 2026-11-18: "it
+        # cuts my script on its own"): only markdown, links and clear
+        # labels ("Hook:", "Scene 2", "[music]") are removed — a short
+        # spoken line without a full stop is NOT a heading.
+        script = _clean_custom(script.strip())
         source = "custom"
     else:
         script, source = autovideo.generate_script(title, minutes,
@@ -121,12 +127,15 @@ def generate_scenes(title: str, minutes: int, script: str | None = None,
     group_size = 2 if is_short else 3
     min_scene_words = 10 if is_short else 20
     scenes: list[dict] = []
-    for paragraph in autovideo.split_paragraphs(script, group_size=group_size):
-        paragraph = paragraph.strip()
+    parts = _split_custom(script, group_size) if custom else autovideo.split_paragraphs(script, group_size=group_size)
+    carry = ""  # a short opening line (the hook!) is never dropped: it joins the next scene
+    for paragraph in parts:
+        first = re.split(r"(?<=[.!?])\s+", paragraph.strip())
+        visual = first[0] if first and first[0] else title  # the scene's OWN first sentence finds its footage
+        paragraph = (carry + " " + paragraph.strip()).strip() if carry else paragraph.strip()
+        carry = ""
         if not paragraph:
             continue
-        first = re.split(r"(?<=[.!?])\s+", paragraph)
-        visual = first[0] if first else title
         # Tiny fragments (e.g. a trailing 'Hidden layers of
         # intrigue?') are not scenes: merge them into the
         # previous scene instead of shipping a 2-second scene.
@@ -134,11 +143,56 @@ def generate_scenes(title: str, minutes: int, script: str | None = None,
             scenes[-1]["narration"] += " " + paragraph
             continue
         if len(paragraph.split()) < min_scene_words and not scenes:
+            carry = paragraph
             continue
         scenes.append({"narration": paragraph, "visual": visual})
+    if carry:
+        scenes.append({"narration": carry, "visual": title})
     if not scenes:
         scenes = [{"narration": script.strip(), "visual": title}]
     return scenes, source + "-scenes"
+
+
+_LABEL_RE = re.compile(r"(?i)^\s*(?:hook|intro(?:duction)?|outro|conclusion|ending|summary|recap|cta|call to action|"
+                       r"scene|section|chapter|part|segment|step|point|title|narrator|voice ?over|vo|host|speaker)"
+                       r"(?:\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|[ivx]+))?\s*[:.\-–—]?\s*$")
+_LABEL_PREFIX_RE = re.compile(r"(?i)^\s*(?:narrator|voice ?over|vo|host|speaker|hook|intro(?:duction)?|outro|conclusion)\s*:\s*")
+_STAGE_RE = re.compile(r"^\s*[\[(][^\])]{0,80}[\])]\s*$")
+
+
+def _clean_custom(text: str) -> str:
+    """Your own script: keep every spoken word. Removed: markdown
+    marks, links, '[music]' / '(pause)' lines, bare labels like
+    'Hook:' or 'Scene 3', and a 'Narrator:' prefix."""
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text or "")
+    text = re.sub(r"(?<!\w)\*([^*\n]+)\*(?!\w)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"https?://\S+|www\.\S+", "", text)
+    out = []
+    for line in text.splitlines():
+        raw = line.strip()
+        core = re.sub(r"^[#>\-*•\s]+", "", raw).strip()
+        if not core:
+            out.append("")
+            continue
+        if _LABEL_RE.match(core) or _STAGE_RE.match(core) or re.fullmatch(r"[-=_*~]{3,}", core):
+            continue
+        core = _LABEL_PREFIX_RE.sub("", core)
+        core = re.sub(r"\s*[\[(](?:music|sfx|pause|beat|b-roll|broll|cut to|visual|on screen|graphic)[^\])]*[\])]\s*", " ", core, flags=re.I).strip()
+        if core:
+            out.append(core)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def _split_custom(script: str, group_size: int) -> list[str]:
+    """Your script → scenes: your paragraphs; one long paragraph (or
+    single lines) → a few sentences per scene. Nothing is dropped."""
+    paras = [p.strip() for p in re.split(r"\n\s*\n", script) if p.strip()]
+    if len(paras) == 1 or all(len(p.split()) < 12 for p in paras):
+        text = " ".join(" ".join(p.split()) for p in paras)
+        sentences = [x for x in re.split(r"(?<=[.!?…])\s+", text) if x.strip()]
+        return [" ".join(sentences[i:i + group_size]) for i in range(0, len(sentences), group_size)]
+    return [" ".join(p.split()) for p in paras]
 
 
 def _parse_scenes(text: str) -> list[dict]:
@@ -229,10 +283,6 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # that Commons answered with carbon-budget videos for a
     # banking video. short_query keeps at most 5 topical words.
     search_text = autovideo.short_query(title, visual_text)
-    found = autovideo.fetch_visuals(search_text, visuals,
-                                    pexels_key=pexels_key,
-                                    pixabay_key=pixabay_key,
-                                    vertical=vertical)
 
     def _on_topic(item: dict) -> bool:
         if not title_core:
@@ -275,12 +325,36 @@ def _scene_visual(title: str, scene: dict, visuals: str,
             dest = work_dir / f"scene-{index:02d}{suffix}"
             if autovideo._download(item["url"], dest):
                 if autovideo._ffprobe_duration(dest):
+                    autovideo_smart.remember_footage(item["url"])
                     return dest, "clip", item["title"]
             _release_url(used_urls, lock, item["url"])
         return None
+    # SMART + VARIED (user, 2026-11-18): footage found from what the scene
+    # MEANS (the AI's searches, wrong things filtered out), picked at random
+    # among the best matches, and not what recent videos already used.
+    import autovideo_smart
+    smart = autovideo_smart.smart_candidates(title, scene, visuals, pexels_key, pixabay_key, vertical)
+    if visuals in ("videos", "both") and smart["videos"]:
+        got = _try_clips(smart["videos"])
+        if got:
+            return got
+    if visuals in ("images", "both"):
+        for item in smart["images"]:
+            if not _reserve_url(used_urls, lock, item["url"]):
+                continue
+            dest = work_dir / f"scene-{index:02d}.jpg"
+            if autovideo._download(item["url"], dest) and autovideo._valid_image(dest):
+                autovideo_smart.remember_footage(item["url"])
+                return dest, "image", item["title"]
+            _release_url(used_urls, lock, item["url"])
+    # the older word-based search, when the plan found nothing usable
+    found = autovideo.fetch_visuals(search_text, visuals,
+                                    pexels_key=pexels_key,
+                                    pixabay_key=pixabay_key,
+                                    vertical=vertical)
     if visuals in ("videos", "both"):
-        on_topic = [it for it in found["videos"] if _on_topic(it)]
-        any_clip = list(found["videos"])
+        on_topic = autovideo_smart.vary([it for it in found["videos"] if _on_topic(it)])
+        any_clip = autovideo_smart.vary(list(found["videos"]))
         for pool in (
             [it for it in on_topic if (it.get("size") or 0) <= _FAST_VIDEO_BYTES],
             on_topic,
@@ -659,6 +733,31 @@ _POPUP_LEAD_SEC = 0.4
 _POPUP_MAX_PER_SCENE = 2
 
 
+_STAT_SHOW_SEC = 2.4   # a figure card stays long enough to read its label
+_WORD_SHOW_SEC = 1.7
+_LABEL_SKIP = {"the", "a", "an", "of", "and", "or", "to", "in", "on", "at", "for", "with", "that", "this", "is",
+               "are", "was", "were", "it", "its", "by", "from", "as", "than", "be", "been", "has", "have", "had"}
+
+
+def _stat_label(narration: str, m) -> str:
+    """The words that say WHAT the figure is: '11 kilometres deep' →
+    'KILOMETRES DEEP', '3000 year old honey' → 'YEAR OLD HONEY'."""
+    after = re.split(r"[.,;:!?()\n]", narration[m.end():], maxsplit=1)[0].split()
+    out = []
+    for w in after[:5]:
+        core = re.sub(r"[^A-Za-z'-]", "", w)
+        if not core:
+            break
+        out.append(core)
+        if len(out) == 3:
+            break
+    while out and out[-1].lower() in _LABEL_SKIP:
+        out.pop()
+    while out and out[0].lower() in _LABEL_SKIP and len(out) > 1:
+        out.pop(0)
+    return " ".join(out).upper()[:28]
+
+
 def _popup_display(matched: str) -> str:
     """Short punchy text for a pop-up: '$100' stays '$100',
     '200 million' becomes '200M', '5 billion' becomes '5B',
@@ -753,8 +852,9 @@ def find_number_popups(scenes: list[dict], work_dir: Path) -> list[dict]:
             # 2026-11-09) so the pop lands as the word is said.
             start = max(0.0, offset + when - _POPUP_LEAD_SEC)
             popups.append({"text": display, "start": round(start, 2),
-                           "end": round(start + _POPUP_SHOW_SEC, 2),
-                           "scene": i})
+                           "end": round(start + _STAT_SHOW_SEC, 2),
+                           "scene": i, "label": _stat_label(narration, m),
+                           "kind": "stat"})
             taken += 1
         offset += duration
     return popups
@@ -810,6 +910,13 @@ def find_word_popups(scenes: list[dict], work_dir: Path,
     by word position; narration-position fallback). A word that
     is spoken 5 times gets 5 pop-ups, one per occurrence. Each
     pop-up carries the word in its spoken form."""
+    # AUTO (user, 2026-11-18: "the pick-the-words strategy was wrong"):
+    # "__auto__" / "__auto__:fewer|more" = the app chooses the key words,
+    # figures and lists itself, paced so they never rush in together.
+    auto = next((w for w in words if str(w).startswith("__auto__")), None)
+    if auto is not None:
+        import autovideo_smart
+        return autovideo_smart.plan_auto_popups(scenes, work_dir, (auto.split(":", 1) + ["normal"])[1] or "normal")
     wanted = {w.lower().strip() for w in words if w and w.strip()}
     if not wanted:
         return []
@@ -849,8 +956,8 @@ def find_word_popups(scenes: list[dict], work_dir: Path,
             start = max(0.0, offset + when - _POPUP_LEAD_SEC)
             display = display[:1].upper() + display[1:] if display else display
             popups.append({"text": display, "start": round(start, 2),
-                           "end": round(start + _POPUP_SHOW_SEC, 2),
-                           "scene": i})
+                           "end": round(start + _WORD_SHOW_SEC, 2),
+                           "scene": i, "kind": "word"})
         offset += duration
     return popups
 
@@ -890,21 +997,17 @@ _POPUP_COLORS = ["#FFD60A", "#00E5FF", "#FF6B9D", "#7CFC00",
 def apply_popups(final_path: Path, popups: list[dict],
                  work_dir: Path, duration: float | None,
                  progress_cb=None) -> Path:
-    """Burn word/number pop-ups into a finished video with
-    FFmpeg drawtext. Each pop-up POPS in at a random point —
-    it scales up from 40% to 110% (a slight overshoot) over
-    0.2s, then settles at full size and stays 1.2s — and every
-    one gets a different random style (colour, size, background
-    box) so the video never looks templated. The old fly-in from
-    a corner (user, 2026-11-09) looked rough and mechanical; a
-    scale pop is the real pop-up effect. Returns the new file
-    path (final-popups.mp4). The caller swaps it in for final.mp4.
-    Raises on failure (the caller keeps the original)."""
-    import random
+    """Burn the pop-ups into a finished video — STUDIO style (user,
+    2026-11-18: "make the pop-up text most professional"). Every pop-up
+    is a clean broadcast card drawn as a picture (Pillow): a dark glass
+    panel, one accent colour bar for the whole video, a bold white word
+    or figure and, for a figure, a small caption saying what it is
+    ("11" / "KILOMETRES DEEP"). Cards slide in softly with a fade, sit
+    in the upper corners (never over the subtitles or the middle of the
+    picture), take turns left / right, and never pile on each other.
+    Returns final-popups.mp4; raises on failure (the caller keeps the
+    original video)."""
     import subprocess
-    font = _filter_font_path(work_dir)
-    if not font:
-        raise RuntimeError("No font available for the pop-ups.")
     width, height = 1280, 720
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0",
@@ -913,66 +1016,201 @@ def apply_popups(final_path: Path, popups: list[dict],
         **video_module.no_window_kwargs())
     if probe.returncode == 0 and probe.stdout.strip():
         try:
-            w, h = probe.stdout.strip().split(",")
+            w, h = probe.stdout.strip().split(",")[:2]
             width, height = int(w), int(h)
         except ValueError:
             pass
-    rng = random.Random(20261109)
-    # SHORTS (user, 2026-11-09): the font was sized by HEIGHT —
-    # for a 1080x1920 Short that made 115–211px words that filled
-    # the frame and overlapped the captions. Size by the SMALLER
-    # side instead (same for 1280x720 landscape, sane for
-    # vertical), keep pop-ups out of the bottom caption zone
-    # (ey 20–70% of height), and clamp the landing x so the word
-    # never runs off the left/right edge.
-    ref = min(width, height)
-    filters: list[str] = []
-    for p in popups:
-        t0 = p["start"]
-        # A different style every time: random colour, size
-        # (0.06–0.11 of the smaller side) and background box on/off.
-        color = rng.choice(_POPUP_COLORS)
-        fontsize = max(40, int(ref * rng.uniform(0.06, 0.11)))
-        boxed = rng.random() < 0.7
-        text = p["text"].replace("'", "").replace(":", "")
-        # Estimated word width (~0.6 x fontsize per char); keep
-        # the centred word inside the frame with a 20px margin.
-        est_w = max(1.0, len(text) * fontsize * 0.6)
-        lo = int(max(est_w / 2 + 20, width * 0.15))
-        hi = int(min(width - est_w / 2 - 20, width * 0.85))
-        if hi <= lo:
-            ex = width // 2
-        else:
-            ex = rng.randint(lo, hi)
-        ey = rng.randint(int(height * 0.2), int(height * 0.7))
-        # REAL POP (user, 2026-11-09): the word sits at its landing
-        # point and SCALES up — fontsize grows 40% -> 110% over
-        # 0.2s (a slight overshoot), then settles at 100%. The
-        # x/y stay centred on (ex, ey) via text_w/text_h, so the
-        # word grows outward from its centre. No corner fly-in.
-        pop = _POPUP_POP_SEC
-        size_expr = (f"'if(lt(t-{t0},{pop}),"
-                     f"{fontsize}*(0.4+0.7*(t-{t0})/{pop}),{fontsize})'")
-        box = "box=1:boxcolor=black@0.65:boxborderw=24:" if boxed else ""
-        filters.append(
-            f"drawtext=fontfile={font}:text='{text}':"
-            f"fontsize={size_expr}:fontcolor={color}:"
-            f"{box}"
-            f"borderw=2:bordercolor=black:"
-            f"x='{ex}-text_w/2':y='{ey}-text_h/2':"
-            f"enable='between(t,{t0},{p['end']})'")
+    cards = _layout_cards(sorted(popups, key=lambda p: p["start"]), width, height, work_dir)
+    if not cards:
+        raise RuntimeError("No pop-ups to add.")
     out_path = work_dir / "final-popups.mp4"
-    cmd = ["ffmpeg", "-y", "-i", str(final_path),
-           "-vf", ",".join(filters),
-           "-c:v", "libx264", "-preset", "veryfast",
-           "-pix_fmt", "yuv420p", "-c:a", "copy",
-           "-movflags", "+faststart", str(out_path)]
-    ok, out = video_module.run_with_progress(
-        cmd, duration, 0, 100,
-        on_progress=(lambda pct, el, eta: progress_cb(pct) if progress_cb else None))
+    inputs: list[str] = ["-i", str(final_path)]
+    chains: list[str] = []
+    last = "[0:v]"
+    slide = max(24, width // 40)
+    for k, c in enumerate(cards):
+        dur = c["end"] - c["start"]
+        inputs += ["-loop", "1", "-framerate", "30", "-t", f"{dur:.2f}", "-i", str(c["png"])]
+        t0 = c["start"]
+        chains.append(f"[{k + 1}:v]format=rgba,fade=t=in:st=0:d=0.22:alpha=1,"
+                      f"fade=t=out:st={max(0.0, dur - 0.3):.2f}:d=0.3:alpha=1,setpts=PTS-STARTPTS+{t0:.2f}/TB[c{k}]")
+        sign = -1 if c["side"] == "left" else 1
+        # slide 'slide' px in from the screen edge with an ease-out
+        x = f"{c['x']}+{sign}*{slide}*pow(max(0,1-(t-{t0:.2f})/0.28),2)"
+        chains.append(f"{last}[c{k}]overlay=x='{x}':y={c['y']}:eof_action=pass:"
+                      f"enable='between(t,{t0:.2f},{c['end']:.2f})'[v{k}]")
+        last = f"[v{k}]"
+    graph = ";".join(chains)
+
+    def _run(g: str):
+        # the graph goes on the command line (newer FFmpeg dropped -filter_complex_script);
+        # a very long graph goes through a file with the new "-/filter_complex" form
+        if len(g) < 24000:
+            fc = ["-filter_complex", g]
+        else:
+            script = work_dir / "popups.filter"
+            script.write_text(g, encoding="utf-8")
+            fc = ["-/filter_complex", str(script)]
+        cmd = ["ffmpeg", "-y"] + inputs + fc + [
+            "-map", last, "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-pix_fmt", "yuv420p", "-c:a", "copy",
+            "-movflags", "+faststart", str(out_path)]
+        return video_module.run_with_progress(
+            cmd, duration, 0, 100,
+            on_progress=(lambda pct, el, eta: progress_cb(pct) if progress_cb else None))
+    ok, out = _run(graph)
+    if not ok or not out_path.exists():
+        # plain version: no slide, just the cards fading in and out
+        plain = re.sub(r"overlay=x='[^']*'", lambda m: "overlay=x='" + m.group(0).split("'")[1].split("+")[0] + "'", graph)
+        ok, out = _run(plain)
     if not ok or not out_path.exists():
         raise RuntimeError(f"Pop-ups failed: {out[-500:]}")
     return out_path
+
+
+_ACCENTS = ["#FFC300", "#00D1FF", "#FF4D6D", "#7CFF6B", "#B388FF", "#FF8A00"]
+
+
+def _card_fonts() -> tuple[str | None, str | None]:
+    """Bold + medium fonts for the cards (Poppins ships with the app;
+    Windows / Linux system fonts as a fallback)."""
+    here = Path(__file__).resolve().parent / "fonts"
+    bold = [here / "Poppins-Bold.ttf", Path(r"C:\Windows\Fonts\seguibl.ttf"), Path(r"C:\Windows\Fonts\segoeuib.ttf"),
+            Path(r"C:\Windows\Fonts\arialbd.ttf"), Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")]
+    med = [here / "Poppins-Medium.ttf", Path(r"C:\Windows\Fonts\seguisb.ttf"), Path(r"C:\Windows\Fonts\segoeui.ttf"),
+           Path(r"C:\Windows\Fonts\arial.ttf"), Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")]
+    pick = lambda xs: next((str(p) for p in xs if p.exists()), None)  # noqa: E731
+    return pick(bold), pick(med) or pick(bold)
+
+
+def _draw_card(text: str, label: str, accent: str, height: int, dest: Path, max_w: int = 0,
+               scale: float = 1.0) -> tuple[int, int]:
+    """One broadcast-style card as a transparent PNG. Returns its size.
+    max_w: the card shrinks its text until it fits (a narrow Reel screen)."""
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    bold, med = _card_fonts()
+    text = text.strip()
+    if len(text) > 26:
+        text = text[:25] + "…"
+    big = int(height * (0.088 if label else 0.066) * scale)
+    small = int(height * 0.034 * scale)
+    while True:
+        fb = ImageFont.truetype(bold, big) if bold else ImageFont.load_default()
+        fm = ImageFont.truetype(med, small) if med else ImageFont.load_default()
+        need = int(height * 0.09) + max(int(fb.getlength(text)), int(fm.getlength(label) * 1.2) if label else 0)
+        if not max_w or need <= max_w or big <= 18:
+            break
+        big, small = int(big * 0.9), max(12, int(small * 0.92))
+    track = max(1, small // 6)  # letter spacing for the caption
+
+    def wide(s: str, f, sp: int = 0) -> int:
+        return int(sum(f.getlength(ch) + sp for ch in s)) if s else 0
+    tw = int(fb.getlength(text))
+    asc, desc = fb.getmetrics()
+    lw = wide(label, fm, track)
+    pad_x, pad_y = int(height * 0.03 * scale), int(height * 0.022 * scale)
+    bar = max(5, int(height * 0.009 * scale))
+    inner_w = max(tw, lw)
+    w = pad_x * 2 + bar + int(height * 0.012) + inner_w
+    h = pad_y * 2 + (asc + desc) + (int(small * 1.5) if label else 0)
+    sh = int(height * 0.018)  # room for the shadow
+    img = Image.new("RGBA", (w + sh * 2, h + sh * 2), (0, 0, 0, 0))
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle((sh, sh + sh // 3, sh + w, sh + h + sh // 3), radius=int(height * 0.016), fill=(0, 0, 0, 150))
+    img = Image.alpha_composite(img, shadow.filter(ImageFilter.GaussianBlur(sh * 0.6)))
+    d = ImageDraw.Draw(img)
+    r = int(height * 0.016)
+    d.rounded_rectangle((sh, sh, sh + w, sh + h), radius=r, fill=(13, 17, 30, 228))
+    d.rounded_rectangle((sh, sh, sh + w, sh + h), radius=r, outline=(255, 255, 255, 38), width=max(1, height // 540))
+    ac = tuple(int(accent[i:i + 2], 16) for i in (1, 3, 5))
+    d.rounded_rectangle((sh + pad_x // 2, sh + pad_y, sh + pad_x // 2 + bar, sh + h - pad_y), radius=bar // 2, fill=ac + (255,))
+    x0 = sh + pad_x // 2 + bar + int(height * 0.018)
+    d.text((x0, sh + pad_y - int(big * 0.06)), text, font=fb, fill=(255, 255, 255, 255))
+    if label:
+        ly = sh + pad_y + asc + desc - int(small * 0.1)
+        x = x0
+        for ch in label:
+            d.text((x, ly), ch, font=fm, fill=ac + (255,))
+            x += int(fm.getlength(ch)) + track
+    img.save(dest)
+    return img.size
+
+
+def _layout_cards(popups: list[dict], width: int, height: int, work_dir: Path) -> list[dict]:
+    """Where and when each card shows.
+    - Footage: upper-left / upper-right in turn (top-centre on a Reel),
+      never two on the same spot at once.
+    - A list ("stack"): one card per item, each under the one before,
+      all leaving together.
+    - A studio scene: beside the presenter (left or right of him — he looks
+      that way).
+    - Reels: every card is sized to fit inside the narrow screen."""
+    import hashlib
+    accent = _ACCENTS[int(hashlib.md5(str(work_dir).encode()).hexdigest(), 16) % len(_ACCENTS)]
+    vertical = height > width
+    ref_h = int(width * 0.85) if vertical else height  # a Reel: big enough to read on a phone, still inside the width
+    margin_x = int(width * (0.06 if vertical else 0.045))
+    top = int(height * (0.14 if vertical else 0.075))
+    max_w = width - 2 * margin_x
+    busy: dict[str, float] = {"left": -1.0, "right": -1.0, "top": -1.0, "top2": -1.0}
+    side_turn = 0
+    stacks: dict[str, dict] = {}
+    out = []
+    for i, p in enumerate(popups):
+        text = " ".join(str(p.get("text") or "").split())
+        if not text:
+            continue
+        label = str(p.get("label") or "")
+        png = work_dir / f"popup-card-{i:03d}.png"
+        start, end = float(p["start"]), float(p["end"])
+        if p.get("kind") == "stack":
+            st = stacks.get(p["group"])
+            if st is None:
+                side = p.get("side") or ("left" if not vertical else "top")
+                st = stacks[p["group"]] = {"y": top, "side": side}
+            cw, ch = _draw_card(text, "", accent, ref_h, png, max_w=int(max_w * (0.48 if p.get("studio") and not vertical else 1)),
+                                scale=0.82)
+            if p.get("studio") and not vertical:
+                x = int(width * 0.6) if st["side"] == "right" else int(width * 0.4) - cw
+            elif vertical:
+                x = (width - cw) // 2
+            else:
+                x = margin_x - int(ref_h * 0.018)
+            out.append({"png": png, "x": max(0, min(x, width - cw)), "y": st["y"], "start": round(start, 2), "end": round(end, 2),
+                        "side": "left" if st["side"] in ("left", "top") else "right"})
+            st["y"] += int(ch * 0.86)
+            continue
+        if p.get("studio"):
+            # beside the presenter, at chest height; he looks this way
+            side = p.get("side") or "right"
+            half = int(width * (0.44 if vertical else 0.36))
+            cw, ch = _draw_card(text, label, accent, ref_h, png, max_w=half)
+            x = int(width * 0.56) if side == "right" else int(width * 0.44) - cw
+            y = int(height * (0.3 if vertical else 0.34))
+            out.append({"png": png, "x": max(0, min(x, width - cw)), "y": y, "start": round(start, 2),
+                        "end": round(end, 2), "side": side})
+            continue
+        cw, ch = _draw_card(text, label, accent, ref_h, png, max_w=max_w)
+        slots = ["top", "top2"] if vertical else (["left", "right"] if side_turn % 2 == 0 else ["right", "left"])
+        slot = next((s_ for s_ in slots if busy[s_] + 0.25 <= start), None)
+        if slot is None:  # both busy: wait for the first one to clear (still while the word is fresh)
+            slot = min(slots, key=lambda s_: busy[s_])
+            shift = busy[slot] + 0.25 - start
+            if shift > 1.0:
+                continue
+            start, end = start + shift, end + shift
+        busy[slot] = end
+        side_turn += 1
+        if vertical:
+            x = (width - cw) // 2
+            y = top + (0 if slot == "top" else int(ch * 1.05))
+        else:
+            x = margin_x - int(ref_h * 0.018) if slot == "left" else width - margin_x - cw + int(ref_h * 0.018)
+            y = top
+        out.append({"png": png, "x": max(0, min(x, width - cw)), "y": max(0, y), "start": round(start, 2), "end": round(end, 2),
+                    "side": "left" if slot in ("left", "top") else "right"})
+    return out
 
 
 _WHISPER_MODEL = None
@@ -1004,6 +1242,12 @@ def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Pat
     None on ANY failure: a subtitle failure must never break a
     scene — the segment is then built with its static caption
     instead."""
+    srt_cached = work_dir / f"scene-{index:02d}.srt"
+    try:
+        if srt_cached.exists() and srt_cached.stat().st_mtime >= voice_path.stat().st_mtime:
+            return srt_cached  # already transcribed (rich-footage timing used it)
+    except OSError:
+        pass
     try:
         model = _get_whisper_model()
         # Decode with FFmpeg to a numpy array (video.decode_audio_16k)
@@ -1216,19 +1460,34 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
             "[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p"
         )
     else:
-        base_vf = (
-            "scale=1280:720:force_original_aspect_ratio=decrease,"
-            "pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p"
-        )
+        # (user, 2026-11-18: stock scenes looked wrong) A clip close to
+        # 16:9 FILLS the frame (no black bars); a tall / square / very
+        # wide clip is shown whole over a soft blurred copy of itself.
+        ar = _clip_aspect(clip_path)
+        if 1.45 <= ar <= 2.1:
+            base_vf = ("scale=1280:720:force_original_aspect_ratio=increase,"
+                       "crop=1280:720,setsar=1,format=yuv420p")
+        else:
+            base_vf = (
+                "split[a][b];"
+                "[a]scale=1280:720:force_original_aspect_ratio=increase,"
+                "crop=1280:720,gblur=sigma=26,eq=brightness=-0.22:saturation=0.85[bg];"
+                "[b]scale=1280:720:force_original_aspect_ratio=decrease[fg];"
+                "[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p"
+            )
     clip_dur = autovideo._ffprobe_duration(clip_path) or duration
     loop_args: list[str] = []
+    seek_args: list[str] = []
     if clip_dur < duration:
         loop_args = ["-stream_loop", str(math.ceil(duration / clip_dur))]
+    elif clip_dur > duration + 2.5:
+        # skip the clip's own first second (fades from black, logos)
+        seek_args = ["-ss", f"{min(1.5, (clip_dur - duration) / 2):.2f}"]
 
     def _encode(vf: str) -> bool:
-        cmd = ["ffmpeg", "-y"] + loop_args + ["-i", str(clip_path),
-               "-vf", vf, "-r", "30", "-t", str(duration), "-an",
-               "-c:v", "libx264", "-preset", "veryfast",
+        cmd = ["ffmpeg", "-y", "-fflags", "+genpts"] + loop_args + seek_args + ["-i", str(clip_path),
+               "-map", "0:v:0", "-vf", vf, "-r", "30", "-t", str(duration), "-an", "-sn", "-dn",
+               "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
                "-pix_fmt", "yuv420p", str(dest)]
         run_kwargs = dict(video_module.no_window_kwargs())
         if subtitles_srt is not None:
@@ -1283,6 +1542,26 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
     if caption_file is not None:
         caption_file.unlink(missing_ok=True)
     return _encode(f"{base_vf}{fade_sfx}")
+
+
+def _clip_aspect(path: Path) -> float:
+    """Width / height of a clip as it is SHOWN (phone videos carry a
+    rotation flag: a 1920x1080 file can really be portrait)."""
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                            "stream=width,height:stream_side_data=rotation:stream_tags=rotate",
+                            "-of", "json", str(path)], capture_output=True, text=True,
+                           **video_module.no_window_kwargs())
+        st = json.loads(r.stdout or "{}").get("streams", [{}])[0]
+        w, h = float(st.get("width") or 16), float(st.get("height") or 9)
+        rot = str((st.get("tags") or {}).get("rotate") or "")
+        for sd in st.get("side_data_list") or []:
+            rot = str(sd.get("rotation", rot))
+        if rot.strip("-") in ("90", "270"):
+            w, h = h, w
+        return w / max(1.0, h)
+    except Exception:  # noqa: BLE001
+        return 16 / 9
 
 
 def _build_scene(index: int, scene: dict, title: str, visuals: str,
@@ -1505,12 +1784,16 @@ def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
     video_only = work_dir / "master-video-only.mp4"
     joined_ok = False
     join_method = "copy"
-    if transitions and len(segments) > 1:
+    import autovideo_smart
+    for names in ((autovideo_smart.SCENE_TRANSITIONS, autovideo_smart.SAFE_TRANSITIONS, _TRANSITION_TYPES)
+                  if transitions and len(segments) > 1 else ()):
+        if joined_ok:
+            break
         chain: list[str] = []
         prev = "[0:v]"
         offset = 0.0
         for k in range(len(segments) - 1):
-            ttype = _TRANSITION_TYPES[k % len(_TRANSITION_TYPES)]
+            ttype = names[k % len(names)]
             offset += voice_durs[k]
             out = f"[x{k}]" if k < len(segments) - 2 else "[vout]"
             chain.append(
@@ -1684,7 +1967,8 @@ def rebuild_scene_segment(work_dir: Path, index: int, scene: dict,
 # so the join/mux code has a single home.
 def _voice_scene_with_fallback(index: int, narration: str, voice: str,
                                work_dir: Path, tts_provider: str = "edge",
-                               tts_key: str | None = None
+                               tts_key: str | None = None, first_scene: bool = False,
+                               last_scene: bool = False
                                ) -> tuple[Path | None, str, float, bool, str]:
     """Voice ONE scene with the chosen provider; if that provider
     fails (bad key, free limit finished, network), fall back to
@@ -1695,7 +1979,8 @@ def _voice_scene_with_fallback(index: int, narration: str, voice: str,
     not the one used."""
     try:
         path, engine, duration = synthesize_scene_voice(
-            index, narration, voice, work_dir, tts_provider, tts_key)
+            index, narration, voice, work_dir, tts_provider, tts_key,
+            first_scene=first_scene, last_scene=last_scene)
         return path, engine, duration, False, ""
     except Exception as exc:  # noqa: BLE001
         if not tts_provider or tts_provider == "edge":
@@ -1707,19 +1992,39 @@ def _voice_scene_with_fallback(index: int, narration: str, voice: str,
 
 def synthesize_scene_voice(index: int, narration: str, voice: str,
                            work_dir: Path, tts_provider: str = "edge",
-                           tts_key: str | None = None
+                           tts_key: str | None = None, first_scene: bool = False,
+                           last_scene: bool = False
                            ) -> tuple[Path | None, str, float]:
     """TTS for ONE scene (plain voice — SSML is banned: it slowed
     speech 3x). Returns (voice_path, engine, duration_sec); the
     path is None when the voice could not be measured. The provider
     (edge/google/unreal/elevenlabs) is the one the user picked in
     Step 1; the key is theirs, passed through, never stored here."""
-    if tts_provider and tts_provider != "edge":
+    # STUDIO PRESENTER (user, 2026-11-18: "the voice is flat"): every
+    # sentence spoken with a presenter's emotion, for every voice type —
+    # Edge, your own key's provider, or a cloned voice ("clone:<id>").
+    voice_path = None
+    try:
+        import tools_presenter
+        voice_path, engine = tools_presenter.presenter_voice(
+            index, narration, voice, work_dir, tts_provider, tts_key,
+            first_scene=first_scene, last_scene=last_scene)
+    except Exception as exc:  # noqa: BLE001 — the plain voice below, never a stuck video
+        voice_path = None
+        presenter_error = str(exc)[:120]
+    else:
+        presenter_error = ""
+    if voice_path is None and voice.startswith("clone:"):
+        voice, tts_provider = "en-US-AriaNeural", "edge"
+    if voice_path is None and tts_provider and tts_provider != "edge":
         voice_path, engine = tts_module.synthesize_provider(
             narration, tts_provider, voice, tts_key, "+0%", work_dir)
-    else:
+    elif voice_path is None:
         voice_path, engine = tts_module.synthesize(
             narration, voice, "+0%", work_dir, expressive=False)
+    if presenter_error:
+        # never silent (user, 2026-11-18): the Audio step shows the voice was flat, and why
+        engine = f"{engine} — flat voice, studio presenter failed: {presenter_error}"
     duration = video_module.get_duration(voice_path) or 0
     if not duration or duration <= 0:
         return None, engine, 0.0
@@ -1787,12 +2092,16 @@ def join_and_mux(work_dir: Path, segments: list[Path],
     video_only = work_dir / "master-video-only.mp4"
     joined_ok = False
     join_method = "copy"
-    if transitions and len(segments) > 1:
+    import autovideo_smart
+    for names in ((autovideo_smart.SCENE_TRANSITIONS, autovideo_smart.SAFE_TRANSITIONS, _TRANSITION_TYPES)
+                  if transitions and len(segments) > 1 else ()):
+        if joined_ok:
+            break
         chain: list[str] = []
         prev = "[0:v]"
         offset = 0.0
         for k in range(len(segments) - 1):
-            ttype = _TRANSITION_TYPES[k % len(_TRANSITION_TYPES)]
+            ttype = names[k % len(names)]
             offset += durations[k]
             out = f"[x{k}]" if k < len(segments) - 2 else "[vout]"
             chain.append(
@@ -1944,6 +2253,46 @@ def join_and_mux(work_dir: Path, segments: list[Path],
     return final_path, round(final_duration, 1), join_method
 
 
+def _av_app():
+    import sys
+    for mod in list(sys.modules.values()):
+        if mod is not None and hasattr(mod, "_av_read") and hasattr(mod, "_av_write"):
+            return mod
+    return None
+
+
+def _job_scenes_live(work_dir: Path, scenes: list[dict]) -> None:
+    """Put the real scenes into the job while the footage is still being collected."""
+    app = _av_app()
+    if app is None:
+        return
+    try:
+        job = app._av_read(work_dir.name)
+        if job.get("status") in (None, "unknown"):
+            return
+        job["scenes"] = [{**s_, "index": i, "kind": "", "visual_file": "", "visual_source": "", "duration_sec": 0}
+                         for i, s_ in enumerate(scenes)]
+        app._av_write(job)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _job_scene_done(work_dir: Path, result: dict) -> None:
+    """One scene's footage is ready: show it on the page now."""
+    app = _av_app()
+    if app is None:
+        return
+    try:
+        job = app._av_read(work_dir.name)
+        sc = job.get("scenes") or []
+        i = int(result["index"])
+        if 0 <= i < len(sc):
+            sc[i] = {**sc[i], **{k: result[k] for k in ("kind", "visual_file", "visual_source", "visual_url") if k in result}}
+            app._av_write(job)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def plan_footage(title: str, minutes: int, script: str | None,
                  visuals: str, work_dir: Path,
                  pexels_key: str | None = None,
@@ -1979,7 +2328,15 @@ def plan_footage(title: str, minutes: int, script: str | None,
                                      is_short=is_short)
     if not scenes:
         raise RuntimeError("Could not build a scene script.")
+    if progress_cb:
+        progress_cb(0, len(scenes), "Reading every scene to plan its footage…")
+    import autovideo_smart
+    autovideo_smart.attach_scene_plans(title, scenes)
     script_text = "\n\n".join(s["narration"] for s in scenes)
+    # (user, 2026-11-18) while footage is collected, the page shows HIS real
+    # scenes (never example lines): they go into the job right away.
+    _job_scenes_live(work_dir, [{"narration": s_["narration"], "caption": _caption_text(s_), "visual": s_["visual"]}
+                                for s_ in scenes])
     used_urls: set = set()
     lock = threading.Lock()
     results: dict[int, dict] = {}
@@ -1989,6 +2346,11 @@ def plan_footage(title: str, minutes: int, script: str | None,
             title, scene, visuals, work_dir, index, used_urls, lock,
             pexels_key=pexels_key, pixabay_key=pixabay_key,
             vertical=is_short)
+        try:  # rich footage: a clip for each new thing the scene talks about
+            shots = autovideo_smart.collect_shots(title, scene, index, work_dir, visuals, pexels_key, pixabay_key,
+                                                  is_short, used_urls, lock) if kind == "clip" else []
+        except Exception:  # noqa: BLE001
+            shots = []
         return {
             "index": index,
             "narration": scene["narration"],
@@ -2003,7 +2365,10 @@ def plan_footage(title: str, minutes: int, script: str | None,
             # main words, one by one, as clickable search chips
             # in the footage browser — each word searched on its
             # own gives the most results.
-            "keywords": autovideo.core_words(scene["narration"])[:8],
+            "keywords": (list((scene.get("plan") or {}).get("queries") or [])
+                         + autovideo.core_words(scene["narration"]))[:8],
+            "plan": scene.get("plan") or {},
+            "shots": shots,
         }
 
     workers = max(2, min(4, os.cpu_count() or 4))
@@ -2015,6 +2380,7 @@ def plan_footage(title: str, minutes: int, script: str | None,
             result = future.result()
             results[result["index"]] = result
             done += 1
+            _job_scene_done(work_dir, result)
             if progress_cb:
                 progress_cb(done, len(scenes),
                             f"Collecting footage — scene {done} of {len(scenes)}…")
@@ -2067,7 +2433,7 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
         futures = {
             pool.submit(_voice_scene_with_fallback, i,
                         s["narration"], voice, work_dir,
-                        tts_provider, tts_key): i
+                        tts_provider, tts_key, i == 0, i == len(scenes) - 1): i
             for i, s in enumerate(scenes)
         }
         done = 0
@@ -2113,21 +2479,17 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     # each sub-step, and cap the whole phase at 150s so it can
     # never hang for 10 minutes again (a missing track is fine;
     # the video still renders).
-    fetch_deadline = time.time() + 150
+    # FAST (user, 2026-11-18: "fetching background music hangs"): music,
+    # music options and transition sounds are fetched at the same time with a
+    # 40 s limit; earlier tracks / sounds are reused from disk and the app's
+    # own music pack fills in at once.
     if progress_cb:
-        progress_cb(len(scenes), len(scenes), "Fetching background music…")
-    if music:
-        music_path, music_status = _fetch_mood_music(
-            mood, freesound_key, work_dir, deadline=fetch_deadline)
-        options, options_status = list_mood_music(
-            mood, freesound_key, deadline=fetch_deadline)
-    else:
-        music_path, music_status = None, "off"
-        options, options_status = [], "off"
-    if progress_cb:
-        progress_cb(len(scenes), len(scenes), "Fetching transition sounds…")
-    sfx_paths, sfx_status = _fetch_transition_sfx(
-        freesound_key, work_dir, deadline=fetch_deadline)
+        progress_cb(len(scenes), len(scenes), "Fetching background music and sounds…")
+    import autovideo_smart
+    music_path, music_status, options, options_status, sfx_paths, sfx_status = autovideo_smart.fast_music_and_sfx(
+        sys.modules[__name__], mood, freesound_key, work_dir, music, progress_cb, len(scenes))
+    if not music:
+        music_path, music_status, options, options_status = None, "off", [], "off"
     return {
         "durations": [round(d, 1) for d in durations],
         "voice_files": [p.name for p in voice_files],
@@ -2200,6 +2562,18 @@ def render_video(work_dir: Path, scenes: list[dict],
                 f"Scene {i + 1} footage missing: {scene['visual_file']}")
         voice_path = voice_files[i]
         caption = scene.get("caption") or _caption_text(scene)
+        if scene.get("shots") and scene.get("kind") == "clip" and not scene.get("studio"):
+            # rich footage: the extra shots cut in, with smooth effects, when their words are spoken
+            try:
+                import autovideo_smart
+                srt = _transcribe_scene_voice(voice_path, work_dir, i) if subtitles else None
+                last = i >= len(scenes) - 1
+                multi = autovideo_smart.compose_shots(work_dir, i, visual_path, scene,
+                                                      durations[i] + (0 if last else _TRANSITION_SEC), srt, voice_path, vertical)
+                if multi is not None:
+                    visual_path = multi
+            except Exception:  # noqa: BLE001 — the scene's one clip, as before
+                pass
         dest = encode_scene_segment(
             i, visual_path, scene["kind"], caption, durations[i],
             work_dir, voice_path, subtitles=subtitles,

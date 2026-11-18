@@ -1,0 +1,221 @@
+{
+  "id": "9b5ee96b5a91",
+  "status": "done",
+  "phase": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Budget Hack Banks Are Hiding",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NDE4MDE4NC4wNDY2NTY2LCJqb2JfcmVmIjoiOWI1ZWU5NmI1YTkxIiwibm9uY2UiOiJjZWQwYWM1NTYyNjlmZDczIn0=.55ca1cce031d046066ceb7c7e8ad49de891248ef4a00179ee13d3ebae93c15b9",
+  "scene_total": 6,
+  "script": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?\n\nBanks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.\n\nThe hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.\n\nTraditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.\n\nTo beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.\n\nThis simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps. Stop letting commercial banks profit off your hard work for free. Hit subscribe to PocketIQ and let us master your money together.",
+  "script_source": "custom-scenes",
+  "script_words": 185,
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?",
+      "visual": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?",
+      "caption": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even\u2026",
+      "kind": "clip",
+      "visual_source": "accountant, financial report, office work, business finance, budget planning, tax documents, number analysis, paperwork, working desk, accounting profession, business data, spreadsheet review, finance expert, desk work, financial audit, tax season, bookkeeping, economic analysis, professional focus, budget review, laptop work, money management, corporate finance, report checking, financial control",
+      "visual_file": "scene-00.mp4",
+      "visual_url": "",
+      "duration_sec": 9.0,
+      "keywords": [
+        "checking",
+        "account",
+        "balance",
+        "crazy"
+      ]
+    },
+    {
+      "index": 1,
+      "narration": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.",
+      "visual": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.",
+      "caption": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they\u2026",
+      "kind": "clip",
+      "visual_source": "pay, money, dollar, hands, currency, bank note, finance, business, paper money, cash and cash equivalents, bank, seem, award, pension, loose change, flowers, counterfeit money",
+      "visual_file": "scene-01.mp4",
+      "visual_url": "",
+      "duration_sec": 8.7,
+      "keywords": [
+        "banks",
+        "money",
+        "cash",
+        "flow"
+      ]
+    },
+    {
+      "index": 2,
+      "narration": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.",
+      "visual": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.",
+      "caption": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which\u2026",
+      "kind": "clip",
+      "visual_source": "glitch, monogram, data, code, retro, gringe, hack, hacking, hacker, programing, digital, network, technology, coding, computer, freevideo",
+      "visual_file": "scene-02.mp4",
+      "visual_url": "",
+      "duration_sec": 11.6,
+      "keywords": [
+        "hack",
+        "automated",
+        "sweep",
+        "fractional",
+        "yield",
+        "routing",
+        "money",
+        "moving"
+      ]
+    },
+    {
+      "index": 3,
+      "narration": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.",
+      "visual": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.",
+      "caption": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand\u2026",
+      "kind": "clip",
+      "visual_source": "piggy, bank, dollars, flying, money, finance, business, banking, currency, piggy bank, pig, savings, cash, financial, investment, wealth, save, coin, deposit, economy, piggybank, invest, account, retirement, income, investing, rich, symbol, beautiful wallpaper, fund, loan, safe, dollar, golden, gold, rotating, moving, bill, design, 3d, background, loop, seamless, banknote",
+      "visual_file": "scene-03.mp4",
+      "visual_url": "",
+      "duration_sec": 9.6,
+      "keywords": [
+        "banks",
+        "hard",
+        "high",
+        "interest",
+        "rates",
+        "microscopic",
+        "fraction",
+        "percent"
+      ]
+    },
+    {
+      "index": 4,
+      "narration": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.",
+      "visual": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.",
+      "caption": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly\u2026",
+      "kind": "clip",
+      "visual_source": "dollar, money, currency, finance, wealth, cash, banknotes, business, bank",
+      "visual_file": "scene-04.mp4",
+      "visual_url": "",
+      "duration_sec": 11.0,
+      "keywords": [
+        "routing",
+        "dollar",
+        "high",
+        "yield",
+        "account",
+        "short",
+        "term",
+        "treasury"
+      ]
+    },
+    {
+      "index": 5,
+      "narration": "This simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps. Stop letting commercial banks profit off your hard work for free. Hit subscribe to PocketIQ and let us master your money together.",
+      "visual": "This simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps.",
+      "caption": "This simple automation forces your idle cash to work around the clock, generating passive returns that\u2026",
+      "kind": "clip",
+      "visual_source": "money, cash, dollars, business",
+      "visual_file": "scene-05.mp4",
+      "visual_url": "",
+      "duration_sec": 18.3,
+      "keywords": [
+        "automation",
+        "cash",
+        "banking",
+        "commercial",
+        "banks",
+        "hard",
+        "free",
+        "hit"
+      ]
+    }
+  ],
+  "voice_duration_sec": 68.1,
+  "voice_engine": "edge-tts",
+  "voice_files": [
+    "f68da72d29b4.mp3",
+    "eb32f2f2151d.mp3",
+    "ff56413bce61.mp3",
+    "f9f1f87e8932.mp3",
+    "d2d7a4428f7a.mp3",
+    "eb1fe5baf365.mp3"
+  ],
+  "mood": "suspense",
+  "music": "Thriller Intro",
+  "music_status": "ok",
+  "music_options": [
+    {
+      "id": 793480,
+      "name": "Dark Tension Atmosphere",
+      "duration_sec": 369.3,
+      "preview_url": "https://cdn.freesound.org/previews/793/793480_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 459163,
+      "name": "Thriller Intro",
+      "duration_sec": 80.0,
+      "preview_url": "https://cdn.freesound.org/previews/459/459163_3914271-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 743986,
+      "name": "Crime Scene Shadows",
+      "duration_sec": 66.8,
+      "preview_url": "https://cdn.freesound.org/previews/743/743986_16085323-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 447521,
+      "name": "tense synth build up",
+      "duration_sec": 31.2,
+      "preview_url": "https://cdn.freesound.org/previews/447/447521_4256189-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 583729,
+      "name": "Suspense_Bass.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583729_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 583732,
+      "name": "Suspense_Strings.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583732_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 415208,
+      "name": "Dark Suspense",
+      "duration_sec": 67.6,
+      "preview_url": "https://cdn.freesound.org/previews/415/415208_5926389-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 743967,
+      "name": "Sinister Secrets",
+      "duration_sec": 65.1,
+      "preview_url": "https://cdn.freesound.org/previews/743/743967_16024318-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
+  "music_options_status": "ok",
+  "music_volume": 1.0,
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "final_minutes": 1.1,
+  "download_url": "/api/autovideo/download/9b5ee96b5a91",
+  "final_duration_sec": 68.1,
+  "transitions": true,
+  "join": "xfade",
+  "images_used": 0,
+  "clips_used": 6,
+  "ai_images": 0,
+  "title_cards": 0,
+  "pipeline": "master-scenes-steps"
+}

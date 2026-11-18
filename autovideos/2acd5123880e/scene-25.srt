@@ -1,0 +1,19 @@
+1
+00:00:00,000 --> 00:00:01,820
+They define risk solely as
+
+2
+00:00:01,820 --> 00:00:03,160
+the volatility of your nominal
+
+3
+00:00:03,160 --> 00:00:05,100
+balance, meaning the fear that
+
+4
+00:00:05,100 --> 00:00:06,540
+your digital number might drop
+
+5
+00:00:06,540 --> 00:00:07,020
+temporarily.

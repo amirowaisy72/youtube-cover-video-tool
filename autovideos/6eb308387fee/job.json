@@ -1,0 +1,52 @@
+{
+  "id": "6eb308387fee",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Untold Story of the First Moon Landing",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "download_url": "/api/autovideo/download/6eb308387fee",
+  "script": "Hook  \n\u201cHave you ever stared up at the night sky, feeling the thrum of a distant, silver whisper, and wondered what secrets the Moon holds?! If you\u2019ve ever dreamt of stepping into the unknown, then buckle up, because tonight we\u2019re unraveling the untold story of the first Moon landing, and it\u2019s far stranger\u2014and more incredible\u2014than you think.\u201d\n\nSection One: The Quiet Before the Storm  \nIn the dim glow of the 1960s, a country couched its ambitions in quiet secrecy. NASA\u2019s corridors were not humming with party lights but with white coats, blueprints, and the electric pulse of possibility. The pilots, the engineers\u2014each a silent oath to tilt humanity\u2019s gaze toward the dark. Did you know\u2014no, it wasn\u2019t a frantic scramble\u2014it was a meticulous ballet of minds and machinery, choreographed to the beat of a fraction of a second. Section Two: The Hidden Lives of the Crew  \nImagine Neil Armstrong not as the stoic hero we love, but a coffee\u2011hoarding, nervous teenage son of a small Ohio town. Buzz Aldrin grappling with the roar of rockets while secretly doodling victory boats in his cramped apartment. Michael Collins\u2014there in that tiny capsule, an unseen guardian, whispering \u201cCome on, Arnold\u201d to his rocky counterpart. Their laughter, their doubts, their moments of shared solitude. This isn\u2019t just a spike of triumph; it\u2019s a tapestry of ordinary souls turned extraordinary.\"\n\nSection Three: The Unexpected Lens  \nThe first view of the lunar landscape wasn\u2019t from an astronaut\u2019s helmet but from a ball\u2010pocket film camera strapped to a first\u2011manned space suit. A grainy picture that showed us craters and dust, but also the raw, unfiltered awe that spiralled like a comet across Earth\u2019s night. And suddenly\u2014boom! The world switched from 3:00 a.m. to a burst of cinematic history, a reel that would run for the next decade of science, art, and humanity. Conclusion  \nSo next time you look up, remember: the Moon\u2019s glow is a silent salute to the quiet genius, the whispered victories, and the hidden dreams that propelled us beyond the horizon.",
+  "script_source": "pollinations-scenes",
+  "script_words": 337,
+  "voice_duration_sec": 127.4,
+  "voice_engine": "edge-tts",
+  "final_minutes": 2.1,
+  "scenes": [
+    {
+      "narration": "Hook  \n\u201cHave you ever stared up at the night sky, feeling the thrum of a distant, silver whisper, and wondered what secrets the Moon holds?! If you\u2019ve ever dreamt of stepping into the unknown, then buckle up, because tonight we\u2019re unraveling the untold story of the first Moon landing, and it\u2019s far stranger\u2014and more incredible\u2014than you think.\u201d",
+      "visual": "Hook  \n\u201cHave you ever stared up at the night sky, feeling the thrum of a distant, silver whisper, and wondered what secrets the Moon holds?!",
+      "caption": "Hook  \n\u201cHave you ever stared up at the night sky, feeling the thrum of a distant, silver whisper, and\u2026",
+      "kind": "image",
+      "visual_source": "File:A New View of the Moon.jpg",
+      "duration_sec": 19.8
+    },
+    {
+      "narration": "Section One: The Quiet Before the Storm  \nIn the dim glow of the 1960s, a country couched its ambitions in quiet secrecy. NASA\u2019s corridors were not humming with party lights but with white coats, blueprints, and the electric pulse of possibility. The pilots, the engineers\u2014each a silent oath to tilt humanity\u2019s gaze toward the dark. Did you know\u2014no, it wasn\u2019t a frantic scramble\u2014it was a meticulous ballet of minds and machinery, choreographed to the beat of a fraction of a second. Section Two: The Hidden Lives of the Crew  \nImagine Neil Armstrong not as the stoic hero we love, but a coffee\u2011hoarding, nervous teenage son of a small Ohio town. Buzz Aldrin grappling with the roar of rockets while secretly doodling victory boats in his cramped apartment. Michael Collins\u2014there in that tiny capsule, an unseen guardian, whispering \u201cCome on, Arnold\u201d to his rocky counterpart. Their laughter, their doubts, their moments of shared solitude. This isn\u2019t just a spike of triumph; it\u2019s a tapestry of ordinary souls turned extraordinary.\"",
+      "visual": "Section One: The Quiet Before the Storm  \nIn the dim glow of the 1960s, a country couched its ambitions in quiet secrecy.",
+      "caption": "Section One: The Quiet Before the Storm  \nIn the dim glow of the 1960s, a country couched its ambitions in\u2026",
+      "kind": "image",
+      "visual_source": "File:Apollo 11 first photo on Moon after landing (48334532882).jpg",
+      "duration_sec": 66.5
+    },
+    {
+      "narration": "Section Three: The Unexpected Lens  \nThe first view of the lunar landscape wasn\u2019t from an astronaut\u2019s helmet but from a ball\u2010pocket film camera strapped to a first\u2011manned space suit. A grainy picture that showed us craters and dust, but also the raw, unfiltered awe that spiralled like a comet across Earth\u2019s night. And suddenly\u2014boom! The world switched from 3:00 a.m. to a burst of cinematic history, a reel that would run for the next decade of science, art, and humanity. Conclusion  \nSo next time you look up, remember: the Moon\u2019s glow is a silent salute to the quiet genius, the whispered victories, and the hidden dreams that propelled us beyond the horizon.",
+      "visual": "Section Three: The Unexpected Lens  \nThe first view of the lunar landscape wasn\u2019t from an astronaut\u2019s helmet but from a ball\u2010pocket film camera strapped to a first\u2011manned space suit.",
+      "caption": "Section Three: The Unexpected Lens  \nThe first view of the lunar landscape wasn\u2019t from an astronaut\u2019s helmet\u2026",
+      "kind": "ai",
+      "visual_source": "ai:Section Three: The Unexpected Lens  \nThe first view of the lunar landscape wasn\u2019",
+      "duration_sec": 41.2
+    }
+  ],
+  "distinct_commons_visuals": 2,
+  "images_found": 3,
+  "clips_found": 0,
+  "images_used": 3,
+  "clips_used": 0,
+  "ai_images": 1,
+  "title_cards": 0,
+  "visual_warning": "",
+  "pipeline": "master-scenes"
+}

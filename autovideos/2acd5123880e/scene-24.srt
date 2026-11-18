@@ -1,0 +1,39 @@
+1
+00:00:00,000 --> 00:00:02,040
+In financial literature, they
+
+2
+00:00:02,040 --> 00:00:03,500
+are classified as risk -free
+
+3
+00:00:03,500 --> 00:00:05,080
+assets because there is virtually
+
+4
+00:00:05,080 --> 00:00:06,480
+zero chance that the bank
+
+5
+00:00:06,480 --> 00:00:07,960
+will default on returning your
+
+6
+00:00:07,960 --> 00:00:09,340
+nominal principal balance.
+
+7
+00:00:10,380 --> 00:00:12,180
+But financial advisors and banking
+
+8
+00:00:12,180 --> 00:00:14,140
+institutions love to play semantic
+
+9
+00:00:14,140 --> 00:00:15,700
+games with the definition of
+
+10
+00:00:15,700 --> 00:00:16,020
+risk.

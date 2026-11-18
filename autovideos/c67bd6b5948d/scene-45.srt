@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:01,440
+Let us look at the
+
+2
+00:00:01,440 --> 00:00:02,760
+actual math of what happens
+
+3
+00:00:02,760 --> 00:00:04,300
+if you take that initial
+
+4
+00:00:04,300 --> 00:00:06,200
+hundred dollar start and feed
+
+5
+00:00:06,200 --> 00:00:07,940
+it consistently month after month
+
+6
+00:00:07,940 --> 00:00:09,380
+for the next 30 years.

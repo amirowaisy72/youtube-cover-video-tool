@@ -1,0 +1,100 @@
+{
+  "id": "0c6de872eb0b",
+  "status": "done",
+  "progress": 100,
+  "message": "Your video is ready!",
+  "title": "Teddy and Peddy's Secret Midnight Snack!",
+  "minutes": 10.0,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd",
+    "auto-cat",
+    "auto-mom"
+  ],
+  "review": false,
+  "subtitles": true,
+  "idea": "",
+  "gemini_key": "",
+  "custom_script": "# Scene: bedroom (sitting)\nTeddy: {wake} {sniff} Peddy, wake up, I smell a secret midnight *cookie* jar! {idea} [excited, point, shout, ding]\nPeddy: {rub-eyes} {laugh} Let us sneak into the kitchen right now! {jump} [happy, wave, excited]\n# Time skip: Creeping down the hall...\n# Scene: kitchen\nTeddy: {open:fridge} Look, the hidden jar of sweet *cookies* is right on the top shelf! {gasp} [surprised, point, shout, gasp]\nPeddy: {stretch} Help me reach it before anyone hears us! {sweat} [surprised, think, shout]\n# Time skip: A minute of tiptoeing later...\n# Scene: kitchen\nTeddy: {carry:jar} Got it! Now let us open it very quietly. {hmm} [suspicious, think, calm, sip]\nPeddy: {open:jar} {show:cookie} Hand one over before they wake up! {whisper} [excited, point, excited]\n# Time skip: Suddenly dropping a crumb...\n# Scene: kitchen\nTeddy: {drop:cookie} {oops} Oh no, a crumb fell right on the floor! {gasp} [surprised, facepalm, shout, crash]\nPeddy: {look-around} Wait, why are those little paws moving near the stove? {shock} [surprised, look-around, shout]\n# Time skip: Right behind the counter...\n# Scene: kitchen\nCat: {meow} {show:fish} Someone woke me up for a midnight snack too! {laugh} [happy, wave, excited]\nTeddy: {scared} A *cat* in the kitchen, hide the jar fast! {hide} [surprised, scared, shout, scream]\n# Time skip: Scrambling away...\n# Scene: living room\nPeddy: {run} Run, it is chasing us across the living room carpet! {sweat} [surprised, run, shout, footsteps]\nTeddy: {throw:pillow} Take this shield to block its path! {push} [surprised, point, shout]\n# Time skip: Into the hallway...\n# Scene: neighbourhood\nPeddy: {run} We ran right out the front door into the street! {gasp} [surprised, run, shout]\nTeddy: {look-around} Look, the whole *neighbourhood* is completely dark and quiet. {hmm} [suspicious, think, calm]\n# Time skip: Trying to hide...\n# Scene: park\nPeddy: {hide:bush} Let us hide behind these park bushes with our jar! {shrug} [suspicious, shrug, whisper]\nTeddy: {eat:cookie} {yay} At least we secured our secret midnight feast! {crunch} [happy, eat, excited, munch]\n# Time skip: Morning light...\n# Scene: kitchen\nMom: {angry} Who left the empty *cookie* jar out on the table?! {shamp} [angry, hips, shout, angry]\nTeddy: {gasp} {sweat} Uh oh, our secret mission is busted! {oops} [surprised, scared, shout, slap]\nPeddy: {laugh} {high-five} Worth every single crumb! {yay} [happy, high-five, excited, ding]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "acting": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-18T03:34:23",
+  "story_source": "custom",
+  "auto_chars": [
+    {
+      "id": "auto-cat",
+      "name": "Cat",
+      "auto": true,
+      "species": "cat",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-AriaNeural",
+        "label": "Female"
+      }
+    },
+    {
+      "id": "auto-mom",
+      "name": "Mom",
+      "auto": true,
+      "species": "",
+      "female": true,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-GB-SoniaNeural",
+        "label": "Female"
+      }
+    }
+  ],
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\sfx_cache\\music-832440.mp3",
+  "music_credit": "Music: \"SON OF PSYCHO\" from Freesound (check its license on freesound.org) · Drawings: OpenMoji (openmoji.org), CC BY-SA 4.0",
+  "sound_effects": [
+    "ambience",
+    "applause",
+    "boing",
+    "crash",
+    "creak",
+    "ding",
+    "eat",
+    "footsteps",
+    "gasp",
+    "pop",
+    "scream",
+    "sip",
+    "slap",
+    "sniff",
+    "thud",
+    "tick",
+    "tock",
+    "whoosh"
+  ],
+  "mix_file": "mix.m4a",
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 238,
+  "duration": 114.9,
+  "background_sources": [],
+  "finished_at": "2026-11-18T04:11:55",
+  "video_url": "/api/animator/jobs/0c6de872eb0b/video?v=1794957115"
+}

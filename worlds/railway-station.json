@@ -1,0 +1,3129 @@
+{
+ "season": "spring",
+ "fog": 0.0,
+ "models": {
+  "platform": {
+   "label": "railway platform",
+   "aliases": [
+    "platform",
+    "station platform"
+   ],
+   "floor": true,
+   "parts": [
+    {
+     "shape": "box",
+     "size": [
+      30,
+      0.55,
+      3.6
+     ],
+     "pos": [
+      0,
+      0.275,
+      0
+     ],
+     "color": "#cbbba0"
+    },
+    {
+     "shape": "box",
+     "size": [
+      30,
+      0.06,
+      0.3
+     ],
+     "pos": [
+      0,
+      0.56,
+      -1.65
+     ],
+     "color": "#facc15"
+    },
+    {
+     "shape": "box",
+     "size": [
+      30,
+      0.5,
+      0.12
+     ],
+     "pos": [
+      0,
+      0.25,
+      1.82
+     ],
+     "color": "#a8a29e"
+    }
+   ],
+   "abilities": [
+    "solid"
+   ]
+  },
+  "station_building": {
+   "label": "railway station building",
+   "aliases": [
+    "station",
+    "station building",
+    "station house",
+    "booking office",
+    "ticket office"
+   ],
+   "abilities": [
+    "solid",
+    "enterable",
+    "openable"
+   ],
+   "parts": [
+    {
+     "shape": "box",
+     "size": [
+      8.4,
+      0.3,
+      4.4
+     ],
+     "pos": [
+      0,
+      0.15,
+      0
+     ],
+     "color": "#9ca3af"
+    },
+    {
+     "shape": "box",
+     "size": [
+      8,
+      3.2,
+      4
+     ],
+     "pos": [
+      0,
+      1.6,
+      0
+     ],
+     "color": "#f3e3c3"
+    },
+    {
+     "shape": "box",
+     "size": [
+      8.8,
+      0.3,
+      5.4
+     ],
+     "pos": [
+      0,
+      3.35,
+      0.5
+     ],
+     "color": "#9a3412"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.1,
+     "height": 3.1,
+     "pos": [
+      -3.6,
+      1.55,
+      2.7
+     ],
+     "color": "#7c2d12"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.1,
+     "height": 3.1,
+     "pos": [
+      -1.2,
+      1.55,
+      2.7
+     ],
+     "color": "#7c2d12"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.1,
+     "height": 3.1,
+     "pos": [
+      1.2,
+      1.55,
+      2.7
+     ],
+     "color": "#7c2d12"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.1,
+     "height": 3.1,
+     "pos": [
+      3.6,
+      1.55,
+      2.7
+     ],
+     "color": "#7c2d12"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.1,
+      2.2,
+      0.08
+     ],
+     "pos": [
+      0,
+      1.1,
+      2.02
+     ],
+     "color": "#7c2d12",
+     "door": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.35,
+      1.15,
+      0.04
+     ],
+     "pos": [
+      -2.6,
+      1.9,
+      2.01
+     ],
+     "color": "#ffffff"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.2,
+      1,
+      0.05
+     ],
+     "pos": [
+      -2.6,
+      1.9,
+      2.04
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.35,
+      1.15,
+      0.04
+     ],
+     "pos": [
+      2.6,
+      1.9,
+      2.01
+     ],
+     "color": "#ffffff"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.2,
+      1,
+      0.05
+     ],
+     "pos": [
+      2.6,
+      1.9,
+      2.04
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "text",
+     "text": "TICKETS",
+     "size": [
+      1.3,
+      0.3
+     ],
+     "color": "#166534",
+     "textColor": "#ffffff",
+     "pos": [
+      -2.6,
+      2.7,
+      2.06
+     ]
+    },
+    {
+     "shape": "text",
+     "text": "RAILWAY STATION",
+     "size": [
+      5,
+      0.6
+     ],
+     "color": "#ffffff",
+     "textColor": "#166534",
+     "pos": [
+      0,
+      2.95,
+      2.07
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.6,
+      1.5,
+      1.2
+     ],
+     "pos": [
+      0,
+      4.2,
+      1
+     ],
+     "color": "#f3e3c3"
+    },
+    {
+     "shape": "cone",
+     "radius": 1.2,
+     "height": 0.9,
+     "pos": [
+      0,
+      5.4,
+      1
+     ],
+     "color": "#9a3412"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.5,
+     "height": 0.08,
+     "pos": [
+      0,
+      4.25,
+      1.62
+     ],
+     "color": "#ffffff",
+     "rot": [
+      90,
+      0,
+      0
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.05,
+      0.4,
+      0.03
+     ],
+     "pos": [
+      0,
+      4.4,
+      1.68
+     ],
+     "color": "#111827"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.3,
+      0.05,
+      0.03
+     ],
+     "pos": [
+      0.13,
+      4.25,
+      1.68
+     ],
+     "color": "#111827"
+    }
+   ]
+  },
+  "stall": {
+   "label": "tea stall (khokha)",
+   "aliases": [
+    "stall",
+    "khokha",
+    "tea stall",
+    "chai stall",
+    "shop",
+    "dukan",
+    "kiosk"
+   ],
+   "abilities": [
+    "solid"
+   ],
+   "parts": [
+    {
+     "shape": "box",
+     "size": [
+      2.6,
+      1,
+      1.2
+     ],
+     "pos": [
+      0,
+      0.5,
+      0.3
+     ],
+     "color": "#a16207"
+    },
+    {
+     "shape": "box",
+     "size": [
+      2.8,
+      0.08,
+      1.4
+     ],
+     "pos": [
+      0,
+      1.04,
+      0.3
+     ],
+     "color": "#d6a96b"
+    },
+    {
+     "shape": "box",
+     "size": [
+      2.6,
+      2.4,
+      0.1
+     ],
+     "pos": [
+      0,
+      1.2,
+      -0.3
+     ],
+     "color": "#92400e"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.05,
+     "height": 2.5,
+     "pos": [
+      -1.25,
+      1.25,
+      0.9
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.05,
+     "height": 2.5,
+     "pos": [
+      1.25,
+      1.25,
+      0.9
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      3,
+      0.1,
+      1.8
+     ],
+     "pos": [
+      0,
+      2.5,
+      0.3
+     ],
+     "color": "#dc2626",
+     "rot": [
+      -8,
+      0,
+      0
+     ]
+    },
+    {
+     "shape": "text",
+     "text": "CHAI",
+     "size": [
+      1.2,
+      0.4
+     ],
+     "color": "#fde047",
+     "textColor": "#7c2d12",
+     "pos": [
+      0,
+      2.2,
+      0.95
+     ]
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.15,
+     "height": 0.25,
+     "pos": [
+      -0.6,
+      1.2,
+      0.3
+     ],
+     "color": "#e5e7eb"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.12,
+     "height": 0.3,
+     "pos": [
+      0.5,
+      1.2,
+      0.3
+     ],
+     "color": "#9ca3af"
+    }
+   ]
+  },
+  "water_tank": {
+   "label": "water tank on legs",
+   "aliases": [
+    "water tank",
+    "tank",
+    "tanki",
+    "water tower"
+   ],
+   "abilities": [
+    "solid"
+   ],
+   "parts": [
+    {
+     "shape": "cylinder",
+     "radius": 0.09,
+     "height": 4,
+     "pos": [
+      0.9,
+      2,
+      0.9
+     ],
+     "color": "#4b5563"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.09,
+     "height": 4,
+     "pos": [
+      -0.9,
+      2,
+      0.9
+     ],
+     "color": "#4b5563"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.09,
+     "height": 4,
+     "pos": [
+      0.9,
+      2,
+      -0.9
+     ],
+     "color": "#4b5563"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.09,
+     "height": 4,
+     "pos": [
+      -0.9,
+      2,
+      -0.9
+     ],
+     "color": "#4b5563"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.9,
+      0.08,
+      0.08
+     ],
+     "pos": [
+      0,
+      2,
+      0.9
+     ],
+     "color": "#4b5563"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.9,
+      0.08,
+      0.08
+     ],
+     "pos": [
+      0,
+      2,
+      -0.9
+     ],
+     "color": "#4b5563"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 1.35,
+     "height": 1.8,
+     "pos": [
+      0,
+      4.9,
+      0
+     ],
+     "color": "#64748b"
+    },
+    {
+     "shape": "cone",
+     "radius": 1.5,
+     "height": 0.6,
+     "pos": [
+      0,
+      6.1,
+      0
+     ],
+     "color": "#334155"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.15,
+      0.15,
+      1.4
+     ],
+     "pos": [
+      1.3,
+      4.1,
+      0.5
+     ],
+     "color": "#334155",
+     "rot": [
+      0,
+      45,
+      0
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.06,
+      4,
+      0.06
+     ],
+     "pos": [
+      -0.25,
+      2,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.06,
+      4,
+      0.06
+     ],
+     "pos": [
+      0.25,
+      2,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.5,
+      0.05,
+      0.05
+     ],
+     "pos": [
+      0,
+      0.5,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.5,
+      0.05,
+      0.05
+     ],
+     "pos": [
+      0,
+      1.1,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.5,
+      0.05,
+      0.05
+     ],
+     "pos": [
+      0,
+      1.7,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.5,
+      0.05,
+      0.05
+     ],
+     "pos": [
+      0,
+      2.3,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.5,
+      0.05,
+      0.05
+     ],
+     "pos": [
+      0,
+      2.9,
+      1.2
+     ],
+     "color": "#78350f"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.5,
+      0.05,
+      0.05
+     ],
+     "pos": [
+      0,
+      3.5,
+      1.2
+     ],
+     "color": "#78350f"
+    }
+   ]
+  },
+  "clock": {
+   "label": "station clock on a pole",
+   "aliases": [
+    "clock",
+    "ghanta",
+    "ghari",
+    "watch tower"
+   ],
+   "parts": [
+    {
+     "shape": "cylinder",
+     "radius": 0.08,
+     "height": 3,
+     "pos": [
+      0,
+      1.5,
+      0
+     ],
+     "color": "#374151"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.12,
+     "pos": [
+      0,
+      3.2,
+      0
+     ],
+     "color": "#ffffff",
+     "rot": [
+      90,
+      0,
+      0
+     ]
+    },
+    {
+     "shape": "torus",
+     "radius": 0.45,
+     "tube": 0.05,
+     "pos": [
+      0,
+      3.2,
+      0
+     ],
+     "color": "#1f2937"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.05,
+      0.35,
+      0.03
+     ],
+     "pos": [
+      0,
+      3.33,
+      0.08
+     ],
+     "color": "#111827"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.28,
+      0.05,
+      0.03
+     ],
+     "pos": [
+      0.12,
+      3.2,
+      0.08
+     ],
+     "color": "#111827"
+    }
+   ],
+   "abilities": [
+    "solid"
+   ]
+  },
+  "rail_track": {
+   "label": "railway track",
+   "aliases": [
+    "track",
+    "rail",
+    "railway",
+    "line",
+    "patri"
+   ],
+   "parts": [
+    {
+     "shape": "box",
+     "size": [
+      2,
+      0.04,
+      3.2
+     ],
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "color": "#9ca3af"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.25,
+      0.1,
+      2.6
+     ],
+     "pos": [
+      -0.5,
+      0.07,
+      0
+     ],
+     "color": "#6b4f3a"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.25,
+      0.1,
+      2.6
+     ],
+     "pos": [
+      0.5,
+      0.07,
+      0
+     ],
+     "color": "#6b4f3a"
+    },
+    {
+     "shape": "box",
+     "size": [
+      2,
+      0.12,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.18,
+      -0.72
+     ],
+     "color": "#6b7280"
+    },
+    {
+     "shape": "box",
+     "size": [
+      2,
+      0.12,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.18,
+      0.72
+     ],
+     "color": "#6b7280"
+    }
+   ]
+  },
+  "train": {
+   "label": "steam train with coaches",
+   "aliases": [
+    "train",
+    "engine",
+    "locomotive",
+    "rail gari",
+    "railgari",
+    "coach"
+   ],
+   "abilities": [
+    "solid"
+   ],
+   "parts": [
+    {
+     "shape": "box",
+     "size": [
+      6,
+      1.6,
+      2.6
+     ],
+     "pos": [
+      0.5,
+      1.5,
+      0
+     ],
+     "color": "#166534"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 1,
+     "height": 4,
+     "pos": [
+      1.5,
+      2.2,
+      0
+     ],
+     "color": "#15803d",
+     "rot": [
+      0,
+      0,
+      90
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      2.2,
+      2.6,
+      2.8
+     ],
+     "pos": [
+      -1.9,
+      2.3,
+      0
+     ],
+     "color": "#14532d"
+    },
+    {
+     "shape": "box",
+     "size": [
+      2.6,
+      0.25,
+      3.1
+     ],
+     "pos": [
+      -1.9,
+      3.7,
+      0
+     ],
+     "color": "#7f1d1d"
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.9,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -1.9,
+      2.8,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.9,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -1.9,
+      2.8,
+      -1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 1.2,
+     "pos": [
+      2.9,
+      3.4,
+      0
+     ],
+     "color": "#1f2937",
+     "radiusTop": 0.45,
+     "smoke": true
+    },
+    {
+     "shape": "sphere",
+     "radius": 0.25,
+     "pos": [
+      3.6,
+      2.3,
+      0
+     ],
+     "color": "#fde68a",
+     "glow": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.3,
+      0.6,
+      2.8
+     ],
+     "pos": [
+      3.6,
+      0.8,
+      0
+     ],
+     "color": "#b91c1c"
+    },
+    {
+     "shape": "cone",
+     "radius": 0.6,
+     "height": 0.5,
+     "pos": [
+      3.7,
+      0.5,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      -90
+     ],
+     "color": "#374151"
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 0.2,
+     "pos": [
+      2.2,
+      0.55,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 0.2,
+     "pos": [
+      0.6,
+      0.55,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 0.2,
+     "pos": [
+      -1,
+      0.55,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 0.2,
+     "pos": [
+      2.2,
+      0.55,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 0.2,
+     "pos": [
+      0.6,
+      0.55,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 0.2,
+     "pos": [
+      -1,
+      0.55,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      11,
+      2.6,
+      2.8
+     ],
+     "pos": [
+      -9.3,
+      2,
+      0
+     ],
+     "color": "#b91c1c"
+    },
+    {
+     "shape": "box",
+     "size": [
+      11.4,
+      0.25,
+      3.1
+     ],
+     "pos": [
+      -9.3,
+      3.4,
+      0
+     ],
+     "color": "#7f1d1d"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -5.6,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -7.6,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -9.6,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -11.6,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.9,
+      1.9,
+      0.05
+     ],
+     "pos": [
+      -13.8,
+      1.7,
+      1.42
+     ],
+     "color": "#7f1d1d"
+    },
+    {
+     "shape": "text",
+     "text": "PAKISTAN RAILWAYS",
+     "size": [
+      5,
+      0.45
+     ],
+     "color": "#b91c1c",
+     "textColor": "#fde047",
+     "pos": [
+      -9.3,
+      1.25,
+      1.43
+     ]
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -5.5,
+      0.45,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -13,
+      0.45,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -5.5,
+      0.45,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -13,
+      0.45,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.6,
+      0.3,
+      0.3
+     ],
+     "pos": [
+      -3.6,
+      0.9,
+      0
+     ],
+     "color": "#374151"
+    },
+    {
+     "shape": "box",
+     "size": [
+      11,
+      2.6,
+      2.8
+     ],
+     "pos": [
+      -21,
+      2,
+      0
+     ],
+     "color": "#1d4ed8"
+    },
+    {
+     "shape": "box",
+     "size": [
+      11.4,
+      0.25,
+      3.1
+     ],
+     "pos": [
+      -21,
+      3.4,
+      0
+     ],
+     "color": "#1e3a8a"
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -17.3,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -19.3,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -21.3,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      1,
+      0.8,
+      0.05
+     ],
+     "pos": [
+      -23.3,
+      2.4,
+      1.42
+     ],
+     "color": "#bae6fd",
+     "glass": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -17.2,
+      0.45,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -24.7,
+      0.45,
+      1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -17.2,
+      0.45,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "cylinder",
+     "radius": 0.45,
+     "height": 0.2,
+     "pos": [
+      -24.7,
+      0.45,
+      -1.35
+     ],
+     "color": "#111827",
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "wheel": true
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.6,
+      0.3,
+      0.3
+     ],
+     "pos": [
+      -15.3,
+      0.9,
+      0
+     ],
+     "color": "#374151"
+    }
+   ]
+  }
+ },
+ "recipe": {
+  "name": "Pakistani Railway Station",
+  "place": "village",
+  "ground": "dirt",
+  "time": "day",
+  "season": "spring",
+  "weather": "clear",
+  "wind": 0.2,
+  "terrain": {
+   "hills": "few",
+   "mountains": false
+  },
+  "things": [
+   {
+    "what": "model:rail_track",
+    "row": true,
+    "z": -6
+   },
+   {
+    "what": "model:train",
+    "z": -6,
+    "moves": "arrive"
+   },
+   {
+    "what": "model:platform",
+    "z": -2,
+    "floor": true
+   },
+   {
+    "what": "model:station_building",
+    "where": "back",
+    "x": -3,
+    "z": -4
+   },
+   {
+    "what": "model:stall",
+    "where": "back",
+    "x": 2,
+    "z": -4
+   },
+   {
+    "what": "model:water_tank",
+    "where": "right",
+    "x": 6,
+    "z": -3
+   },
+   {
+    "what": "model:clock",
+    "where": "back",
+    "x": -3,
+    "z": -3
+   },
+   {
+    "what": "bench",
+    "count": 3,
+    "where": "behind"
+   },
+   {
+    "what": "crate",
+    "count": 4,
+    "where": "left"
+   },
+   {
+    "what": "basket",
+    "count": 2,
+    "where": "right"
+   },
+   {
+    "what": "big_tree",
+    "count": 4,
+    "where": "far"
+   },
+   {
+    "what": "bush",
+    "count": 10,
+    "where": "everywhere"
+   },
+   {
+    "what": "flowers",
+    "count": 12,
+    "where": "everywhere"
+   },
+   {
+    "what": "stones",
+    "count": 8,
+    "where": "everywhere"
+   }
+  ],
+  "animals": [
+   {
+    "species": "dog",
+    "count": 2,
+    "where": "stage",
+    "doing": "sleep"
+   },
+   {
+    "species": "chicken",
+    "count": 3,
+    "where": "stage",
+    "doing": "walk"
+   },
+   {
+    "species": "bird",
+    "count": 8,
+    "where": "far",
+    "doing": "fly"
+   }
+  ],
+  "people": [
+   {
+    "who": "porter",
+    "count": 1,
+    "where": "stage",
+    "doing": "walk",
+    "female": false
+   },
+   {
+    "who": "villager",
+    "count": 2,
+    "where": "behind",
+    "doing": "talk",
+    "female": false
+   },
+   {
+    "who": "station master",
+    "count": 1,
+    "where": "stage",
+    "doing": "wave",
+    "female": false
+   },
+   {
+    "who": "shopkeeper",
+    "count": 1,
+    "where": "back",
+    "doing": "work",
+    "female": false
+   },
+   {
+    "who": "child",
+    "count": 1,
+    "where": "stage",
+    "doing": "play",
+    "female": false
+   }
+  ],
+  "models": {
+   "platform": {
+    "label": "station platform",
+    "abilities": [
+     "solid"
+    ],
+    "floor": true,
+    "parts": [
+     {
+      "shape": "box",
+      "size": [
+       16,
+       0.4,
+       3
+      ],
+      "pos": [
+       0,
+       0.2,
+       0
+      ],
+      "color": "#d1d5db"
+     },
+     {
+      "shape": "box",
+      "size": [
+       16,
+       0.45,
+       0.3
+      ],
+      "pos": [
+       0,
+       0.22,
+       1.5
+      ],
+      "color": "#9ca3af"
+     }
+    ]
+   },
+   "station_building": {
+    "label": "old station building",
+    "abilities": [
+     "solid",
+     "enterable",
+     "openable"
+    ],
+    "parts": [
+     {
+      "shape": "box",
+      "size": [
+       4,
+       3,
+       3
+      ],
+      "pos": [
+       0,
+       1.5,
+       0
+      ],
+      "color": "#fef08a"
+     },
+     {
+      "shape": "box",
+      "size": [
+       4.4,
+       0.3,
+       3.4
+      ],
+      "pos": [
+       0,
+       3.15,
+       0
+      ],
+      "color": "#b45309"
+     },
+     {
+      "shape": "box",
+      "size": [
+       0.9,
+       2.1,
+       0.1
+      ],
+      "pos": [
+       0,
+       1.05,
+       1.5
+      ],
+      "color": "#78350f",
+      "door": true
+     },
+     {
+      "shape": "box",
+      "size": [
+       0.8,
+       0.8,
+       0.05
+      ],
+      "pos": [
+       1.2,
+       1.8,
+       1.5
+      ],
+      "color": "#bae6fd",
+      "glass": true
+     }
+    ]
+   },
+   "stall": {
+    "label": "tea khokha",
+    "abilities": [
+     "solid"
+    ],
+    "parts": [
+     {
+      "shape": "box",
+      "size": [
+       2.5,
+       2.2,
+       2
+      ],
+      "pos": [
+       0,
+       1.1,
+       0
+      ],
+      "color": "#78350f"
+     },
+     {
+      "shape": "box",
+      "size": [
+       2.8,
+       0.2,
+       2.3
+      ],
+      "pos": [
+       0,
+       2.3,
+       0
+      ],
+      "color": "#b45309"
+     },
+     {
+      "shape": "box",
+      "size": [
+       1.5,
+       1,
+       0.1
+      ],
+      "pos": [
+       0,
+       1.1,
+       1
+      ],
+      "color": "#fde047"
+     },
+     {
+      "shape": "cylinder",
+      "radius": 0.2,
+      "height": 0.6,
+      "pos": [
+       0.6,
+       1.8,
+       0.4
+      ],
+      "color": "#ef4444",
+      "smoke": true
+     }
+    ]
+   },
+   "water_tank": {
+    "label": "overhead water tank",
+    "abilities": [
+     "solid"
+    ],
+    "parts": [
+     {
+      "shape": "cylinder",
+      "radius": 1.2,
+      "height": 2.5,
+      "pos": [
+       0,
+       2.5,
+       0
+      ],
+      "color": "#0284c7"
+     },
+     {
+      "shape": "cylinder",
+      "radius": 0.15,
+      "height": 2.5,
+      "pos": [
+       0.9,
+       1.25,
+       0.9
+      ],
+      "color": "#374151"
+     },
+     {
+      "shape": "cylinder",
+      "radius": 0.15,
+      "height": 2.5,
+      "pos": [
+       -0.9,
+       1.25,
+       0.9
+      ],
+      "color": "#374151"
+     },
+     {
+      "shape": "cylinder",
+      "radius": 0.15,
+      "height": 2.5,
+      "pos": [
+       0.9,
+       1.25,
+       -0.9
+      ],
+      "color": "#374151"
+     },
+     {
+      "shape": "cylinder",
+      "radius": 0.15,
+      "height": 2.5,
+      "pos": [
+       -0.9,
+       1.25,
+       -0.9
+      ],
+      "color": "#374151"
+     }
+    ]
+   },
+   "clock": {
+    "label": "station clock",
+    "abilities": [
+     "solid"
+    ],
+    "parts": [
+     {
+      "shape": "cylinder",
+      "radius": 0.5,
+      "height": 0.2,
+      "pos": [
+       0,
+       3.5,
+       0
+      ],
+      "rot": [
+       90,
+       0,
+       0
+      ],
+      "color": "#1f2937"
+     },
+     {
+      "shape": "cylinder",
+      "radius": 0.45,
+      "height": 0.22,
+      "pos": [
+       0,
+       3.5,
+       0
+      ],
+      "rot": [
+       90,
+       0,
+       0
+      ],
+      "color": "#f9fafb"
+     },
+     {
+      "shape": "box",
+      "size": [
+       0.1,
+       0.3,
+       0.05
+      ],
+      "pos": [
+       0,
+       3.65,
+       0.12
+      ],
+      "color": "#111827"
+     }
+    ]
+   }
+  }
+ },
+ "version": 1,
+ "name": "Railway Station",
+ "kind": "village",
+ "ground": "dirt",
+ "time": "day",
+ "wind": 0.2,
+ "weather": "",
+ "grass": 0.0,
+ "objects": [
+  {
+   "id": "hill-500392-0",
+   "type": "hill",
+   "x": -15.02,
+   "z": -28.28,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 7.871217944426462,
+    "height": 3.0539030614309013
+   }
+  },
+  {
+   "id": "hill-500392-1",
+   "type": "hill",
+   "x": 19.75,
+   "z": -27.96,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 6.60667798970826,
+    "height": 4.125971727073193
+   }
+  },
+  {
+   "id": "hill-500392-2",
+   "type": "hill",
+   "x": -10.08,
+   "z": -20.34,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 8.438528783386573,
+    "height": 4.940683765569702
+   }
+  },
+  {
+   "id": "model-500392-3",
+   "type": "model",
+   "x": -46.0,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-4",
+   "type": "model",
+   "x": -43.45,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-5",
+   "type": "model",
+   "x": -40.9,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-6",
+   "type": "model",
+   "x": -38.36,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-7",
+   "type": "model",
+   "x": -35.81,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-8",
+   "type": "model",
+   "x": -33.26,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-9",
+   "type": "model",
+   "x": -30.71,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-10",
+   "type": "model",
+   "x": -28.16,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-11",
+   "type": "model",
+   "x": -25.62,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-12",
+   "type": "model",
+   "x": -23.07,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-13",
+   "type": "model",
+   "x": -20.52,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-14",
+   "type": "model",
+   "x": -17.97,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-15",
+   "type": "model",
+   "x": -15.42,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-16",
+   "type": "model",
+   "x": -12.88,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-17",
+   "type": "model",
+   "x": -10.33,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-18",
+   "type": "model",
+   "x": -7.78,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-19",
+   "type": "model",
+   "x": -5.23,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-20",
+   "type": "model",
+   "x": -2.68,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-21",
+   "type": "model",
+   "x": -0.14,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-22",
+   "type": "model",
+   "x": 2.41,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-23",
+   "type": "model",
+   "x": 4.96,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-24",
+   "type": "model",
+   "x": 7.51,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-25",
+   "type": "model",
+   "x": 10.06,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-26",
+   "type": "model",
+   "x": 12.6,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-27",
+   "type": "model",
+   "x": 15.15,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-28",
+   "type": "model",
+   "x": 17.7,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-29",
+   "type": "model",
+   "x": 20.25,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-30",
+   "type": "model",
+   "x": 22.8,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-31",
+   "type": "model",
+   "x": 25.34,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-32",
+   "type": "model",
+   "x": 27.89,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-33",
+   "type": "model",
+   "x": 30.44,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-34",
+   "type": "model",
+   "x": 32.99,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-35",
+   "type": "model",
+   "x": 35.54,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-36",
+   "type": "model",
+   "x": 38.08,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-37",
+   "type": "model",
+   "x": 40.63,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-38",
+   "type": "model",
+   "x": 43.18,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-39",
+   "type": "model",
+   "x": 45.73,
+   "z": -6.0,
+   "rot": 1.5707963267948966,
+   "scale": 1.0,
+   "traits": {},
+   "opts": {
+    "model": "rail_track"
+   }
+  },
+  {
+   "id": "model-500392-40",
+   "type": "model",
+   "x": 0.0,
+   "z": -6.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true
+   },
+   "opts": {
+    "model": "train",
+    "moves": "arrive",
+    "lift": 0.24
+   }
+  },
+  {
+   "id": "model-500392-41",
+   "type": "model",
+   "x": 4.13,
+   "z": -2.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true
+   },
+   "opts": {
+    "model": "platform"
+   }
+  },
+  {
+   "id": "model-500392-42",
+   "type": "model",
+   "x": -3.0,
+   "z": -11.7,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true,
+    "enterable": true,
+    "openable": true
+   },
+   "opts": {
+    "model": "station_building"
+   }
+  },
+  {
+   "id": "model-500392-43",
+   "type": "model",
+   "x": 2.0,
+   "z": -9.6,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true
+   },
+   "opts": {
+    "model": "stall"
+   }
+  },
+  {
+   "id": "model-500392-44",
+   "type": "model",
+   "x": 6.7,
+   "z": -3.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true
+   },
+   "opts": {
+    "model": "water_tank"
+   }
+  },
+  {
+   "id": "model-500392-45",
+   "type": "model",
+   "x": -3.0,
+   "z": -3.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "traits": {
+    "solid": true
+   },
+   "opts": {
+    "model": "clock"
+   }
+  },
+  {
+   "id": "bench-500392-46",
+   "type": "bench",
+   "x": -8.93,
+   "z": -14.44,
+   "rot": -0.020620410889387132,
+   "scale": 0.9753183506429195
+  },
+  {
+   "id": "bench-500392-47",
+   "type": "bench",
+   "x": -8.45,
+   "z": -8.92,
+   "rot": -0.2866248844191432,
+   "scale": 0.9085335778538137
+  },
+  {
+   "id": "bench-500392-48",
+   "type": "bench",
+   "x": 16.29,
+   "z": -8.95,
+   "rot": -0.2719070563092828,
+   "scale": 1.0655632878886536
+  },
+  {
+   "id": "crate-500392-49",
+   "type": "crate",
+   "x": -13.03,
+   "z": -11.43,
+   "rot": 0.22978105880320074,
+   "scale": 0.9113297644071281
+  },
+  {
+   "id": "crate-500392-50",
+   "type": "crate",
+   "x": -11.2,
+   "z": -12.55,
+   "rot": 0.24999626614153386,
+   "scale": 1.0310858618235215
+  },
+  {
+   "id": "crate-500392-51",
+   "type": "crate",
+   "x": -15.44,
+   "z": 0.63,
+   "rot": -0.387089884839952,
+   "scale": 0.8839375865180045
+  },
+  {
+   "id": "crate-500392-52",
+   "type": "crate",
+   "x": -11.3,
+   "z": 0.57,
+   "rot": 0.3416767992079258,
+   "scale": 1.073673523380421
+  },
+  {
+   "id": "basket-500392-53",
+   "type": "basket",
+   "x": 19.2,
+   "z": -1.82,
+   "rot": -0.2144144641235471,
+   "scale": 1.09178593729157
+  },
+  {
+   "id": "basket-500392-54",
+   "type": "basket",
+   "x": 7.48,
+   "z": 1.98,
+   "rot": 0.03842597920447588,
+   "scale": 0.8869330067187547
+  },
+  {
+   "id": "big_tree-500392-55",
+   "type": "big_tree",
+   "x": 16.96,
+   "z": -22.7,
+   "rot": 5.484155346639454,
+   "scale": 1.0150231580948457
+  },
+  {
+   "id": "big_tree-500392-56",
+   "type": "big_tree",
+   "x": -1.39,
+   "z": -18.08,
+   "rot": 5.289518137928098,
+   "scale": 0.9705540446797385
+  },
+  {
+   "id": "big_tree-500392-57",
+   "type": "big_tree",
+   "x": -15.73,
+   "z": -23.15,
+   "rot": 5.117702556308359,
+   "scale": 1.1082128171110526
+  },
+  {
+   "id": "big_tree-500392-58",
+   "type": "big_tree",
+   "x": -12.81,
+   "z": -27.71,
+   "rot": 1.7679079016670585,
+   "scale": 0.9931118469685316
+  },
+  {
+   "id": "bush-500392-59",
+   "type": "bush",
+   "x": -19.07,
+   "z": -27.23,
+   "rot": 4.74981306726113,
+   "scale": 0.9624500253470615
+  },
+  {
+   "id": "bush-500392-60",
+   "type": "bush",
+   "x": 2.96,
+   "z": -12.15,
+   "rot": 4.39005810348317,
+   "scale": 1.013404857343994
+  },
+  {
+   "id": "bush-500392-61",
+   "type": "bush",
+   "x": -23.38,
+   "z": -17.68,
+   "rot": 0.39875253941863775,
+   "scale": 1.1366144168423489
+  },
+  {
+   "id": "bush-500392-62",
+   "type": "bush",
+   "x": -16.9,
+   "z": -3.06,
+   "rot": 1.5841690795496106,
+   "scale": 0.9018977375002578
+  },
+  {
+   "id": "bush-500392-63",
+   "type": "bush",
+   "x": -21.66,
+   "z": -23.64,
+   "rot": 4.178172237239778,
+   "scale": 1.0725881995633244
+  },
+  {
+   "id": "bush-500392-64",
+   "type": "bush",
+   "x": -20.12,
+   "z": -0.7,
+   "rot": 1.687824232969433,
+   "scale": 1.1146793966647237
+  },
+  {
+   "id": "bush-500392-65",
+   "type": "bush",
+   "x": 26.99,
+   "z": -14.78,
+   "rot": 1.3544328482821584,
+   "scale": 0.999746120464988
+  },
+  {
+   "id": "bush-500392-66",
+   "type": "bush",
+   "x": 13.41,
+   "z": -29.63,
+   "rot": 1.774577911477536,
+   "scale": 0.8616137215401977
+  },
+  {
+   "id": "bush-500392-67",
+   "type": "bush",
+   "x": 23.67,
+   "z": -9.79,
+   "rot": 5.215865397825837,
+   "scale": 1.1185110194142909
+  },
+  {
+   "id": "bush-500392-68",
+   "type": "bush",
+   "x": 26.44,
+   "z": -27.47,
+   "rot": 5.48517328966409,
+   "scale": 0.9916532667353749
+  },
+  {
+   "id": "flowers-500392-69",
+   "type": "flowers",
+   "x": 14.47,
+   "z": -12.44,
+   "rot": 0.2833767538890243,
+   "scale": 0.8573211088543757
+  },
+  {
+   "id": "flowers-500392-70",
+   "type": "flowers",
+   "x": 7.25,
+   "z": -23.67,
+   "rot": 0.23148618061095477,
+   "scale": 0.9560219819424673
+  },
+  {
+   "id": "flowers-500392-71",
+   "type": "flowers",
+   "x": -12.97,
+   "z": -22.03,
+   "rot": -0.09764181319624186,
+   "scale": 0.8757664531469345
+  },
+  {
+   "id": "flowers-500392-72",
+   "type": "flowers",
+   "x": -19.75,
+   "z": -14.84,
+   "rot": 0.19804019760340452,
+   "scale": 0.9495426635025069
+  },
+  {
+   "id": "flowers-500392-73",
+   "type": "flowers",
+   "x": -18.11,
+   "z": -14.74,
+   "rot": 0.04532844983041287,
+   "scale": 0.8900195650290698
+  },
+  {
+   "id": "flowers-500392-74",
+   "type": "flowers",
+   "x": 25.8,
+   "z": 1.22,
+   "rot": 0.17738337684422734,
+   "scale": 0.9610394084593281
+  },
+  {
+   "id": "flowers-500392-75",
+   "type": "flowers",
+   "x": 10.9,
+   "z": -17.52,
+   "rot": -0.047614085488021374,
+   "scale": 1.0214845462469384
+  },
+  {
+   "id": "flowers-500392-76",
+   "type": "flowers",
+   "x": 18.57,
+   "z": -10.29,
+   "rot": -0.0004486111924052239,
+   "scale": 1.0505671514431014
+  },
+  {
+   "id": "flowers-500392-77",
+   "type": "flowers",
+   "x": 12.38,
+   "z": -25.09,
+   "rot": -0.020901467092335226,
+   "scale": 0.9485081707593054
+  },
+  {
+   "id": "flowers-500392-78",
+   "type": "flowers",
+   "x": -20.09,
+   "z": -21.08,
+   "rot": -0.1602247402071953,
+   "scale": 1.0990447127260268
+  },
+  {
+   "id": "flowers-500392-79",
+   "type": "flowers",
+   "x": 15.35,
+   "z": -25.25,
+   "rot": -0.13702736012637615,
+   "scale": 0.9180052262963727
+  },
+  {
+   "id": "flowers-500392-80",
+   "type": "flowers",
+   "x": -12.85,
+   "z": -15.41,
+   "rot": -0.12219167500734329,
+   "scale": 0.8500566886970773
+  },
+  {
+   "id": "stones-500392-81",
+   "type": "stones",
+   "x": 19.1,
+   "z": 1.1,
+   "rot": -0.2654988680034876,
+   "scale": 0.9887612101389095
+  },
+  {
+   "id": "stones-500392-82",
+   "type": "stones",
+   "x": 15.13,
+   "z": -2.75,
+   "rot": 0.09268879555165768,
+   "scale": 1.074923454085365
+  },
+  {
+   "id": "stones-500392-83",
+   "type": "stones",
+   "x": -12.54,
+   "z": 2.67,
+   "rot": 0.22945117987692357,
+   "scale": 0.9631409266963601
+  },
+  {
+   "id": "stones-500392-84",
+   "type": "stones",
+   "x": 6.14,
+   "z": -16.8,
+   "rot": 0.09309565331786872,
+   "scale": 1.0645095419837163
+  },
+  {
+   "id": "stones-500392-85",
+   "type": "stones",
+   "x": 10.52,
+   "z": -12.05,
+   "rot": 0.3531006906181574,
+   "scale": 0.9516876437235623
+  },
+  {
+   "id": "stones-500392-86",
+   "type": "stones",
+   "x": 25.47,
+   "z": -22.07,
+   "rot": 0.26453095059841875,
+   "scale": 1.0052161117084324
+  },
+  {
+   "id": "stones-500392-87",
+   "type": "stones",
+   "x": -23.5,
+   "z": -28.85,
+   "rot": 0.060148696042597295,
+   "scale": 1.0140604213578626
+  },
+  {
+   "id": "stones-500392-88",
+   "type": "stones",
+   "x": 24.63,
+   "z": -28.19,
+   "rot": -0.04257903527468443,
+   "scale": 1.1128420520573854
+  },
+  {
+   "id": "animal-500392-89",
+   "type": "animal",
+   "x": 4.59,
+   "z": -1.46,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "dog",
+    "doing": "sleep",
+    "radius": 1.7885028519667685,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-90",
+   "type": "animal",
+   "x": -5.5,
+   "z": -1.43,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "dog",
+    "doing": "sleep",
+    "radius": 2.9870753288269043,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-91",
+   "type": "animal",
+   "x": 2.26,
+   "z": -1.95,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 1.7873839670792222,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-92",
+   "type": "animal",
+   "x": -1.14,
+   "z": -2.53,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 2.184283598791808,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-93",
+   "type": "animal",
+   "x": -5.3,
+   "z": -1.93,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 2.588782405015081,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-94",
+   "type": "animal",
+   "x": 12.8,
+   "z": -23.78,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.9638231261633337,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-95",
+   "type": "animal",
+   "x": -16.44,
+   "z": -28.65,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.8745784014463425,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-96",
+   "type": "animal",
+   "x": 23.08,
+   "z": -26.55,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.959561225492507,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-97",
+   "type": "animal",
+   "x": -12.71,
+   "z": -24.8,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.545792704913765,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-98",
+   "type": "animal",
+   "x": 10.39,
+   "z": -26.55,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.5291742430999875,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-99",
+   "type": "animal",
+   "x": 1.9,
+   "z": -13.44,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.8123083948157728,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-100",
+   "type": "animal",
+   "x": -20.41,
+   "z": -13.74,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 3.020831555593759,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-500392-101",
+   "type": "animal",
+   "x": 19.48,
+   "z": -27.82,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.555923000909388,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "person-500392-102",
+   "type": "person",
+   "x": 0.84,
+   "z": -1.65,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "porter",
+    "doing": "walk",
+    "female": false,
+    "radius": 2.007124785333872
+   }
+  },
+  {
+   "id": "person-500392-103",
+   "type": "person",
+   "x": 3.86,
+   "z": -8.96,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "villager",
+    "doing": "talk",
+    "female": false,
+    "radius": 3.3055740473791957
+   }
+  },
+  {
+   "id": "person-500392-104",
+   "type": "person",
+   "x": 8.1,
+   "z": -8.53,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "villager",
+    "doing": "talk",
+    "female": false,
+    "radius": 3.6116434331052005
+   }
+  },
+  {
+   "id": "person-500392-105",
+   "type": "person",
+   "x": -1.29,
+   "z": -1.71,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "station master",
+    "doing": "wave",
+    "female": false,
+    "radius": 2.3515364793129265
+   }
+  },
+  {
+   "id": "person-500392-106",
+   "type": "person",
+   "x": -23.92,
+   "z": -29.88,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "shopkeeper",
+    "doing": "work",
+    "female": false,
+    "radius": 3.6831458443775773
+   }
+  },
+  {
+   "id": "person-500392-107",
+   "type": "person",
+   "x": -1.51,
+   "z": -1.87,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "child",
+    "doing": "walk",
+    "female": false,
+    "radius": 2.4664946128614247
+   }
+  }
+ ],
+ "stage": {
+  "x": 0.0,
+  "z": 0.0,
+  "rot": 0.0
+ },
+ "updated": "2026-11-17T04:25:28"
+}

@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:01,920
+Determine the exact amount of
+
+2
+00:00:01,920 --> 00:00:02,940
+cash you need for your
+
+3
+00:00:02,940 --> 00:00:04,620
+emergency buffer and short -term
+
+4
+00:00:04,620 --> 00:00:06,240
+expenses do within the next
+
+5
+00:00:06,240 --> 00:00:07,420
+six to 12 months.
+
+6
+00:00:07,920 --> 00:00:08,920
+And treat that number as
+
+7
+00:00:08,920 --> 00:00:09,960
+a ceiling rather than a
+
+8
+00:00:09,960 --> 00:00:10,220
+floor.

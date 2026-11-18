@@ -47,6 +47,9 @@ const tools = [
   { to: "/stock", n: "16", title: "Stock Video & B-Roll", desc: "Free stock footage for your YouTube videos — preview, then download.", img: toolStock, cta: "Find B-roll" },
   { to: "/channel", n: "17", title: "Channel Setup Wizard", desc: "Set up a new YouTube channel — SEO names, description, tags, banner and logo.", img: toolChannel, cta: "Set up a channel" },
   { to: "/channel-inspect", n: "18", title: "Channel Inspector", desc: "Audit an existing channel — see what is missing, get fixes, and apply them to the channel.", img: toolChannel, cta: "Inspect a channel" },
+  { to: "/animator", n: "21", title: "Story Animator", desc: "Type a title and minutes — get a finished cartoon video starring your own characters.", img: scene3, cta: "Make a cartoon" },
+  { to: "/characters", n: "20", title: "Character Studio", desc: "Design your own cartoon characters, name them and give each a voice — they star in your animated stories.", img: scene1, cta: "Design a character" },
+  { to: "/voice-clone", n: "19", title: "Voice Cloner", desc: "Give a 15–20 sec voice sample — clone it, name it, and voice any script in that voice.", img: scene2, cta: "Clone a voice" },
 ] as const;
 
 function Home() {
@@ -59,7 +62,7 @@ function Home() {
   return (
     <div>
       <section className="mb-12 text-center">
-        <span className="chip mb-5">✦ 18 tools · zero learning curve</span>
+        <span className="chip mb-5">✦ 21 tools · zero learning curve</span>
         <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-tight md:text-6xl">
           Make YouTube magic in <span className="text-gradient">a few clicks</span>
         </h1>
@@ -72,39 +75,39 @@ function Home() {
         </div>
       ) : (
         <>
-      {locked && (
-        <div className="glass mx-auto mb-8 max-w-2xl p-6 text-center">
-          <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
-          {installed ? (
-            <>
-              <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all 18 tools.</p>
-              <p className="mt-1 text-sm text-muted-foreground">Click <b>Activate</b> at the top right and enter your license key.</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 18 tools.</p>
-              <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
-            </>
+          {locked && (
+            <div className="glass mx-auto mb-8 max-w-2xl p-6 text-center">
+              <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
+              {installed ? (
+                <>
+                  <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all 18 tools.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Click <b>Activate</b> at the top right and enter your license key.</p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 18 tools.</p>
+                  <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
+                </>
+              )}
+            </div>
           )}
-        </div>
-      )}
-      <div className="grid gap-6 md:grid-cols-3">
-        {tools.map((t) => (
-          <Link key={t.to} to={t.to} className="glass group overflow-hidden transition hover:-translate-y-1 hover:shadow-[var(--shadow-glow)]">
-            <div className="relative aspect-video overflow-hidden">
-              <img src={t.img} alt="" width={1280} height={720} className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-              <span className="absolute left-4 top-4 font-display text-4xl font-bold text-gradient">{t.n}</span>
-              {locked && (<span className="absolute right-4 top-4 chip">🔒 Locked</span>)}
-            </div>
-            <div className="p-6">
-              <h2 className="text-2xl font-bold">{t.title}</h2>
-              <p className="mt-2 text-muted-foreground">{t.desc}</p>
-              <span className="btn btn-primary mt-6 w-full">{locked ? (installed ? "🔒 Locked — Activate license" : "🔒 Locked — Install Setup") : `${t.cta} →`}</span>
-            </div>
-          </Link>
-        ))}
-      </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {tools.map((t) => (
+              <Link key={t.to} to={t.to} className="glass group overflow-hidden transition hover:-translate-y-1 hover:shadow-[var(--shadow-glow)]">
+                <div className="relative aspect-video overflow-hidden">
+                  <img src={t.img} alt="" width={1280} height={720} className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                  <span className="absolute left-4 top-4 font-display text-4xl font-bold text-gradient">{t.n}</span>
+                  {locked && (<span className="absolute right-4 top-4 chip">🔒 Locked</span>)}
+                </div>
+                <div className="p-6">
+                  <h2 className="text-2xl font-bold">{t.title}</h2>
+                  <p className="mt-2 text-muted-foreground">{t.desc}</p>
+                  <span className="btn btn-primary mt-6 w-full">{locked ? (installed ? "🔒 Locked — Activate license" : "🔒 Locked — Install Setup") : `${t.cta} →`}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
         </>
       )}
     </div>

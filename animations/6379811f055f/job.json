@@ -1,0 +1,130 @@
+{
+  "id": "6379811f055f",
+  "status": "done",
+  "progress": 100,
+  "message": "Your video is ready!",
+  "title": "The Train That Wouldn’t Wait",
+  "minutes": 10.0,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd",
+    "auto-station-master",
+    "auto-shopkeeper",
+    "auto-dog",
+    "auto-train"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "# Scene: Railway Station\nPeddy: Hurry up, Teddy! The *train* is leaving in two minutes! {run} [surprised, wave, shout, horn]\nTeddy: {ohoo} Relax! My shoe lace was *untied*. {pace} [calm, shrug, giggle]\nPeddy: {gasp} Look at the *clock*! It's moving too fast! {point} [surprised, point, excited, ding]\nTeddy: {hmm} Impossible. Clocks don't have *legs*. {shake-head} [suspicious, think]\nPeddy: {look:clock} It literally just winked at us! {shock} [surprised, point, gasp]\n# Scene: Railway Station\nTeddy: {walk-to} Let's ask the *station master* over there. {point} [calm, point]\nPeddy: {wave} Excuse us! When does this *train* depart? {shout} [excited, wave, shout]\nStation Master: {angry} Right now! And you missed it by *ten* seconds! {point} [angry, point, shout, horn]\nTeddy: {ohoo} No way! We have our *tickets* right here! {show:basket} [surprised, shrug, ohoo]\nStation Master: {laugh} Tickets don't matter if the *train* is already flying! {point} [happy, idle, laugh]\nPeddy: {shock} Flying?! Since when do *trains* fly?! {gasp} [surprised, point, gasp]\n# Time skip: Five minutes later…\n# Scene: Railway Station\nTeddy: {sit:bench} Well, that's great. Now we're stuck at the *station*. {sigh} [sad, shrug, fail]\nPeddy: {pace} We cannot just sit here! We have a *journey* to finish! {angry} [angry, hips, shout]\nTeddy: {idea} {light-fire} Let's make *tea* using the station khokha! {clap} [excited, point, ding]\nShopkeeper: {angry} Hey! That's my private *stove*! {point} [angry, point, shout, slap]\nPeddy: {oops} Sorry, mister! We are just desperate *travelers*! {sweat} [surprised, shrug, oops]\n# Scene: Railway Station\nTeddy: {drink} Ah, this tea is actually quite *good*. {smile} [happy, idle, sip]\nPeddy: {angry} Stop drinking and help me push this *crate*! {push} [angry, point, shout]\nTeddy: {ha} Push it where? The *tracks* are empty! {shout} [surprised, shrug]\nPeddy: {look-around} Wait… where did the *train* go? {gasp} [surprised, look-around, gasp]\nShopkeeper: {laugh} It left for the *mountains* an hour ago! {point} [happy, idle, laugh]\n# Scene: Railway Station\nTeddy: {facepalm} An hour ago?! But you said *ten* seconds! {cry} [sad, shrug, fail, cry]\nStation Master: {wink} Time flies when you're having *fun* at the station! {laugh} [happy, wave, laugh]\nPeddy: {angry} This isn't fun, this is a *nightmare*! {shout} [angry, hips, shout]\nTeddy: {idea} Look, a stray *dog* is sleeping on the platform! {point} [surprised, point, ding]\nPeddy: {sniff} What does a sleeping *dog* have to do with our train? {hmm} [suspicious, think]\n# Scene: Railway Station\nTeddy: {wake} Maybe he knows the *shortcut* through the hills! {jump} [excited, point, boing]\nDog: {bark} Woof! Follow me, you *fools*! {run} [excited, idle, shout]\nPeddy: {gasp} Did that *dog* just speak English?! {shock} [surprised, point, gasp]\nTeddy: {run} Who cares! Run after the *dog*! {chase} [excited, point, shout, footsteps]\nPeddy: {huff} I'm too out of shape for this *adventure*! {sweat} [sad, shrug, phew]\n# Time skip: Ten minutes later…\n# Scene: Railway Station\nTeddy: {climb:water tank} I can see the whole *village* from up here! {point} [excited, point, wow]\nPeddy: {shout} Get down before you fall off that *tank*! {fear} [angry, point, shout]\nTeddy: {slip} Whoops! I'm slipping on the *metal*! {fall} [surprised, point, crash]\nPeddy: {catch} I got you! Grab my *hand*! {pull} [surprised, point, gasp]\nTeddy: {yay} Safe! Thanks for not letting me *crash*. {hug} [happy, wave, yay]\n# Scene: Railway Station\nShopkeeper: {give:mango} Here, take this *mango* and stop making noise. {smile} [happy, idle, sip]\nPeddy: {eat:mango} Mmm, surprisingly delicious! Free *food* is the best. {yum} [happy, idle, eat]\nTeddy: {look-around} Wait, listen… do you hear that *sound*? {hmm} [suspicious, think]\nPeddy: {gasp} It's the *train* coming back! {point} [surprised, point, gasp, horn]\nTeddy: {jump} Quick, grab our *bags*! {run} [excited, point, yay, boing]\n# Scene: Railway Station\nPeddy: {open:door} Open the coach *door*, it's stopping! {push} [excited, point, shout, door]\nTrain: {horn} Toot toot! All aboard the *express*! {shout} [excited, idle, horn]\nTeddy: {enter:hut} We made it! Inside the *train* at last! {yay} [happy, wave, yay]\nPeddy: {sit} Never running for a *train* ever again. {sigh} [calm, idle, phew]\nTeddy: {laugh} Until the next *episode*, anyway! {wink} [happy, wave, laugh]\n# Scene: Railway Station\nDog: {bark} Don't leave me behind, *guys*! {run} [excited, idle, shout]\nPeddy: {oops} Oh look, our favorite *dog* wants to come too! {point} [surprised, point, oops]\nTeddy: {pull} Quick, pull him inside the *window*! {help} [excited, point, slap]\nDog: {smile} Thanks, humans! This *train* is awesome! {yay} [happy, idle, yay]\nPeddy: {laugh} Best *railway station* trip ever! {cheer} [happy, wave, applause]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "acting": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-17T05:22:06",
+  "story_source": "custom",
+  "auto_chars": [
+    {
+      "id": "auto-station-master",
+      "name": "Station Master",
+      "auto": true,
+      "species": "",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-GB-RyanNeural",
+        "label": "Male"
+      }
+    },
+    {
+      "id": "auto-shopkeeper",
+      "name": "Shopkeeper",
+      "auto": true,
+      "species": "",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    },
+    {
+      "id": "auto-dog",
+      "name": "Dog",
+      "auto": true,
+      "species": "dog",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    },
+    {
+      "id": "auto-train",
+      "name": "Train",
+      "auto": true,
+      "species": "",
+      "female": false,
+      "config": {},
+      "voice": {
+        "type": "edge",
+        "id": "en-US-GuyNeural",
+        "label": "Male"
+      }
+    }
+  ],
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\animations\\6379811f055f\\music-made.wav",
+  "music_credit": "Drawings: OpenMoji (openmoji.org), CC BY-SA 4.0",
+  "sound_effects": [
+    "ambience",
+    "applause",
+    "boing",
+    "crash",
+    "creak",
+    "ding",
+    "door",
+    "eat",
+    "fail",
+    "footsteps",
+    "gasp",
+    "horn",
+    "laugh",
+    "magic",
+    "pop",
+    "rustle",
+    "sip",
+    "slap",
+    "sniff",
+    "tick",
+    "tock",
+    "whoosh"
+  ],
+  "mix_file": "mix.m4a",
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 457,
+  "duration": 215.7,
+  "background_sources": [],
+  "finished_at": "2026-11-17T06:58:47",
+  "video_url": "/api/animator/jobs/6379811f055f/video?v=1794880727"
+}

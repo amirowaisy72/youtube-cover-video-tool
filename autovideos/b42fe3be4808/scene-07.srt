@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:01,600
+It doesn't matter how elegant
+
+2
+00:00:01,600 --> 00:00:03,640
+your logic is, without accounting
+
+3
+00:00:03,640 --> 00:00:05,240
+for the hidden forces, your
+
+4
+00:00:05,240 --> 00:00:06,360
+code will bite back at
+
+5
+00:00:06,360 --> 00:00:06,740
+scale.
+
+6
+00:00:07,800 --> 00:00:09,220
+In the end, thinking globally,
+
+7
+00:00:09,680 --> 00:00:11,760
+testing across real distributed scenarios,
+
+8
+00:00:12,380 --> 00:00:14,440
+and embracing adaptive safeguards isn't
+
+9
+00:00:14,440 --> 00:00:15,900
+a luxury, it's a necessity.

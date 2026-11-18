@@ -1,0 +1,59 @@
+1
+00:00:00,000 --> 00:00:01,980
+Hey there, imagine you're building
+
+2
+00:00:01,980 --> 00:00:03,460
+a bridge that stretches across
+
+3
+00:00:03,460 --> 00:00:04,060
+a canyon.
+
+4
+00:00:05,040 --> 00:00:06,080
+You think a simple set
+
+5
+00:00:06,080 --> 00:00:07,440
+of instructions will hold it
+
+6
+00:00:07,440 --> 00:00:08,660
+up, but as the wind
+
+7
+00:00:08,660 --> 00:00:10,600
+blows, the structure learns a
+
+8
+00:00:10,600 --> 00:00:11,860
+secret language all of its
+
+9
+00:00:11,860 --> 00:00:12,220
+own.
+
+10
+00:00:13,080 --> 00:00:14,480
+That secret language is the
+
+11
+00:00:14,480 --> 00:00:16,120
+hidden logic of complex systems,
+
+12
+00:00:16,520 --> 00:00:17,780
+and trust me, it's why
+
+13
+00:00:17,780 --> 00:00:19,420
+simple code, no matter how
+
+14
+00:00:19,420 --> 00:00:20,880
+clean, fails when you try
+
+15
+00:00:20,880 --> 00:00:21,340
+to scale.

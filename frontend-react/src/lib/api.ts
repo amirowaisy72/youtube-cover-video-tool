@@ -445,6 +445,120 @@ export const ttsGenerate = (text: string, voice: string, rate: string) =>
     body: JSON.stringify({ text, voice, rate }),
   });
 
+// ---------------------------------------------------------- story animator
+export type AnimatorLine = { speaker: string; text: string; expression: string; pose: string; sfx?: string };
+export type AnimatorScene = {
+  place: string; sitting: boolean; location: string; background: string; characters: string[]; lines: AnimatorLine[];
+};
+export type AnimatorJob = {
+  id: string; status: string; progress?: number; message?: string; title: string;
+  format: "long" | "reel"; character_ids: string[]; video_url?: string; duration?: number;
+  music_credit?: string; sound_effects?: string[];
+};
+export type AnimatorSprite = {
+  key: string; character_id: string; pose: string; expression: string;
+  mouth: string | null; blink: boolean; facing: string; stance: string;
+  look?: string; flags?: Record<string, boolean>;
+};
+export type AnimatorStartPayload = {
+  title: string; minutes: number; format: "long" | "reel"; language: "en" | "ur";
+  character_ids: string[]; review: boolean; subtitles: boolean; custom_script: string; pixabay_key: string;
+  backgrounds: "drawn" | "pixabay"; music: string; sfx: boolean; freesound_key: string;
+  tts_keys: Record<string, string>;
+};
+const jsonPost = (body: unknown, method = "POST"): RequestInit => ({
+  method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+});
+export const animatorStart = (payload: AnimatorStartPayload) =>
+  api<{ job_id: string }>("/api/animator/start", jsonPost(payload));
+export const animatorOptions = () =>
+  api<{ music: { file: string; name: string; artist: string }[]; sfx: string[] }>("/api/animator/options");
+export const animatorJob = (id: string) => api<AnimatorJob>(`/api/animator/jobs/${id}`);
+export const animatorScript = (id: string) => api<{ scenes: AnimatorScene[] }>(`/api/animator/jobs/${id}/script`);
+export const animatorSaveScript = (id: string, scenes: AnimatorScene[]) =>
+  api<{ scenes: AnimatorScene[] }>(`/api/animator/jobs/${id}/script`, jsonPost({ scenes }, "PUT"));
+export const animatorContinue = (id: string, pixabayKey: string, freesoundKey = "", ttsKeys: Record<string, string> = {}) =>
+  api<{ ok: boolean }>(`/api/animator/jobs/${id}/continue`, jsonPost({ pixabay_key: pixabayKey, freesound_key: freesoundKey, tts_keys: ttsKeys }));
+export const animatorSprites = (id: string) =>
+  api<{
+    size: [number, number];
+    sprites: AnimatorSprite[];
+    emotes?: { key: string; name: string; frame: number }[];
+    geometry: { width: number; height: number; floorY: number; seatY: number; unit: number };
+    environments: { index: number; layout: { kind: string; props: { type: string; x: number; x2?: number }[] } }[];
+  }>(`/api/animator/jobs/${id}/sprites`);
+export async function animatorUploadSprite(id: string, key: string, png: Blob) {
+  const form = new FormData();
+  form.append("file", png, `${key}.png`);
+  return api<{ ok: boolean }>(`/api/animator/jobs/${id}/sprites/${key}`, { method: "POST", body: form });
+}
+export async function animatorUploadBackground(id: string, index: number, png: Blob) {
+  const form = new FormData();
+  form.append("file", png, `scene-${index}.png`);
+  return api<{ ok: boolean }>(`/api/animator/jobs/${id}/background/${index}`, { method: "POST", body: form });
+}
+export const animatorRender = (id: string) =>
+  api<{ ok: boolean }>(`/api/animator/jobs/${id}/render`, { method: "POST" });
+
+// ---------------------------------------------------------- characters
+export type Character = {
+  id: string; name: string; config: Record<string, unknown>;
+  voice: { type: "edge" | "clone" | "provider"; id: string; label: string; provider?: string };
+  created_at: string; updated_at: string;
+};
+export type CharacterPayload = { name: string; voice: Character["voice"]; config: unknown };
+export const characterList = async () =>
+  (await api<{ characters: Character[] }>("/api/characters")).characters;
+export const characterCreate = (payload: CharacterPayload) =>
+  api<Character>("/api/characters", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+export const characterUpdate = (id: string, payload: CharacterPayload) =>
+  api<Character>(`/api/characters/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+export const characterDelete = (id: string) =>
+  api<{ deleted: string }>(`/api/characters/${id}`, { method: "DELETE" });
+
+// ------------------------------------------------------------ voice cloner
+export type CloneVoice = { id: string; name: string; seconds: number; created_at: string };
+export type VoiceCloneStatus = {
+  installed: boolean; installing: boolean; install_error: string; frozen: boolean;
+  install_log?: string[]; install_elapsed?: number;
+  device: string | null; model_loaded: boolean; languages: { id: string; label: string }[];
+  model_cached?: boolean;
+  min_seconds: number; max_seconds: number; max_text_chars: number;
+};
+export type VoiceCloneJob = {
+  id: string; status: string; progress?: number; message?: string;
+  seconds?: number; download_url?: string; voice_name?: string;
+};
+export const voiceCloneStatus = () => api<VoiceCloneStatus>("/api/voiceclone/status");
+export const voiceCloneInstall = () =>
+  api<{ started: boolean; installed: boolean }>("/api/voiceclone/install", { method: "POST" });
+export const voiceCloneList = async () =>
+  (await api<{ voices: CloneVoice[] }>("/api/voiceclone/voices")).voices;
+export async function voiceCloneCreate(file: Blob, name: string, consent: boolean): Promise<CloneVoice> {
+  const form = new FormData();
+  form.append("file", file, file instanceof File ? file.name : "recording.webm");
+  form.append("name", name);
+  form.append("consent", consent ? "true" : "false");
+  return api<CloneVoice>("/api/voiceclone/voices", { method: "POST", body: form });
+}
+export const voiceCloneDelete = (id: string) =>
+  api<{ deleted: string }>(`/api/voiceclone/voices/${id}`, { method: "DELETE" });
+export const voiceCloneGenerate = (voiceId: string, text: string, language: string, exaggeration: number) =>
+  api<{ job_id: string; status: string }>("/api/voiceclone/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ voice_id: voiceId, text, language, exaggeration }),
+  });
+export const voiceCloneJob = (jobId: string) => api<VoiceCloneJob>(`/api/voiceclone/jobs/${jobId}`);
+
 // -------------------------------------------------------------- auto video
 export const autovideoCreate = (title: string, minutes: number, voice: string, subtitles = true, pexelsKey = "", pixabayKey = "", freesoundKey = "", music = true, transitions = true, script = "") =>
   api<{ job_id: string; status: string }>("/api/autovideo", {

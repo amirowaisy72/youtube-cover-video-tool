@@ -1,0 +1,11 @@
+{
+  "id": "2ee099df4c09",
+  "status": "error",
+  "progress": 0,
+  "message": "Voiceover failed: 'NoneType' object is not callable",
+  "voice_id": "861f7c712e4e",
+  "voice_name": "Master",
+  "language": "en",
+  "chars": 219,
+  "created_at": "2026-11-15T23:32:09"
+}

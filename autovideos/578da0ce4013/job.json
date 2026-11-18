@@ -1,0 +1,83 @@
+{
+  "id": "578da0ce4013",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The wonders about the life on Mars",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "download_url": "/api/autovideo/download/578da0ce4013",
+  "script": "[Hook \u2013 Exciting, immersive tone]  \nDid you ever wonder what it would feel like to walk on a planet that\u2019s not your own, where the sky is a dusty orange and the silence is louder than any roar? Imagine the thrill of uncovering a secret that rewrites our place in the cosmos. That secret?\n\nLife on Mars \u2014 a mystery that has tugged at our curiosity for decades, and maybe soon, it will become the adventure of a lifetime. [Section 1 \u2013 The Canvas of Mars]  \nMars, the Red Planet, is that familiar postcard in our heads, but look closer. Ancient riverbeds, shapes carved by wind and water, hint at a once\u2011flooded world.\n\nOtherworldly dunes that sparkle at sunset whisper that something\u2014something bright and brilliant\u2014could have thrived there. How does a planet that only receives a fraction of the Sun\u2019s light support life? The answer is in its deep subsurface, where groundwater, salts, and warmth could stitch a habitat from the rotting depths of its craters.\n\n[Section 2 \u2013 The Wonder of Possibility]  \nConsider the discovery of recurring slope lineae, those mysterious red streaks that ebb and flow with the seasons. What if they\u2019re not just crystals, but microbes dancing to the rhythm of a hidden underground reservoir? Picture tiny organisms turning iron into rust, building their own cities within basaltic tunnels, unnoticed yet magnificent \u2014 a living, breathing tapestry woven from Martian dust.\n\nIs it conceivable that these microbes\u2014our cousin\u2019s cousin, perhaps\u2014have survived billions of years at the edge of the Sun's reach? Imagine sampling a rock and finding the DNA of a Martian microbe humming a new song to the Universe. [Section 3 \u2013 The Human Intuition]  \nWe feel that urge to push the boundaries, to taste the unknown.\n\nThe rovers now map, confirm, and dream. Their cameras take the first breath of a story yet to be written. And every new image is an invitation\u2014\u201cDo you want to hear what it feels like?\u201d The wonder, the awe, the vastness\u2014it strikes at the human heart in ways words can\u2019t capture.",
+  "script_source": "pollinations-scenes",
+  "script_words": 342,
+  "voice_duration_sec": 127.7,
+  "voice_engine": "edge-tts",
+  "mood": "suspense",
+  "music": "mood-music.mp3",
+  "music_status": "ok",
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "transitions": true,
+  "join": "xfade",
+  "final_minutes": 2.1,
+  "scenes": [
+    {
+      "narration": "[Hook \u2013 Exciting, immersive tone]  \nDid you ever wonder what it would feel like to walk on a planet that\u2019s not your own, where the sky is a dusty orange and the silence is louder than any roar? Imagine the thrill of uncovering a secret that rewrites our place in the cosmos. That secret?",
+      "visual": "[Hook \u2013 Exciting, immersive tone]  \nDid you ever wonder what it would feel like to walk on a planet that\u2019s not your own, where the sky is a dusty orange and the silence is louder than any roar?",
+      "caption": "[Hook \u2013 Exciting, immersive tone]  \nDid you ever wonder what it would feel like to walk on a planet that\u2019s\u2026",
+      "kind": "card",
+      "visual_source": "card:[Hook \u2013 Exciting, immersive tone]  \nDid you ever wonder what it would feel like ",
+      "duration_sec": 17.8
+    },
+    {
+      "narration": "Life on Mars \u2014 a mystery that has tugged at our curiosity for decades, and maybe soon, it will become the adventure of a lifetime. [Section 1 \u2013 The Canvas of Mars]  \nMars, the Red Planet, is that familiar postcard in our heads, but look closer. Ancient riverbeds, shapes carved by wind and water, hint at a once\u2011flooded world.",
+      "visual": "Life on Mars \u2014 a mystery that has tugged at our curiosity for decades, and maybe soon, it will become the adventure of a lifetime.",
+      "caption": "Life on Mars \u2014 a mystery that has tugged at our curiosity for decades, and maybe soon, it will become the\u2026",
+      "kind": "card",
+      "visual_source": "card:Life on Mars \u2014 a mystery that has tugged at our curiosity for decades, and maybe",
+      "duration_sec": 21.9
+    },
+    {
+      "narration": "Otherworldly dunes that sparkle at sunset whisper that something\u2014something bright and brilliant\u2014could have thrived there. How does a planet that only receives a fraction of the Sun\u2019s light support life? The answer is in its deep subsurface, where groundwater, salts, and warmth could stitch a habitat from the rotting depths of its craters.",
+      "visual": "Otherworldly dunes that sparkle at sunset whisper that something\u2014something bright and brilliant\u2014could have thrived there.",
+      "caption": "Otherworldly dunes that sparkle at sunset whisper that something\u2014something bright and brilliant\u2014could have\u2026",
+      "kind": "card",
+      "visual_source": "card:Otherworldly dunes that sparkle at sunset whisper that something\u2014something brigh",
+      "duration_sec": 20.4
+    },
+    {
+      "narration": "[Section 2 \u2013 The Wonder of Possibility]  \nConsider the discovery of recurring slope lineae, those mysterious red streaks that ebb and flow with the seasons. What if they\u2019re not just crystals, but microbes dancing to the rhythm of a hidden underground reservoir? Picture tiny organisms turning iron into rust, building their own cities within basaltic tunnels, unnoticed yet magnificent \u2014 a living, breathing tapestry woven from Martian dust.",
+      "visual": "[Section 2 \u2013 The Wonder of Possibility]  \nConsider the discovery of recurring slope lineae, those mysterious red streaks that ebb and flow with the seasons.",
+      "caption": "[Section 2 \u2013 The Wonder of Possibility]  \nConsider the discovery of recurring slope lineae, those mysterious\u2026",
+      "kind": "ai",
+      "visual_source": "ai:[Section 2 \u2013 The Wonder of Possibility]  \nConsider the discovery of recurring sl",
+      "duration_sec": 27.3
+    },
+    {
+      "narration": "Is it conceivable that these microbes\u2014our cousin\u2019s cousin, perhaps\u2014have survived billions of years at the edge of the Sun's reach? Imagine sampling a rock and finding the DNA of a Martian microbe humming a new song to the Universe. [Section 3 \u2013 The Human Intuition]  \nWe feel that urge to push the boundaries, to taste the unknown.",
+      "visual": "Is it conceivable that these microbes\u2014our cousin\u2019s cousin, perhaps\u2014have survived billions of years at the edge of the Sun's reach?",
+      "caption": "Is it conceivable that these microbes\u2014our cousin\u2019s cousin, perhaps\u2014have survived billions of years at the\u2026",
+      "kind": "ai",
+      "visual_source": "ai:Is it conceivable that these microbes\u2014our cousin\u2019s cousin, perhaps\u2014have survived",
+      "duration_sec": 21.5
+    },
+    {
+      "narration": "The rovers now map, confirm, and dream. Their cameras take the first breath of a story yet to be written. And every new image is an invitation\u2014\u201cDo you want to hear what it feels like?\u201d The wonder, the awe, the vastness\u2014it strikes at the human heart in ways words can\u2019t capture.",
+      "visual": "The rovers now map, confirm, and dream.",
+      "caption": "The rovers now map, confirm, and dream.",
+      "kind": "clip",
+      "visual_source": "rover, mars rover, curiosity, mars surface, planet mars",
+      "duration_sec": 18.7
+    }
+  ],
+  "distinct_commons_visuals": 1,
+  "images_found": 5,
+  "clips_found": 1,
+  "images_used": 5,
+  "clips_used": 1,
+  "ai_images": 2,
+  "title_cards": 3,
+  "visual_warning": "",
+  "pipeline": "master-scenes"
+}

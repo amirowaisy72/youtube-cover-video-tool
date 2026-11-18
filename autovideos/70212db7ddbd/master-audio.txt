@@ -1,0 +1,5 @@
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\70212db7ddbd\68776af2424c.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\70212db7ddbd\92512994b268.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\70212db7ddbd\13404ce24aed.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\70212db7ddbd\c33e9ce3d4b1.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\70212db7ddbd\7d90151d904b.mp3'

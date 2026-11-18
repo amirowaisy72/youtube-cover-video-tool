@@ -1,0 +1,32 @@
+{
+  "id": "ef57f1b14c9d",
+  "status": "done",
+  "progress": 100,
+  "message": "Your video is ready!",
+  "title": "Imran tries to borrow money from Master but things go hilariously wrong",
+  "minutes": 0.5,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "created_at": "2026-11-16T02:43:33",
+  "story_source": "template",
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 33,
+  "duration": 26.8,
+  "background_sources": [
+    "pixabay",
+    "pixabay"
+  ],
+  "finished_at": "2026-11-16T02:51:15",
+  "video_url": "/api/animator/jobs/ef57f1b14c9d/video"
+}

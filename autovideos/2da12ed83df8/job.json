@@ -1,0 +1,248 @@
+{
+  "id": "2da12ed83df8",
+  "status": "audio-ready",
+  "phase": "audio-ready",
+  "stage": "Audio ready \u2014 pick the music.",
+  "progress": 100,
+  "title": "Why You\u2019re Always Broke (It\u2019s Not Your Salary)",
+  "minutes": 2,
+  "visuals": "both",
+  "video_type": "long",
+  "short_seconds": 60,
+  "voice": "af_nicole",
+  "tts_provider": "unreal",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NDk2Njk4Ny4zNDg4Njg0LCJqb2JfcmVmIjoiMmRhMTJlZDgzZGY4Iiwibm9uY2UiOiIzZGRlZWY2NTY1MGE5ZDI2In0=.14c4e4b3b059f935c507aca3b16255725bf7cb227fc800bfbf59c78abaf866b9",
+  "scene_total": 7,
+  "script": "Picture this: you\u2019re sitting on a cluttered coffee table, your wallet feels heavier than a sack of lead, yet you swear you\u2019re \u201cearning enough\u201d because your salary looks nice on paper. You says it, you hear it: \u201cIt\u2019s not my salary.\u201d That\u2019s the story we\u2019re about to juggle\u2014why you\u2019re always broke, and why the paycheck alone won\u2019t light up the bank account. Ever notice how the same Monday, you shuffle out the door, your paycheck lands, and the money just\u2026 disappears?\n\n\u201cI have to catch the bus, grab lunch, budget a coffee\u2014oh wait, I just paid Uncle Billy\u2019s overdue loan.\u201d It\u2019s a pattern: the dollars you make seem to dissolve like a sugar cube in a hot kettle. Why? Let\u2019s dig.\n\nYour salary can look generous because it\u2019s one figure on your statement. But hidden behind that neat number is a cascade of deductions: taxes, benefits, retirement contributions. Suddenly, that \u201cgood pay\u201d shrinks to a fraction of what you actually get to keep.\n\nIt's like buying a house and then realizing you still need to pay the upkeep. And if you\u2019re renting, the landlord\u2019s rent\u2011increase card keeps sliding into your debt stack with every month. Then come the lifestyle choices.\n\nDinner out, streaming subscriptions, the urge to upgrade that shoes\u2011and\u2011watch combo. You jump from one small indulgence to the next, and before you know it, your emergency fund is a myth. It\u2019s not that you\u2019re overspending out of spite\u2014it\u2019s that every \u201cjust a drip\u201d becomes a tide.\n\nYou might have a budget, but if it\u2019s static, not living, you\u2019ll hit walls. A rigid spreadsheet can feel like a prison. What if budgeting was a living, breathing thing?\n\nA flexible system that senses your cash flow and real\u2011time guilt\u2014calling you to plan during that sudden sale or surprise bonus. So, you\u2019re not \u201cbroke because of your salary\u201d\u2014you\u2019re blanketing every dollar under a cloud of traffic tickets, unexpected bills, and the relentless avalanche of instant gratification. The trick? Pull back.",
+  "script_source": "pollinations-scenes",
+  "script_words": 328,
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "Picture this: you\u2019re sitting on a cluttered coffee table, your wallet feels heavier than a sack of lead, yet you swear you\u2019re \u201cearning enough\u201d because your salary looks nice on paper. You says it, you hear it: \u201cIt\u2019s not my salary.\u201d That\u2019s the story we\u2019re about to juggle\u2014why you\u2019re always broke, and why the paycheck alone won\u2019t light up the bank account. Ever notice how the same Monday, you shuffle out the door, your paycheck lands, and the money just\u2026 disappears?",
+      "visual": "Picture this: you\u2019re sitting on a cluttered coffee table, your wallet feels heavier than a sack of lead, yet you swear you\u2019re \u201cearning enough\u201d because your salary looks nice on paper.",
+      "caption": "Picture this: you\u2019re sitting on a cluttered coffee table, your wallet feels heavier than a sack of lead, yet\u2026",
+      "kind": "clip",
+      "visual_source": "gull, bird, snow, plumage, sitting, winter, wildlife",
+      "visual_file": "scene-00.mp4",
+      "visual_url": "",
+      "duration_sec": 38.5,
+      "keywords": [
+        "sitting",
+        "cluttered",
+        "coffee",
+        "table",
+        "wallet",
+        "heavier",
+        "than",
+        "sack"
+      ]
+    },
+    {
+      "index": 1,
+      "narration": "\u201cI have to catch the bus, grab lunch, budget a coffee\u2014oh wait, I just paid Uncle Billy\u2019s overdue loan.\u201d It\u2019s a pattern: the dollars you make seem to dissolve like a sugar cube in a hot kettle. Why? Let\u2019s dig.",
+      "visual": "\u201cI have to catch the bus, grab lunch, budget a coffee\u2014oh wait, I just paid Uncle Billy\u2019s overdue loan.\u201d It\u2019s a pattern: the dollars you make seem to dissolve like a sugar cube in a hot kettle.",
+      "caption": "\u201cI have to catch the bus, grab lunch, budget a coffee\u2014oh wait, I just paid Uncle Billy\u2019s overdue loan.\u201d It\u2019s\u2026",
+      "kind": "clip",
+      "visual_source": "bus, riding, passenger, race, city bus, republic of korea",
+      "visual_file": "scene-01.mp4",
+      "visual_url": "",
+      "duration_sec": 18.8,
+      "keywords": [
+        "catch",
+        "bus",
+        "grab",
+        "lunch",
+        "budget",
+        "coffee",
+        "paid",
+        "uncle"
+      ]
+    },
+    {
+      "index": 2,
+      "narration": "Your salary can look generous because it\u2019s one figure on your statement. But hidden behind that neat number is a cascade of deductions: taxes, benefits, retirement contributions. Suddenly, that \u201cgood pay\u201d shrinks to a fraction of what you actually get to keep.",
+      "visual": "Your salary can look generous because it\u2019s one figure on your statement.",
+      "caption": "Your salary can look generous because it\u2019s one figure on your statement.",
+      "kind": "clip",
+      "visual_source": "money, euro, finance, salary, cash, economy, income, bank, profit, business, check",
+      "visual_file": "scene-02.mp4",
+      "visual_url": "",
+      "duration_sec": 23.0,
+      "keywords": [
+        "salary",
+        "look",
+        "generous",
+        "figure",
+        "statement",
+        "but",
+        "neat",
+        "number"
+      ]
+    },
+    {
+      "index": 3,
+      "narration": "It's like buying a house and then realizing you still need to pay the upkeep. And if you\u2019re renting, the landlord\u2019s rent\u2011increase card keeps sliding into your debt stack with every month. Then come the lifestyle choices.",
+      "visual": "It's like buying a house and then realizing you still need to pay the upkeep.",
+      "caption": "It's like buying a house and then realizing you still need to pay the upkeep.",
+      "kind": "clip",
+      "visual_source": "bird, sperling, house sparrow, collect nesting material, nature",
+      "visual_file": "scene-03.mp4",
+      "visual_url": "",
+      "duration_sec": 17.1,
+      "keywords": [
+        "house",
+        "realizing",
+        "pay",
+        "upkeep",
+        "renting",
+        "landlord",
+        "rent",
+        "increase"
+      ]
+    },
+    {
+      "index": 4,
+      "narration": "Dinner out, streaming subscriptions, the urge to upgrade that shoes\u2011and\u2011watch combo. You jump from one small indulgence to the next, and before you know it, your emergency fund is a myth. It\u2019s not that you\u2019re overspending out of spite\u2014it\u2019s that every \u201cjust a drip\u201d becomes a tide.",
+      "visual": "Dinner out, streaming subscriptions, the urge to upgrade that shoes\u2011and\u2011watch combo.",
+      "caption": "Dinner out, streaming subscriptions, the urge to upgrade that shoes\u2011and\u2011watch combo.",
+      "kind": "clip",
+      "visual_source": "youtube intro, intro, facebook intro, starting soon, streaming, youtube streaming, facebook streaming, instagram streaming",
+      "visual_file": "scene-04.mp4",
+      "visual_url": "",
+      "duration_sec": 23.9,
+      "keywords": [
+        "dinner",
+        "streaming",
+        "subscriptions",
+        "urge",
+        "upgrade",
+        "shoes",
+        "watch",
+        "combo"
+      ]
+    },
+    {
+      "index": 5,
+      "narration": "You might have a budget, but if it\u2019s static, not living, you\u2019ll hit walls. A rigid spreadsheet can feel like a prison. What if budgeting was a living, breathing thing?",
+      "visual": "You might have a budget, but if it\u2019s static, not living, you\u2019ll hit walls.",
+      "caption": "You might have a budget, but if it\u2019s static, not living, you\u2019ll hit walls.",
+      "kind": "clip",
+      "visual_source": "banknotes, money, currency, cash, finance, australian money, financial, business, dollars, wealth, 50, note, fifty, bank, pay, investment, savings, australian, success, exchange, falling, paying, economic, profit, price, payment, salary, budget, debt, growth, account, economy, stock",
+      "visual_file": "scene-05.mp4",
+      "visual_url": "",
+      "duration_sec": 13.3,
+      "keywords": [
+        "budget",
+        "but",
+        "static",
+        "living",
+        "hit",
+        "walls",
+        "rigid",
+        "spreadsheet"
+      ]
+    },
+    {
+      "index": 6,
+      "narration": "A flexible system that senses your cash flow and real\u2011time guilt\u2014calling you to plan during that sudden sale or surprise bonus. So, you\u2019re not \u201cbroke because of your salary\u201d\u2014you\u2019re blanketing every dollar under a cloud of traffic tickets, unexpected bills, and the relentless avalanche of instant gratification. The trick? Pull back.",
+      "visual": "A flexible system that senses your cash flow and real\u2011time guilt\u2014calling you to plan during that sudden sale or surprise bonus.",
+      "caption": "A flexible system that senses your cash flow and real\u2011time guilt\u2014calling you to plan during that sudden sale\u2026",
+      "kind": "clip",
+      "visual_source": "butterfly, wing, trunk, sensor, sense organ, insect, wildlife",
+      "visual_file": "scene-06.mp4",
+      "visual_url": "",
+      "duration_sec": 29.0,
+      "keywords": [
+        "flexible",
+        "senses",
+        "cash",
+        "flow",
+        "guilt",
+        "calling",
+        "plan",
+        "during"
+      ]
+    }
+  ],
+  "audio_started_at": 1794967236.10421,
+  "voice_duration_sec": 163.7,
+  "voice_engine": "unreal-kokoro (studio presenter)",
+  "voice_fallback": false,
+  "voice_fallback_note": "",
+  "voice_files": [
+    "scene-00-presenter.mp3",
+    "scene-01-presenter.mp3",
+    "scene-02-presenter.mp3",
+    "scene-03-presenter.mp3",
+    "scene-04-presenter.mp3",
+    "scene-05-presenter.mp3",
+    "scene-06-presenter.mp3"
+  ],
+  "mood": "suspense",
+  "music": "mood-music.mp3",
+  "music_status": "ok",
+  "music_options": [
+    {
+      "id": 459163,
+      "name": "Thriller Intro",
+      "duration_sec": 80.0,
+      "preview_url": "https://cdn.freesound.org/previews/459/459163_3914271-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 793480,
+      "name": "Dark Tension Atmosphere",
+      "duration_sec": 369.3,
+      "preview_url": "https://cdn.freesound.org/previews/793/793480_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 743986,
+      "name": "Crime Scene Shadows",
+      "duration_sec": 66.8,
+      "preview_url": "https://cdn.freesound.org/previews/743/743986_16085323-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 447521,
+      "name": "tense synth build up",
+      "duration_sec": 31.2,
+      "preview_url": "https://cdn.freesound.org/previews/447/447521_4256189-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 583729,
+      "name": "Suspense_Bass.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583729_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 583732,
+      "name": "Suspense_Strings.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583732_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 415208,
+      "name": "Dark Suspense",
+      "duration_sec": 67.6,
+      "preview_url": "https://cdn.freesound.org/previews/415/415208_5926389-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 661266,
+      "name": "Foreshadow",
+      "duration_sec": 166.8,
+      "preview_url": "https://cdn.freesound.org/previews/661/661266_11740799-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    }
+  ],
+  "music_options_status": "ok",
+  "music_volume": 0.2,
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "final_minutes": 2.7
+}

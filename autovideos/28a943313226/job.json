@@ -1,0 +1,169 @@
+{
+  "id": "28a943313226",
+  "status": "done",
+  "phase": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Budget Hack Banks Are Hiding",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-GuyNeural",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NDE3OTI4Mi4yNDI1NzY2LCJqb2JfcmVmIjoiMjhhOTQzMzEzMjI2Iiwibm9uY2UiOiI0M2NhZGEyZGYxMjZhNTMwIn0=.27c69aa214005f7165da93a89f4d2182930b1cef5d9f29bb7ae5adb052bb3ee9",
+  "scene_total": 6,
+  "script": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?\n\nBanks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.\n\nThe hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.\n\nTraditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.\n\nTo beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.\n\nThis simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps. Stop letting commercial banks profit off your hard work for free. Hit subscribe to PocketIQ and let us master your money together.",
+  "script_source": "custom-scenes",
+  "script_words": 185,
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?",
+      "visual": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even when you swear you haven't been buying anything crazy?",
+      "caption": "Have you ever noticed how your checking account balance seems to mysteriously shrink every single month, even\u2026",
+      "kind": "ai",
+      "visual_source": "ai:Have you ever noticed how your checking account balance seems to mysteriously sh",
+      "visual_file": "scene-00-ai.jpg",
+      "visual_url": "",
+      "duration_sec": 8.7
+    },
+    {
+      "index": 1,
+      "narration": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.",
+      "visual": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they quietly profit off your cash flow.",
+      "caption": "Banks rely on a silent, clever system that makes saving money feel like climbing an uphill battle while they\u2026",
+      "kind": "ai",
+      "visual_source": "ai:Banks rely on a silent, clever system that makes saving money feel like climbing",
+      "visual_file": "scene-01-ai.jpg",
+      "visual_url": "",
+      "duration_sec": 7.8
+    },
+    {
+      "index": 2,
+      "narration": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.",
+      "visual": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which keeps your money moving into high-yield instruments instead of sitting dead in a zero-percent checking account.",
+      "caption": "The hidden hack they don\u2019t want you to know about is automated sweep and fractional yield routing, which\u2026",
+      "kind": "ai",
+      "visual_source": "ai:The hidden hack they don\u2019t want you to know about is automated sweep and fractio",
+      "visual_file": "scene-02-ai.jpg",
+      "visual_url": "",
+      "duration_sec": 10.5
+    },
+    {
+      "index": 3,
+      "narration": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.",
+      "visual": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand you a microscopic fraction of a percent in return.",
+      "caption": "Traditional banks take your hard-earned deposits, lend them out to others at high interest rates, and hand\u2026",
+      "kind": "ai",
+      "visual_source": "ai:Traditional banks take your hard-earned deposits, lend them out to others at hig",
+      "visual_file": "scene-03-ai.jpg",
+      "visual_url": "",
+      "duration_sec": 8.8
+    },
+    {
+      "index": 4,
+      "narration": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.",
+      "visual": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly spending threshold automatically sweeps into a high-yield account or short-term treasury fund.",
+      "caption": "To beat this system, you need to set up a smart routing rule where every dollar exceeding your weekly\u2026",
+      "kind": "ai",
+      "visual_source": "ai:To beat this system, you need to set up a smart routing rule where every dollar ",
+      "visual_file": "scene-04-ai.jpg",
+      "visual_url": "",
+      "duration_sec": 10.1
+    },
+    {
+      "index": 5,
+      "narration": "This simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps. Stop letting commercial banks profit off your hard work for free. Hit subscribe to PocketIQ and let us master your money together.",
+      "visual": "This simple automation forces your idle cash to work around the clock, generating passive returns that completely bypass traditional banking traps.",
+      "caption": "This simple automation forces your idle cash to work around the clock, generating passive returns that\u2026",
+      "kind": "ai",
+      "visual_source": "ai:This simple automation forces your idle cash to work around the clock, generatin",
+      "visual_file": "scene-05-ai.jpg",
+      "visual_url": "",
+      "duration_sec": 17.3
+    }
+  ],
+  "voice_duration_sec": 63.1,
+  "voice_engine": "edge-tts",
+  "voice_files": [
+    "b5c864fc7ac6.mp3",
+    "ce4e33f8a5b6.mp3",
+    "5ec3c3fa8c8a.mp3",
+    "a034e3821493.mp3",
+    "220500ae056e.mp3",
+    "f42bd277d8ce.mp3"
+  ],
+  "mood": "suspense",
+  "music": "mood-music.mp3",
+  "music_status": "ok",
+  "music_options": [
+    {
+      "id": 793480,
+      "name": "Dark Tension Atmosphere",
+      "duration_sec": 369.3,
+      "preview_url": "https://cdn.freesound.org/previews/793/793480_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 459163,
+      "name": "Thriller Intro",
+      "duration_sec": 80.0,
+      "preview_url": "https://cdn.freesound.org/previews/459/459163_3914271-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 743986,
+      "name": "Crime Scene Shadows",
+      "duration_sec": 66.8,
+      "preview_url": "https://cdn.freesound.org/previews/743/743986_16085323-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 447521,
+      "name": "tense synth build up",
+      "duration_sec": 31.2,
+      "preview_url": "https://cdn.freesound.org/previews/447/447521_4256189-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 583729,
+      "name": "Suspense_Bass.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583729_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 583732,
+      "name": "Suspense_Strings.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583732_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 415208,
+      "name": "Dark Suspense",
+      "duration_sec": 67.6,
+      "preview_url": "https://cdn.freesound.org/previews/415/415208_5926389-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 743967,
+      "name": "Sinister Secrets",
+      "duration_sec": 65.1,
+      "preview_url": "https://cdn.freesound.org/previews/743/743967_16024318-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
+  "music_options_status": "ok",
+  "music_volume": 0.2,
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "final_minutes": 1.1,
+  "download_url": "/api/autovideo/download/28a943313226",
+  "final_duration_sec": 63.1,
+  "transitions": true,
+  "join": "xfade",
+  "images_used": 6,
+  "clips_used": 0,
+  "ai_images": 6,
+  "title_cards": 0,
+  "pipeline": "master-scenes-steps"
+}

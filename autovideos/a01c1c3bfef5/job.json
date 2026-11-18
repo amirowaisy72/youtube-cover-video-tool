@@ -1,0 +1,75 @@
+{
+  "id": "a01c1c3bfef5",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Psychology of Focus: Why Your Brain Craves Distraction and How to Hack It",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "download_url": "/api/autovideo/download/a01c1c3bfef5",
+  "script": "Hey, imagine you\u2019re on a train rolling toward your goal \u2014 a project, a study session, a presentation \u2014 and suddenly a bright window pops up, a siren blares, and your brain pulls the seat away, urging you to step out and gaze at the world. You get that urge! That\u2019s the psychology of focus in a nutshell.\n\nDid you ever wonder why that inner buzz feels so infectious? Our brains are wired to chase novelty. Each click, each ping releases dopamine, those little feel\u2011good surges that feel like instant rewards. That\u2019s why scrolling feels like a tiny victory, even though it\u2019s pulling us farther from the task at hand. So, before you dive into the cave of endless feeds, ask yourself: What am I really chasing? The craving is not laziness; it\u2019s biology wrapped in habit.\n\nNow, how can we hack this relentless cycle? First, create a ritual that signals your brain the real reward is ahead. Set a timer, put your phone in another room, light a scented candle\u2014anything that turns work into a whispered ritual. Second, chunk the task into bite\u2011sized, story\u2011driven segments. Narrate the piece: \u201cOnce upon a block of 25 minutes, the creator discovers the first clue.\u201d That narrative tracks the brain\u2019s need for narrative arcs. Third, reward yourself after the quest, not during. When the timer buzzes, celebrate with a stretch or a quick breath. Your brain then learns that the payoff follows, not precedes the effort.\n\nImagine finishing a chapter of your own story. The satisfaction lights up a different neural pathway. That becomes your new addiction \u2014 the end, not the detour, that keeps the brain alive. So, next time a buzz threatens your focus, pause, breathe, and remember: the brain\u2019s craving for distraction is a doorway, not a trap.\n\nTake this knowledge home: transform your workspace, set clear milestones, and let your brain\u2019s natural rhythms play the hero\u2019s journey. Then you\u2019ll find your mind returning, not drifting, to the story you\u2019re telling. Happy focusing!",
+  "script_source": "pollinations-scenes",
+  "script_words": 333,
+  "voice_duration_sec": 132.7,
+  "voice_engine": "edge-tts",
+  "mood": "epic",
+  "music": null,
+  "music_status": "key_rejected",
+  "transition_sfx": 0,
+  "sfx_status": "key_rejected",
+  "transitions": true,
+  "join": "xfade",
+  "final_minutes": 2.2,
+  "scenes": [
+    {
+      "narration": "Hey, imagine you\u2019re on a train rolling toward your goal \u2014 a project, a study session, a presentation \u2014 and suddenly a bright window pops up, a siren blares, and your brain pulls the seat away, urging you to step out and gaze at the world. You get that urge! That\u2019s the psychology of focus in a nutshell.",
+      "visual": "Hey, imagine you\u2019re on a train rolling toward your goal \u2014 a project, a study session, a presentation \u2014 and suddenly a bright window pops up, a siren blares, and your brain pulls the seat away, urging you to step out and gaze at the world.",
+      "caption": "Hey, imagine you\u2019re on a train rolling toward your goal \u2014 a project, a study session, a presentation \u2014 and\u2026",
+      "kind": "clip",
+      "visual_source": "File:Psychology student Karoline Nanfeldt on disappearing down the Wikipedia rabbit hole.webm",
+      "duration_sec": 19.6
+    },
+    {
+      "narration": "Did you ever wonder why that inner buzz feels so infectious? Our brains are wired to chase novelty. Each click, each ping releases dopamine, those little feel\u2011good surges that feel like instant rewards. That\u2019s why scrolling feels like a tiny victory, even though it\u2019s pulling us farther from the task at hand. So, before you dive into the cave of endless feeds, ask yourself: What am I really chasing? The craving is not laziness; it\u2019s biology wrapped in habit.",
+      "visual": "Did you ever wonder why that inner buzz feels so infectious?",
+      "caption": "Did you ever wonder why that inner buzz feels so infectious?",
+      "kind": "clip",
+      "visual_source": "brain, question, red, psychology, cartoon, health, philosophy, medical, mental, mind, depression, stress",
+      "duration_sec": 31.1
+    },
+    {
+      "narration": "Now, how can we hack this relentless cycle? First, create a ritual that signals your brain the real reward is ahead. Set a timer, put your phone in another room, light a scented candle\u2014anything that turns work into a whispered ritual. Second, chunk the task into bite\u2011sized, story\u2011driven segments. Narrate the piece: \u201cOnce upon a block of 25 minutes, the creator discovers the first clue.\u201d That narrative tracks the brain\u2019s need for narrative arcs. Third, reward yourself after the quest, not during. When the timer buzzes, celebrate with a stretch or a quick breath. Your brain then learns that the payoff follows, not precedes the effort.",
+      "visual": "Now, how can we hack this relentless cycle?",
+      "caption": "Now, how can we hack this relentless cycle?",
+      "kind": "clip",
+      "visual_source": "brain, network, psychology, neurons, intelligence, head, link, synapses, think, neural pathways, nerve cell, science",
+      "duration_sec": 44.1
+    },
+    {
+      "narration": "Imagine finishing a chapter of your own story. The satisfaction lights up a different neural pathway. That becomes your new addiction \u2014 the end, not the detour, that keeps the brain alive. So, next time a buzz threatens your focus, pause, breathe, and remember: the brain\u2019s craving for distraction is a doorway, not a trap.",
+      "visual": "Imagine finishing a chapter of your own story.",
+      "caption": "Imagine finishing a chapter of your own story.",
+      "kind": "clip",
+      "visual_source": "neuron, brain, mind, psychology, thought, idea, electricity",
+      "duration_sec": 22.3
+    },
+    {
+      "narration": "Take this knowledge home: transform your workspace, set clear milestones, and let your brain\u2019s natural rhythms play the hero\u2019s journey. Then you\u2019ll find your mind returning, not drifting, to the story you\u2019re telling. Happy focusing!",
+      "visual": "Take this knowledge home: transform your workspace, set clear milestones, and let your brain\u2019s natural rhythms play the hero\u2019s journey.",
+      "caption": "Take this knowledge home: transform your workspace, set clear milestones, and let your brain\u2019s natural\u2026",
+      "kind": "clip",
+      "visual_source": "File:AFN Aviano TV In Focus- Major Accident Response Exercise (973728).webm",
+      "duration_sec": 15.5
+    }
+  ],
+  "distinct_commons_visuals": 5,
+  "images_found": 0,
+  "clips_found": 5,
+  "images_used": 0,
+  "clips_used": 5,
+  "ai_images": 0,
+  "title_cards": 0,
+  "visual_warning": "",
+  "pipeline": "master-scenes"
+}

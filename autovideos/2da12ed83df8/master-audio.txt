@@ -1,0 +1,7 @@
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-00-presenter.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-01-presenter.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-02-presenter.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-03-presenter.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-04-presenter.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-05-presenter.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\2da12ed83df8\scene-06-presenter.mp3'

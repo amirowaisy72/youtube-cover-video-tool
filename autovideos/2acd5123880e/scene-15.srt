@@ -1,0 +1,39 @@
+1
+00:00:00,000 --> 00:00:01,180
+When you keep your wealth
+
+2
+00:00:01,180 --> 00:00:02,820
+locked away in cash, you
+
+3
+00:00:02,820 --> 00:00:04,000
+are holding on to slices
+
+4
+00:00:04,000 --> 00:00:05,540
+of a shrinking value pie,
+
+5
+00:00:05,840 --> 00:00:07,020
+even if your nominal count
+
+6
+00:00:07,020 --> 00:00:08,500
+of slices appears stable.
+
+7
+00:00:09,560 --> 00:00:10,420
+Let us look at a
+
+8
+00:00:10,420 --> 00:00:12,320
+concrete historical example to see
+
+9
+00:00:12,320 --> 00:00:13,980
+how devastating this math truly
+
+10
+00:00:13,980 --> 00:00:14,840
+is over time.

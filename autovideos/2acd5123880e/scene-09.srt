@@ -1,0 +1,27 @@
+1
+00:00:00,000 --> 00:00:01,980
+When you deposit $1 ,000
+
+2
+00:00:01,980 --> 00:00:03,620
+into a traditional bank savings
+
+3
+00:00:03,620 --> 00:00:05,140
+account, you look at your
+
+4
+00:00:05,140 --> 00:00:06,360
+phone screen a year later
+
+5
+00:00:06,360 --> 00:00:08,960
+and see $1 ,000, assuming
+
+6
+00:00:08,960 --> 00:00:10,680
+a generous 1 % annual
+
+7
+00:00:10,680 --> 00:00:11,460
+interest rate.

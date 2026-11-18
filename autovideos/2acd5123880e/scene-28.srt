@@ -1,0 +1,39 @@
+1
+00:00:00,000 --> 00:00:01,160
+It is a slow -motion
+
+2
+00:00:01,160 --> 00:00:02,540
+robbery where the thief leaves
+
+3
+00:00:02,540 --> 00:00:04,020
+a receipt showing your exact
+
+4
+00:00:04,020 --> 00:00:06,160
+starting balance, making you feel
+
+5
+00:00:06,160 --> 00:00:07,580
+like everything is fine while
+
+6
+00:00:07,580 --> 00:00:10,080
+your financial future quietly evaporates.
+
+7
+00:00:11,060 --> 00:00:12,440
+Let us examine the exact
+
+8
+00:00:12,440 --> 00:00:14,460
+mathematical mechanics of this quiet
+
+9
+00:00:14,460 --> 00:00:16,560
+robbery using a modern, realistic
+
+10
+00:00:16,560 --> 00:00:17,140
+scenario.

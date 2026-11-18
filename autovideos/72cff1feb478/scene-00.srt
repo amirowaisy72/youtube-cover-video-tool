@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:01,980
+Hook, picture a young coder,
+
+2
+00:00:02,240 --> 00:00:03,680
+eyes bright, scribbing a line
+
+3
+00:00:03,680 --> 00:00:04,840
+of code that might just
+
+4
+00:00:04,840 --> 00:00:06,000
+launch a unicorn on the
+
+5
+00:00:06,000 --> 00:00:07,060
+next funding round.
+
+6
+00:00:08,000 --> 00:00:09,840
+The crowd is electrified, the
+
+7
+00:00:09,840 --> 00:00:11,080
+air hums with possibility.
+
+8
+00:00:12,220 --> 00:00:13,480
+But what's the secret sauce
+
+9
+00:00:13,480 --> 00:00:15,020
+behind that one clever line?

@@ -1,0 +1,14 @@
+{
+  "id": "1411712c17e3",
+  "status": "done",
+  "progress": 100,
+  "message": "Done",
+  "voice_id": "b0e8e17942a6",
+  "voice_name": "Clone 3",
+  "language": "en",
+  "chars": 236,
+  "created_at": "2026-11-16T01:12:58",
+  "seconds": 17.3,
+  "download_url": "/api/voiceclone/download/1411712c17e3",
+  "finished_at": "2026-11-16T01:15:46"
+}

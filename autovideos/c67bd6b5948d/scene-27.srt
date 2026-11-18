@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:02,140
+Popular and trusted tickers
+
+2
+00:00:02,140 --> 00:00:04,340
+include VOO, VTI,
+
+3
+00:00:04,800 --> 00:00:06,500
+or SPI, which all track
+
+4
+00:00:06,500 --> 00:00:07,780
+the broader market and have
+
+5
+00:00:07,780 --> 00:00:09,800
+historically rewarded patient investors
+
+6
+00:00:09,800 --> 00:00:11,060
+year after year.

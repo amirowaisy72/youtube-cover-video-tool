@@ -1,0 +1,80 @@
+{
+  "id": "8eaf6c549ebb",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Budget Hack Banks Hate",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "timeline": [
+    {
+      "t": 0,
+      "text": "Building scenes\u2026"
+    },
+    {
+      "t": 16,
+      "text": "Script ready \u2014 building scenes\u2026"
+    },
+    {
+      "t": 85,
+      "text": "Building scene 1 of 2\u2026 \u2014 scene 2: ai from ai:Next, picture this: a budgeting style that works like a mind\u2011reading wizard, not"
+    },
+    {
+      "t": 88,
+      "text": "Building scene 2 of 2\u2026 \u2014 scene 1: clip from glitch, monogram, data, code, retro, gringe, hack, hacking, hacker, programing, digital, network, technology, coding, computer, freevideo"
+    },
+    {
+      "t": 230,
+      "text": "Joining scenes\u2026"
+    },
+    {
+      "t": 233,
+      "text": "done"
+    }
+  ],
+  "scene_total": 2,
+  "download_url": "/api/autovideo/download/8eaf6c549ebb",
+  "script": "Hey there, dream\u2011chasers! Ever feel like banks are the tight\u2011fisted brothers at the party, shaking their heads when you talk about living brighter? What if I told you there\u2019s a secret budget hack they\u2019re hiding from you\u2014one that could turn your wallet from whisper\u2011thin to a roar? Stick with me, because the next few minutes might just rewrite your financial playbook. First, imagine your bank\u2019s silent audit: every fee, every micromanager moment, won\u2019t you ask yourself, \u201cIs this what really keeps the lights on?\u201d If you\u2019ve ever skimmed a fee schedule and felt eyes on you, you\u2019re in the right place. The hack? The cash\u2011back ice\u2011cream trick. It flips the script on those monthly charges, letting you earn a small slice of the money you\u2019re already tucking into that all\u2011in\u2011one card. The biggest surprise? You don\u2019t even have to track it with a spreadsheet\u2014just an auto\u2011granted reward each month that piles up faster than you can say \u201cvalue.\u201d\n\nNext, picture this: a budgeting style that works like a mind\u2011reading wizard, not another dead\u2011end spreadsheet that turns the nights gray. We\u2019re talking \u2018envelope budgeting\u2019 but on a phone app. The trick is visual\u2014divide your disposable income into colored buckets, label \u201cGuilt\u2011Free Splurges,\u201d \u201cSavings Sprint,\u201d even \u201cJust In Case.\u201d When the app nudges you, does your heart skip or sigh? That\u2019s the living currency you\u2019ve been missing! Now, let\u2019s tackle the caption that spooks everyone\u2014\u201cno credit cards?\u201d\u2014but here\u2019s the twist: using a pay\u2011between\u2011you card as a middle ground. Banks hate it because it separates personal and business blur with better rates. If used right, it turns into a double\u2011checked treasure chest, and the banks? They\u2019re just left scratching heads. Finally, the grand revelation: zero\u2011interest balance transfers don\u2019t just save you; they teach your money to keep working while it sleeps. Can you feel the chill of the future? Each month, the debt melts and your future self is full of options. So, dear friends, remember\u2014your budget isn\u2019t just numbers; it\u2019s a living, breathing badge of freedom.",
+  "script_source": "pollinations-scenes",
+  "script_words": 334,
+  "voice_duration_sec": 145.9,
+  "voice_engine": "edge-tts",
+  "mood": "suspense",
+  "music": "Dark Tension Atmosphere",
+  "music_status": "ok",
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "transitions": true,
+  "join": "xfade",
+  "final_minutes": 2.4,
+  "scenes": [
+    {
+      "narration": "Hey there, dream\u2011chasers! Ever feel like banks are the tight\u2011fisted brothers at the party, shaking their heads when you talk about living brighter? What if I told you there\u2019s a secret budget hack they\u2019re hiding from you\u2014one that could turn your wallet from whisper\u2011thin to a roar? Stick with me, because the next few minutes might just rewrite your financial playbook. First, imagine your bank\u2019s silent audit: every fee, every micromanager moment, won\u2019t you ask yourself, \u201cIs this what really keeps the lights on?\u201d If you\u2019ve ever skimmed a fee schedule and felt eyes on you, you\u2019re in the right place. The hack? The cash\u2011back ice\u2011cream trick. It flips the script on those monthly charges, letting you earn a small slice of the money you\u2019re already tucking into that all\u2011in\u2011one card. The biggest surprise? You don\u2019t even have to track it with a spreadsheet\u2014just an auto\u2011granted reward each month that piles up faster than you can say \u201cvalue.\u201d",
+      "visual": "Hey there, dream\u2011chasers!",
+      "caption": "Hey there, dream\u2011chasers!",
+      "kind": "clip",
+      "visual_source": "glitch, monogram, data, code, retro, gringe, hack, hacking, hacker, programing, digital, network, technology, coding, computer, freevideo",
+      "duration_sec": 72.9
+    },
+    {
+      "narration": "Next, picture this: a budgeting style that works like a mind\u2011reading wizard, not another dead\u2011end spreadsheet that turns the nights gray. We\u2019re talking \u2018envelope budgeting\u2019 but on a phone app. The trick is visual\u2014divide your disposable income into colored buckets, label \u201cGuilt\u2011Free Splurges,\u201d \u201cSavings Sprint,\u201d even \u201cJust In Case.\u201d When the app nudges you, does your heart skip or sigh? That\u2019s the living currency you\u2019ve been missing! Now, let\u2019s tackle the caption that spooks everyone\u2014\u201cno credit cards?\u201d\u2014but here\u2019s the twist: using a pay\u2011between\u2011you card as a middle ground. Banks hate it because it separates personal and business blur with better rates. If used right, it turns into a double\u2011checked treasure chest, and the banks? They\u2019re just left scratching heads. Finally, the grand revelation: zero\u2011interest balance transfers don\u2019t just save you; they teach your money to keep working while it sleeps. Can you feel the chill of the future? Each month, the debt melts and your future self is full of options. So, dear friends, remember\u2014your budget isn\u2019t just numbers; it\u2019s a living, breathing badge of freedom.",
+      "visual": "Next, picture this: a budgeting style that works like a mind\u2011reading wizard, not another dead\u2011end spreadsheet that turns the nights gray.",
+      "caption": "Next, picture this: a budgeting style that works like a mind\u2011reading wizard, not another dead\u2011end spreadsheet\u2026",
+      "kind": "image",
+      "visual_source": "changed: scene-change-01.jpg",
+      "duration_sec": 72.9
+    }
+  ],
+  "distinct_commons_visuals": 1,
+  "images_found": 1,
+  "clips_found": 1,
+  "images_used": 1,
+  "clips_used": 1,
+  "ai_images": 1,
+  "title_cards": 0,
+  "visual_warning": "",
+  "pipeline": "master-scenes",
+  "music_volume": 1.0,
+  "scene_changed": 1
+}

@@ -1,0 +1,27 @@
+{
+  "id": "8f31b59119cb",
+  "name": "Peddy",
+  "voice": {
+    "type": "provider",
+    "id": "af_heart",
+    "label": "\u2b50 Unreal Speech \u2014 Kokoro \u2014 Female, Heart",
+    "provider": "unreal"
+  },
+  "config": {
+    "skin": "#ffffff",
+    "hair": "long",
+    "hairColor": "#3b2414",
+    "hat": "none",
+    "hatColor": "#f97316",
+    "top": "kurta",
+    "topColor": "#64748b",
+    "top2Color": "#14b8a6",
+    "bottom": "jeans",
+    "bottomColor": "#2f3640",
+    "shoes": "slippers",
+    "shoeColor": "#7c2d12",
+    "accessories": []
+  },
+  "created_at": "2026-11-16T02:41:22",
+  "updated_at": "2026-11-16T20:37:35"
+}

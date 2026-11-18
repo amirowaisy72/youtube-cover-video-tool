@@ -1,0 +1,14 @@
+{
+  "id": "9be614be11e6",
+  "status": "done",
+  "progress": 100,
+  "message": "Done",
+  "voice_id": "861f7c712e4e",
+  "voice_name": "Master",
+  "language": "en",
+  "chars": 219,
+  "created_at": "2026-11-16T00:38:33",
+  "seconds": 13.4,
+  "download_url": "/api/voiceclone/download/9be614be11e6",
+  "finished_at": "2026-11-16T00:42:22"
+}

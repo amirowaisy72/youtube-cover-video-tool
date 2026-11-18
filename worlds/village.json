@@ -1,0 +1,1370 @@
+{
+ "season": "summer",
+ "fog": 0.0,
+ "recipe": {
+  "name": "Pakistani Gaon",
+  "place": "village",
+  "ground": "dirt",
+  "time": "day",
+  "season": "summer",
+  "weather": "clear",
+  "wind": 0.2,
+  "terrain": {
+   "hills": "few",
+   "mountains": false
+  },
+  "water": [
+   {
+    "type": "river",
+    "from": "left",
+    "to": "right",
+    "width": 4,
+    "fish": true
+   }
+  ],
+  "things": [
+   {
+    "what": "bridge",
+    "count": 1,
+    "where": "behind",
+    "size": 1.5
+   },
+   {
+    "what": "boat",
+    "count": 1,
+    "where": "river",
+    "size": 1.2,
+    "moving": true,
+    "rower": true
+   },
+   {
+    "what": "hut",
+    "count": 4,
+    "where": "back",
+    "size": 1.8
+   },
+   {
+    "what": "house",
+    "count": 1,
+    "where": "back",
+    "size": 2
+   },
+   {
+    "what": "well",
+    "count": 1,
+    "where": "behind",
+    "size": 1
+   },
+   {
+    "what": "bench",
+    "count": 1,
+    "where": "stage",
+    "size": 1
+   },
+   {
+    "what": "crate",
+    "count": 2,
+    "where": "stage",
+    "size": 0.8
+   },
+   {
+    "what": "campfire",
+    "count": 1,
+    "where": "right",
+    "size": 1
+   },
+   {
+    "what": "log",
+    "count": 2,
+    "where": "right",
+    "size": 0.9
+   },
+   {
+    "what": "mango_tree",
+    "count": 4,
+    "where": "back",
+    "size": 1.8
+   },
+   {
+    "what": "banana_plant",
+    "count": 2,
+    "where": "left",
+    "size": 1.2
+   },
+   {
+    "what": "big_tree",
+    "count": 6,
+    "where": "back",
+    "size": 2
+   },
+   {
+    "what": "bush",
+    "count": 8,
+    "where": "everywhere",
+    "size": 1
+   },
+   {
+    "what": "tall_grass",
+    "count": 10,
+    "where": "far",
+    "size": 1.2
+   },
+   {
+    "what": "fence",
+    "count": 5,
+    "where": "far",
+    "size": 1
+   },
+   {
+    "what": "flowers",
+    "count": 12,
+    "where": "everywhere",
+    "size": 0.6
+   },
+   {
+    "what": "stones",
+    "count": 8,
+    "where": "everywhere",
+    "size": 0.5
+   },
+   {
+    "what": "basket",
+    "count": 1,
+    "where": "stage",
+    "size": 0.7
+   }
+  ],
+  "animals": [
+   {
+    "species": "duck",
+    "count": 4,
+    "where": "river",
+    "swim": true,
+    "doing": "swim"
+   },
+   {
+    "species": "goat",
+    "count": 3,
+    "where": "far",
+    "doing": "graze"
+   },
+   {
+    "species": "cow",
+    "count": 2,
+    "where": "far",
+    "doing": "graze"
+   },
+   {
+    "species": "chicken",
+    "count": 4,
+    "where": "left",
+    "doing": "walk"
+   },
+   {
+    "species": "dog",
+    "count": 1,
+    "where": "stage",
+    "doing": "play"
+   },
+   {
+    "species": "bird",
+    "count": 6,
+    "where": "back",
+    "doing": "fly"
+   },
+   {
+    "species": "fish",
+    "count": 5,
+    "where": "river",
+    "doing": "swim"
+   }
+  ],
+  "people": [
+   {
+    "who": "boatman",
+    "count": 1,
+    "where": "river",
+    "doing": "row",
+    "female": false
+   },
+   {
+    "who": "old man",
+    "count": 1,
+    "where": "near-bank",
+    "doing": "fish",
+    "female": false
+   },
+   {
+    "who": "woman",
+    "count": 1,
+    "where": "near-bank",
+    "doing": "wash",
+    "female": true
+   },
+   {
+    "who": "farmer",
+    "count": 1,
+    "where": "stage",
+    "doing": "work",
+    "female": false
+   },
+   {
+    "who": "villager",
+    "count": 2,
+    "where": "stage",
+    "doing": "talk",
+    "female": false
+   },
+   {
+    "who": "girl",
+    "count": 1,
+    "where": "stage",
+    "doing": "wave",
+    "female": true
+   }
+  ]
+ },
+ "version": 1,
+ "name": "Village",
+ "kind": "village",
+ "ground": "dirt",
+ "time": "day",
+ "wind": 0.2,
+ "weather": "",
+ "grass": 0.0,
+ "objects": [
+  {
+   "id": "river-350680-0",
+   "type": "river",
+   "x": -40.0,
+   "z": -7.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "width": 4,
+    "fish": 6
+   },
+   "points": [
+    [
+     -40.0,
+     -7.0
+    ],
+    [
+     -34.191584536824756,
+     -6.5733633363778186
+    ],
+    [
+     -28.397650573478675,
+     -6.330045008114776
+    ],
+    [
+     -22.61819810996174,
+     -6.3850717026828745
+    ],
+    [
+     -16.853227146273973,
+     -6.731110311559689
+    ],
+    [
+     -11.102737682415361,
+     -7.241395509343983
+    ],
+    [
+     -5.36672971838591,
+     -7.720337966916119
+    ],
+    [
+     0.35479674581438303,
+     -7.981609004545328
+    ],
+    [
+     6.061841710185515,
+     -7.922528138419984
+    ],
+    [
+     11.754405174727498,
+     -7.565055960961716
+    ],
+    [
+     17.432487139440312,
+     -7.047026866818225
+    ],
+    [
+     23.09608760432397,
+     -6.567121762055742
+    ],
+    [
+     28.74520656937847,
+     -6.3055491682916145
+    ],
+    [
+     34.37984403460382,
+     -6.352101012032081
+    ],
+    [
+     40.0,
+     -6.670305211806594
+    ]
+   ]
+  },
+  {
+   "id": "hill-350680-1",
+   "type": "hill",
+   "x": -25.52,
+   "z": -15.12,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 6.106666866922751,
+    "height": 2.3406839596573263
+   }
+  },
+  {
+   "id": "hill-350680-2",
+   "type": "hill",
+   "x": 25.05,
+   "z": -16.81,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 6.068905031075701,
+    "height": 2.6649885175284
+   }
+  },
+  {
+   "id": "hill-350680-3",
+   "type": "hill",
+   "x": -26.95,
+   "z": -29.09,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 10.13836796884425,
+    "height": 3.780236738966778
+   }
+  },
+  {
+   "id": "bridge-350680-4",
+   "type": "bridge",
+   "x": 1.13,
+   "z": -8.0,
+   "rot": 1.5884861213549062,
+   "scale": 1.0,
+   "opts": {
+    "len": 6.5
+   }
+  },
+  {
+   "id": "boat-350680-5",
+   "type": "boat",
+   "x": 17.08,
+   "z": -7.23,
+   "rot": -0.08776218097580298,
+   "scale": 1.024367217896506,
+   "opts": {
+    "moving": true,
+    "rower": true
+   }
+  },
+  {
+   "id": "hut-350680-6",
+   "type": "hut",
+   "x": 24.53,
+   "z": -21.86,
+   "rot": 0.2058953579515219,
+   "scale": 1.5787363086501136
+  },
+  {
+   "id": "hut-350680-7",
+   "type": "hut",
+   "x": -7.15,
+   "z": -27.88,
+   "rot": 0.22434702143073082,
+   "scale": 1.6245365747110918
+  },
+  {
+   "id": "hut-350680-8",
+   "type": "hut",
+   "x": -0.16,
+   "z": -17.93,
+   "rot": 0.1776123957708478,
+   "scale": 1.8877245832700282
+  },
+  {
+   "id": "hut-350680-9",
+   "type": "hut",
+   "x": 15.1,
+   "z": -21.33,
+   "rot": -0.27670665457844734,
+   "scale": 1.9966229692893105
+  },
+  {
+   "id": "house-350680-10",
+   "type": "house",
+   "x": 21.67,
+   "z": -31.8,
+   "rot": -0.20330623704940082,
+   "scale": 1.8105805626139044
+  },
+  {
+   "id": "well-350680-11",
+   "type": "well",
+   "x": -0.42,
+   "z": -4.32,
+   "rot": -0.30179336126893763,
+   "scale": 1.0590871672844515
+  },
+  {
+   "id": "bench-350680-12",
+   "type": "bench",
+   "x": -18.7,
+   "z": -16.1,
+   "rot": -0.25159023720771073,
+   "scale": 0.8914175818208605
+  },
+  {
+   "id": "crate-350680-13",
+   "type": "crate",
+   "x": 3.15,
+   "z": -2.52,
+   "rot": 0.030304496549069884,
+   "scale": 0.9007773521356285
+  },
+  {
+   "id": "crate-350680-14",
+   "type": "crate",
+   "x": 5.43,
+   "z": -2.65,
+   "rot": -0.029816193506121635,
+   "scale": 0.7568771507404746
+  },
+  {
+   "id": "campfire-350680-15",
+   "type": "campfire",
+   "x": 16.02,
+   "z": -11.78,
+   "rot": 0.3797017300501466,
+   "scale": 1.1282580960774795,
+   "opts": {
+    "lit": true
+   }
+  },
+  {
+   "id": "log-350680-16",
+   "type": "log",
+   "x": 23.87,
+   "z": -10.02,
+   "rot": 0.31149026863276963,
+   "scale": 0.929139121582266
+  },
+  {
+   "id": "log-350680-17",
+   "type": "log",
+   "x": 16.62,
+   "z": 1.9,
+   "rot": -0.14712775871157646,
+   "scale": 0.8663800358818844
+  },
+  {
+   "id": "mango_tree-350680-18",
+   "type": "mango_tree",
+   "x": 22.41,
+   "z": -13.93,
+   "rot": 4.634989297483116,
+   "scale": 1.8127935087354852
+  },
+  {
+   "id": "mango_tree-350680-19",
+   "type": "mango_tree",
+   "x": 10.64,
+   "z": -28.13,
+   "rot": 3.530587088316679,
+   "scale": 1.7813811591267585
+  },
+  {
+   "id": "mango_tree-350680-20",
+   "type": "mango_tree",
+   "x": -15.43,
+   "z": -23.91,
+   "rot": 1.9952477971091866,
+   "scale": 1.6147454268531873
+  },
+  {
+   "id": "mango_tree-350680-21",
+   "type": "mango_tree",
+   "x": -19.88,
+   "z": -26.28,
+   "rot": 2.3006643801927567,
+   "scale": 1.8342604107549416
+  },
+  {
+   "id": "banana_plant-350680-22",
+   "type": "banana_plant",
+   "x": -10.12,
+   "z": -0.8,
+   "rot": 3.4242574428208172,
+   "scale": 1.2125653321668506
+  },
+  {
+   "id": "banana_plant-350680-23",
+   "type": "banana_plant",
+   "x": -17.98,
+   "z": -2.74,
+   "rot": 0.15972941229119897,
+   "scale": 1.3502705545350908
+  },
+  {
+   "id": "big_tree-350680-24",
+   "type": "big_tree",
+   "x": -22.59,
+   "z": -20.2,
+   "rot": 5.96598981320858,
+   "scale": 2.07927353749983
+  },
+  {
+   "id": "big_tree-350680-25",
+   "type": "big_tree",
+   "x": -14.97,
+   "z": -16.74,
+   "rot": 1.8384120790287852,
+   "scale": 2.1999015127308668
+  },
+  {
+   "id": "big_tree-350680-26",
+   "type": "big_tree",
+   "x": -8.96,
+   "z": -19.76,
+   "rot": 1.5976822231896222,
+   "scale": 2.0718105821870267
+  },
+  {
+   "id": "big_tree-350680-27",
+   "type": "big_tree",
+   "x": -8.04,
+   "z": -12.35,
+   "rot": 4.761489695403725,
+   "scale": 1.737812157999724
+  },
+  {
+   "id": "big_tree-350680-28",
+   "type": "big_tree",
+   "x": 4.25,
+   "z": -27.86,
+   "rot": 5.701973630581051,
+   "scale": 1.9870500994380562
+  },
+  {
+   "id": "big_tree-350680-29",
+   "type": "big_tree",
+   "x": 11.49,
+   "z": -15.63,
+   "rot": 4.460763373877853,
+   "scale": 1.7823256065137685
+  },
+  {
+   "id": "bush-350680-30",
+   "type": "bush",
+   "x": 5.81,
+   "z": 1.4,
+   "rot": 2.009269536472857,
+   "scale": 0.8715765912784263
+  },
+  {
+   "id": "bush-350680-31",
+   "type": "bush",
+   "x": 9.61,
+   "z": -19.57,
+   "rot": 3.582302011549473,
+   "scale": 1.0844994619023054
+  },
+  {
+   "id": "bush-350680-32",
+   "type": "bush",
+   "x": -25.01,
+   "z": -22.52,
+   "rot": 2.2336708065122366,
+   "scale": 1.0877692400244996
+  },
+  {
+   "id": "bush-350680-33",
+   "type": "bush",
+   "x": 19.54,
+   "z": -20.02,
+   "rot": 5.815420329105109,
+   "scale": 0.9099202150246128
+  },
+  {
+   "id": "bush-350680-34",
+   "type": "bush",
+   "x": 3.38,
+   "z": -3.75,
+   "rot": 0.5482723745517433,
+   "scale": 1.135525101213716
+  },
+  {
+   "id": "bush-350680-35",
+   "type": "bush",
+   "x": 1.52,
+   "z": -24.32,
+   "rot": 2.4630151712335646,
+   "scale": 1.1492395983543247
+  },
+  {
+   "id": "bush-350680-36",
+   "type": "bush",
+   "x": 16.96,
+   "z": -0.14,
+   "rot": 5.278799504041672,
+   "scale": 1.1192592712119223
+  },
+  {
+   "id": "bush-350680-37",
+   "type": "bush",
+   "x": 5.78,
+   "z": 3.6,
+   "rot": 3.6752559347078204,
+   "scale": 0.9231154517969117
+  },
+  {
+   "id": "tall_grass-350680-38",
+   "type": "tall_grass",
+   "x": 8.61,
+   "z": -13.62,
+   "rot": -0.002419252321124077,
+   "scale": 1.1537479720730335
+  },
+  {
+   "id": "tall_grass-350680-39",
+   "type": "tall_grass",
+   "x": -20.49,
+   "z": -30.51,
+   "rot": -0.35657295342534784,
+   "scale": 1.2960100601892919
+  },
+  {
+   "id": "tall_grass-350680-40",
+   "type": "tall_grass",
+   "x": -11.33,
+   "z": -10.24,
+   "rot": 0.078131240606308,
+   "scale": 1.3591830976400523
+  },
+  {
+   "id": "tall_grass-350680-41",
+   "type": "tall_grass",
+   "x": 6.43,
+   "z": -24.41,
+   "rot": 0.23537188153713942,
+   "scale": 1.3283984559774398
+  },
+  {
+   "id": "tall_grass-350680-42",
+   "type": "tall_grass",
+   "x": 17.8,
+   "z": -25.59,
+   "rot": 0.18110056016594173,
+   "scale": 1.281349274776876
+  },
+  {
+   "id": "tall_grass-350680-43",
+   "type": "tall_grass",
+   "x": 21.69,
+   "z": -17.67,
+   "rot": 0.33666907604783775,
+   "scale": 1.3443678176589309
+  },
+  {
+   "id": "tall_grass-350680-44",
+   "type": "tall_grass",
+   "x": 6.06,
+   "z": -21.54,
+   "rot": 0.3084923941642046,
+   "scale": 1.2681832979433239
+  },
+  {
+   "id": "tall_grass-350680-45",
+   "type": "tall_grass",
+   "x": -10.66,
+   "z": -16.93,
+   "rot": -0.39863823261111975,
+   "scale": 1.0404437246918679
+  },
+  {
+   "id": "tall_grass-350680-46",
+   "type": "tall_grass",
+   "x": -0.54,
+   "z": -27.87,
+   "rot": -0.20151179637759925,
+   "scale": 1.3043844905588775
+  },
+  {
+   "id": "tall_grass-350680-47",
+   "type": "tall_grass",
+   "x": 15.75,
+   "z": -27.15,
+   "rot": -0.07797325011342765,
+   "scale": 1.3022198487259447
+  },
+  {
+   "id": "fence-350680-48",
+   "type": "fence",
+   "x": -13.29,
+   "z": -31.92,
+   "rot": -0.03519021421670914,
+   "scale": 1.0392069518798963
+  },
+  {
+   "id": "fence-350680-49",
+   "type": "fence",
+   "x": -26.76,
+   "z": -26.49,
+   "rot": 0.3601475177332759,
+   "scale": 0.997602683212608
+  },
+  {
+   "id": "fence-350680-50",
+   "type": "fence",
+   "x": -24.58,
+   "z": -13.79,
+   "rot": -0.38324109744280577,
+   "scale": 1.1281258386559785
+  },
+  {
+   "id": "fence-350680-51",
+   "type": "fence",
+   "x": 25.83,
+   "z": 2.82,
+   "rot": 0.025021380931138995,
+   "scale": 1.114150140946731
+  },
+  {
+   "id": "fence-350680-52",
+   "type": "fence",
+   "x": -26.88,
+   "z": 1.7,
+   "rot": 0.3518132796511054,
+   "scale": 0.9170398636488244
+  },
+  {
+   "id": "flowers-350680-53",
+   "type": "flowers",
+   "x": 26.61,
+   "z": -14.97,
+   "rot": 0.062054339423775674,
+   "scale": 0.6263019406702369
+  },
+  {
+   "id": "flowers-350680-54",
+   "type": "flowers",
+   "x": -22.62,
+   "z": -27.1,
+   "rot": 0.3371302269399166,
+   "scale": 0.5209471181686967
+  },
+  {
+   "id": "flowers-350680-55",
+   "type": "flowers",
+   "x": -2.33,
+   "z": -11.51,
+   "rot": -0.174996592476964,
+   "scale": 0.5480585471726954
+  },
+  {
+   "id": "flowers-350680-56",
+   "type": "flowers",
+   "x": 20.15,
+   "z": -21.77,
+   "rot": -0.16457674447447063,
+   "scale": 0.6408618920389563
+  },
+  {
+   "id": "flowers-350680-57",
+   "type": "flowers",
+   "x": 11.91,
+   "z": -11.57,
+   "rot": -0.2632714340463281,
+   "scale": 0.6195067556155845
+  },
+  {
+   "id": "flowers-350680-58",
+   "type": "flowers",
+   "x": 18.26,
+   "z": -1.89,
+   "rot": -0.07460294049233199,
+   "scale": 0.5108182474644855
+  },
+  {
+   "id": "flowers-350680-59",
+   "type": "flowers",
+   "x": 20.29,
+   "z": -2.42,
+   "rot": 0.04934917259961367,
+   "scale": 0.630263767610304
+  },
+  {
+   "id": "flowers-350680-60",
+   "type": "flowers",
+   "x": 1.6,
+   "z": -3.22,
+   "rot": -0.1767516249790788,
+   "scale": 0.5242395372362807
+  },
+  {
+   "id": "flowers-350680-61",
+   "type": "flowers",
+   "x": -5.45,
+   "z": -17.71,
+   "rot": 0.043216077052056795,
+   "scale": 0.5155140616977587
+  },
+  {
+   "id": "flowers-350680-62",
+   "type": "flowers",
+   "x": 9.86,
+   "z": -22.74,
+   "rot": -0.23905511349439623,
+   "scale": 0.61364041950088
+  },
+  {
+   "id": "flowers-350680-63",
+   "type": "flowers",
+   "x": -18.03,
+   "z": -14.36,
+   "rot": 0.3393873691558838,
+   "scale": 0.5576142180338501
+  },
+  {
+   "id": "flowers-350680-64",
+   "type": "flowers",
+   "x": -19.32,
+   "z": 3.4,
+   "rot": 0.08339705988764763,
+   "scale": 0.5825469458196312
+  },
+  {
+   "id": "stones-350680-65",
+   "type": "stones",
+   "x": -11.85,
+   "z": 1.06,
+   "rot": 0.28171006608754395,
+   "scale": 0.5256739635951817
+  },
+  {
+   "id": "stones-350680-66",
+   "type": "stones",
+   "x": -15.16,
+   "z": -12.02,
+   "rot": 0.010732522793114187,
+   "scale": 0.5005033417721279
+  },
+  {
+   "id": "stones-350680-67",
+   "type": "stones",
+   "x": -22.8,
+   "z": -16.66,
+   "rot": 0.02066035158932209,
+   "scale": 0.5246195976738818
+  },
+  {
+   "id": "stones-350680-68",
+   "type": "stones",
+   "x": 12.06,
+   "z": -2.9,
+   "rot": -0.3133256167173386,
+   "scale": 0.46625607655150814
+  },
+  {
+   "id": "stones-350680-69",
+   "type": "stones",
+   "x": -6.08,
+   "z": -22.67,
+   "rot": 0.29381983522325755,
+   "scale": 0.533694109832868
+  },
+  {
+   "id": "stones-350680-70",
+   "type": "stones",
+   "x": 3.38,
+   "z": 3.09,
+   "rot": 0.038861863873898984,
+   "scale": 0.5154248420149088
+  },
+  {
+   "id": "stones-350680-71",
+   "type": "stones",
+   "x": -11.45,
+   "z": -25.6,
+   "rot": -0.39811183884739876,
+   "scale": 0.5736059052404017
+  },
+  {
+   "id": "stones-350680-72",
+   "type": "stones",
+   "x": 16.96,
+   "z": -4.06,
+   "rot": -0.12074391394853592,
+   "scale": 0.5247988173970952
+  },
+  {
+   "id": "basket-350680-73",
+   "type": "basket",
+   "x": -1.26,
+   "z": -1.49,
+   "rot": 0.18434383794665338,
+   "scale": 0.7363236841000615
+  },
+  {
+   "id": "animal-350680-74",
+   "type": "animal",
+   "x": -14.29,
+   "z": -5.76,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "duck",
+    "doing": "swim",
+    "radius": 3.3025015289895236,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-75",
+   "type": "animal",
+   "x": 20.53,
+   "z": -5.57,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "duck",
+    "doing": "swim",
+    "radius": 1.8813843769021332,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-76",
+   "type": "animal",
+   "x": -18.84,
+   "z": -5.38,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "duck",
+    "doing": "swim",
+    "radius": 2.3319185418076813,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-77",
+   "type": "animal",
+   "x": 8.19,
+   "z": -6.64,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "duck",
+    "doing": "swim",
+    "radius": 3.428275318350643,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-78",
+   "type": "animal",
+   "x": 18.14,
+   "z": -17.57,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "goat",
+    "doing": "graze",
+    "radius": 3.2619916894473135,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-79",
+   "type": "animal",
+   "x": -22.7,
+   "z": -31.95,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "goat",
+    "doing": "graze",
+    "radius": 2.419631415978074,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-80",
+   "type": "animal",
+   "x": -5.08,
+   "z": -22.05,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "goat",
+    "doing": "graze",
+    "radius": 1.5930471401661634,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-81",
+   "type": "animal",
+   "x": -19.35,
+   "z": -20.44,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "cow",
+    "doing": "graze",
+    "radius": 1.6409423914738,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-82",
+   "type": "animal",
+   "x": -2.84,
+   "z": -31.06,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "cow",
+    "doing": "graze",
+    "radius": 2.119145973585546,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-83",
+   "type": "animal",
+   "x": -18.46,
+   "z": -11.2,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 2.2851721262559295,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-84",
+   "type": "animal",
+   "x": -20.31,
+   "z": 1.14,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 2.6833591177128255,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-85",
+   "type": "animal",
+   "x": -16.91,
+   "z": 1.21,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 3.2277653398923576,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-86",
+   "type": "animal",
+   "x": -14.94,
+   "z": -2.85,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "chicken",
+    "doing": "walk",
+    "radius": 2.451746374834329,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-87",
+   "type": "animal",
+   "x": -5.08,
+   "z": -1.71,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "dog",
+    "doing": "play",
+    "radius": 2.1101745450869203,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-88",
+   "type": "animal",
+   "x": -0.54,
+   "z": -23.11,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.7701869108714163,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-89",
+   "type": "animal",
+   "x": -11.3,
+   "z": -10.54,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.03966729901731,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-90",
+   "type": "animal",
+   "x": 16.09,
+   "z": -28.59,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 3.1148169357329607,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-91",
+   "type": "animal",
+   "x": -19.46,
+   "z": -19.12,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.5339633165858686,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-92",
+   "type": "animal",
+   "x": 7.66,
+   "z": -28.51,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.664676861371845,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-93",
+   "type": "animal",
+   "x": -22.72,
+   "z": -31.71,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.5839949110522866,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-94",
+   "type": "animal",
+   "x": 15.53,
+   "z": -6.01,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "fish",
+    "doing": "swim",
+    "radius": 2.0757476864382625,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-95",
+   "type": "animal",
+   "x": 20.67,
+   "z": -5.52,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "fish",
+    "doing": "swim",
+    "radius": 2.06989988591522,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-96",
+   "type": "animal",
+   "x": -25.36,
+   "z": -5.09,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "fish",
+    "doing": "swim",
+    "radius": 3.4537365650758147,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-97",
+   "type": "animal",
+   "x": -18.45,
+   "z": -5.41,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "fish",
+    "doing": "swim",
+    "radius": 2.615740262437612,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-350680-98",
+   "type": "animal",
+   "x": 3.2,
+   "z": -6.83,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "fish",
+    "doing": "swim",
+    "radius": 1.6333413203246891,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "boat-350680-99",
+   "type": "boat",
+   "x": -9.5,
+   "z": -7.55,
+   "rot": 0.08590894213662124,
+   "scale": 1.0,
+   "opts": {
+    "moving": true,
+    "rower": true,
+    "who": "boatman"
+   }
+  },
+  {
+   "id": "person-350680-100",
+   "type": "person",
+   "x": -2.05,
+   "z": -3.61,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "old man",
+    "doing": "fish",
+    "female": false,
+    "radius": 3.8599234516732395
+   }
+  },
+  {
+   "id": "person-350680-101",
+   "type": "person",
+   "x": -23.87,
+   "z": -2.99,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "woman",
+    "doing": "wash",
+    "female": true,
+    "radius": 2.016003757249564
+   }
+  },
+  {
+   "id": "person-350680-102",
+   "type": "person",
+   "x": 3.32,
+   "z": -1.46,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "farmer",
+    "doing": "work",
+    "female": false,
+    "radius": 2.2363956081680954
+   }
+  },
+  {
+   "id": "person-350680-103",
+   "type": "person",
+   "x": -5.76,
+   "z": -1.53,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "villager",
+    "doing": "talk",
+    "female": false,
+    "radius": 2.4947186703793705
+   }
+  },
+  {
+   "id": "person-350680-104",
+   "type": "person",
+   "x": -5.65,
+   "z": -2.53,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "villager",
+    "doing": "talk",
+    "female": false,
+    "radius": 3.07882429799065
+   }
+  },
+  {
+   "id": "person-350680-105",
+   "type": "person",
+   "x": 0.98,
+   "z": -2.31,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "girl",
+    "doing": "wave",
+    "female": true,
+    "radius": 2.0713746594265103
+   }
+  }
+ ],
+ "stage": {
+  "x": 0.0,
+  "z": 0.0,
+  "rot": 0.0
+ },
+ "updated": "2026-11-17T03:28:06"
+}

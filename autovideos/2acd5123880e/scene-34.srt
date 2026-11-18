@@ -1,0 +1,19 @@
+1
+00:00:00,000 --> 00:00:01,620
+Even though you gained $100
+
+2
+00:00:01,620 --> 00:00:03,820
+nominal dollars, your ability to
+
+3
+00:00:03,820 --> 00:00:05,620
+purchase real -world assets has
+
+4
+00:00:05,620 --> 00:00:07,600
+dropped by nearly $800 in
+
+5
+00:00:07,600 --> 00:00:08,300
+real terms.

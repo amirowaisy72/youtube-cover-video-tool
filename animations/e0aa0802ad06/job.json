@@ -1,0 +1,64 @@
+{
+  "id": "e0aa0802ad06",
+  "status": "ready",
+  "progress": 75,
+  "message": "Preview ready — watch it, then press Render final video.",
+  "title": "Teddy and Peddy Save Passengers",
+  "minutes": 1.0,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd"
+  ],
+  "review": true,
+  "subtitles": true,
+  "idea": "",
+  "custom_script": "# Scene: City street\nTeddy: {run} Peddy, let us ride our *motorcycle* across the town! {jump} [excited, point, shout, horn]\nPeddy: {walk-to} {laugh} Hold on tight as we speed along! [happy, wave, excited]\n# Time skip: Moments later...\n# Scene: Railway Station (rail_track, train, big trees)\nTeddy: {look-around} {gasp} Look, the *rail_track* is broken right here! [surprised, point, shout, gasp]\nPeddy: {shock} Oh no, a *train* is coming this way fast! {scared} [surprised, facepalm, shout, horn]\n# Time skip: Right before the train hits...\n# Scene: Railway Station (rail_track, train)\nTeddy: {run} Quick, we must *weld* the track before it arrives! {idea} [excited, point, shout, footsteps]\nPeddy: {light-fire} {weld:rail_track} Fixed it just in time! {yay} [happy, point, excited, magic]\nTeddy: {clap} Look, the *train* crossed safely over our fixed *rail_track*! {laugh} [happy, wave, applause]\nPeddy: {high-five} {yay} The *passengers* are safe and cheering for us! [happy, idle, excited, ding]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "acting": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-18T02:35:17",
+  "story_source": "custom",
+  "auto_chars": [],
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\animations\\e0aa0802ad06\\music-made.wav",
+  "music_credit": "Drawings: OpenMoji (openmoji.org), CC BY-SA 4.0",
+  "sound_effects": [
+    "ambience",
+    "applause",
+    "boing",
+    "ding",
+    "fire",
+    "footsteps",
+    "gasp",
+    "horn",
+    "magic",
+    "pop",
+    "thud",
+    "tick",
+    "tock",
+    "whoosh"
+  ],
+  "mix_file": "mix.m4a",
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 99,
+  "duration": 68.6,
+  "background_sources": []
+}

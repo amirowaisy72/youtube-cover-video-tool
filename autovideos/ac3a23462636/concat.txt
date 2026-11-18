@@ -1,0 +1,6 @@
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ac3a23462636\d0d07ba2b207.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ac3a23462636\2c8793c2f473.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ac3a23462636\be63d8204549.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ac3a23462636\a37f6e24414d.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ac3a23462636\f1262eb9f075.mp3'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ac3a23462636\a76ebeecbc98.mp3'

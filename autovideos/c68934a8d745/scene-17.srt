@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:01,260
+If you spend a weekend
+
+2
+00:00:01,260 --> 00:00:03,500
+designing a clean, automated and
+
+3
+00:00:03,500 --> 00:00:05,720
+intuitive, personal finance spreadsheet that
+
+4
+00:00:05,720 --> 00:00:07,440
+solves that specific pain point,
+
+5
+00:00:07,760 --> 00:00:08,860
+you have created a digital
+
+6
+00:00:08,860 --> 00:00:09,340
+product.

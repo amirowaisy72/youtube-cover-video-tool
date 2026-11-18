@@ -1,0 +1,53 @@
+{
+  "id": "81c6d594af47",
+  "status": "ready",
+  "progress": 75,
+  "message": "Preview ready — watch it, then press Render final video.",
+  "title": "Imran borrows Master's phone for one minute but chaos happens",
+  "minutes": 1.0,
+  "format": "long",
+  "language": "en",
+  "character_ids": [
+    "8f31b59119cb",
+    "6d7bf361b7fd"
+  ],
+  "review": false,
+  "subtitles": true,
+  "custom_script": "# Scene: home (sitting)\nImran: Master, can I borrow your phone? Just one minute! [happy, wave]\nMaster: One minute only. {sweat} Don't touch anything! [suspicious, point]\nImran: {phone} Hello Mom? {gasp} Oops, I pressed something. [surprised, shrug]\nMaster: What did you press?! {scared} [surprised, hips, scream]\nImran: {look-around} Just… \"send to all contacts.\" [sad, shrug, fail]\n# Time skip: One minute later…\n# Scene: street\nMaster: Two hundred people saw my baby photo! {cry} [sad, shrug]\nImran: {giggle} You looked so cute in that diaper! [happy, point]\nMaster: {angry} Give me that phone! [angry, hips, crash]\nImran: {walk-out} Bye, cutie! [happy, wave, footsteps]",
+  "pixabay_key": "13090133-080b838297c4731ddeb5c9834",
+  "backgrounds": "drawn",
+  "music": "auto",
+  "sfx": true,
+  "freesound_key": "TfXnjK8NVoKIDL6iAnMbZ2NAQVEaG8K0jDHg0rbI",
+  "tts_keys": {
+    "unreal": "4G3h8Ex2ax3dUUl3SPyfhqnKuoawhwBG064saMMVKmxxgMDYK0LTq1",
+    "elevenlabs": "sk_b12f7b1b48e208bc6007820e5c27256c7cdf141c0a4e6683"
+  },
+  "created_at": "2026-11-16T04:51:13",
+  "story_source": "custom",
+  "music_file": "G:\\Web Apps\\youtube-cover-video-tool\\backend\\music_pack\\bicycle.mp3",
+  "music_credit": "Music: \"Bicycle\" by Kevin MacLeod (CC-BY 4.0 — credit Kevin MacLeod when you use it)",
+  "sound_effects": [
+    "crash",
+    "fail",
+    "footsteps",
+    "phone",
+    "scream",
+    "tick",
+    "tock"
+  ],
+  "geometry": {
+    "width": 1280,
+    "height": 720,
+    "unit": 1.1875,
+    "floorY": 682.6,
+    "seatY": 631.5
+  },
+  "sprite_size": [
+    237,
+    475
+  ],
+  "sprite_count": 86,
+  "duration": 53.5,
+  "background_sources": []
+}

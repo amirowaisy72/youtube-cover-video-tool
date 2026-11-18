@@ -1,0 +1,5 @@
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\c3052ae988d5\master-seg-00.mp4'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\c3052ae988d5\master-seg-01.mp4'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\c3052ae988d5\master-seg-02.mp4'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\c3052ae988d5\master-seg-03.mp4'
+file 'G:\Web Apps\youtube-cover-video-tool\autovideos\c3052ae988d5\master-seg-04.mp4'

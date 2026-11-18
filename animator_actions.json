@@ -1,0 +1,22 @@
+{
+ "cheer": {
+  "label": "cheer",
+  "words": [
+   "cheer"
+  ],
+  "frames": 72,
+  "go": true,
+  "body": "stand",
+  "arms": "work",
+  "hold": "",
+  "ride": false,
+  "rideDist": 8.0,
+  "effect": "",
+  "change": "",
+  "color": "#f472b6",
+  "atStart": false,
+  "sound": "",
+  "closeup": true,
+  "thing": "High Five"
+ }
+}

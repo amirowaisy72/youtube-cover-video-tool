@@ -1,0 +1,1036 @@
+{
+ "season": "spring",
+ "fog": 0.0,
+ "models": {},
+ "recipe": {
+  "name": "World of Wonders",
+  "place": "forest",
+  "ground": "grass",
+  "time": "sunset",
+  "season": "spring",
+  "weather": "clear",
+  "wind": 0.2,
+  "terrain": {
+   "hills": "few",
+   "mountains": true
+  },
+  "water": [
+   {
+    "type": "river",
+    "from": "back-left",
+    "to": "front-right",
+    "width": 4,
+    "fish": true
+   },
+   {
+    "type": "pond",
+    "where": "right",
+    "size": "big",
+    "fish": true
+   },
+   {
+    "type": "waterfall",
+    "where": "back"
+   }
+  ],
+  "things": [
+   {
+    "what": "big_tree",
+    "count": 10,
+    "where": "everywhere",
+    "size": 1.5
+   },
+   {
+    "what": "mushroom",
+    "count": 15,
+    "where": "near-bank",
+    "size": 1
+   },
+   {
+    "what": "flowers",
+    "count": 20,
+    "where": "stage",
+    "size": 0.8
+   },
+   {
+    "what": "bridge",
+    "count": 1,
+    "where": "river",
+    "size": 1
+   },
+   {
+    "what": "boat",
+    "count": 2,
+    "where": "river",
+    "moving": true,
+    "rower": true
+   },
+   {
+    "what": "picture:crystal_tower",
+    "count": 1,
+    "where": "far",
+    "size": 8
+   }
+  ],
+  "animals": [
+   {
+    "species": "bird",
+    "count": 8,
+    "where": "everywhere",
+    "doing": "fly"
+   },
+   {
+    "species": "deer",
+    "count": 4,
+    "where": "far-bank",
+    "doing": "graze"
+   },
+   {
+    "species": "frog",
+    "count": 5,
+    "where": "around-pond",
+    "doing": "play"
+   }
+  ],
+  "people": [
+   {
+    "who": "old man",
+    "count": 1,
+    "where": "stage",
+    "doing": "talk",
+    "female": false
+   },
+   {
+    "who": "girl",
+    "count": 1,
+    "where": "stage",
+    "doing": "wave",
+    "female": true
+   },
+   {
+    "who": "fisherman",
+    "count": 1,
+    "where": "river",
+    "doing": "row",
+    "female": false
+   }
+  ]
+ },
+ "version": 1,
+ "name": "World of Wonders",
+ "kind": "forest",
+ "ground": "grass",
+ "time": "sunset",
+ "wind": 0.2,
+ "weather": "",
+ "grass": 1.0,
+ "objects": [
+  {
+   "id": "river-86038-0",
+   "type": "river",
+   "x": -34.0,
+   "z": -30.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "width": 4,
+    "fish": 6
+   },
+   "points": [
+    [
+     -34.0,
+     -30.0
+    ],
+    [
+     -29.363734027180744,
+     -26.73469795198247
+    ],
+    [
+     -24.69348699523479,
+     -23.66086056219808
+    ],
+    [
+     -19.98925890416211,
+     -20.89351451811885
+    ],
+    [
+     -15.25104975396273,
+     -18.425326711222343
+    ],
+    [
+     -10.478859544636641,
+     -16.129531816107324
+    ],
+    [
+     -5.672688276183848,
+     -13.81054050365416
+    ],
+    [
+     -0.8325359486043453,
+     -11.282024094132078
+    ],
+    [
+     4.0415974381018644,
+     -8.441302103729454
+    ],
+    [
+     8.94971188393479,
+     -6.421320802881382
+    ],
+    [
+     13.891807388894412,
+     -2.0269575521951615
+    ],
+    [
+     18.867883952980744,
+     1.2101497082225694
+    ],
+    [
+     23.877941576193788,
+     4.220778134767935
+    ],
+    [
+     28.92198025853354,
+     6.915135800934699
+    ],
+    [
+     34.0,
+     9.329694788193406
+    ]
+   ]
+  },
+  {
+   "id": "pond-86038-1",
+   "type": "pond",
+   "x": 18.29,
+   "z": -10.23,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 4.6,
+    "fish": 5
+   }
+  },
+  {
+   "id": "waterfall-86038-2",
+   "type": "waterfall",
+   "x": 0.0,
+   "z": -15.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "height": 6.460462672170252
+   }
+  },
+  {
+   "id": "pond-86038-3",
+   "type": "pond",
+   "x": 0.0,
+   "z": -11.2,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 3.4,
+    "fish": 5
+   }
+  },
+  {
+   "id": "hill-86038-4",
+   "type": "hill",
+   "x": -10.05,
+   "z": -25.63,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 9.61289539723657,
+    "height": 3.0706773234996945
+   }
+  },
+  {
+   "id": "hill-86038-5",
+   "type": "hill",
+   "x": 12.32,
+   "z": -30.73,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 10.011414099950343,
+    "height": 3.1189328264445066
+   }
+  },
+  {
+   "id": "hill-86038-6",
+   "type": "hill",
+   "x": -21.08,
+   "z": -11.69,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 6.862832027487457,
+    "height": 4.959172707283869
+   }
+  },
+  {
+   "id": "hill-86038-7",
+   "type": "hill",
+   "x": -8.0,
+   "z": -16.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 8,
+    "height": 5.5
+   }
+  },
+  {
+   "id": "hill-86038-8",
+   "type": "hill",
+   "x": 8.0,
+   "z": -16.0,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 8,
+    "height": 5.5
+   }
+  },
+  {
+   "id": "hill-86038-9",
+   "type": "hill",
+   "x": -45.36,
+   "z": -51.89,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 15.07940695201978,
+    "height": 13.490119281224906
+   }
+  },
+  {
+   "id": "hill-86038-10",
+   "type": "hill",
+   "x": -19.39,
+   "z": -52.94,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 14.261339293327183,
+    "height": 11.383755132323131
+   }
+  },
+  {
+   "id": "hill-86038-11",
+   "type": "hill",
+   "x": -1.23,
+   "z": -54.5,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 16.91454010317102,
+    "height": 11.089780329959467
+   }
+  },
+  {
+   "id": "hill-86038-12",
+   "type": "hill",
+   "x": 20.47,
+   "z": -52.32,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 18.53899150993675,
+    "height": 9.519402154022828
+   }
+  },
+  {
+   "id": "hill-86038-13",
+   "type": "hill",
+   "x": 41.39,
+   "z": -48.38,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "radius": 19.45091399271041,
+    "height": 14.677027597557753
+   }
+  },
+  {
+   "id": "big_tree-86038-14",
+   "type": "big_tree",
+   "x": -10.48,
+   "z": -7.69,
+   "rot": 3.693330434616655,
+   "scale": 1.3148246846627445
+  },
+  {
+   "id": "big_tree-86038-15",
+   "type": "big_tree",
+   "x": -2.89,
+   "z": -23.14,
+   "rot": 1.5450949645601213,
+   "scale": 1.5526545016444286
+  },
+  {
+   "id": "big_tree-86038-16",
+   "type": "big_tree",
+   "x": 15.8,
+   "z": -20.95,
+   "rot": 2.8616742049343884,
+   "scale": 1.5807524208677934
+  },
+  {
+   "id": "big_tree-86038-17",
+   "type": "big_tree",
+   "x": -13.82,
+   "z": -9.9,
+   "rot": 0.2638724190182984,
+   "scale": 1.6613797491649167
+  },
+  {
+   "id": "big_tree-86038-18",
+   "type": "big_tree",
+   "x": 23.73,
+   "z": -2.32,
+   "rot": 3.0711744390428066,
+   "scale": 1.4027885970426723
+  },
+  {
+   "id": "big_tree-86038-19",
+   "type": "big_tree",
+   "x": 9.08,
+   "z": -21.3,
+   "rot": 1.5128998258151114,
+   "scale": 1.3392027801135553
+  },
+  {
+   "id": "big_tree-86038-20",
+   "type": "big_tree",
+   "x": 24.27,
+   "z": -15.14,
+   "rot": 3.607852769549936,
+   "scale": 1.3670199512620456
+  },
+  {
+   "id": "big_tree-86038-21",
+   "type": "big_tree",
+   "x": -21.12,
+   "z": -29.79,
+   "rot": 3.120065781287849,
+   "scale": 1.379578455153387
+  },
+  {
+   "id": "big_tree-86038-22",
+   "type": "big_tree",
+   "x": -3.98,
+   "z": -5.04,
+   "rot": 1.1095735598355532,
+   "scale": 1.6861788891954346
+  },
+  {
+   "id": "big_tree-86038-23",
+   "type": "big_tree",
+   "x": -16.46,
+   "z": -25.01,
+   "rot": 5.118514178786427,
+   "scale": 1.4894137765746562
+  },
+  {
+   "id": "mushroom-86038-24",
+   "type": "mushroom",
+   "x": -15.4,
+   "z": -12.93,
+   "rot": 0.16952029522508383,
+   "scale": 0.9202247928828001
+  },
+  {
+   "id": "mushroom-86038-25",
+   "type": "mushroom",
+   "x": -3.39,
+   "z": -7.88,
+   "rot": 0.029989981278777125,
+   "scale": 0.8803118736715987
+  },
+  {
+   "id": "mushroom-86038-26",
+   "type": "mushroom",
+   "x": 10.49,
+   "z": 0.98,
+   "rot": -0.3248735083267093,
+   "scale": 1.1077328552957624
+  },
+  {
+   "id": "mushroom-86038-27",
+   "type": "mushroom",
+   "x": -13.29,
+   "z": -12.66,
+   "rot": 0.276340620778501,
+   "scale": 0.9151655042078346
+  },
+  {
+   "id": "mushroom-86038-28",
+   "type": "mushroom",
+   "x": -6.15,
+   "z": -9.18,
+   "rot": -0.3264881663024426,
+   "scale": 0.9940943506779149
+  },
+  {
+   "id": "mushroom-86038-29",
+   "type": "mushroom",
+   "x": 17.51,
+   "z": 4.58,
+   "rot": 0.3175643691793084,
+   "scale": 0.8541726554278284
+  },
+  {
+   "id": "mushroom-86038-30",
+   "type": "mushroom",
+   "x": 17.0,
+   "z": 5.93,
+   "rot": 0.22480043042451145,
+   "scale": 1.045061339228414
+  },
+  {
+   "id": "mushroom-86038-31",
+   "type": "mushroom",
+   "x": -18.79,
+   "z": -16.33,
+   "rot": -0.2831308301538229,
+   "scale": 1.0140078228199854
+  },
+  {
+   "id": "mushroom-86038-32",
+   "type": "mushroom",
+   "x": -19.46,
+   "z": -15.01,
+   "rot": 0.21159404478967192,
+   "scale": 1.0334428801666946
+  },
+  {
+   "id": "mushroom-86038-33",
+   "type": "mushroom",
+   "x": -25.47,
+   "z": -18.24,
+   "rot": 0.36643020752817396,
+   "scale": 0.9669295701198279
+  },
+  {
+   "id": "mushroom-86038-34",
+   "type": "mushroom",
+   "x": 21.88,
+   "z": 6.97,
+   "rot": 0.049776491522789006,
+   "scale": 1.0800010627368466
+  },
+  {
+   "id": "mushroom-86038-35",
+   "type": "mushroom",
+   "x": 8.34,
+   "z": -3.06,
+   "rot": 0.13069323878735303,
+   "scale": 0.8908461289480328
+  },
+  {
+   "id": "mushroom-86038-36",
+   "type": "mushroom",
+   "x": -16.47,
+   "z": -13.49,
+   "rot": -0.3648800648748875,
+   "scale": 1.1067323740106076
+  },
+  {
+   "id": "mushroom-86038-37",
+   "type": "mushroom",
+   "x": -23.6,
+   "z": -19.12,
+   "rot": 0.14086833633482457,
+   "scale": 1.0609838699456304
+  },
+  {
+   "id": "mushroom-86038-38",
+   "type": "mushroom",
+   "x": 11.52,
+   "z": 2.29,
+   "rot": 0.12053393442183734,
+   "scale": 0.8931619274662808
+  },
+  {
+   "id": "flowers-86038-39",
+   "type": "flowers",
+   "x": -4.11,
+   "z": -2.5,
+   "rot": 0.3755733244121075,
+   "scale": 0.9176089909859002
+  },
+  {
+   "id": "flowers-86038-40",
+   "type": "flowers",
+   "x": 2.39,
+   "z": -2.28,
+   "rot": -0.11367034669965506,
+   "scale": 0.7854296442307532
+  },
+  {
+   "id": "flowers-86038-41",
+   "type": "flowers",
+   "x": -2.65,
+   "z": -2.69,
+   "rot": -0.2736680874601007,
+   "scale": 0.7577585435658694
+  },
+  {
+   "id": "flowers-86038-42",
+   "type": "flowers",
+   "x": -1.83,
+   "z": -2.6,
+   "rot": 0.2548202557489276,
+   "scale": 0.6948393514379859
+  },
+  {
+   "id": "flowers-86038-43",
+   "type": "flowers",
+   "x": -4.75,
+   "z": -1.33,
+   "rot": 0.21360932290554047,
+   "scale": 0.7532439617812634
+  },
+  {
+   "id": "flowers-86038-44",
+   "type": "flowers",
+   "x": -2.45,
+   "z": -1.3,
+   "rot": 0.16267632227391005,
+   "scale": 0.7840249460004269
+  },
+  {
+   "id": "flowers-86038-45",
+   "type": "flowers",
+   "x": 1.18,
+   "z": -1.84,
+   "rot": 0.11741382107138634,
+   "scale": 0.6933270470052958
+  },
+  {
+   "id": "flowers-86038-46",
+   "type": "flowers",
+   "x": 3.48,
+   "z": -1.69,
+   "rot": -0.22084267493337395,
+   "scale": 0.7813527300022542
+  },
+  {
+   "id": "flowers-86038-47",
+   "type": "flowers",
+   "x": 0.98,
+   "z": -2.66,
+   "rot": 0.27212263327091935,
+   "scale": 0.7518031056970358
+  },
+  {
+   "id": "flowers-86038-48",
+   "type": "flowers",
+   "x": 0.38,
+   "z": -1.85,
+   "rot": 0.12155445944517851,
+   "scale": 0.8952753257192673
+  },
+  {
+   "id": "flowers-86038-49",
+   "type": "flowers",
+   "x": 4.73,
+   "z": -1.55,
+   "rot": 0.30414254404604435,
+   "scale": 0.7984158328175545
+  },
+  {
+   "id": "flowers-86038-50",
+   "type": "flowers",
+   "x": 3.9,
+   "z": -2.38,
+   "rot": 0.2435865515843034,
+   "scale": 0.8594998644664884
+  },
+  {
+   "id": "flowers-86038-51",
+   "type": "flowers",
+   "x": -6.0,
+   "z": -1.77,
+   "rot": -0.37470812872052195,
+   "scale": 0.8566435881890357
+  },
+  {
+   "id": "flowers-86038-52",
+   "type": "flowers",
+   "x": 6.3,
+   "z": -1.33,
+   "rot": -0.32087043542414906,
+   "scale": 0.7804965252988041
+  },
+  {
+   "id": "flowers-86038-53",
+   "type": "flowers",
+   "x": -0.22,
+   "z": -2.58,
+   "rot": -0.2859185110777617,
+   "scale": 0.8498851034790278
+  },
+  {
+   "id": "flowers-86038-54",
+   "type": "flowers",
+   "x": -1.11,
+   "z": -2.0,
+   "rot": 0.2652635283768177,
+   "scale": 0.8016634911671281
+  },
+  {
+   "id": "flowers-86038-55",
+   "type": "flowers",
+   "x": 2.16,
+   "z": -1.35,
+   "rot": 0.15319350250065328,
+   "scale": 0.8373866419680417
+  },
+  {
+   "id": "flowers-86038-56",
+   "type": "flowers",
+   "x": -5.8,
+   "z": -2.68,
+   "rot": -0.3883654134348035,
+   "scale": 0.9140786341764033
+  },
+  {
+   "id": "flowers-86038-57",
+   "type": "flowers",
+   "x": 5.22,
+   "z": -2.32,
+   "rot": -0.268496510758996,
+   "scale": 0.9182298410683871
+  },
+  {
+   "id": "flowers-86038-58",
+   "type": "flowers",
+   "x": 6.23,
+   "z": -2.63,
+   "rot": 0.021259730309247972,
+   "scale": 0.7160420783609153
+  },
+  {
+   "id": "bridge-86038-59",
+   "type": "bridge",
+   "x": -19.93,
+   "z": -20.86,
+   "rot": 1.064528893426847,
+   "scale": 1.0,
+   "opts": {
+    "len": 6.5
+   }
+  },
+  {
+   "id": "boat-86038-60",
+   "type": "boat",
+   "x": 7.27,
+   "z": -7.71,
+   "rot": -0.4611566927829563,
+   "scale": 0.8916071338113397,
+   "opts": {
+    "moving": true,
+    "rower": true
+   }
+  },
+  {
+   "id": "boat-86038-61",
+   "type": "boat",
+   "x": 14.35,
+   "z": -1.03,
+   "rot": -0.6558291016519827,
+   "scale": 0.8650615138234571,
+   "opts": {
+    "moving": true,
+    "rower": true
+   }
+  },
+  {
+   "id": "item-86038-62",
+   "type": "item",
+   "x": 2.93,
+   "z": -27.55,
+   "rot": 0.0004692267626523972,
+   "scale": 1.0,
+   "opts": {
+    "word": "crystal_tower",
+    "size": 8
+   }
+  },
+  {
+   "id": "animal-86038-63",
+   "type": "animal",
+   "x": -1.11,
+   "z": -27.84,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.7283822088502347,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-64",
+   "type": "animal",
+   "x": -0.68,
+   "z": -3.7,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.8449147939682007,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-65",
+   "type": "animal",
+   "x": -20.89,
+   "z": -8.78,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.9556091143749654,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-66",
+   "type": "animal",
+   "x": 8.01,
+   "z": -28.1,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.9134029387496412,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-67",
+   "type": "animal",
+   "x": 6.1,
+   "z": -15.8,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.917247906792909,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-68",
+   "type": "animal",
+   "x": 7.22,
+   "z": -0.65,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 2.0198696204461157,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-69",
+   "type": "animal",
+   "x": -13.5,
+   "z": 1.06,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.9644169136881828,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-70",
+   "type": "animal",
+   "x": 10.32,
+   "z": -24.9,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "bird",
+    "doing": "fly",
+    "radius": 1.676262965425849,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-71",
+   "type": "animal",
+   "x": -20.91,
+   "z": -26.97,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "deer",
+    "doing": "graze",
+    "radius": 3.2458367166109383,
+    "bank": "far"
+   }
+  },
+  {
+   "id": "animal-86038-72",
+   "type": "animal",
+   "x": -8.65,
+   "z": -18.99,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "deer",
+    "doing": "graze",
+    "radius": 2.421536366455257,
+    "bank": "far"
+   }
+  },
+  {
+   "id": "animal-86038-73",
+   "type": "animal",
+   "x": -11.92,
+   "z": -20.94,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "deer",
+    "doing": "graze",
+    "radius": 2.1511227739974856,
+    "bank": "far"
+   }
+  },
+  {
+   "id": "animal-86038-74",
+   "type": "animal",
+   "x": -10.25,
+   "z": -21.69,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "deer",
+    "doing": "graze",
+    "radius": 2.2786244093440473,
+    "bank": "far"
+   }
+  },
+  {
+   "id": "animal-86038-75",
+   "type": "animal",
+   "x": 11.98,
+   "z": -7.98,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "frog",
+    "doing": "play",
+    "radius": 2.880425849929452,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-76",
+   "type": "animal",
+   "x": 19.3,
+   "z": -17.54,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "frog",
+    "doing": "play",
+    "radius": 2.899087625090033,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-77",
+   "type": "animal",
+   "x": 21.72,
+   "z": -15.89,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "frog",
+    "doing": "play",
+    "radius": 2.611895067151636,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-78",
+   "type": "animal",
+   "x": 0.51,
+   "z": -6.56,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "frog",
+    "doing": "play",
+    "radius": 2.0322464858181775,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "animal-86038-79",
+   "type": "animal",
+   "x": -5.0,
+   "z": -8.61,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "species": "frog",
+    "doing": "play",
+    "radius": 2.1251320145092905,
+    "bank": "near"
+   }
+  },
+  {
+   "id": "person-86038-80",
+   "type": "person",
+   "x": -3.76,
+   "z": -1.49,
+   "rot": 0.0,
+   "scale": 1.0,
+   "opts": {
+    "who": "girl",
+    "doing": "wave",
+    "female": true,
+    "radius": 2.557488122023642
+   }
+  },
+  {
+   "id": "boat-86038-81",
+   "type": "boat",
+   "x": 15.68,
+   "z": -0.21,
+   "rot": -0.6558291016519827,
+   "scale": 1.0,
+   "opts": {
+    "moving": true,
+    "rower": true,
+    "who": "fisherman"
+   }
+  }
+ ],
+ "stage": {
+  "x": 0.0,
+  "z": 0.0,
+  "rot": 0.0
+ },
+ "updated": "2026-11-17T18:37:59"
+}

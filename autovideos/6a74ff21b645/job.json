@@ -1,0 +1,75 @@
+{
+  "id": "6a74ff21b645",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Psychology of Problem Solving: Why Your Brain Solves Hardest Bugs While Sleeping",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "download_url": "/api/autovideo/download/6a74ff21b645",
+  "script": "Hey there, dream\u2011catcher! Have you ever stared at a code flaw, felt the walls close in, and then\u2014bam!\u2014a perfectly elegant fix pops into your mind while you\u2019re nodding off? Curious how that night\u2011time magic works? Hold tight; we\u2019re about to dive into the psychology behind why your brain cracks the hardest bugs while you\u2019re sleeping.\n\nFirst, let\u2019s talk dream\u2011mode: during REM sleep, your brain\u2019s default mode network\u2014our inner creative lab\u2014crazily re\u2011organizes information. Think of it as a nightly Photoshop session: layers of memory, emotion, intuition, and random neural noise all collage together, giving you fresh angles on stale problems. Ever wondered why a weary coder suddenly hears the answer in a dream? That\u2019s your subconscious doing unsupervised brainstorming, free from the day\u2019s distractions.\n\nNow, science gets glamorous. Neuro-imaging studies show a surge of activity in the prefrontal cortex when you\u2019re in REM sleep, exactly the area responsible for complex reasoning and pattern recognition. Add in the thalamus pulsing with random bursts, and you\u2019ve got the recipe for serendipitous connections. Remember the famous story of the Dutch chemist who discovered the benzene structure after a strange dream? It\u2019s not just sleepy genius; it\u2019s hardwired brain chemistry that lets you sift through data faster than a ticking clock.\n\nWhat does that mean for you? Before hitting the hay, set a clear intent\u2014narrate the problem aloud, jot down key constraints\u2014so your brain has a target. Then, tuck in, and inevitably, your subconscious will run the supercomputer while you\u2019re catching z\u2019s. You\u2019ll wake with a fresh angle or a fully formed solution. Try it: review a stubborn bug at lunch, then sleep; the next morning might just feel like the answer came from nowhere.\n\nSo, next time you stare at that stubborn code, remember: your brain is an overnight problem\u2011solving workshop. Give it the right prep, close the curtains, and let the dream\u2011joints do the heavy lifting. Good night, and may your dreams debug with style!",
+  "script_source": "pollinations-scenes",
+  "script_words": 322,
+  "voice_duration_sec": 131.5,
+  "voice_engine": "edge-tts",
+  "mood": "calm",
+  "music": null,
+  "music_status": "key_rejected",
+  "transition_sfx": 0,
+  "sfx_status": "key_rejected",
+  "transitions": true,
+  "join": "xfade",
+  "final_minutes": 2.2,
+  "scenes": [
+    {
+      "narration": "Hey there, dream\u2011catcher! Have you ever stared at a code flaw, felt the walls close in, and then\u2014bam!\u2014a perfectly elegant fix pops into your mind while you\u2019re nodding off? Curious how that night\u2011time magic works? Hold tight; we\u2019re about to dive into the psychology behind why your brain cracks the hardest bugs while you\u2019re sleeping.",
+      "visual": "Hey there, dream\u2011catcher!",
+      "caption": "Hey there, dream\u2011catcher!",
+      "kind": "clip",
+      "visual_source": "puzzle, puzzling, game, play, playing, people, girl, woman, problem solving, puzzle pieces, matching, thinking, intelligence",
+      "duration_sec": 21.6
+    },
+    {
+      "narration": "First, let\u2019s talk dream\u2011mode: during REM sleep, your brain\u2019s default mode network\u2014our inner creative lab\u2014crazily re\u2011organizes information. Think of it as a nightly Photoshop session: layers of memory, emotion, intuition, and random neural noise all collage together, giving you fresh angles on stale problems. Ever wondered why a weary coder suddenly hears the answer in a dream? That\u2019s your subconscious doing unsupervised brainstorming, free from the day\u2019s distractions.",
+      "visual": "First, let\u2019s talk dream\u2011mode: during REM sleep, your brain\u2019s default mode network\u2014our inner creative lab\u2014crazily re\u2011organizes information.",
+      "caption": "First, let\u2019s talk dream\u2011mode: during REM sleep, your brain\u2019s default mode network\u2014our inner creative\u2026",
+      "kind": "clip",
+      "visual_source": "File:Psychology student Karoline Nanfeldt on disappearing down the Wikipedia rabbit hole.webm",
+      "duration_sec": 31.4
+    },
+    {
+      "narration": "Now, science gets glamorous. Neuro-imaging studies show a surge of activity in the prefrontal cortex when you\u2019re in REM sleep, exactly the area responsible for complex reasoning and pattern recognition. Add in the thalamus pulsing with random bursts, and you\u2019ve got the recipe for serendipitous connections. Remember the famous story of the Dutch chemist who discovered the benzene structure after a strange dream? It\u2019s not just sleepy genius; it\u2019s hardwired brain chemistry that lets you sift through data faster than a ticking clock.",
+      "visual": "Now, science gets glamorous.",
+      "caption": "Now, science gets glamorous.",
+      "kind": "clip",
+      "visual_source": "man, question, thinking, green screen, chroma key, male, adult, conundrum, problem solving, problem, choice, decision, wondering, question mark, dilemma, unsure, confusion, confused",
+      "duration_sec": 33.6
+    },
+    {
+      "narration": "What does that mean for you? Before hitting the hay, set a clear intent\u2014narrate the problem aloud, jot down key constraints\u2014so your brain has a target. Then, tuck in, and inevitably, your subconscious will run the supercomputer while you\u2019re catching z\u2019s. You\u2019ll wake with a fresh angle or a fully formed solution. Try it: review a stubborn bug at lunch, then sleep; the next morning might just feel like the answer came from nowhere.",
+      "visual": "What does that mean for you?",
+      "caption": "What does that mean for you?",
+      "kind": "clip",
+      "visual_source": "science, discovery, solve, problem",
+      "duration_sec": 28.7
+    },
+    {
+      "narration": "So, next time you stare at that stubborn code, remember: your brain is an overnight problem\u2011solving workshop. Give it the right prep, close the curtains, and let the dream\u2011joints do the heavy lifting. Good night, and may your dreams debug with style!",
+      "visual": "So, next time you stare at that stubborn code, remember: your brain is an overnight problem\u2011solving workshop.",
+      "caption": "So, next time you stare at that stubborn code, remember: your brain is an overnight problem\u2011solving workshop.",
+      "kind": "clip",
+      "visual_source": "File:Chess academy helps children learn discipline, problem-solving skills.webm",
+      "duration_sec": 16.1
+    }
+  ],
+  "distinct_commons_visuals": 5,
+  "images_found": 0,
+  "clips_found": 5,
+  "images_used": 0,
+  "clips_used": 5,
+  "ai_images": 0,
+  "title_cards": 0,
+  "visual_warning": "",
+  "pipeline": "master-scenes"
+}

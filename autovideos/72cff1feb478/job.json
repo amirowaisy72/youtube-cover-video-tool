@@ -1,0 +1,91 @@
+{
+  "id": "72cff1feb478",
+  "status": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "The Mathematics of Luck: How Randomness Shapes Tech Startups and Success",
+  "minutes": 2,
+  "visuals": "both",
+  "voice": "en-US-AriaNeural",
+  "download_url": "/api/autovideo/download/72cff1feb478",
+  "script": "[Hook]  \nPicture a young coder, eyes bright, scribbing a line of code that might just launch a unicorn on the next funding round. The crowd is electrified, the air hums with possibility. But what\u2019s the secret sauce behind that one clever line?\n\nIs it sheer talent, a network rabbit hole, or something more... serendipitous? Dive in, because it\u2019s all tied to the strange universe of luck, and by \u201cluck\u201d I mean good old-fashioned randomness\u2014and then, the magic of math.\n\n[The Problem of Chance]  \nEvery startup is a gamble. You spend months building a product while the market rages a different storm, investor sentiment dances to an unknown rhythm, and the competition moves like a shadow just beyond sight. We often think \u201cI dropped the perfect idea at the right moment.\u201d But in truth, we\u2019re each playing a probabilistic game, a binomial field where the odds tick in ways we barely notice.\n\nDoesn\u2019t that make you wonder? If two lotteries are identical in structure, could one just be luckier because of a random set of variables? [Mathematics to the Rescue]  \nEnter probability and statistics, silent guides that map this chaos.\n\nImagine a startup\u2019s success as a variable that follows a normal distribution. Some ventures beam up into the upper tail, while most drift midstream, unseen. We can measure volatility, calculate expected returns, and even model network effects with graph theory.\n\nBy casting doubt through equations, we see the chance of a $10 million exit isn\u2019t a green flag\u2014it\u2019s a tiny 1.2% probability that sprouts from a complex web of interconnected factors. [Real\u2011World Story]  \nThink of Dropbox. It started as a simple file\u2011sharing idea, coded in a living room.\n\nYet the leap to a million users? Pure chance\u2014seeding it at the right conference, a video that went viral, an investor\u2019s talismanic handshake. Dropping a line of math on the data, execs saw where randomness breathed most vigorously\u2014click behavior, referral loops. They amplified those small edges until exponential growth mashed through the walls of probability.",
+  "script_source": "pollinations-scenes",
+  "script_words": 332,
+  "voice_duration_sec": 134.3,
+  "voice_engine": "edge-tts",
+  "mood": "happy",
+  "music": null,
+  "music_status": "key_rejected",
+  "transition_sfx": 0,
+  "sfx_status": "key_rejected",
+  "transitions": true,
+  "join": "xfade",
+  "final_minutes": 2.2,
+  "scenes": [
+    {
+      "narration": "[Hook]  \nPicture a young coder, eyes bright, scribbing a line of code that might just launch a unicorn on the next funding round. The crowd is electrified, the air hums with possibility. But what\u2019s the secret sauce behind that one clever line?",
+      "visual": "[Hook]  \nPicture a young coder, eyes bright, scribbing a line of code that might just launch a unicorn on the next funding round.",
+      "caption": "[Hook]  \nPicture a young coder, eyes bright, scribbing a line of code that might just launch a unicorn on the\u2026",
+      "kind": "clip",
+      "visual_source": "File:DEF-TECH Bharat 2026, KTPO Exhibition and Convention Centre, Bangalore 02.webm",
+      "duration_sec": 15.9
+    },
+    {
+      "narration": "Is it sheer talent, a network rabbit hole, or something more... serendipitous? Dive in, because it\u2019s all tied to the strange universe of luck, and by \u201cluck\u201d I mean good old-fashioned randomness\u2014and then, the magic of math.",
+      "visual": "Is it sheer talent, a network rabbit hole, or something more...",
+      "caption": "Is it sheer talent, a network rabbit hole, or something more...",
+      "kind": "clip",
+      "visual_source": "File:DEF-TECH Bharat 2026, KTPO Exhibition and Convention Centre, Bangalore 01.webm",
+      "duration_sec": 14.3
+    },
+    {
+      "narration": "[The Problem of Chance]  \nEvery startup is a gamble. You spend months building a product while the market rages a different storm, investor sentiment dances to an unknown rhythm, and the competition moves like a shadow just beyond sight. We often think \u201cI dropped the perfect idea at the right moment.\u201d But in truth, we\u2019re each playing a probabilistic game, a binomial field where the odds tick in ways we barely notice.",
+      "visual": "[The Problem of Chance]  \nEvery startup is a gamble.",
+      "caption": "[The Problem of Chance]  \nEvery startup is a gamble.",
+      "kind": "clip",
+      "visual_source": "casino, game, play, dices, luck, gambling, win, chance, betting, jackpot, dice, money, gamble, vegas, fortune, bet, winner, entertainment",
+      "duration_sec": 26.0
+    },
+    {
+      "narration": "Doesn\u2019t that make you wonder? If two lotteries are identical in structure, could one just be luckier because of a random set of variables? [Mathematics to the Rescue]  \nEnter probability and statistics, silent guides that map this chaos.",
+      "visual": "Doesn\u2019t that make you wonder?",
+      "caption": "Doesn\u2019t that make you wonder?",
+      "kind": "clip",
+      "visual_source": "countdown, timer, begin, startup, start sequence, count, pay, zero, writing, nine, glittering, film start, 3d",
+      "duration_sec": 15.8
+    },
+    {
+      "narration": "Imagine a startup\u2019s success as a variable that follows a normal distribution. Some ventures beam up into the upper tail, while most drift midstream, unseen. We can measure volatility, calculate expected returns, and even model network effects with graph theory.",
+      "visual": "Imagine a startup\u2019s success as a variable that follows a normal distribution.",
+      "caption": "Imagine a startup\u2019s success as a variable that follows a normal distribution.",
+      "kind": "clip",
+      "visual_source": "File:Motlatse Canyon Bourke Luck Potholes (2).webm",
+      "duration_sec": 17.7
+    },
+    {
+      "narration": "By casting doubt through equations, we see the chance of a $10 million exit isn\u2019t a green flag\u2014it\u2019s a tiny 1.2% probability that sprouts from a complex web of interconnected factors. [Real\u2011World Story]  \nThink of Dropbox. It started as a simple file\u2011sharing idea, coded in a living room.",
+      "visual": "By casting doubt through equations, we see the chance of a $10 million exit isn\u2019t a green flag\u2014it\u2019s a tiny 1.2% probability that sprouts from a complex web of interconnected factors.",
+      "caption": "By casting doubt through equations, we see the chance of a $10 million exit isn\u2019t a green flag\u2014it\u2019s a tiny\u2026",
+      "kind": "clip",
+      "visual_source": "File:DEF-TECH Bharat 2026, KTPO Exhibition and Convention Centre, Bangalore 03.webm",
+      "duration_sec": 20.6
+    },
+    {
+      "narration": "Yet the leap to a million users? Pure chance\u2014seeding it at the right conference, a video that went viral, an investor\u2019s talismanic handshake. Dropping a line of math on the data, execs saw where randomness breathed most vigorously\u2014click behavior, referral loops. They amplified those small edges until exponential growth mashed through the walls of probability.",
+      "visual": "Yet the leap to a million users?",
+      "caption": "Yet the leap to a million users?",
+      "kind": "clip",
+      "visual_source": "drone, nature, beach, landscape, camera, technology, tech, aircraft, uav, travel, sea, summer",
+      "duration_sec": 24.1
+    }
+  ],
+  "distinct_commons_visuals": 7,
+  "images_found": 0,
+  "clips_found": 7,
+  "images_used": 0,
+  "clips_used": 7,
+  "ai_images": 0,
+  "title_cards": 0,
+  "visual_warning": "",
+  "pipeline": "master-scenes"
+}

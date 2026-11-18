@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:01,840
+If the government suddenly slices
+
+2
+00:00:01,840 --> 00:00:03,220
+that pie into twice as
+
+3
+00:00:03,220 --> 00:00:04,740
+many pieces without the actual
+
+4
+00:00:04,740 --> 00:00:05,940
+size of the pie growing,
+
+5
+00:00:06,440 --> 00:00:08,260
+each individual slice commands a
+
+6
+00:00:08,260 --> 00:00:09,500
+smaller fraction of the whole.
