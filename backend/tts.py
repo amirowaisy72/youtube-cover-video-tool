@@ -109,7 +109,10 @@ async def _save_chunk(text: str, voice: str, rate: str, dest: Path,
     if expressive:
         spoken = _expressive_ssml(text, voice) or text
     communicate = edge_tts.Communicate(spoken, voice, rate=rate)
-    await communicate.save(str(dest))
+    # 120s timeout (2026-11-20): a hung Edge-TTS websocket used to
+    # block forever; now it raises TimeoutError and the caller's
+    # gTTS fallback triggers instead.
+    await asyncio.wait_for(communicate.save(str(dest)), timeout=120)
 
 
 async def _synthesize_all(chunks: list[str], voice: str, rate: str, out_dir: Path,

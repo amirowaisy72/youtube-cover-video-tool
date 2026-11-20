@@ -3153,6 +3153,48 @@ def _run_autovideo_audio(
             )
             _av_write(j)
 
+        # Per-scene checkpoint/resume (2026-11-20): scenes voiced
+        # in an earlier (stuck) attempt are recorded in
+        # job["scene_voices"] and reused instead of re-voiced.
+        # Keys may be str or int — normalize to int; voice_path
+        # is a file NAME only, resolved against the job dir by
+        # prepare_audio. Old jobs without scene_voices get {} and
+        # behave exactly as before (full voicing).
+        _raw_voices = job.get("scene_voices") or {}
+        existing_voices: dict[int, dict] = {}
+        if isinstance(_raw_voices, dict):
+            for _key, _entry in _raw_voices.items():
+                try:
+                    _idx = int(_key)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(_entry, dict) and _entry.get("voice_path"):
+                    existing_voices[_idx] = {
+                        "voice_path": Path(str(_entry["voice_path"])).name,
+                        "engine": _entry.get("engine") or "",
+                        "duration": _entry.get("duration") or 0,
+                    }
+
+        def _on_scene_done(idx: int, voice_path, engine: str,
+                           duration: float) -> None:
+            # Checkpoint one freshly voiced scene immediately, so
+            # a later retry resumes from here. Re-read the job
+            # fresh so concurrent progress writes are not clobbered.
+            try:
+                fresh = _av_read(job_id)
+                voices = fresh.get("scene_voices") or {}
+                if not isinstance(voices, dict):
+                    voices = {}
+                voices[str(idx)] = {
+                    "voice_path": Path(voice_path).name,
+                    "engine": engine,
+                    "duration": float(duration),
+                }
+                fresh["scene_voices"] = voices
+                _av_write(fresh)
+            except Exception:  # noqa: BLE001 — a checkpoint failure never breaks voicing
+                pass
+
         audio = autovideo2.prepare_audio(
             job.get("title") or "",
             scenes,
@@ -3163,6 +3205,8 @@ def _run_autovideo_audio(
             progress_cb=_audio_progress,
             tts_provider=tts_provider,
             tts_key=tts_key,
+            existing_voices=existing_voices,
+            on_scene_done=_on_scene_done,
         )
         job = _av_read(job_id)
         for i, d in enumerate(audio["durations"]):

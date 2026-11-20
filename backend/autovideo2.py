@@ -2580,7 +2580,9 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
                   work_dir: Path, freesound_key: str | None = None,
                   music: bool = True,
                   progress_cb=None, tts_provider: str = "edge",
-                  tts_key: str | None = None) -> dict:
+                  tts_key: str | None = None,
+                  existing_voices: dict[int, dict] | None = None,
+                  on_scene_done=None) -> dict:
     """STEP 3 — Audio. Voices every scene (parallel), joins the
     voiceover into master-voice.mp3, detects the mood and lists
     the matching Freesound tracks, and fetches transition SFX.
@@ -2605,11 +2607,37 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
                     f"script needs {script_chars:,}. The voice would stop mid-way. "
                     "Pick another voice or use the default.")
     import os
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
     workers = max(2, min(4, os.cpu_count() or 4))
     results: dict[int, dict] = {}
     fallback_note = ""
+
+    # Per-scene checkpoint/resume (2026-11-20): scenes already
+    # voiced in an earlier (stuck) attempt are reused from
+    # existing_voices, never re-voiced. A scene is reused only
+    # when its file still exists under work_dir and duration > 0.
+    for _idx, _entry in (existing_voices or {}).items():
+        try:
+            _idx = int(_idx)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(_entry, dict):
+            continue
+        try:
+            _duration = float(_entry.get("duration") or 0)
+        except (TypeError, ValueError):
+            continue
+        _name = _entry.get("voice_path") or ""
+        _candidate = work_dir / Path(str(_name)).name if _name else None
+        if (0 <= _idx < len(scenes) and _candidate is not None
+                and _candidate.exists() and _duration > 0):
+            results[_idx] = {"voice_path": _candidate,
+                             "engine": _entry.get("engine") or "kept",
+                             "duration": _duration}
+    if results and progress_cb:
+        progress_cb(len(results), len(scenes),
+                    f"Voicing scene {len(results)} of {len(scenes)}…")
 
     def _voice_keep(i, narration, *rest):
         """(user, 2026-11-20) an audio step that was stopped half-way (the app was closed) keeps the
@@ -2633,28 +2661,61 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
             except OSError:
                 pass
         return res
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+    # Watchdog (2026-11-20): as_completed() only yields finished
+    # futures, so a result(timeout=...) guard inside it can never
+    # fire while a worker is hung. Instead wait() with a deadline:
+    # if no scene finishes within 180s, the step fails loudly
+    # naming a pending scene instead of hanging forever. The pool
+    # is shut down with wait=False so a hung worker can never
+    # block the exit either (it is abandoned; the Edge-TTS call
+    # itself is bounded at 120s by tts.py).
+    pool = ThreadPoolExecutor(max_workers=workers)
+    try:
         futures = {
             pool.submit(_voice_keep, i,
                         s["narration"], voice, work_dir,
                         tts_provider, tts_key, i == 0, i == len(scenes) - 1): i
-            for i, s in enumerate(scenes)
+            for i, s in enumerate(scenes) if i not in results
         }
-        done = 0
-        for future in as_completed(futures):
-            voice_path, engine, duration, fell_back, err = future.result()
-            idx = futures[future]
-            results[idx] = {"voice_path": voice_path, "engine": engine,
-                            "duration": duration}
-            if fell_back and not fallback_note:
-                fallback_note = (
-                    f"{tts_module.PROVIDERS[tts_provider]['label']} failed "
-                    f"({err}) — the default Edge voice (Aria) was used "
-                    "instead, so the video still completed.")
-            done += 1
-            if progress_cb:
-                progress_cb(done, len(scenes),
-                            f"Voicing scene {done} of {len(scenes)}…")
+        done = len(results)
+        pending = set(futures)
+        last_progress = time.time()
+        while pending:
+            remaining = 180 - (time.time() - last_progress)
+            if remaining <= 0:
+                _stuck = min(futures[f] for f in pending)
+                for f in pending:
+                    f.cancel()
+                raise RuntimeError(f"Scene {_stuck + 1} voice timed out after 180s")
+            _finished, pending = wait(pending, timeout=remaining,
+                                     return_when=FIRST_COMPLETED)
+            if not _finished:
+                _stuck = min(futures[f] for f in pending)
+                for f in pending:
+                    f.cancel()
+                raise RuntimeError(f"Scene {_stuck + 1} voice timed out after 180s")
+            last_progress = time.time()
+            for future in _finished:
+                idx = futures[future]
+                voice_path, engine, duration, fell_back, err = future.result()
+                results[idx] = {"voice_path": voice_path, "engine": engine,
+                                "duration": duration}
+                if on_scene_done is not None and voice_path is not None and duration > 0:
+                    try:
+                        on_scene_done(idx, voice_path, engine, duration)
+                    except Exception:  # noqa: BLE001 — a checkpoint failure never breaks voicing
+                        pass
+                if fell_back and not fallback_note:
+                    fallback_note = (
+                        f"{tts_module.PROVIDERS[tts_provider]['label']} failed "
+                        f"({err}) — the default Edge voice (Aria) was used "
+                        "instead, so the video still completed.")
+                done += 1
+                if progress_cb:
+                    progress_cb(done, len(scenes),
+                                f"Voicing scene {done} of {len(scenes)}…")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     ordered = [results[i] for i in sorted(results)]
     if not ordered or any(r["voice_path"] is None for r in ordered):
         raise RuntimeError("Voiceover failed for a scene.")
