@@ -63,7 +63,15 @@ def studio_pick(job_id: str) -> dict:
     job = app._av_read(job_id)
     scenes = job.get("scenes") or []
     if scenes and not all(s.get("plan") for s in scenes):
-        sm.attach_scene_plans(str(job.get("title") or ""), scenes)  # an older job: plan it now
+        # (user, 2026-11-20) NEVER wait on AI planning here: visual jobs
+        # carry empty plans ({}) by design, so the old attach_scene_plans
+        # call made this request grind through the AI for every scene and
+        # the Film button sat disabled for minutes. Rules plans are instant
+        # and the picker spreads scenes itself when none are flagged.
+        title = str(job.get("title") or "")
+        for i, sc in enumerate(scenes):
+            if not sc.get("plan"):
+                sc["plan"] = sm._rules_plan(title, sc.get("narration") or "", i, len(scenes))
         job["scenes"] = scenes
         app._av_write(job)
     return {"scenes": sm.pick_studio_scenes(scenes), "count": len(scenes)}
