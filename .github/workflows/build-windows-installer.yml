@@ -67,6 +67,19 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Install voice-clone engine (CPU torch + chatterbox-tts)
+        # The voice-clone engine is bundled into the frozen app
+        # (user, 2026-11-21): CPU-only torch, because the exe runs
+        # on machines without an NVIDIA GPU, and chatterbox-tts
+        # pins torch==2.6.0 — installing the CPU build first means
+        # pip keeps it (==2.6.0 matches 2.6.0+cpu) instead of
+        # downloading the ~770 MB CUDA build from PyPI.
+        # Workflow-only on purpose: requirements.txt is untouched,
+        # so a local run.bat never installs torch.
+        run: |
+          pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install chatterbox-tts
+
       - name: Download FFmpeg (static Windows build)
         run: |
           Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
@@ -109,6 +122,37 @@ jobs:
             --collect-all av `
             --collect-all tokenizers `
             --collect-all huggingface_hub `
+            --collect-all chatterbox `
+            --collect-all torch `
+            --collect-all torchaudio `
+            --collect-all transformers `
+            --collect-all diffusers `
+            --collect-all librosa `
+            --collect-all conformer `
+            --collect-all s3tokenizer `
+            --collect-all perth `
+            --collect-all numpy `
+            --collect-all safetensors `
+            --collect-all scipy `
+            --collect-all sklearn `
+            --collect-all numba `
+            --collect-all soundfile `
+            --collect-all joblib `
+            --collect-all soxr `
+            --collect-all audioread `
+            --collect-all pooch `
+            --collect-all lazy_loader `
+            --collect-all msgpack `
+            --collect-all decorator `
+            --collect-all tqdm `
+            --collect-all yaml `
+            --collect-all regex `
+            --collect-all filelock `
+            --collect-all fsspec `
+            --collect-all packaging `
+            --collect-all typing_extensions `
+            --collect-all pkuseg `
+            --collect-all pykakasi `
             --hidden-import google.auth `
             --hidden-import google.auth.transport.requests `
             --hidden-import google.oauth2.credentials `
@@ -137,6 +181,14 @@ jobs:
             $page = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 10
             if ($page.Content -notmatch "YT Guru") { throw "Home page did not serve the React app." }
             Write-Host "Smoke test passed: home page serves the React app."
+            # Voice-clone engine check (bundled since 1.0.5): the
+            # first /status call triggers the cold torch import,
+            # which can take tens of seconds in the frozen app, so
+            # the timeout is generous on purpose.
+            $vc = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/voiceclone/status" -UseBasicParsing -TimeoutSec 180
+            $vcObj = $vc.Content | ConvertFrom-Json
+            if (-not $vcObj.installed) { throw "Voice-clone engine did not import in the frozen app: $($vc.Content)" }
+            Write-Host "Smoke test passed: voice-clone engine imports in the frozen app."
           } finally {
             if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
           }
@@ -156,4 +208,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ inputs.version }}" "ytguru-commercial/installer/installer-output/YT-Guru-Setup-${{ inputs.version }}.exe" --title "YT Guru ${{ inputs.version }}" --notes "Install Setup link in the topbar; tools stay locked until the setup is installed and the license is activated."
+          gh release create "v${{ inputs.version }}" "ytguru-commercial/installer/installer-output/YT-Guru-Setup-${{ inputs.version }}.exe" --title "YT Guru ${{ inputs.version }}" --notes "Free for everyone — no license key needed. Install the setup and all tools work, including Voice Cloner (its ~3 GB model downloads the first time you use it)."
