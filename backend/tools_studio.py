@@ -58,23 +58,41 @@ def studio_pick(job_id: str) -> dict:
     """Which scenes the presenter says to camera — the app decides from what
     each scene says (user, 2026-11-18: "no fixed formula"), balanced so the
     studio is never too much and never gone."""
-    import autovideo_smart as sm
-    app = _app()
-    job = app._av_read(job_id)
-    scenes = job.get("scenes") or []
-    if scenes and not all(s.get("plan") for s in scenes):
-        # (user, 2026-11-20) NEVER wait on AI planning here: visual jobs
-        # carry empty plans ({}) by design, so the old attach_scene_plans
-        # call made this request grind through the AI for every scene and
-        # the Film button sat disabled for minutes. Rules plans are instant
-        # and the picker spreads scenes itself when none are flagged.
-        title = str(job.get("title") or "")
-        for i, sc in enumerate(scenes):
-            if not sc.get("plan"):
-                sc["plan"] = sm._rules_plan(title, sc.get("narration") or "", i, len(scenes))
-        job["scenes"] = scenes
-        app._av_write(job)
-    return {"scenes": sm.pick_studio_scenes(scenes), "count": len(scenes)}
+    # (user, 2026-11-21) This endpoint must NEVER fail silently: the old
+    # behaviour left the Film button disabled forever with a silent "…"
+    # whenever the pick request errored. Any failure here returns scene 1
+    # with the reason, so the button enables and the user sees the cause
+    # instead of nothing. Only a job that reads fine but truly has no
+    # scenes returns an empty list (nothing to film).
+    try:
+        import autovideo_smart as sm
+        app = _app()
+        job = app._av_read(job_id)
+        scenes = job.get("scenes") or []
+        if scenes and not all(s.get("plan") for s in scenes):
+            # (user, 2026-11-20) NEVER wait on AI planning here: visual jobs
+            # carry empty plans ({}) by design, so the old attach_scene_plans
+            # call made this request grind through the AI for every scene and
+            # the Film button sat disabled for minutes. Rules plans are instant
+            # and the picker spreads scenes itself when none are flagged.
+            # Best-effort only: a failed backfill must never fail the pick.
+            try:
+                title = str(job.get("title") or "")
+                for i, sc in enumerate(scenes):
+                    if not sc.get("plan"):
+                        sc["plan"] = sm._rules_plan(title, sc.get("narration") or "", i, len(scenes))
+                job["scenes"] = scenes
+                try:
+                    app._av_write(job)
+                except Exception:  # noqa: BLE001 — backfill save is best-effort
+                    pass
+            except Exception:  # noqa: BLE001 — a failed backfill must not fail the pick
+                pass
+        if not scenes:
+            return {"scenes": [], "count": 0}
+        return {"scenes": sm.pick_studio_scenes(scenes), "count": len(scenes)}
+    except Exception as exc:  # noqa: BLE001 — never leave the Film button disabled without a reason
+        return {"scenes": [0], "count": 0, "error": f"Could not pick studio scenes: {str(exc)[-200:]}"}
 
 
 @router.get("/{job_id}/timeline")

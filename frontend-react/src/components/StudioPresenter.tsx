@@ -39,12 +39,38 @@ export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; 
   }, []);
 
   // the app decides which scenes the presenter says to camera (user, 2026-11-18: no fixed formula)
+  // (user, 2026-11-21) never fail silently here: a failed pick used to
+  // leave the Film button disabled forever with a silent "…". Now a bad
+  // response, an empty pick, or a server-reported error shows the reason
+  // under the button — either the button works or the user sees why not.
   useEffect(() => {
     if (!who) return;
-    fetch(`/api/animator/studio/${jobId}/pick`).then((r) => r.json())
-      .then((d: { scenes?: number[] }) => setScenes(d.scenes ?? []))
-      .catch(() => setScenes([0]));
-  }, [who, jobId]);
+    setError("");
+    fetch(`/api/animator/studio/${jobId}/pick`)
+      .then(async (r) => {
+        const d = (await r.json().catch(() => ({}))) as { scenes?: number[]; error?: string };
+        if (!r.ok) throw new Error(d.error || `Server error (${r.status}) while picking studio scenes.`);
+        return d;
+      })
+      .then((d) => {
+        const picked = d.scenes ?? [];
+        if (d.error) {
+          // the server fell back to scene 1 and told us why — enable the
+          // button and show the reason instead of a silent "…".
+          setError(d.error);
+          setScenes(picked);
+        } else if (picked.length === 0 && sceneCount > 0) {
+          setError("The server sent no studio scenes for this video, so there is nothing to film yet.");
+          setScenes([]);
+        } else {
+          setScenes(picked);
+        }
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Could not reach the server to pick studio scenes.");
+        setScenes([0]);
+      });
+  }, [who, jobId, sceneCount]);
 
   const film = async () => {
     const ch = chars.find((c) => c.id === who);
