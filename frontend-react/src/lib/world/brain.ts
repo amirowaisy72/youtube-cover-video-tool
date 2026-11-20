@@ -27,7 +27,7 @@ export type Body = {
   line?: [number, number, number] | null; // fishing line goes to this point
 };
 export type WAct = { v: string; o: string; t: number; n: number; id: string };
-type FrameChar = { cid: string; x: number; wact?: WAct | null; act?: string | null; stance: string; facing: string };
+type FrameChar = { cid: string; x: number; wact?: WAct | null; act?: string | null; stance: string; facing: string; mouth?: string | null };
 type P = { x: number; z: number };
 type Park = { x: number; z: number; y: number; yaw: number; mode: "stand" | "sit" | "perch" | "cling" | "inside" | "hide" | "kneel"; obj?: RObj; faceCam?: boolean };
 type Plan = {
@@ -187,7 +187,18 @@ export class Brain {
     const want = tgt ? yawTo(k.x, k.z, tgt.x, tgt.z) * 0.65 : 0;
     if (k.mode === "cling") b.yaw = k.yaw;
     else if (k.mode === "perch" || k.mode === "sit") b.yaw = clamp(want, -0.8, 0.8) + (k.faceCam ? 0 : k.yaw * 0);
-    else if (k.mode === "inside") { b.hidden = true; this.hiddenAt[n]!.add(c.cid); }
+    else if (k.mode === "inside") {
+      b.hidden = true; this.hiddenAt[n]!.add(c.cid);
+      // talking from inside the car / the hut (user, 2026-11-19: "they vanished and kept
+      // talking"): the camera shows the car they are in, wherever it drove to
+      const talking = c.mouth === "talk-open" || c.mouth === "talk-half";
+      const allIn = all.every((o) => o.cid === c.cid || this.st.get(o.cid)?.park?.mode === "inside");
+      if (k.obj && (talking || allIn)) {
+        const p = w.posAt(k.obj, n);
+        const h = Math.min(3, Math.max(1, k.obj.b.height));
+        this.focus[n]!.push(new THREE.Vector3(p.x - 1.2, p.y + 0.3, p.z), new THREE.Vector3(p.x + 1.2, p.y + h, p.z));
+      }
+    }
     else b.yaw = want;
     if (animal) { if (k.mode === "cling") b.roll = Math.PI / 2 - 0.25; return; }
     const j = b.j;
@@ -675,6 +686,18 @@ export class Brain {
     }
 
     // ------------------------------------------------------ doors / houses
+    // getting into a car / taxi / police car: walk to its side, get in (out of sight), stay in it
+    if (v === "enter" && word && /\b(car|taxi|cab|truck|van|police|jeep|suv|sedan|limo)\b/.test(word)) {
+      const car = w.named(word);
+      if (car) {
+        const side = { x: car.pos.x - 0.4, z: car.pos.z + Math.max(0.9, car.b.radius + 0.5) };
+        return {
+          ...base, path: standAt(side, car), focus: [new THREE.Vector3(car.pos.x, 1, car.pos.z)],
+          after: { x: car.pos.x, z: car.pos.z, y: 0, yaw: 0, mode: "inside", obj: car },
+          pose: (t, bb) => { preDown(t, bb); if (t < A) return; bb.yaw = yawTo(bb.x, bb.z, car.pos.x, car.pos.z); if (t >= A + 6) bb.hidden = true; },
+        };
+      }
+    }
     if (v === "open" || v === "close" || v === "enter" || v === "exit") {
       const f = w.find(word || "door", me, v === "enter" || v === "exit" ? "enterable" : "openable");
       const o = (v === "exit" && s.park?.mode === "inside" ? s.park.obj : null) ?? f?.obj ?? null;
@@ -873,7 +896,9 @@ export class Brain {
     const N = wa.n;
     const me: P = s.park ? { x: s.park.x, z: s.park.z } : { x: b.x, z: b.z };
     const f = wa.o ? w.find(wa.o, cd.atStart ? { x: 0, z: 0 } : me) : null;
-    let obj = f?.obj && (!wa.o || w.named(wa.o) || f.obj.words.some((x) => x.includes(wa.o) || wa.o.includes(x))) ? f.obj : (wa.o ? w.named(wa.o) : null);
+    // "police car": exactly that one first (not the nearest car of any kind)
+    const exact = wa.o && /\s/.test(wa.o.trim()) ? w.named(wa.o) : null;
+    let obj = exact ?? (f?.obj && (!wa.o || w.named(wa.o) || f.obj.words.some((x) => x.includes(wa.o) || wa.o.includes(x))) ? f.obj : (wa.o ? w.named(wa.o) : null));
     // mending: the one that IS broken (not just any track piece)
     if (cd.change === "fix" || cd.change === "show") {
       const want = cd.change === "fix" ? "break" : "hide";
@@ -902,16 +927,20 @@ export class Brain {
     const riding = !!cd.ride && !!obj && !animal;
     if (riding) w.drive(obj!, doF + 12, f0 + N - 6, cd.rideDist ?? 8);
     const seat = obj ? Math.max(0.45, Math.min(1.3, obj.b.height * 0.55)) : 0.5;
+    // a car / taxi / police car has a roof: the driver sits INSIDE (not on top) and stays in it
+    const enclosed = riding && /\b(car|cars|taxi|cab|truck|bus|van|police|jeep|suv|sedan|hatchback|ambulance)\b/.test(obj!.words.join(" ").toLowerCase());
     let after: Park | null | "keep" = "keep";
     if (riding) {
       const end = w.posAt(obj!, f0 + N + 1);
       w.posAt(obj!, f0); // back to now
-      after = { x: end.x, z: end.z + 0.9, y: w.heightAt(end.x, end.z + 0.9, true), yaw: 0, mode: "stand" };
+      after = enclosed ? { x: end.x, z: end.z, y: w.heightAt(end.x, end.z, true), yaw: 0, mode: "inside", obj: obj! }
+        : { x: end.x, z: end.z + 0.9, y: w.heightAt(end.x, end.z + 0.9, true), yaw: 0, mode: "stand" };
     } else if (go) after = { x: to.x, z: to.z, y: w.heightAt(to.x, to.z, true), yaw: 0, mode: "stand" };
     const pose = (t: number, bb: Body) => {
       if (t < A) return;
       const n = f0 + t, u = t - A;
       bb.walking = false;
+      if (enclosed && t >= A + 6) bb.hidden = true; // in the car now
       if (riding) {
         const p = w.posAt(obj!, n);
         bb.x = p.x; bb.z = p.z; bb.y = p.y + seat;

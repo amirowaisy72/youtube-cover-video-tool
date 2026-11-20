@@ -1,4 +1,0 @@
-CapCut: New project -> Import all files -> drag each one onto the timeline at 0:00 (one per track).
-1 = picture, 2 = character voices, 3 = sound effects, 4 = background music (already ducked under voices),
-5 = subtitles (Text -> Local captions -> import .srt). Then edit anything you like.
-Music: "Satanic music" from Freesound (check its license on freesound.org)

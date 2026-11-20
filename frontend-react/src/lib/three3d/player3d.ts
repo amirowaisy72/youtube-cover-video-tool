@@ -14,21 +14,21 @@
 import * as THREE from "three";
 import { type CharacterConfig, type Emote, emoteSvg, normalizeCharacter } from "../stickman";
 import { madeUpSpecies, type Species, speciesFor, vehicleFor } from "../creatures";
-import { type Pop, StoryPlayer, type Timeline } from "../player";
+import { applyLook, type LookSpec, type Pop, StoryPlayer, type Timeline } from "../player";
 import { buildAnimal, buildVehicle, type Creature3D, type Vehicle3D } from "./animal";
 import { buildHuman, CHAR_H, type Face, HIP_H, type Human, JOINT_KEYS, type Joints, SEAT_H, targetJoints } from "./human";
 import { at, billboard, box, cone, cyl, drawnTexture, puffTexture, sphere, toon } from "./kit";
 import { buildPlace, type Place } from "./places";
 import { World, loadIconsIn } from "../world/world";
-import { autoWorld, extraObjects, missingThings, WORLD_KINDS } from "../world/auto";
+import { autoWorld, extraObjects, missingThings, myThingFor, WORLD_KINDS } from "../world/auto";
 import { type Recipe, recipeToWorld } from "../world/recipe";
 import { STARTER } from "../world/starter";
 import { BLUEPRINTS, blueprintFor, buildBlueprint } from "../world/blueprints";
 import { findKit, kitsOf, loadKitIndex, preloadKits } from "../world/kits";
 import { Brain, type Body } from "../world/brain";
-import { axeMesh, rodMesh } from "../world/catalog";
+import { axeMesh, buildModel, rodMesh } from "../world/catalog";
 import type { CustomAction, ModelDef, WorldDoc, WorldObj } from "../world/types";
-import { handProp } from "./props";
+import { designedThings, handProp } from "./props";
 
 type Frame = Timeline["frames"][number];
 function wrapNear(a: number, ref: number) { while (a - ref > Math.PI) a -= Math.PI * 2; while (a - ref < -Math.PI) a += Math.PI * 2; return a; }
@@ -53,6 +53,31 @@ function quietDoc(doc: WorldDoc, quiet?: boolean): WorldDoc {
   return { ...doc, objects: doc.objects.filter((o) => o.type !== "person" && !/\/(character|person|astronaut|human)/.test(String(o.opts?.kit ?? ""))) };
 }
 
+/** Clothes from the story ({wear:…}): a beach / "Vice City" look, a leather
+ * jacket, a suit… on top of the character's own face and hair. */
+export function outfitOf(cfg: CharacterConfig, outfit: string, cid: string, custom?: LookSpec): CharacterConfig {
+  const o = outfit.toLowerCase();
+  if (custom) return applyLook(cfg, custom) as CharacterConfig; // an outfit from an add-on pack
+  const acc = new Set<string>(cfg.accessories as string[]);
+  const out: Record<string, unknown> = { ...cfg };
+  const loud = ["#ec4899", "#14b8a6", "#f97316", "#8b5cf6", "#06b6d4"];
+  const pick = loud[[...cid].reduce((a, ch) => a + ch.charCodeAt(0), 0) % loud.length]!;
+  if (/jacket|leather|biker/.test(o)) {
+    Object.assign(out, { top: "jacket", topColor: /teddy|pink/.test(cid + o) ? "#db2777" : "#111827", top2Color: "#f8fafc", bottom: "jeans", bottomColor: "#1f2937" });
+    acc.add("sunglasses"); acc.add("chain");
+  } else if (/suit|tux|formal/.test(o)) {
+    Object.assign(out, { top: "shirt", topColor: "#111827", top2Color: "#ffffff", bottom: "trousers", bottomColor: "#111827" });
+  } else if (/police|cop|uniform/.test(o)) {
+    Object.assign(out, { hat: "police", top: "police", bottom: "trousers" });
+  } else {
+    // "vice" / beach / flower shirt: a loud patterned shirt, shades, a gold chain
+    Object.assign(out, { top: "checks", topColor: pick, top2Color: "#fde047", bottom: "jeans", bottomColor: "#38bdf8" });
+    acc.add("sunglasses"); acc.add("chain");
+  }
+  out.accessories = [...acc];
+  return out as CharacterConfig;
+}
+
 export class StoryPlayer3D extends StoryPlayer {
   private renderer!: THREE.WebGLRenderer;
   private glLost = false; // Chrome took the 3D away (a graphics crash)
@@ -62,6 +87,7 @@ export class StoryPlayer3D extends StoryPlayer {
   private sun = new THREE.DirectionalLight(0xffffff, 2);
   private places: Place[] = [];
   private humans = new Map<string, Human>();
+  private outfits = new Map<string, Human>(); // "cid|vice": the same person in other clothes ({wear:…})
   private animals = new Map<string, Creature3D>();
   private forms = new Map<string, Creature3D>(); // "cid|frog" -> the body they were turned into
   private magic: { group: THREE.Group; puffs: THREE.Sprite[]; stars: THREE.Mesh[] } | null = null;
@@ -69,6 +95,7 @@ export class StoryPlayer3D extends StoryPlayer {
   private faces: Map<string, Face>[] = [];
   private camTrack: Float32Array; // per frame: x, y, z, tx, ty, tz
   private extras3: Extra3D[] = [];
+  private myThings: Record<string, ModelDef> = {}; // designed things (3D World Designer, add-on packs)
   private fx = new THREE.Group();
   private emoteTex = new Map<string, THREE.Texture>();
   private emoteSprites = new Map<string, THREE.Sprite>();
@@ -119,12 +146,48 @@ export class StoryPlayer3D extends StoryPlayer {
 
   private toWorldX(x: number) { return (x - 0.5) * this.span; }
 
+  /** Big solid things standing in the characters' lane are moved back behind it (a new world is built only when needed). */
+  private clearStage(world: World, seed: number): World {
+    const SKIP = /^(river|pond|waterfall|path|hill|bridge|grass|tall_grass|flowers|mushroom|stones|fruit|animal|person|birds|butterflies|fish)$/;
+    const half = this.span * 0.5;
+    const moved = new Map<string, { x: number; z: number }>();
+    for (const ro of world.objects) {
+      const o = ro.o, b = ro.b;
+      if (SKIP.test(o.type) || o.points?.length) continue;
+      if (/^(veh-|on-|seat-)/.test(o.id)) continue; // the story's own car / a thing on a table / the seats they sit on
+      if (/bench|chair|sofa|bed|seat|desk|stool|log|stump|campfire/.test(`${o.type} ${String(o.opts?.kit ?? "")} ${String(o.opts?.model ?? "")}`)) continue;
+      const abil = b.abilities ?? [];
+      if (abil.includes("sittable") || abil.includes("floor") || (o.traits?.sittable)) continue;
+      const box = new THREE.Box3().setFromObject(b.root);
+      if (box.isEmpty()) continue;
+      const size = box.getSize(new THREE.Vector3());
+      if (size.y < 0.45 && size.x < 0.8 && size.z < 0.8) continue; // small things on the ground: fine
+      if (box.max.x < -half || box.min.x > half || box.min.z > 0.6 || box.max.z < -0.75 || box.min.y > 1.6) continue;
+      const dz = box.max.z + 0.8;
+      const d = world.toDoc(ro.pos.x, ro.pos.z - dz);
+      moved.set(o.id, { x: d.x, z: d.z });
+    }
+    if (!moved.size) return world;
+    const doc = { ...world.doc, objects: world.doc.objects.map((o) => (moved.has(o.id) ? { ...o, ...moved.get(o.id)! } : o)) };
+    return new World(doc, { seed });
+  }
+
+  /** 1 = full picture, 0.75 = "faster filming" (scaled up when the frame is put together). */
+  setFilmScale(k: number) {
+    if (this.renderer) this.renderer.setSize(Math.round(this.W * k), Math.round(this.H * k), false);
+  }
+
   async prepare(onProgress?: (msg: string) => void) {
     const tl = this.tl;
     onProgress?.("Building the 3D world…");
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(1);
-    this.renderer.setSize(this.W, this.H, false);
+    // "⚡ Faster filming" (opt-in, user 2026-11-19): the 3D picture drawn at 75% size and
+    // scaled up — about 1.7x less work for the graphics card, a slightly softer picture
+    let fast = false;
+    try { fast = localStorage.getItem("ytguru-fast-film") === "1"; } catch { /* private mode */ }
+    const k = fast ? 0.75 : 1;
+    this.renderer.setSize(Math.round(this.W * k), Math.round(this.H * k), false);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -139,6 +202,11 @@ export class StoryPlayer3D extends StoryPlayer {
     const castSpecies = (tl.auto_chars ?? []).map((a) => a.species).filter(Boolean);
     await loadKitIndex(); // the free ready-made 3D models (houses, cars, furniture…)
     if (tl.layouts.some((l) => (l.props ?? []).some((p) => p.type === "bed"))) await preloadKits(["furniture-kit/bedsingle"]);
+    // your own designed things (3D World Designer, add-on packs): used when a script needs them
+    let myThings: Record<string, ModelDef> = {};
+    try { myThings = (await (await fetch("/api/worlds/_things")).json()).models ?? {}; } catch { /* none */ }
+    this.myThings = myThings;
+    designedThings.lib = myThings;
     for (let i = 0; i < tl.scenes; i++) {
       const layout = tl.layouts[i] ?? { kind: "plain", props: [], seed: i + 1 };
       const kind = layout.kind as string;
@@ -171,7 +239,7 @@ export class StoryPlayer3D extends StoryPlayer {
         const words = sceneWords;
         const bp = layout.blueprint ? BLUEPRINTS.find((b) => b.id === layout.blueprint) ?? null : blueprintFor(words, kind);
         if (bp) {
-          const doc = quietDoc(buildBlueprint(bp, { seed, span: this.span, words, night: layout.night, weather: layout.weather }), layout.quiet);
+          const doc = quietDoc(buildBlueprint(bp, { seed, span: this.span, words, night: layout.night, weather: layout.weather, signs: layout.signs }), layout.quiet);
           onProgress?.(`Building "${bp.label}" (scene ${i + 1})…`);
           await preloadKits(kitsOf(doc.objects), (d, t) => onProgress?.(`Loading 3D models for "${bp.label}"… ${d} of ${t}`));
           world = new World(this.withSeats(doc, layout.props ?? [], kind), { seed });
@@ -202,13 +270,29 @@ export class StoryPlayer3D extends StoryPlayer {
           const item = { id: `on-${seed}-${placed.length}`, type: "item", x, z, rot: 0, opts: { word: nd.word, size: 0.42, y, edible: false }, traits: { pickable: true } } as unknown as WorldObj;
           placed.push(ro ? item : this.toDocSpace(w0.doc, item));
         }
-        const miss = missingThings((layout.need ?? []).filter((nd) => !onDone.has(nd.word)), (wd) => w0.has(wd), this.span, seed);
+        // a SPECIFIC vehicle the story uses ("police car", "taxi", "sports car", "boat"):
+        // the world gets exactly that model when it only has some other car
+        for (const nd of layout.need ?? []) {
+          if (!/^(drive|ride|enter|board|crash|get-in)$/.test(nd.verb) || !nd.word || onDone.has(nd.word)) continue;
+          const toks = nd.word.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+          const have = w0.objects.some((o) => toks.every((t) => o.words.join(" ").toLowerCase().includes(t)));
+          const k = have ? null : findKit(nd.word);
+          if (!k || k.cat !== "vehicle") continue;
+          onDone.add(nd.word);
+          await preloadKits([k.id]);
+          placed.push(this.toDocSpace(w0.doc, { id: `veh-${seed}-${placed.length}`, type: "kit", x: 2.6 - placed.length * 3.2, z: 2.4, rot: 0,
+            opts: { kit: k.id }, traits: { solid: true } } as unknown as WorldObj));
+        }
+        const miss = missingThings((layout.need ?? []).filter((nd) => !onDone.has(nd.word)), (wd) => w0.has(wd), this.span, seed, myThings);
         if (miss.objects.length || placed.length) {
           await preloadKits(kitsOf(miss.objects));
           const doc = { ...w0.doc, stage: w0.doc.stage, objects: [...w0.doc.objects, ...placed, ...miss.objects.map((o) => this.toDocSpace(w0.doc, o))], models: { ...(w0.doc.models ?? {}), ...miss.models } };
           world = new World(doc, { seed });
         }
       }
+      // nothing stands where the characters stand and walk (user, 2026-11-19: "the policeman
+      // walked through the boat"): big things in that lane are moved back behind them
+      if (world && !world.bare && !world.doc.room) world = this.clearStage(world, seed);
       let p: Place;
       if (world) {
         p = { group: world.group, light: world.light, update: () => {}, seatY: SEAT_H, bedY: 0.62 };
@@ -256,6 +340,18 @@ export class StoryPlayer3D extends StoryPlayer {
         this.humans.set(cid, h);
       }
     }
+    // {wear:vice} / {wear:jacket}: the same person in other clothes, built once and swapped in
+    for (const f of tl.frames) for (const c of f.chars) {
+      const key = `${c.cid}|${c.outfit}`;
+      if (!c.outfit || this.outfits.has(key)) continue;
+      const cfg = this.configs3.get(c.cid);
+      if (!cfg) continue;
+      const h = buildHuman(normalizeCharacter(outfitOf(cfg, c.outfit, c.cid, this.tl.pack?.outfits?.[c.outfit.toLowerCase()])));
+      h.root.visible = false;
+      h.root.traverse((o) => { o.castShadow = !o.userData.outline; });
+      this.scene3.add(h.root);
+      this.outfits.set(key, h);
+    }
     // what magic turns them into (a frog…): built once, shown while they are it
     for (const f of tl.frames) for (const c of f.chars) {
       for (const form of [c.form, c.morph?.to, c.morph?.was]) {
@@ -282,6 +378,7 @@ export class StoryPlayer3D extends StoryPlayer {
     this.buildMagic();
     // pictures for pop-ups and extras (shared with 2D)
     await this.preparePictures();
+    await this.prepareInserts(onProgress);
     this.buildExtras();
     this.buildEffects();
     for (const name of ["idea", "question", "exclaim", "zzz", "love", "dizzy", "angry"] as Emote[]) {
@@ -426,6 +523,14 @@ export class StoryPlayer3D extends StoryPlayer {
       } else if (veh) {
         const v = buildVehicle(veh, ["#facc15", "#ef4444", "#3b82f6", "#10b981", "#f97316"][Math.round(e.x * 10) % 5]!);
         item = { obj: v.root, e, vehicle: v, len: v.length };
+      } else if (myThingFor(word, this.myThings)) {
+        // {show:medal}: the thing you designed (an add-on pack), in 3D instead of a picture
+        const [key, def] = myThingFor(word, this.myThings)!;
+        const built = buildModel({ id: `show-${key}`, type: "model", x: 0, z: 0, opts: { model: key } } as WorldObj, def, () => 0.5);
+        built.root.traverse((o) => { o.castShadow = true; });
+        const tall = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).y;
+        if (tall > 0 && tall < 0.7) built.root.scale.setScalar(0.7 / tall); // small things are shown big enough to read
+        item = { obj: built.root, e, len: Math.max(0.5, built.radius * 2) };
       } else {
         const img = this.popIcons.get(e.src);
         if (!img) continue;
@@ -813,6 +918,7 @@ export class StoryPlayer3D extends StoryPlayer {
     const ex = this.extraF[n]!;
     const shown = new Set(f.chars.filter((c) => !ex.get(c.cid)?.hidden).map((c) => c.cid));
     for (const [cid, h] of this.humans) h.root.visible = shown.has(cid);
+    for (const h of this.outfits.values()) h.root.visible = false;
     for (const [cid, a] of this.animals) a.root.visible = shown.has(cid);
     for (const a of this.forms.values()) a.root.visible = false;
     if (this.magic) this.magic.group.visible = false;
@@ -848,7 +954,10 @@ export class StoryPlayer3D extends StoryPlayer {
         if (c.emote) this.emote3(c, head);
         continue;
       }
-      const h = this.humans.get(c.cid);
+      const h0 = this.humans.get(c.cid);
+      const alt = c.outfit ? this.outfits.get(`${c.cid}|${c.outfit}`) : undefined;
+      if (alt && h0) { alt.root.visible = h0.root.visible; h0.root.visible = false; }
+      const h = alt ?? h0;
       if (h) h.root.scale.setScalar(sq);
       else this.animals.get(c.cid)?.root.scale.setScalar(sq);
       if (h) {
@@ -1151,6 +1260,8 @@ export class StoryPlayer3D extends StoryPlayer {
     // pop-ups: in a FREE part of the picture (never over a face or a body), only when it
     // makes sense (not while someone runs / fights), smaller — the spot is chosen once
     this.drawPops(ctx, n, 0, 0, 1, (pop: Pop) => this.popSpot(pop), 0.17);
+    this.drawScreen(ctx, n);
+    this.drawInserts(ctx, n);
   }
 
   private popSpots = new Map<Pop, [number, number] | null>();

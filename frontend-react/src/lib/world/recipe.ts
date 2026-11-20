@@ -45,9 +45,6 @@ const DIRS: Record<string, [number, number]> = {
 
 /** The prompt to copy into ChatGPT (with the user's own description inside). */
 export function recipePrompt(description: string, library: string[] = []): string {
-  library = [...new Set([...Object.keys(STARTER), ...library])];
-  const types = CATALOG.filter((c) => !["animal", "person", "item", "river", "pond", "waterfall", "path", "hill"].includes(c.type)).map((c) => c.type);
-  const species = Object.keys(SPECIES).filter((s) => !["kitty", "bandar", "hen", "lamb", "pony", "cobra"].includes(s));
   return `You design 3D cartoon worlds for an animation tool. Read my description and turn it into a WORLD RECIPE in JSON — exactly the format below, nothing else.
 
 MY DESCRIPTION (it may be in Urdu / Roman Urdu / English):
@@ -55,7 +52,15 @@ MY DESCRIPTION (it may be in Urdu / Roman Urdu / English):
 ${description.trim() || "(write your description here)"}
 """
 
-FORMAT (reply with ONLY this JSON inside one code block):
+` + recipeSpec(library);
+}
+
+/** The recipe format and its rules (also used by the Script Planner's add-on prompt). */
+export function recipeSpec(library: string[] = []): string {
+  library = [...new Set([...Object.keys(STARTER), ...library])];
+  const types = CATALOG.filter((c) => !["animal", "person", "item", "river", "pond", "waterfall", "path", "hill"].includes(c.type)).map((c) => c.type);
+  const species = Object.keys(SPECIES).filter((s) => !["kitty", "bandar", "hen", "lamb", "pony", "cobra"].includes(s));
+  return `FORMAT (reply with ONLY this JSON inside one code block):
 {
   "name": "short name for this world",
   "place": one of "jungle","forest","mountain","village","farm","park","beach","desert","snow","plain",

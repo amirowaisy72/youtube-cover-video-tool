@@ -2,6 +2,12 @@
 import * as THREE from "three";
 import { at, box, cyl, sphere } from "./kit";
 import { findKit, kitInstance, preloadKits } from "../world/kits";
+import { myThingFor } from "../world/auto";
+import { buildModel } from "../world/catalog";
+import type { ModelDef, WorldObj } from "../world/types";
+
+/** Things you designed (3D World Designer, add-on packs) — set by the 3D player, used for things in the hand. */
+export const designedThings: { lib: Record<string, ModelDef> } = { lib: {} };
 
 /** A small thing to hold, made from simple shapes (or a ready-made model of that name). Points along +y. */
 export function handProp(name: string): THREE.Object3D {
@@ -20,6 +26,14 @@ export function handProp(name: string): THREE.Object3D {
   else if (/pan|wok/.test(w)) { stick(0.22, "#1f2937"); g.add(at(cyl(0.13, 0.11, 0.04, "#374151", 0.04, 16), 0.0, 0.3, 0)); }
   else if (/wrench|spanner|tool/.test(w)) { stick(0.24, "#6b7280"); g.add(at(box(0.07, 0.05, 0.03, "#6b7280"), 0, 0.26, 0)); }
   else if (/sword|stick|rod|bat/.test(w)) stick(0.6, /sword/.test(w) ? "#cbd5e1" : "#92400e");
+  else if (myThingFor(name, designedThings.lib)) {
+    // the medal / map / ticket from your add-on pack, in 3D
+    const [key, def] = myThingFor(name, designedThings.lib)!;
+    const built = buildModel({ id: `hand-${key}`, type: "model", x: 0, z: 0 } as WorldObj, def, () => 0.5);
+    const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
+    built.root.scale.setScalar(0.35 / Math.max(0.05, size.x, size.y, size.z));
+    g.add(built.root);
+  }
   else {
     const k = findKit(name);
     const inst = k ? kitInstance(k.id) : null;

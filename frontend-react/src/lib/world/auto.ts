@@ -242,7 +242,24 @@ const HANDY = new Set(["pick", "eat", "give", "throw", "drop", "carry", "kick", 
 
 /** Things the script uses that this world does not have (a mango on the
  * railway platform, a clock to point at…): made and put near the characters. */
-export function missingThings(needs: Need[], has: (w: string) => boolean, span: number, seed: number): { objects: WorldObj[]; models: Record<string, ModelDef> } {
+/** Your own designed thing a word means (exact name, its label, or all its words). */
+export function myThingFor(word: string, lib: Record<string, ModelDef>): [string, ModelDef] | null {
+  const w = norm(word);
+  const key = w.replace(/\s+/g, "_");
+  if (lib[key]) return [key, lib[key]!];
+  for (const [k, d] of Object.entries(lib)) {
+    const names = [k.replace(/_/g, " "), String(d.label ?? "").toLowerCase()];
+    if (names.some((n) => n === w)) return [k, d];
+  }
+  const toks = w.split(" ").filter((t) => t.length > 2);
+  for (const [k, d] of Object.entries(lib)) {
+    const kt = k.replace(/_/g, " ").split(" ");
+    if (toks.length && kt.length && kt.every((t) => toks.includes(t))) return [k, d];
+  }
+  return null;
+}
+
+export function missingThings(needs: Need[], has: (w: string) => boolean, span: number, seed: number, lib: Record<string, ModelDef> = {}): { objects: WorldObj[]; models: Record<string, ModelDef> } {
   const objects: WorldObj[] = [], models: Record<string, ModelDef> = {};
   const near = [[2.6, -1.6], [-2.6, -1.7], [1.3, -2.4], [-1.4, -2.5], [4.0, -2.0], [-4.1, -2.1]];
   const far = [[5.2, -3.6], [-5.3, -3.7], [3.0, -4.6], [-3.2, -4.8]];
@@ -260,10 +277,12 @@ export function missingThings(needs: Need[], has: (w: string) => boolean, span: 
       const [x, z] = near[ni++ % near.length]!;
       o = { id: `miss-${seed}-${objects.length}`, type: "fruit", x: x! * sx, z: z!, opts: { kind: kind === "fruit" ? "mango" : kind, count: 3 } };
     } else {
-      const model = starterFor(w);
+      const mine = myThingFor(w, lib);
+      const model = mine?.[1] ?? starterFor(w);
       const t = typeForWord(w, "plain", nd.verb);
       const [x, z] = (small ? near[ni++ % near.length] : far[fi++ % far.length])!;
-      if (model && !small) { models[w.replace(/\s+/g, "_")] = model; o = { id: `miss-${seed}-${objects.length}`, type: "model", x: x! * sx, z: z!, opts: { model: w.replace(/\s+/g, "_") }, traits: Object.fromEntries((model.abilities ?? []).map((a) => [a, true])) }; }
+      if (mine) { models[mine[0]] = mine[1]; o = { id: `miss-${seed}-${objects.length}`, type: "model", x: x! * sx, z: z!, opts: { model: mine[0] }, traits: Object.fromEntries((mine[1].abilities ?? []).map((a) => [a, true])) }; }
+      else if (model && !small) { models[w.replace(/\s+/g, "_")] = model; o = { id: `miss-${seed}-${objects.length}`, type: "model", x: x! * sx, z: z!, opts: { model: w.replace(/\s+/g, "_") }, traits: Object.fromEntries((model.abilities ?? []).map((a) => [a, true])) }; }
       else if (t && !["river", "pond", "waterfall", "hill", "path", "bridge"].includes(t) && !(small && /tree|palm|plant|hut|house|tent|well/.test(t))) o = { id: `miss-${seed}-${objects.length}`, type: t, x: x! * sx, z: z!, rot: 0 };
       else if (findKit(w)) o = { id: `miss-${seed}-${objects.length}`, type: "kit", x: x! * sx, z: z!, rot: 0, opts: { kit: findKit(w)!.id } }; // a real 3D model from the library
       else o = { id: `miss-${seed}-${objects.length}`, type: "item", x: x! * sx, z: z!, opts: { word: w, size: small ? 0.42 : 1.2, edible: nd.verb === "eat" }, traits: small ? undefined : { pickable: false } };

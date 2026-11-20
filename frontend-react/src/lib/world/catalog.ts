@@ -1086,6 +1086,15 @@ function kitObj(o: WorldObj): Built {
     inst.scale.multiplyScalar(k);
     if (cat === "vehicle") inst.rotation.y = KIT_FRONT; // like our own vehicles: the front leads along +x
     b.pivot.add(inst);
+    if (/police/.test(id) && cat === "vehicle") {
+      // a siren bar on the roof: red and blue, flashing in turn (World.update)
+      for (const [dz, col, tag] of [[-0.18, "#ef4444", "r"], [0.18, "#3b82f6", "b"]] as const) {
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.22 * k, 0.12 * k, 0.3 * k), new THREE.MeshBasicMaterial({ color: col }));
+        lamp.position.set(0, h + 0.04 * k, dz * k);
+        lamp.userData.siren = tag;
+        b.pivot.add(lamp);
+      }
+    }
   } else {
     // not loaded (offline): a plain block of the same size keeps the layout
     const m = box(w, h, d, cat === "tree" || cat === "plant" ? "#5fae55" : cat === "road" ? "#555b66" : "#cfc8bd", 0.02);

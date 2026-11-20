@@ -136,6 +136,8 @@ export class World {
 
   /** world-file point → scene point */
   toScene(x: number, z: number): THREE.Vector3 { return new THREE.Vector3(x, 0, z).applyMatrix4(this.stageM); }
+  /** scene point → world-file point */
+  toDoc(x: number, z: number): THREE.Vector3 { return new THREE.Vector3(x, 0, z).applyMatrix4(this.stageInv); }
 
   // ---------------------------------------------------------------- sky
   private buildSky(): PlaceLight {
@@ -845,6 +847,12 @@ export class World {
     if (w.length < 3 || NOT_THINGS.has(w)) return null;
     const hit = this.objects.filter((o) => !CATALOG_BY_TYPE.get(o.o.type)?.line && !o.b.creature && !o.b.person && o.b.height >= (o.o.type === "kit" ? 0.25 : 0.6) && (
       (o.o.name && norm(o.o.name).split(" ").includes(w)) || o.words.some((x) => norm(x) === w || norm(x).split(" ").includes(w))));
+    // "police car": the one that is ALL of it (not just any car)
+    const toks = String(word).toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+    if (toks.length > 1) {
+      const all = this.objects.filter((o) => !o.b.creature && !o.b.person && toks.every((t) => o.words.join(" ").toLowerCase().includes(t)));
+      if (all.length) return all[0]!;
+    }
     return hit.find((o) => String(o.o.opts?.kit ?? "").split("/").pop() === w) ?? hit[0] ?? null;
   }
   /** Boxes the camera must never be inside (and should see past), at frame n. */
@@ -1173,7 +1181,10 @@ export class World {
   }
 
   /** The whole world at frame n. */
+  private sirens: THREE.Object3D[] | null = null;
   update(n: number, ctx: UpdateCtx) {
+    if (this.sirens === null) { this.sirens = []; this.group.traverse((o) => { if (o.userData.siren) this.sirens!.push(o); }); }
+    for (const s of this.sirens) s.visible = (Math.floor(n / 6) % 2 === 0) === (s.userData.siren === "r");
     this.poseStatic(n);
     const tmp = new THREE.Vector3();
     for (const t of this.things) {

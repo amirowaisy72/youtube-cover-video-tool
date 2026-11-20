@@ -1,0 +1,221 @@
+01:55:27 ok 10.4s 36 chars
+01:55:36 ok 9.2s 33 chars
+01:55:40 ok 4.2s 6 chars
+01:55:45 ok 4.6s 15 chars
+01:55:54 ok 8.8s 52 chars
+01:56:01 ok 7.2s 39 chars
+01:56:09 ok 7.8s 25 chars
+01:56:16 ok 6.8s 13 chars
+01:56:24 ok 7.5s 30 chars
+01:56:31 ok 6.9s 27 chars
+01:57:00 ok 28.6s 58 chars
+01:57:29 ok 29.2s 41 chars
+01:57:55 ok 25.5s 20 chars
+01:58:48 ok 52.8s 40 chars
+01:59:43 ok 55.0s 50 chars
+02:00:08 ok 25.0s 9 chars
+02:00:38 ok 30.0s 33 chars
+02:01:05 ok 27.2s 31 chars
+02:02:03 ok 57.3s 82 chars
+02:02:55 ok 51.7s 46 chars
+02:03:42 ok 46.9s 7 chars
+02:04:35 ok 53.5s 32 chars
+02:05:01 ok 25.1s 15 chars
+02:05:30 ok 29.4s 37 chars
+02:06:18 ok 48.0s 6 chars
+02:06:52 ok 33.3s 56 chars
+02:07:17 ok 25.7s 25 chars
+02:07:52 ok 34.3s 57 chars
+02:08:45 ok 52.9s 41 chars
+02:09:10 ok 25.0s 19 chars
+02:09:57 ok 47.0s 50 chars
+02:10:50 ok 52.8s 36 chars
+02:11:37 ok 46.9s 6 chars
+02:12:05 ok 27.9s 33 chars
+02:13:01 ok 56.0s 39 chars
+02:13:48 ok 46.9s 6 chars
+02:14:18 ok 29.5s 25 chars
+02:14:50 ok 31.9s 56 chars
+02:15:17 ok 26.8s 33 chars
+02:15:42 ok 25.3s 42 chars
+02:16:09 ok 26.6s 32 chars
+02:16:36 ok 26.8s 22 chars
+02:17:04 ok 28.3s 37 chars
+02:17:29 ok 24.1s 15 chars
+02:17:50 try 1 failed: <urlopen error [WinError 10060] A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has fai
+02:18:22 ok 29.0s 53 chars
+02:18:49 ok 27.5s 18 chars
+02:19:15 ok 25.2s 46 chars
+02:19:42 ok 27.4s 30 chars
+02:20:09 ok 27.3s 27 chars
+02:23:27 ok 35.6s 53 chars
+02:23:35 ok 8.0s 32 chars
+02:23:42 ok 7.2s 49 chars
+02:23:48 ok 5.9s 14 chars
+02:23:56 ok 8.1s 28 chars
+02:24:06 ok 9.1s 38 chars
+02:24:12 ok 6.2s 25 chars
+02:24:19 ok 7.1s 13 chars
+02:24:28 ok 9.0s 44 chars
+02:24:35 ok 7.1s 32 chars
+02:24:41 ok 5.9s 17 chars
+02:24:54 ok 12.1s 63 chars
+02:25:00 ok 6.1s 28 chars
+02:25:13 ok 13.6s 58 chars
+02:25:27 ok 13.0s 56 chars
+02:25:32 ok 5.5s 23 chars
+02:25:43 ok 10.6s 43 chars
+02:25:50 ok 7.4s 31 chars
+02:26:04 ok 13.5s 67 chars
+02:26:08 ok 3.8s 15 chars
+02:26:19 ok 11.0s 52 chars
+02:26:28 ok 9.1s 53 chars
+02:26:34 ok 6.0s 10 chars
+02:26:40 ok 5.2s 6 chars
+02:26:47 ok 6.9s 28 chars
+02:26:58 ok 11.1s 56 chars
+02:27:02 ok 4.1s 14 chars
+02:27:11 ok 8.8s 51 chars
+02:27:18 ok 6.3s 37 chars
+02:27:21 ok 3.4s 14 chars
+02:27:32 ok 10.5s 32 chars
+02:27:36 ok 4.6s 46 chars
+02:27:45 ok 8.6s 33 chars
+02:27:49 ok 4.0s 15 chars
+02:27:55 ok 5.5s 64 chars
+02:27:59 ok 4.2s 5 chars
+02:28:02 ok 3.0s 6 chars
+02:28:09 ok 6.5s 53 chars
+02:28:21 ok 11.7s 53 chars
+02:28:47 ok 26.3s 22 chars
+02:29:38 ok 50.6s 29 chars
+02:30:04 ok 26.3s 17 chars
+02:30:32 ok 27.3s 25 chars
+02:30:59 ok 27.4s 22 chars
+02:31:27 ok 27.6s 56 chars
+02:32:20 ok 53.2s 47 chars
+02:32:48 ok 27.4s 19 chars
+02:33:20 ok 32.6s 51 chars
+02:33:54 ok 32.9s 51 chars
+02:34:42 ok 48.3s 17 chars
+02:35:13 ok 30.7s 56 chars
+02:36:08 ok 54.7s 59 chars
+02:36:37 ok 28.9s 31 chars
+02:37:02 ok 25.1s 71 chars
+02:37:51 ok 48.7s 16 chars
+02:38:20 ok 29.2s 39 chars
+02:38:46 ok 25.3s 60 chars
+02:39:12 ok 26.0s 20 chars
+02:39:19 ok 7.6s 40 chars
+02:39:26 ok 6.6s 18 chars
+02:39:31 ok 4.9s 18 chars
+02:39:41 ok 9.9s 30 chars
+02:39:51 ok 9.5s 46 chars
+02:40:00 ok 9.6s 46 chars
+02:40:09 ok 8.1s 44 chars
+02:40:16 ok 7.4s 43 chars
+02:40:25 ok 8.5s 44 chars
+02:40:29 ok 4.3s 5 chars
+02:40:42 ok 13.4s 43 chars
+02:40:51 ok 8.1s 36 chars
+02:40:57 ok 6.1s 47 chars
+02:41:01 ok 4.3s 28 chars
+02:41:09 ok 7.7s 24 chars
+02:41:15 ok 5.1s 17 chars
+02:41:23 ok 8.3s 27 chars
+02:41:33 ok 9.4s 55 chars
+02:41:39 ok 6.5s 33 chars
+02:41:48 ok 9.0s 40 chars
+02:41:54 ok 5.4s 6 chars
+02:41:58 try 1 failed: HTTP Error 500: Internal Server Error
+02:42:01 try 2 failed: HTTP Error 500: Internal Server Error
+02:42:10 try 3 failed: HTTP Error 500: Internal Server Error
+02:42:46 try 1 failed: HTTP Error 500: Internal Server Error
+02:42:49 try 2 failed: HTTP Error 500: Internal Server Error
+02:42:58 try 3 failed: HTTP Error 500: Internal Server Error
+02:43:37 try 1 failed: HTTP Error 500: Internal Server Error
+02:43:41 try 2 failed: HTTP Error 500: Internal Server Error
+02:43:49 try 3 failed: HTTP Error 500: Internal Server Error
+02:44:46 ok 5.3s 15 chars
+02:44:48 try 1 failed: HTTP Error 500: Internal Server Error
+02:44:51 try 2 failed: HTTP Error 500: Internal Server Error
+02:44:59 try 3 failed: HTTP Error 500: Internal Server Error
+02:45:24 try 1 failed: HTTP Error 500: Internal Server Error
+02:45:28 try 2 failed: HTTP Error 500: Internal Server Error
+02:45:36 try 3 failed: HTTP Error 500: Internal Server Error
+02:46:03 try 1 failed: HTTP Error 500: Internal Server Error
+02:46:06 try 2 failed: HTTP Error 500: Internal Server Error
+02:46:15 try 3 failed: HTTP Error 500: Internal Server Error
+02:46:43 try 1 failed: HTTP Error 500: Internal Server Error
+02:46:46 try 2 failed: HTTP Error 500: Internal Server Error
+02:46:58 ok 3.5s 38 chars
+02:47:02 ok 4.0s 15 chars
+02:47:06 ok 4.6s 35 chars
+02:47:10 try 1 failed: HTTP Error 500: Internal Server Error
+02:47:13 try 2 failed: HTTP Error 500: Internal Server Error
+02:47:22 try 3 failed: HTTP Error 500: Internal Server Error
+05:05:51 ok 25.1s (gpu 22.0s, 1 take(s), link 3.1s) 20 chars
+05:05:59 ok 5.6s (gpu 2.4s, 1 take(s), link 3.2s) 16 chars
+05:06:06 ok 6.4s (gpu 2.6s, 1 take(s), link 3.8s) 21 chars
+05:06:13 ok 6.8s (gpu 3.1s, 1 take(s), link 3.7s) 32 chars
+05:06:22 ok 8.8s (gpu 3.8s, 1 take(s), link 5.0s) 39 chars
+05:06:26 ok 4.2s (gpu 2.2s, 1 take(s), link 2.0s) 15 chars
+05:06:31 ok 4.2s (gpu 1.7s, 1 take(s), link 2.5s) 6 chars
+05:06:38 ok 7.3s (gpu 3.5s, 1 take(s), link 3.9s) 31 chars
+05:06:44 ok 5.9s (gpu 2.4s, 1 take(s), link 3.5s) 15 chars
+05:06:47 ok 3.4s (gpu 1.9s, 1 take(s), link 1.5s) 14 chars
+05:06:58 ok 10.6s (gpu 5.2s, 1 take(s), link 5.4s) 40 chars
+05:07:04 ok 6.3s (gpu 3.8s, 1 take(s), link 2.5s) 5 chars
+05:07:09 ok 4.2s (gpu 2.2s, 1 take(s), link 2.0s) 30 chars
+05:07:12 ok 2.7s (gpu 1.6s, 1 take(s), link 1.1s) 5 chars
+05:07:15 ok 3.9s (gpu 2.2s, 1 take(s), link 1.7s) 13 chars
+05:07:18 ok 2.8s (gpu 1.6s, 1 take(s), link 1.2s) 7 chars
+05:07:24 ok 5.6s (gpu 2.4s, 1 take(s), link 3.1s) 19 chars
+05:07:31 ok 6.3s (gpu 2.7s, 1 take(s), link 3.6s) 13 chars
+05:07:37 ok 6.5s (gpu 3.0s, 1 take(s), link 3.5s) 23 chars
+02:39:54 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:39:54 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:39:57 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:39:57 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:39:57 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:39:57 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:40:06 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:40:06 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:40:06 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:40:06 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:44:12 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:44:15 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:44:23 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:44:48 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:44:51 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:44:59 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:45:51 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:45:54 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:46:02 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:47:10 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:47:13 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:47:21 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:49:38 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:49:41 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:49:49 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:50:37 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:50:40 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:50:48 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:51:34 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:51:37 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:51:45 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:53:45 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:53:48 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+02:53:56 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:12:06 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:12:09 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:12:17 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:12:53 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:12:56 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:13:04 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:13:28 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:13:31 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:13:39 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:14:07 line try 1 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:14:10 line try 2 failed: <urlopen error [Errno 11001] getaddrinfo failed>
+06:14:19 line try 3 failed: <urlopen error [Errno 11001] getaddrinfo failed>

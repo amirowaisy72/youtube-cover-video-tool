@@ -1,0 +1,533 @@
+{
+  "id": "91735b599cf2",
+  "status": "done",
+  "phase": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "Did GTA 6 Make Lucia\u2019s Voice Actress a Millionaire? \ud83d\udcb0 #shorts #gta6 #gtavi",
+  "minutes": 2,
+  "visuals": "both",
+  "video_type": "short",
+  "short_seconds": 60,
+  "voice": "en-GB-RyanNeural",
+  "tts_provider": "edge",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NTEzMTk0MC43NjAzMzU0LCJqb2JfcmVmIjoiOTE3MzViNTk5Y2YyIiwibm9uY2UiOiI0ZjdhZWQ5M2U3NmExZDcxIn0=.5a264a4b6ff854c549eb7661e540f7158ec5b1a167669f3fdb69704b058ce5ee",
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "GTA 6 is predicted to make over $1 billion in its first week, yet the actress playing Lucia almost certainly isn't a millionaire from it. Why doesn't a massive payday for a game company flow down to its star?",
+      "visual": "GTA 6 is predicted to make over $1 billion in its first week, yet the actress playing Lucia almost certainly isn't a millionaire from it.",
+      "caption": "GTA 6 is predicted to make over $1 billion in its first week, yet the actress playing Lucia almost certainly\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-00-script-31476.mp4",
+      "visual_url": "",
+      "duration_sec": 11.8,
+      "keywords": [
+        "gta",
+        "predicted",
+        "billion",
+        "week",
+        "actress",
+        "playing",
+        "lucia",
+        "certainly"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-00-script-31476.mp4",
+      "code": "game_star = thing(\"star\", x=-4.0, h=3.0, color=ORANGE)\ngta_lbl = text(\"GTA 6\", x=-4.0, y=2.5, size=1.05, style=\"title\", color=GOLD)\nenter(game_star, \"pop\")\nadd(gta_lbl)\npulse(game_star)\n\nwhen(\"over $1 billion in its first week\")\nvault = thing(\"bank\", x=3.8, h=3.2, color=BLUE)\nenter(vault, \"grow\")\namt = text(\"$0\", x=3.8, y=2.5, size=1.05, style=\"number\", color=GOLD)\nadd(amt)\ncount(amt, to=1, frm=0, prefix=\"$\", suffix=\" billion\", dur=1.2)\npile(\"coin\", n=8, x=3.8, size=0.55)\n\nwhen(\"actress playing Lucia\")\nactor = thing(\"microphone\", x=-0.2, h=2.6, color=TEAL)\nenter(actor, \"pop\")\nstar_lbl = text(\"STAR SHARE?\", x=-0.2, y=2.5, size=0.85, style=\"label\", color=CREAM)\nadd(star_lbl)\nsfx(\"ding\")\n\nwhen(\"flow down to its star\")\nmove(actor, to=(-1.4, -1.2), dur=0.7, arc=True)\nshake(actor)\n",
+      "pv_file": "scene-00-preview-e9de1b2f4e4e.mp4",
+      "pv_dur": 11.8,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.62,
+          "text": "GTA 6 is predicted to"
+        },
+        {
+          "start": 1.62,
+          "end": 3.16,
+          "text": "make over $1 billion in"
+        },
+        {
+          "start": 3.16,
+          "end": 4.46,
+          "text": "its first week, yet the"
+        },
+        {
+          "start": 4.46,
+          "end": 6.32,
+          "text": "actress playing Lucia almost certainly"
+        },
+        {
+          "start": 6.32,
+          "end": 7.86,
+          "text": "isn't a millionaire from it."
+        },
+        {
+          "start": 8.1,
+          "end": 9.44,
+          "text": "Why doesn't a massive payday"
+        },
+        {
+          "start": 9.44,
+          "end": 10.66,
+          "text": "for a game company flow"
+        },
+        {
+          "start": 10.66,
+          "end": 11.6,
+          "text": "down to its star?"
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795132811.813699
+      }
+    },
+    {
+      "index": 1,
+      "narration": "In video games, voice and motion-capture actors usually sign buyout contracts. Instead of taking a slice of the game's profits, they get paid a flat union day rate\u2014often around $1,000 per 4-hour session.",
+      "visual": "In video games, voice and motion-capture actors usually sign buyout contracts.",
+      "caption": "In video games, voice and motion-capture actors usually sign buyout contracts.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-01-script-31545.mp4",
+      "visual_url": "",
+      "duration_sec": 12.1,
+      "keywords": [
+        "video",
+        "games",
+        "motion",
+        "capture",
+        "actors",
+        "sign",
+        "buyout",
+        "contracts"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-01-script-31545.mp4",
+      "code": "doc = thing(\"document\", x=-3.2, h=3.2, color=CREAM)\nenter(doc, \"left\")\nsfx(\"pop\")\n\nwhen(\"buyout contracts\")\nstamp = thing(\"lock\", x=-3.2, h=1.8, color=RED)\nenter(stamp, \"top\")\nlabel(stamp, \"BUYOUT\")\n\nwhen(\"slice of the game's profits\")\nclear()\npie_slice = thing(\"pie\", x=-2.5, h=3.2, share=0.25, color=PURPLE)\nenter(pie_slice, \"grow\")\n\nwhen(\"around $1,000 per 4-hour session\")\nclock_obj = thing(\"clock\", x=2.8, h=2.8, color=BLUE)\nenter(clock_obj, \"pop\")\nrate = text(\"$0\", x=2.8, y=2.3, style=\"number\", color=GOLD)\nadd(rate)\ncount(rate, to=1000, frm=0, prefix=\"$\", dur=1.1)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795131668.589473
+      },
+      "pv_file": "scene-01-preview-038b32420561.mp4",
+      "pv_dur": 12.1,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.7,
+          "text": "In video games, voice and"
+        },
+        {
+          "start": 1.7,
+          "end": 3.9,
+          "text": "motion-capture actors usually sign buyout"
+        },
+        {
+          "start": 3.9,
+          "end": 4.4,
+          "text": "contracts."
+        },
+        {
+          "start": 5.06,
+          "end": 6.04,
+          "text": "Instead of taking a slice"
+        },
+        {
+          "start": 6.04,
+          "end": 7.43,
+          "text": "of the game's profits, they"
+        },
+        {
+          "start": 7.42,
+          "end": 8.52,
+          "text": "get paid a flat union"
+        },
+        {
+          "start": 8.52,
+          "end": 10.86,
+          "text": "day rate\u2014often around $1,000"
+        },
+        {
+          "start": 10.86,
+          "end": 11.84,
+          "text": "per 4-hour session."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 2,
+      "narration": "Even if an actor works 100 sessions over 3 years of production, that stack of checks adds up to roughly $100,000 before taxes and agent fees. Meanwhile, the publisher keeps 100% of the billion-dollar sales chart.",
+      "visual": "Even if an actor works 100 sessions over 3 years of production, that stack of checks adds up to roughly $100,000 before taxes and agent fees.",
+      "caption": "Even if an actor works 100 sessions over 3 years of production, that stack of checks adds up to roughly\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-02-script-31485.mp4",
+      "visual_url": "",
+      "duration_sec": 13.8,
+      "keywords": [
+        "actor",
+        "works",
+        "100",
+        "sessions",
+        "years",
+        "production",
+        "stack",
+        "checks"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-02-script-31485.mp4",
+      "code": "cal = thing(\"calendar\", x=-3.4, h=3.0, color=ORANGE)\nenter(cal, \"top\")\nsfx(\"whoosh\")\n\nwhen(\"100 sessions over 3 years\")\nstack = thing(\"cash\", x=-0.2, h=2.6, color=GREEN)\nenter(stack, \"bottom\")\ntotal = text(\"$0\", x=-0.2, y=2.1, style=\"number\", color=GOLD)\nadd(total)\ncount(total, to=100000, frm=0, prefix=\"$\", dur=1.2)\n\nwhen(\"publisher keeps 100%\")\npub = thing(\"factory\", x=3.5, h=3.6, color=SLATE)\nenter(pub, \"right\")\nchart = thing(\"bar_chart\", x=3.5, h=2.2, values=[0.3, 0.6, 1.0], color=GOLD)\nmove(chart, to=(3.5, 2.2), dur=0.7)\npulse(pub)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795131675.34901
+      },
+      "pv_file": "scene-02-preview-595620908c31.mp4",
+      "pv_dur": 13.8,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.18,
+          "text": "Even if an actor works"
+        },
+        {
+          "start": 1.18,
+          "end": 3.0,
+          "text": "100 sessions over 3 years"
+        },
+        {
+          "start": 3.0,
+          "end": 4.46,
+          "text": "of production, that stack of"
+        },
+        {
+          "start": 4.46,
+          "end": 5.5,
+          "text": "checks adds up to roughly"
+        },
+        {
+          "start": 5.5,
+          "end": 7.54,
+          "text": "$100,000 before taxes"
+        },
+        {
+          "start": 7.54,
+          "end": 8.7,
+          "text": "and agent fees."
+        },
+        {
+          "start": 9.54,
+          "end": 11.64,
+          "text": "Meanwhile, the publisher keeps 100%"
+        },
+        {
+          "start": 12.0,
+          "end": 13.6,
+          "text": "of the billion-dollar sales chart."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 3,
+      "narration": "Compare that to a movie star who negotiates backend points, where a tiny 2% cut of box office tickets sends millions straight into their bank account. Video game contracts rarely share the upside like that.",
+      "visual": "Compare that to a movie star who negotiates backend points, where a tiny 2% cut of box office tickets sends millions straight into their bank account.",
+      "caption": "Compare that to a movie star who negotiates backend points, where a tiny 2% cut of box office tickets sends\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-03-script-31492.mp4",
+      "visual_url": "",
+      "duration_sec": 11.3,
+      "keywords": [
+        "compare",
+        "movie",
+        "star",
+        "negotiates",
+        "backend",
+        "points",
+        "tiny",
+        "cut"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-03-script-31492.mp4",
+      "code": "cam = thing(\"video_camera\", x=-3.5, h=3.0, color=TEAL)\nenter(cam, \"left\")\nsfx(\"pop\")\n\nwhen(\"tiny 2% cut\")\npts = thing(\"trophy\", x=0.0, h=2.8, color=GOLD)\nenter(pts, \"grow\")\ncut_txt = text(\"2%\", x=0.0, y=2.3, style=\"number\", color=GREEN)\nadd(cut_txt)\n\nwhen(\"millions straight into their bank account\")\nclear()\nb = thing(\"bank\", x=3.0, h=3.5, color=BLUE)\nenter(b, \"pop\")\nflow(pts, b, item=\"gold_bar\", n=8)\npile(\"coin\", n=10, x=3.0, size=0.55)\nmil = text(\"$0M\", x=3.0, y=2.5, style=\"number\", color=GOLD)\nadd(mil)\ncount(mil, to=10, frm=0, prefix=\"$\", suffix=\"M\", dur=1.1)\n",
+      "pv_file": "scene-03-preview-8dc62cfc4ec6.mp4",
+      "pv_dur": 11.3,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.16,
+          "text": "Compare that to a movie"
+        },
+        {
+          "start": 1.16,
+          "end": 3.14,
+          "text": "star who negotiates backend points,"
+        },
+        {
+          "start": 3.4,
+          "end": 4.64,
+          "text": "where a tiny 2% cut"
+        },
+        {
+          "start": 4.64,
+          "end": 6.0,
+          "text": "of box office tickets sends"
+        },
+        {
+          "start": 6.0,
+          "end": 7.4,
+          "text": "millions straight into their bank"
+        },
+        {
+          "start": 7.4,
+          "end": 7.94,
+          "text": "account."
+        },
+        {
+          "start": 8.44,
+          "end": 10.08,
+          "text": "Video game contracts rarely share"
+        },
+        {
+          "start": 10.08,
+          "end": 11.22,
+          "text": "the upside like that."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795132926.644644
+      }
+    },
+    {
+      "index": 4,
+      "narration": "A big title doesn't always mean big wealth\u2014the real money goes to whoever owns the asset, not the person trading hours for a paycheck. Subscribe to PocketIQ for more smart money truths!",
+      "visual": "A big title doesn't always mean big wealth\u2014the real money goes to whoever owns the asset, not the person trading hours for a paycheck.",
+      "caption": "A big title doesn't always mean big wealth\u2014the real money goes to whoever owns the asset, not the person\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-04-script-31579.mp4",
+      "visual_url": "",
+      "duration_sec": 10.2,
+      "keywords": [
+        "big",
+        "title",
+        "doesn",
+        "mean",
+        "wealth",
+        "money",
+        "whoever",
+        "owns"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-04-script-31579.mp4",
+      "code": "title_box = thing(\"game_case\", x=-3.6, h=3.0, color=PURPLE)\nenter(title_box, \"grow\")\nsfx(\"whoosh\")\n\nwhen(\"whoever owns the asset\")\nowner_person = thing(\"person\", x=0.2, h=2.8, color=TEAL)\nbag = thing(\"money_bag\", x=3.6, h=3.0, color=GREEN)\nenter(owner_person, \"pop\")\nenter(bag, \"pop\")\nflow(title_box, bag, item=\"coin\", n=7)\n\nwhen(\"asset, not the person trading hours for a paycheck. Subscribe to PocketIQ for more\")\nclear()\nworker_person = thing(\"person\", x=-3.6, h=2.8, color=ORANGE)\nclk = thing(\"clock\", x=-0.4, h=2.7, color=BLUE)\npay = thing(\"cash\", x=3.6, h=2.7, color=GOLD)\nenter(worker_person, \"left\")\nenter(clk, \"pop\")\nenter(pay, \"right\")\nflow(clk, pay, item=\"coin\", n=5)\nsub_lbl = text(\"PocketIQ\", x=3.6, y=2.5, size=1.0, style=\"title\", color=GOLD)\nadd(sub_lbl)\npulse(sub_lbl)\n",
+      "pv_file": "scene-04-preview-f87b89ce3035.mp4",
+      "pv_dur": 10.2,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.32,
+          "text": "A big title doesn't always"
+        },
+        {
+          "start": 1.32,
+          "end": 3.14,
+          "text": "mean big wealth\u2014the real money"
+        },
+        {
+          "start": 3.14,
+          "end": 4.42,
+          "text": "goes to whoever owns the"
+        },
+        {
+          "start": 4.42,
+          "end": 5.96,
+          "text": "asset, not the person trading"
+        },
+        {
+          "start": 5.96,
+          "end": 6.88,
+          "text": "hours for a paycheck."
+        },
+        {
+          "start": 7.48,
+          "end": 8.98,
+          "text": "Subscribe to PocketIQ for more"
+        },
+        {
+          "start": 8.98,
+          "end": 10.18,
+          "text": "smart money truths!"
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795133036.477514
+      }
+    }
+  ],
+  "script": "GTA 6 is predicted to make over $1 billion in its first week, yet the actress playing Lucia almost certainly isn't a millionaire from it. Why doesn't a massive payday for a game company flow down to its star?\n\nIn video games, voice and motion-capture actors usually sign buyout contracts. Instead of taking a slice of the game's profits, they get paid a flat union day rate\u2014often around $1,000 per 4-hour session.\n\nEven if an actor works 100 sessions over 3 years of production, that stack of checks adds up to roughly $100,000 before taxes and agent fees. Meanwhile, the publisher keeps 100% of the billion-dollar sales chart.\n\nCompare that to a movie star who negotiates backend points, where a tiny 2% cut of box office tickets sends millions straight into their bank account. Video game contracts rarely share the upside like that.\n\nA big title doesn't always mean big wealth\u2014the real money goes to whoever owns the asset, not the person trading hours for a paycheck. Subscribe to PocketIQ for more smart money truths!",
+  "script_source": "custom-scenes",
+  "script_words": 175,
+  "scene_total": 5,
+  "script_code": "# === SCENE 1 ===\nvault = thing(\"bank\", x=2.8, h=3.6, color=GOLD)\nenter(vault, \"grow\")\namt = text(\"$0\", x=2.8, y=2.5, style=\"number\", color=GOLD)\nadd(amt)\n\nwhen(\"over $1 billion in its first week\")\ncount(amt, to=1, frm=0, prefix=\"$\", suffix=\" billion\", dur=1.2)\npile(\"coin\", n=10, x=2.8, size=0.65)\n\nwhen(\"actress playing Lucia\")\nactor = thing(\"microphone\", x=-3.2, h=2.8, color=TEAL)\nenter(actor, \"pop\")\nbadge(\"BUYOUT?\")\n\nwhen(\"flow down to its star\")\nmove(actor, to=(0.5, -1.0), dur=0.7, arc=True)\nshake(actor)\n\n# === SCENE 2 ===\ndoc = thing(\"document\", x=-3.2, h=3.2, color=CREAM)\nenter(doc, \"left\")\nsfx(\"pop\")\n\nwhen(\"buyout contracts\")\nstamp = thing(\"lock\", x=-3.2, h=1.8, color=RED)\nenter(stamp, \"top\")\nlabel(stamp, \"BUYOUT\")\n\nwhen(\"slice of the game's profits\")\nclear()\npie_slice = thing(\"pie\", x=-2.5, h=3.2, share=0.25, color=PURPLE)\nenter(pie_slice, \"grow\")\n\nwhen(\"around $1,000 per 4-hour session\")\nclock_obj = thing(\"clock\", x=2.8, h=2.8, color=BLUE)\nenter(clock_obj, \"pop\")\nrate = text(\"$0\", x=2.8, y=2.3, style=\"number\", color=GOLD)\nadd(rate)\ncount(rate, to=1000, frm=0, prefix=\"$\", dur=1.1)\n\n# === SCENE 3 ===\ncal = thing(\"calendar\", x=-3.4, h=3.0, color=ORANGE)\nenter(cal, \"top\")\nsfx(\"whoosh\")\n\nwhen(\"100 sessions over 3 years\")\nstack = thing(\"cash\", x=-0.2, h=2.6, color=GREEN)\nenter(stack, \"bottom\")\ntotal = text(\"$0\", x=-0.2, y=2.1, style=\"number\", color=GOLD)\nadd(total)\ncount(total, to=100000, frm=0, prefix=\"$\", dur=1.2)\n\nwhen(\"publisher keeps 100%\")\npub = thing(\"factory\", x=3.5, h=3.6, color=SLATE)\nenter(pub, \"right\")\nchart = thing(\"bar_chart\", x=3.5, h=2.2, values=[0.3, 0.6, 1.0], color=GOLD)\nmove(chart, to=(3.5, 2.2), dur=0.7)\npulse(pub)\n\n# === SCENE 4 ===\ncam = thing(\"video_camera\", x=-3.5, h=3.0, color=TEAL)\nenter(cam, \"left\")\nsfx(\"pop\")\n\nwhen(\"tiny 2% cut\")\npts = thing(\"trophy\", x=0.0, h=2.8, color=GOLD)\nenter(pts, \"grow\")\ncut_txt = text(\"2%\", x=0.0, y=2.3, style=\"number\", color=GREEN)\nadd(cut_txt)\n\nwhen(\"millions straight into their bank account\")\nclear()\nb = thing(\"bank\", x=3.0, h=3.5, color=BLUE)\nenter(b, \"pop\")\nflow(b, b, item=\"gold_bar\", n=8)\nmil = text(\"$0M\", x=3.0, y=2.5, style=\"number\", color=GOLD)\nadd(mil)\ncount(mil, to=10, frm=0, prefix=\"$\", suffix=\"M\", dur=1.1)\n\n# === SCENE 5 ===\ntitle_box = thing(\"game_case\", x=-3.2, h=3.2, color=PURPLE)\nenter(title_box, \"grow\")\nsfx(\"whoosh\")\n\nwhen(\"whoever owns the asset\")\nkey_obj = thing(\"key\", x=0.2, h=2.4, color=GOLD)\nenter(key_obj, \"pop\")\npulse(key_obj)\n\nwhen(\"trading hours for a paycheck\")\nbag = thing(\"money_bag\", x=3.4, h=3.2, color=GREEN)\nenter(bag, \"right\")\nlabel(bag, \"ASSET WINS\")\n",
+  "audio_started_at": 1795131586.9416192,
+  "voice_duration_sec": 59.2,
+  "voice_engine": "edge-tts (studio presenter)",
+  "voice_fallback": false,
+  "voice_fallback_note": "",
+  "voice_files": [
+    "scene-00-presenter.mp3",
+    "scene-01-presenter.mp3",
+    "scene-02-presenter.mp3",
+    "scene-03-presenter.mp3",
+    "scene-04-presenter.mp3"
+  ],
+  "mood": "calm",
+  "music": "mood-music.mp3",
+  "music_status": "ok",
+  "music_options": [
+    {
+      "id": 859546,
+      "name": "Minimal Vintage Relaxing Meditative Ambient Piano Soundscape in C minor",
+      "duration_sec": 2637.1,
+      "preview_url": "https://cdn.freesound.org/previews/859/859546_15636277-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 796137,
+      "name": "Relaxing Ambient Soundscape",
+      "duration_sec": 312.0,
+      "preview_url": "https://cdn.freesound.org/previews/796/796137_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 742800,
+      "name": "Beautiful Relaxing Ambient",
+      "duration_sec": 164.3,
+      "preview_url": "https://cdn.freesound.org/previews/742/742800_16085323-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 789272,
+      "name": "Calm Ambient Atmosphere",
+      "duration_sec": 346.0,
+      "preview_url": "https://cdn.freesound.org/previews/789/789272_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 269585,
+      "name": "Calm spring forest Holland 150410_0602.ogg",
+      "duration_sec": 3338.7,
+      "preview_url": "https://cdn.freesound.org/previews/269/269585_1648170-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 742889,
+      "name": "Ambient Documentary Score",
+      "duration_sec": 112.7,
+      "preview_url": "https://cdn.freesound.org/previews/742/742889_16085323-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 796138,
+      "name": "Relaxing Ambient Soundscape 2",
+      "duration_sec": 306.8,
+      "preview_url": "https://cdn.freesound.org/previews/796/796138_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 265268,
+      "name": "Calm city-canal s-Hertogenbosch 150227_00 AB30.flac",
+      "duration_sec": 1600.3,
+      "preview_url": "https://cdn.freesound.org/previews/265/265268_1648170-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
+  "music_options_status": "ok",
+  "music_volume": 0.2,
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "final_minutes": 1.0,
+  "realistic_words": [
+    "__auto__:normal"
+  ],
+  "download_url": "/api/autovideo/download/91735b599cf2",
+  "final_duration_sec": 59.2,
+  "final_size_mb": 2.3,
+  "transitions": true,
+  "join": "xfade",
+  "images_used": 0,
+  "clips_used": 5,
+  "ai_images": 0,
+  "title_cards": 0,
+  "pipeline": "master-scenes-steps"
+}

@@ -271,7 +271,7 @@ function Characters() {
                 {voices.length === 0 && <option value="">Loading voices…</option>}
                 {voices.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
               </select>
-              <p className="mt-1 text-xs text-muted-foreground">⭐ Unreal Speech / ElevenLabs voices show here after you save their key in Auto Video → Narration voice.</p>
+              <p className="mt-1 text-xs text-muted-foreground">⭐ Unreal Speech / ElevenLabs / Gemini voices show here after you add their key in ⚙ Dashboard.</p>
             </div>
           </div>
 

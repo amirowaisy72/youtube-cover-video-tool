@@ -61,6 +61,7 @@ export type CharFrame = {
   act?: string | null; // the action running now (fight, chase…) — 3D world brain
   wact?: { v: string; o: string; t: number; n: number; id: string } | null; // {climb:tree} etc. (3D world)
   hand?: string | null; // still in the hand from an earlier scene (the cookie jar…)
+  outfit?: string | null; // {wear:vice} / {wear:jacket}: clothes changed in the story
   form?: string | null; // turned into a frog (…) by magic: drawn as that, until turned back
   morph?: { t: number; n: number; to: string; was: string; swap: number } | null; // the transformation happening now
 };

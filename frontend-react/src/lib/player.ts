@@ -45,9 +45,35 @@ export type Timeline = {
   pops?: Pop[];
   extras?: Extra[];
   effects?: Effect[];
+  /** {screen:…} — a computer / TV / phone screen fills the shot with this text (frames). */
+  screens?: { start: number; end: number; text: string }[];
+  /** Motion-graphic panels ({meter:…}, {map:…}, {countdown:3}…) drawn with Manim as picture frames. */
+  inserts?: { start: number; end: number; dir: string; n: number; fps: number; kind: string; url?: string }[];
+  /** Add-on packs (Script Planner): new outfits and the looks of side characters. */
+  pack?: { outfits?: Record<string, LookSpec>; cast?: Record<string, LookSpec> };
   /** Characters the story made by itself (the Teacher, a talking Monkey…). */
   auto_chars?: { id: string; name: string; species: string; female: boolean }[];
 };
+
+/** An outfit or a person's look from an add-on pack (only the fields it sets change). */
+export type LookSpec = {
+  top?: string; topColor?: string; top2Color?: string; bottom?: string; bottomColor?: string;
+  hat?: string; hatColor?: string; shoes?: string; shoeColor?: string; hair?: string; hairColor?: string;
+  skin?: string; female?: boolean; add?: string[]; remove?: string[];
+};
+
+export function applyLook(cfg: Cfg, spec: LookSpec | undefined): Cfg {
+  if (!spec) return cfg;
+  const out: Record<string, unknown> = { ...cfg };
+  for (const k of ["top", "topColor", "top2Color", "bottom", "bottomColor", "hat", "hatColor", "shoes", "shoeColor", "hair", "hairColor", "skin"] as const) {
+    if (spec[k]) out[k] = spec[k];
+  }
+  const acc = new Set<string>((cfg.accessories as string[]) ?? []);
+  for (const a of spec.remove ?? []) acc.delete(a);
+  for (const a of spec.add ?? []) acc.add(a);
+  out.accessories = [...acc];
+  return normalizeCharacter(out as Partial<Cfg>);
+}
 
 /** A stickman look for a person the story created ("Mom", "Police Officer", "Old Man"…). */
 export function autoHumanConfig(name: string, female: boolean): Cfg {
@@ -150,7 +176,10 @@ export class StoryPlayer {
     this.H = tl.height;
     for (const a of tl.auto_chars ?? []) {
       if (a.species) this.creatures.set(a.id, speciesFor(a.species) ?? speciesFor(a.name) ?? madeUpSpecies(a.name));
-      else if (!configs.has(a.id)) configs.set(a.id, autoHumanConfig(a.name, a.female));
+      else if (!configs.has(a.id)) {
+        const look = tl.pack?.cast?.[a.name] ?? Object.entries(tl.pack?.cast ?? {}).find(([n]) => n.toLowerCase() === a.name.toLowerCase())?.[1];
+        configs.set(a.id, applyLook(autoHumanConfig(a.name, look?.female ?? a.female), look));
+      }
     }
     this.assets = new RigAssets(configs, tl.size[1] / 400);
     this.stage = document.createElement("canvas");
@@ -207,7 +236,62 @@ export class StoryPlayer {
       }
     }
     await this.preparePictures();
+    await this.prepareInserts(onProgress);
     await this.prepareRig(onProgress);
+  }
+
+  /** The frames of every motion-graphic panel, loaded before filming. */
+  protected insertFrames = new Map<string, HTMLImageElement[]>();
+  protected async prepareInserts(onProgress?: (msg: string) => void) {
+    const list = (this.tl.inserts ?? []).filter((x) => x.url && x.n > 0);
+    let k = 0;
+    for (const ins of list) {
+      onProgress?.(`Loading the graphics… ${++k} of ${list.length}`);
+      const imgs: HTMLImageElement[] = [];
+      for (let i = 0; i < ins.n; i++) {
+        const img = new Image();
+        img.src = `${ins.url}${String(i).padStart(4, "0")}.png`;
+        imgs.push(img);
+      }
+      await Promise.all(imgs.map((im) => im.decode().catch(() => undefined)));
+      this.insertFrames.set(ins.dir, imgs);
+    }
+  }
+
+  /** A motion-graphic panel over the film: slides in at the top corner (top middle on a Reel). */
+  protected drawInserts(ctx: CanvasRenderingContext2D, n: number) {
+    const ins = (this.tl.inserts ?? []).find((x) => n >= x.start && n < x.end);
+    if (!ins) return;
+    const imgs = this.insertFrames.get(ins.dir);
+    if (!imgs?.length) return;
+    const t = (n - ins.start) / this.tl.fps;
+    const img = imgs[Math.min(imgs.length - 1, Math.floor(t * ins.fps))]!;
+    if (!img.complete || !img.naturalWidth) return;
+    const { W, H } = this;
+    const tall = H > W;
+    const full = ins.kind === "chapter";
+    const pw = full ? W : tall ? W * 0.86 : W * 0.4, ph = (pw * 9) / 16;
+    const into = Math.min(1, (n - ins.start) / 6), out = Math.min(1, (ins.end - n) / 6);
+    const k = Math.min(into, out);
+    const ease = 1 - (1 - k) ** 3;
+    const x = full ? 0 : tall ? (W - pw) / 2 : W - pw - W * 0.03;
+    const y = full ? (H - ph) / 2 : (tall ? H * 0.12 : H * 0.12) - (1 - ease) * (ph + H * 0.15); // below the subtitles
+    ctx.save();
+    ctx.globalAlpha = full ? ease : 1;
+    if (!full) {
+      ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+      ctx.beginPath(); ctx.roundRect(x, y, pw, ph, 18); ctx.fillStyle = "#0b1020"; ctx.fill();
+      ctx.shadowColor = "transparent";
+      ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, pw, ph, 18); ctx.clip();
+      ctx.drawImage(img, x, y, pw, ph);
+      ctx.restore();
+      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath(); ctx.roundRect(x, y, pw, ph, 18); ctx.stroke();
+    } else {
+      ctx.fillStyle = "#0b1020"; ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(img, x, y, pw, ph);
+    }
+    ctx.restore();
   }
 
   /** Pictures for pop-ups and extras (OpenMoji / your library / built-in icons). */
@@ -606,6 +690,75 @@ export class StoryPlayer {
     const y0 = cam ? Math.min(Math.max(cam.y + cam.sy - ch / 2, 0), H - ch) : 0;
     ctx.drawImage(this.stage, x0, y0, cw, ch, 0, 0, W, H);
     this.drawPops(ctx, n, x0, y0, z);
+    this.drawScreen(ctx, n);
+    this.drawInserts(ctx, n);
+  }
+
+  /** {screen:Installing GTA 6 — 47%}: the camera "cuts" to a real-looking screen —
+   * a monitor (a phone on a Reel) with the text, a progress bar that fills when the
+   * text has a percentage, a glowing title for "MISSION COMPLETE"-style moments. */
+  protected drawScreen(ctx: CanvasRenderingContext2D, n: number) {
+    const sc = (this.tl.screens ?? []).find((x) => n >= x.start && n < x.end);
+    if (!sc) return;
+    const { W, H } = this;
+    const k = n - sc.start, left = sc.end - n;
+    const a = Math.min(1, k / 6, left / 6);
+    const grow = 0.92 + 0.08 * (1 - Math.pow(1 - Math.min(1, k / 10), 3)) + 0.012 * (k / 60);
+    const tall = H > W;
+    const text = sc.text.trim();
+    const pctM = text.match(/(\d{1,3})\s*%/);
+    const pct = pctM ? Math.min(100, Number(pctM[1])) : null;
+    const big = /mission|complete|passed|won\b|wasted|busted|slow motion|take off|emergency|press start|launch/i.test(text) && text.length < 48;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = "rgba(4,6,14,0.72)";
+    ctx.fillRect(0, 0, W, H);
+    const sw = (tall ? W * 0.8 : W * 0.7) * grow, sh = tall ? sw * 1.9 : sw * 0.6;
+    const x = (W - sw) / 2, y = (H - sh) / 2 - (tall ? 0 : H * 0.02);
+    const r = Math.min(W, H) * 0.02;
+    const round = (rx: number, ry: number, rw: number, rh: number, rr: number) => {
+      ctx.beginPath(); ctx.moveTo(rx + rr, ry); ctx.arcTo(rx + rw, ry, rx + rw, ry + rh, rr); ctx.arcTo(rx + rw, ry + rh, rx, ry + rh, rr);
+      ctx.arcTo(rx, ry + rh, rx, ry, rr); ctx.arcTo(rx, ry, rx + rw, ry, rr); ctx.closePath();
+    };
+    // the device: a dark bezel, a soft glow behind it, a stand under a monitor
+    ctx.shadowColor = "rgba(56,189,248,0.45)"; ctx.shadowBlur = Math.min(W, H) * 0.06;
+    ctx.fillStyle = "#0b0d12"; round(x - r, y - r, sw + 2 * r, sh + 2 * r, r * 1.6); ctx.fill();
+    ctx.shadowBlur = 0;
+    if (!tall) {
+      ctx.fillStyle = "#14161d";
+      ctx.fillRect(W / 2 - sw * 0.04, y + sh + r, sw * 0.08, H * 0.05);
+      round(W / 2 - sw * 0.14, y + sh + r + H * 0.05, sw * 0.28, H * 0.018, H * 0.009); ctx.fill();
+    }
+    const g = ctx.createLinearGradient(x, y, x + sw, y + sh);
+    g.addColorStop(0, "#0b1230"); g.addColorStop(1, big ? "#3b0764" : "#111827");
+    ctx.fillStyle = g; round(x, y, sw, sh, r * 0.8); ctx.fill();
+    // a top bar like a real window
+    ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x, y, sw, sh * 0.07);
+    for (const [i, c] of ["#ef4444", "#f59e0b", "#22c55e"].entries()) {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + sh * 0.05 + i * sh * 0.045, y + sh * 0.035, sh * 0.013, 0, Math.PI * 2); ctx.fill();
+    }
+    // the words, wrapped to fit
+    const fs = Math.round((big ? 0.115 : 0.072) * (tall ? sw * 0.9 : sh));
+    ctx.font = `800 ${fs}px "Poppins", "Segoe UI", Arial, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const words = text.split(/\s+/); const lines: string[] = []; let cur = "";
+    for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > sw * 0.86 && cur) { lines.push(cur); cur = w; } else cur = t; }
+    if (cur) lines.push(cur);
+    const lh = fs * 1.18, ty = y + sh * (pct !== null ? 0.4 : 0.5) - ((lines.length - 1) * lh) / 2;
+    if (big) { ctx.shadowColor = "#facc15"; ctx.shadowBlur = fs * 0.5; }
+    ctx.fillStyle = big ? "#fde047" : "#f8fafc";
+    lines.forEach((ln, i) => ctx.fillText(ln, W / 2, ty + i * lh));
+    ctx.shadowBlur = 0;
+    if (pct !== null) {
+      // the bar fills up a little while it is on screen (a real download)
+      const shown = Math.min(100, pct + Math.min(3, k / 20));
+      const bw = sw * 0.7, bh = sh * 0.055, bx = W / 2 - bw / 2, by = y + sh * 0.68;
+      ctx.fillStyle = "rgba(255,255,255,0.12)"; round(bx, by, bw, bh, bh / 2); ctx.fill();
+      const fg = ctx.createLinearGradient(bx, 0, bx + bw, 0); fg.addColorStop(0, "#22d3ee"); fg.addColorStop(1, "#a855f7");
+      ctx.fillStyle = fg; round(bx, by, Math.max(bh, (bw * shown) / 100), bh, bh / 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)"; const sx = bx + ((k * 9) % Math.max(1, (bw * shown) / 100)); ctx.fillRect(sx, by, bh * 0.8, bh);
+    }
+    ctx.restore();
   }
 
   /** Your own background picture, its floor line on our floor, furniture drawn on top. */
@@ -865,6 +1018,22 @@ export class StoryPlayer {
   }
 }
 
+/** Lets the page breathe (progress, buttons) without a timer — not slowed down in a background tab. */
+function yieldNow(): Promise<void> {
+  return new Promise((resolve) => { const ch = new MessageChannel(); ch.port1.onmessage = () => resolve(); ch.port2.postMessage(0); });
+}
+
+/** Until the encoder has taken a frame from its queue (its own event; a tiny fallback poll). */
+function waitDequeue(encoder: VideoEncoder): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; resolve(); } };
+    try { encoder.addEventListener("dequeue", fin, { once: true }); } catch { /* older browser */ }
+    void yieldNow().then(() => { if (encoder.encodeQueueSize <= 6) fin(); });
+    setTimeout(fin, 50);
+  });
+}
+
 /** Encode the whole video in the browser (H.264), returns the raw stream. */
 /** Anything that can draw numbered frames (the 2D player and the 3D player). */
 export type FramePlayer = {
@@ -905,8 +1074,10 @@ export async function encodeH264(player: FramePlayer, onProgress: (done: number,
     frame.close();
     if (n % 6 === 0) {
       onProgress(n, total);
-      while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 2));
-      await new Promise((r) => setTimeout(r, 0));
+      // wait for the encoder WITHOUT timers: Chrome slows timers in a tab that is not
+      // in front (down to once a second / minute) — that made long renders hours longer
+      while (encoder.encodeQueueSize > 6) await waitDequeue(encoder);
+      await yieldNow();
     }
   }
   await encoder.flush();

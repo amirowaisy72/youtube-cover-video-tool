@@ -631,6 +631,8 @@ export const BLUEPRINTS: Blueprint[] = [
 /** The blueprint a scene's words ask for (first, most specific match), or null. */
 export function blueprintFor(words: string, kind = ""): Blueprint | null {
   const w = ` ${words.toLowerCase()} `;
+  // "inside a plane", "inside the gas station store": an INSIDE place first (not the airport / the railway station)
+  if (/\b(inside|interior|aboard)\b/.test(w)) for (const b of BLUEPRINTS) if (b.inside && b.words.test(w)) return b;
   for (const b of BLUEPRINTS) if (b.words.test(w)) return b;
   const byKind: Record<string, string> = { street: "city", park: "park", farm: "farm", beach: "beach", desert: "desert", space: "space", classroom: "classroom", kitchen: "kitchen", bedroom: "bedroom", home: "living_room", office: "office", restaurant: "restaurant", shop: "shop", library: "library", hospital: "hospital", train: "train_inside", bus: "bus_inside", plane: "plane_inside" };
   const id = byKind[kind];
@@ -654,13 +656,30 @@ export function kitsForBlueprint(bp: Blueprint, seed: number, span: number): str
 
 /** Build the world of a blueprint. */
 export function buildBlueprint(bp: Blueprint, opts: { seed: number; span: number; words: string; night?: boolean; weather?: string;
-  palette?: string[]; density?: number; time?: TimeOfDay; extra?: string[] }): WorldDoc {
+  palette?: string[]; density?: number; time?: TimeOfDay; extra?: string[]; signs?: string[] }): WorldDoc {
   const c = new Ctx(opts.seed, opts.span, opts.words.toLowerCase());
   const pal = (opts.palette ?? []).filter((x) => /^#[0-9a-f]{6}$/i.test(x));
   if (pal.length >= 2) c.tints = pal.map(lighten);
   if (opts.density) c.dens = Math.max(0.5, Math.min(1.8, opts.density));
   if (opts.night) c.time = "night";
   bp.build(c);
+  // the story's own words on big glowing billboards (GTA 6 launch night…), outdoors
+  if (!bp.inside && (opts.signs ?? []).length) {
+    const neon = ["#ff4fd8", "#38bdf8", "#facc15", "#a78bfa"];
+    const xs = [-9, 8.5, -1];
+    (opts.signs ?? []).slice(0, 3).forEach((t, i) => {
+      const txt = t.replace(/\s+/g, " ").trim().slice(0, 40);
+      const col = neon[(i + opts.seed) % neon.length]!;
+      c.custom(`billboard_${i}`, { label: "billboard", parts: [
+        { shape: "box", size: [0.3, 4.4, 0.3], pos: [-2, 2.2, 0], color: "#1f2937" },
+        { shape: "box", size: [0.3, 4.4, 0.3], pos: [2, 2.2, 0], color: "#1f2937" },
+        { shape: "box", size: [6.2, 2.0, 0.2], pos: [0, 5.2, 0], color: "#05070d" },
+        { shape: "text", text: txt, size: [5.8, 1.6], pos: [0, 5.2, 0.12], color: "#0b1020", textColor: col },
+        { shape: "box", size: [6.3, 0.08, 0.08], pos: [0, 6.24, 0.14], color: col, glow: true },
+        { shape: "box", size: [6.3, 0.08, 0.08], pos: [0, 4.16, 0.14], color: col, glow: true },
+      ] } as unknown as ModelDef, xs[i]!, -13 - i * 1.5, 0);
+    });
+  }
   if (opts.night) c.time = "night";
   if (opts.time) c.time = opts.time;
   // things the picture / the words clearly have, from the model library

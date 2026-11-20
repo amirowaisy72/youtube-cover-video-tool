@@ -1,19 +1,33 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 // Note (2026-11-07): this route's chunk hash is content-based;
 // a comment-only edit does not change the built bundle.
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
 import { StudioPresenter } from "@/components/StudioPresenter";
-import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, validateStockKey, voiceCloneList, youtubeStatus } from "@/lib/api";
-import { getChannelNiche, getFreesoundKey, getPexelsKey, getPixabayKey, getTtsKey, setChannelNiche, setFreesoundKey, setPexelsKey, setPixabayKey, setTtsKey } from "@/lib/keys";
+import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, voiceCloneList, youtubeStatus } from "@/lib/api";
+import { getChannelNiche, setChannelNiche } from "@/lib/keys";
+import { getKey, installDashboardButton, type KeyId, useKey } from "@/lib/config";
+import { KeysNeeded } from "@/components/KeysNeeded";
+import { AiStatusBox } from "@/components/AiStatusBox";
+import { MyShapes } from "@/components/MyShapes";
+import { DesignChoice, ScriptMode, getVisualDesign, setVisualDesign } from "@/components/ScriptMode";
+import { VideoPreview } from "@/components/VideoPreview";
+import { MyVideosLink } from "@/components/VideoLibrary";
+import { AvDesignChoice, AvScriptMode, getAvDesign, setAvDesign } from "@/components/AvScriptMode";
 import s1 from "@/assets/scene-1.jpg";
 import s2 from "@/assets/scene-2.jpg";
 import s3 from "@/assets/scene-3.jpg";
 
+installDashboardButton();
+
 export const Route = createFileRoute("/auto-video")({
-  component: AutoVideo,
+  component: AutoVideoRoute,
 });
+
+function AutoVideoRoute() {
+  return <AutoVideoPage />;
+}
 
 const STAGES = ["Script", "Voiceover", "Video clip", "Captions"] as const;
 const imgs = [s1, s2, s3];
@@ -67,8 +81,7 @@ function VoicePicker({ provider, voice, onChange }: {
 }) {
   const [providers, setProviders] = useState<TtsProvider[]>([]);
   const [voices, setVoices] = useState<TtsVoiceOption[]>([]);
-  const [key, setKey] = useState("");
-  const [keySaved, setKeySaved] = useState(false);
+  const key = useKey(provider as KeyId);
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voicesError, setVoicesError] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
@@ -91,8 +104,6 @@ function VoicePicker({ provider, voice, onChange }: {
   }, []);
 
   useEffect(() => {
-    setKey(getTtsKey(provider));
-    setKeySaved(false);
     setQuota(null);
     setQuotaError("");
     if (provider === "edge") {
@@ -123,11 +134,6 @@ function VoicePicker({ provider, voice, onChange }: {
     } finally {
       setLoadingVoices(false);
     }
-  };
-
-  const saveKey = () => {
-    setTtsKey(provider, key);
-    setKeySaved(true);
   };
 
   const checkQuota = async () => {
@@ -193,30 +199,17 @@ function VoicePicker({ provider, voice, onChange }: {
               </button>
             ))}
           </div>
-          {voice.startsWith("clone:") && <p className="mt-1 text-xs text-muted-foreground">Your cloned voice speaks the whole video like a studio presenter (slower on a CPU-only PC).</p>}
+          {voice.startsWith("clone:") && <CloneGpuHint />}
         </div>
       )}
       {selected && selected.key_name && (
         <div className="mt-3">
-          <label className="mb-1 block text-sm font-semibold">{selected.key_name}</label>
-          <div className="flex gap-2">
-            <input
-              className="field flex-1"
-              type="password"
-              value={key}
-              autoComplete="off"
-              placeholder={`Paste your ${selected.key_name}`}
-              onChange={(e) => { setKey(e.target.value); setKeySaved(false); }}
-            />
-            <button className="btn btn-ghost btn-sm" onClick={saveKey}>Save</button>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-semibold">{selected.key_name}:</span>
+            {key ? <span className="text-emerald-400">✓ set in the Dashboard</span> : <span className="text-amber-300">○ not set yet</span>}
+            <Link to="/dashboard" className="btn btn-ghost btn-sm">⚙ {key ? "Change" : "Add it"} in Dashboard</Link>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {selected.key_help}{" "}
-            {selected.key_url && (
-              <a className="text-primary underline" href={selected.key_url} target="_blank" rel="noreferrer">Get the key →</a>
-            )}
-            {keySaved && <span className="text-emerald-400"> · Saved in this browser.</span>}
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{selected.key_help}</p>
           <div className="mt-2 flex gap-2">
             <button className="btn btn-ghost btn-sm" disabled={loadingVoices} onClick={() => void loadVoices()}>
               {loadingVoices ? "Loading voices…" : "Load voices"}
@@ -266,9 +259,162 @@ function VoicePicker({ provider, voice, onChange }: {
   );
 }
 
-function AutoVideo() {
+// Graphics intensity (user, 2026-11-19): how much of the video is motion graphics.
+const GFX_LEVELS: { id: string; label: string; note: string }[] = [
+  { id: "few", label: "Few", note: "~1 in 8 scenes" },
+  { id: "medium", label: "Medium", note: "~1 in 3 scenes" },
+  { id: "many", label: "Many", note: "~half the scenes" },
+  { id: "all", label: "All", note: "only graphics, no stock footage" },
+];
+
+function gfxKey(docu: boolean) {
+  return docu ? "ytguru-docu-graphics" : "ytguru-av-graphics";
+}
+
+function docuSources(): string[] {
+  try { return (localStorage.getItem("ytguru-docu-sources") || "").split(/\s+/).filter((u) => /^https?:\/\//.test(u)).slice(0, 8); } catch { return []; }
+}
+
+/** The look of the next video: graphics amount, theme (Auto Video or Documentary Explainer) and source links. */
+async function saveGfxLevel(level: string, docu = false, visual = false) {
+  if (!visual) { try { localStorage.setItem(gfxKey(docu), level); } catch { /* private mode */ } }
+  try {
+    await fetch("/api/animator/config/av-style", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ graphics: visual ? "all" : level, theme: visual ? "visual" : docu ? "docu" : "classic",
+        sources: docu ? docuSources() : [], gemini_key: getKey("gemini"),
+        ...(visual ? { design: getVisualDesign() } : docu ? {} : { av_design: getAvDesign() }) }),
+    });
+  } catch { /* the server keeps its last choice */ }
+}
+
+function GraphicsAmount({ docu = false }: { docu?: boolean }) {
+  const [level, setLevel] = useState(() => { try { return localStorage.getItem(gfxKey(docu)) || (docu ? "many" : "medium"); } catch { return docu ? "many" : "medium"; } });
+  const [installed, setInstalled] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch("/api/animator/config/av-style").then((r) => r.json()).then((d: { installed?: boolean }) => setInstalled(!!d.installed)).catch(() => setInstalled(null));
+    void saveGfxLevel(level, docu);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="rounded-xl border border-border px-4 py-3">
+      <div className="font-semibold">📊 {docu ? "Documentary graphics" : "Motion graphics"}</div>
+      <p className="mt-1 mb-2 text-sm text-muted-foreground">{docu
+        ? "Paper cards with big numbers, real world maps with routes, years, people grids, charts and news clippings. The other scenes are cinematic footage with the spoken number in the corner. More graphics = longer render."
+        : "Animated explainer graphics (numbers, lists, comparisons, physics) instead of stock footage in some scenes. More graphics = longer render."}</p>
+      <div className="seg">
+        {GFX_LEVELS.map((g) => (
+          <button key={g.id} data-on={level === g.id} title={g.note} onClick={() => { setLevel(g.id); void saveGfxLevel(g.id, docu); }}>{g.label}</button>
+        ))}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{GFX_LEVELS.find((g) => g.id === level)?.note}</p>
+      {installed === false && <p className="mt-1 text-xs text-amber-300">Graphics are not installed yet — install them once in the ⚙ Dashboard (Motion graphics row).</p>}
+    </div>
+  );
+}
+
+function DocuSources({ text, setText }: { text: string; setText: (v: string) => void }) {
+  const count = text.split(/\s+/).filter((u) => /^https?:\/\//.test(u)).length;
+  return (
+    <div className="rounded-xl border border-border px-4 py-3">
+      <div className="font-semibold">📰 Sources <span className="font-normal text-muted-foreground">(optional, up to 8 links)</span></div>
+      <p className="mt-1 mb-2 text-sm text-muted-foreground">Paste links to the news articles / reports your script is based on — one per line. The video shows them as clean news clippings with the key line highlighted, read from the real page (nothing is made up). Without links there are no clippings.</p>
+      <textarea className="field min-h-[90px] font-mono text-xs" value={text} placeholder={"https://www.wfp.org/news/...\nhttps://www.reuters.com/..."}
+        onChange={(e) => setText(e.target.value)} />
+      <p className="mt-1 text-xs text-muted-foreground">{count ? `${count} link${count === 1 ? "" : "s"} — read when the footage is collected.` : "No links yet."}</p>
+    </div>
+  );
+}
+
+/** (user, 2026-11-20) a cloned voice is slow on a CPU-only PC: the free Google GPU (Colab) makes it fast. */
+function CloneGpuHint() {
+  const [st, setSt] = useState<{ set: boolean; ok: boolean } | null>(null);
+  useEffect(() => {
+    fetch("/api/animator/config/colab").then((r) => r.json()).then((d) => setSt(d as { set: boolean; ok: boolean })).catch(() => setSt(null));
+  }, []);
+  if (st?.set && st.ok) return <p className="mt-1 text-xs text-emerald-300">⚡ Your cloned voice is made on Google's free GPU (Colab is connected) — fast.</p>;
+  return (
+    <p className="mt-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-2 text-xs">
+      ⏳ A cloned voice is <b>slow on this computer</b> (every line is made several times on the CPU — a long video can take an hour or more).
+      {st?.set ? " Your Colab link is saved but not answering — is the Colab tab still running?" : " Make it fast with Google's free GPU:"}{" "}
+      <Link to="/dashboard" className="underline">⚙ Dashboard → ⚡ Colab GPU voices</Link> (open the notebook, Run all, paste its line). The voices already made are kept.
+    </p>
+  );
+}
+
+/** Visual Explainer storyboard (user, 2026-11-19): a new idea for one scene, optionally what you want to see. */
+function RedoScene({ jobId, index, onDone }: { jobId: string; index: number; onDone: (scene: AvScene) => void }) {
+  const [hint, setHint] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const go = async () => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/visual/redo", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId, index, hint, gemini_key: getKey("gemini") }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "Redo failed");
+      onDone(d.scene as AvScene);
+      setHint("");
+    } catch (e) { setErr(e instanceof Error ? e.message : "Redo failed"); }
+    setBusy(false);
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <input className="field h-8 min-w-0 flex-1 text-xs" value={hint} onChange={(e) => setHint(e.target.value)}
+        placeholder="optional: what should this scene show? e.g. coins falling into a piggy bank" />
+      <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void go()}>{busy ? "Thinking…" : "🔁 Redo scene"}</button>
+      {err && <p className="w-full text-xs text-rose-300">{err}</p>}
+    </div>
+  );
+}
+
+/** Storyboard check (user, 2026-11-20): scenes the AI could not design well ("simple version") are counted,
+    can all be redone in one go, and the user is warned before moving on with them. */
+function SimpleScenesBar({ job, onScene }: { job: AvJob; onScene: (i: number, sc: AvScene) => void }) {
+  const simple = (job.scenes || []).map((sc, i) => ({ sc, i })).filter(({ sc }) => (sc as { graphic?: { basic?: boolean } }).graphic?.basic);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  if (!simple.length) return <p className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm text-emerald-300">✓ Every scene was designed by Gemini.</p>;
+  const all = async () => {
+    setErr("");
+    for (let k = 0; k < simple.length; k++) {
+      const { i } = simple[k]!;
+      setBusy(`Redoing scene ${i + 1} (${k + 1} of ${simple.length})…`);
+      try {
+        const r = await fetch("/api/visual/redo", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_id: job.id, index: i, hint: "", gemini_key: getKey("gemini") }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Redo failed");
+        onScene(i, d.scene as AvScene);
+      } catch (e) { setErr(`Scene ${i + 1}: ${e instanceof Error ? e.message : "failed"} — try again in a minute.`); break; }
+    }
+    setBusy("");
+  };
+  return (
+    <div className="rounded-xl border border-amber-500/60 bg-amber-500/10 p-3 text-sm">
+      <p><b>⚠ {simple.length} scene{simple.length === 1 ? "" : "s"} only got the simple version</b> (Gemini's plan was not good enough): {simple.map(({ i }) => `#${i + 1}`).join(", ")}. Redo them before you go on — the simple version is plain.</p>
+      <button className="btn btn-secondary btn-sm mt-2" disabled={!!busy} onClick={() => void all()}>{busy || `🔁 Redo all ${simple.length} simple scenes`}</button>
+      {err && <p className="mt-1 text-xs text-rose-300">{err}</p>}
+    </div>
+  );
+}
+
+export function AutoVideoPage({ docu = false, visual = false }: { docu?: boolean; visual?: boolean }) {
   const { jobs, registerJob, updateJob, removeJob, activeChannelId } = useApp();
-  const [title, setTitle] = useState("10 Mind-Blowing Facts About Our World");
+  const ROUTE = visual ? "/visual" : docu ? "/documentary" : "/auto-video";
+  useEffect(() => { if (visual) void saveGfxLevel("all", false, true); }, [visual]);
+  // Script mode (user, 2026-11-20): Gemini designs the scenes, or the user's own AI writes their code
+  const [design, setDesign] = useState<"gemini" | "script">(() => getVisualDesign());
+  const chooseDesign = (d: "gemini" | "script") => { setDesign(d); setVisualDesign(d); void saveGfxLevel("all", false, true); };
+  // Auto Video Script mode (user, 2026-11-20): the app finds the footage, or the user's AI plans it
+  const [avDesign, setAvDesignState] = useState<"auto" | "script">(() => getAvDesign());
+  const chooseAvDesign = (d: "auto" | "script") => {
+    setAvDesignState(d); setAvDesign(d);
+    let lvl = "medium"; try { lvl = localStorage.getItem(gfxKey(false)) || "medium"; } catch { /* private mode */ }
+    void saveGfxLevel(lvl, false, false);
+  };
+  // a topic sent from the Topic Research Lab ("🎬 Make this video") comes in here once
+  const [title, setTitle] = useState(() => { try { const t = localStorage.getItem("ytguru-title-in-av"); if (t) { localStorage.removeItem("ytguru-title-in-av"); return t; } } catch { /* private mode */ } return visual ? "How the Stock Market Really Works" : docu ? "Why One Narrow Strait Can Make the Whole World Hungry" : "10 Mind-Blowing Facts About Our World"; });
   // Prompt for AI (user, 2026-11-09): a button next to the title
   // that copies a prompt for Gemini/AI to suggest video title ideas
   // matching the channel selected in the TopBar. The channel's
@@ -346,7 +492,13 @@ function AutoVideo() {
   // Short-aware (user, 2026-11-09): when Short is picked, the
   // title prompt must say so — a Short's title is punchier and
   // hook-first, not a long-video title.
-  const titleIdeasPrompt = videoType === "short"
+  // Prompts for the selected channel, or for ANY topic (user, 2026-11-19: "sometimes the
+  // video is about something else, not my channel's niche")
+  const [promptFor, setPromptForState] = useState<"channel" | "topic">(() => { try { return localStorage.getItem("ytguru-av-prompt-for") === "topic" ? "topic" : "channel"; } catch { return "channel"; } });
+  const setPromptFor = (v: "channel" | "topic") => { setPromptForState(v); try { localStorage.setItem("ytguru-av-prompt-for", v); } catch { /* private mode */ } };
+  const forChannel = promptFor === "channel";
+  const topicTitlePrompt = `Suggest 10 catchy, clickable YouTube ${videoType === "short" ? "Short " : ""}title ideas about this topic: "${title.trim() || "(write your topic in the title box)"}".\n${videoType === "short" ? "These are for YouTube Shorts (vertical, under 60 seconds): very short (under 50 characters), punchy, hook-first." : "Short (under 60 characters), they create curiosity and match what people really search for."} Return only the titles, one per line, no extra text.`;
+  const titleIdeasPrompt = !forChannel ? topicTitlePrompt : videoType === "short"
     ? `Suggest 10 catchy, clickable YouTube Short title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThese are for YouTube Shorts (vertical video, under 60 seconds) — the titles should be very short (under 50 characters), punchy, hook-first, and create instant curiosity. Return only the titles, one per line, no extra text.`
     : `Suggest 10 catchy, clickable YouTube video title ideas for a YouTube channel called "${activeChannelTitle || "my channel"}"${niche.trim() ? ` about ${niche.trim()}` : ""}.${descSnippet ? `\nChannel description: "${descSnippet}"` : ""}${channelKeywords ? `\nChannel keywords: ${channelKeywords}` : ""}\nThe titles should be short (under 60 characters), create curiosity, and match what viewers search for in this niche. Return only the titles, one per line, no extra text.`;
   const [dur, setDur] = useState(2);
@@ -366,16 +518,79 @@ function AutoVideo() {
   // written by another AI (e.g. Gemini) and the video is built
   // from it. Empty = the tool writes the script itself.
   // your script survives a refresh (user, 2026-11-18: it was lost and the app wrote its own)
-  const [customScript, setCustomScriptRaw] = useState(() => { try { return localStorage.getItem("ytguru-av-script") || ""; } catch { return ""; } });
-  const setCustomScript = (v: string) => { setCustomScriptRaw(v); try { localStorage.setItem("ytguru-av-script", v); } catch { /* full */ } };
+  const scriptKey = visual ? "ytguru-vis-script" : docu ? "ytguru-docu-script" : "ytguru-av-script";
+  const [customScript, setCustomScriptRaw] = useState(() => { try { return localStorage.getItem(scriptKey) || ""; } catch { return ""; } });
+  const [sourcesText, setSourcesTextRaw] = useState(() => { try { return localStorage.getItem("ytguru-docu-sources") || ""; } catch { return ""; } });
+  const setSourcesText = (v: string) => { setSourcesTextRaw(v); try { localStorage.setItem("ytguru-docu-sources", v); } catch { /* full */ } };
+  const setCustomScript = (v: string) => {
+    // Documentary: the AI's "SOURCES:" list goes to the Sources box, never into the narration.
+    const m = docu ? v.match(/\n\s*\**\s*sources?\s*\**\s*:\s*\**\s*\n?([\s\S]*)$/i) : null;
+    if (m) {
+      const links = ((m[1] ?? "").match(/https?:\/\/[^\s)\]>"']+/g) || []).slice(0, 8);
+      v = v.slice(0, m.index ?? v.length).trimEnd();
+      if (links.length) setSourcesText(Array.from(new Set([...sourcesText.split(/\s+/).filter(Boolean), ...links])).slice(0, 8).join("\n"));
+    }
+    setCustomScriptRaw(v);
+    try { localStorage.setItem(scriptKey, v); } catch { /* full */ }
+  };
   // Short-aware (user, 2026-11-09): when Short is picked, the
   // script prompt must ask for a SHORT script (seconds, ~2.5
   // words/sec) with an instant hook — not a minutes-long script.
   // Before this fix it always asked for ${dur} minute(s), so a
   // 30-second Short got a 150-word script.
-  const scriptPrompt = videoType === "short"
-    ? `Write a YouTube Short script for a video titled "${title.trim() || "my video"}"${activeChannelTitle ? ` for the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. This is a YouTube Short: only about ${shortSecs} seconds long (roughly ${Math.round(shortSecs * 2.5)} words). Start with a strong hook in the first 3 seconds, then make one single clear point in simple, punchy spoken language. Write it as plain spoken narration only — no scene directions, no headings, no bullet points. Separate into 3-4 short paragraphs with a blank line between each, one idea per paragraph, so the video cuts to a new visual for each idea.`
-    : `Write a YouTube video script for a video titled "${title.trim() || "my video"}"${activeChannelTitle ? ` for the channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` about ${niche.trim()}` : ""}. The video should be about ${dur} minute(s) long (roughly ${dur * 150} words). Start with a strong hook in the first 15 seconds, then explain the topic in simple, clear language with interesting examples. Write it as plain spoken narration only — no scene directions, no headings, no bullet points. Separate paragraphs with a blank line, one idea per paragraph.`;
+  // The script prompt, written for how THIS app builds a video (2026-11-19): every paragraph
+  // becomes one scene with its own footage; numbers, comparisons, lists, steps and time
+  // become animated graphics; lists of 3+ things pop up one by one; the presenter says
+  // the hook, questions and the ending to camera; the voice acts the punctuation.
+  const channelBit = forChannel ? `${activeChannelTitle ? ` for the YouTube channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` (channel topic: ${niche.trim()})` : ""}` : "";
+  const words = videoType === "short" ? Math.round(shortSecs * 2.5) : dur * 150;
+  const paras = videoType === "short" ? "4-6" : `${Math.max(4, Math.round(dur * 4))}-${Math.max(6, Math.round(dur * 5))}`;
+  const scriptPrompt = `Write the spoken script for a YouTube ${videoType === "short" ? `Short (vertical, about ${shortSecs} seconds)` : `video (about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
+
+LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
+
+HOW MY VIDEO APP USES YOUR SCRIPT (follow this exactly):
+- Every paragraph becomes ONE scene with its own stock footage, so each paragraph is about ONE clear thing that can be SHOWN: real people, objects, places and actions (e.g. "a man checking his empty wallet at a cash machine"), not abstract ideas. ${videoType === "short" ? "Keep paragraphs short (1-3 sentences)." : "Keep each paragraph 2-4 sentences (about 25-45 words)."}
+- Paragraph 1 is the HOOK: a surprising fact, a bold claim or a direct question to the viewer, in 1-2 short sentences. No "Hey guys", no "welcome back", no introducing yourself.
+- About 1 paragraph in 4 should carry DATA the app turns into an animated graphic: real numbers written as digits ($3,000, 35%, 12 months, 1,000,000), a before/after or A-vs-B comparison with both numbers, a clear list of 3-5 items separated by commas, numbered steps (first, second, third), or time passing (from day 1 to day 30). Use correct, well-known figures; when a number is only an example, say so ("say you earn $3,000 a month").
+- Speak directly to the viewer ("you", "your"), in simple everyday words and short sentences. Use ! ? and … where the feeling changes — the voice acts them.
+- Build curiosity: each paragraph should make the viewer want the next one (a small question, a "but here is the catch", a promise of the fix).
+- The LAST paragraph: one clear takeaway the viewer can use today, then a short, natural ask to subscribe.
+
+FORMAT: plain spoken narration only. No title, no headings, no labels like "Narrator:" or "Scene 1", no stage directions, no [brackets], no emojis, no bullet points, no markdown. Only the words that will be spoken.`;
+  // Documentary Explainer (user, 2026-11-19): a calm, researched documentary narration
+  // built for paper cards, real maps, news clippings and cinematic footage.
+  const docuPrompt = `Write the narration for a calm, serious RESEARCH DOCUMENTARY for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
+
+LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
+
+HOW MY VIDEO APP BUILDS THE VIDEO (follow this exactly):
+- Every paragraph becomes ONE scene (2-4 sentences, about 25-45 words). Each scene is shown as EITHER a paper card with a big number, a real world map, a news clipping, OR cinematic footage (ships, ports, trucks, fields, factories, warehouses, cities) with the key number in the corner.
+- Paragraph 1 is a cold open: drop the viewer into one concrete moment (a place, a date, a number) — no greeting, no "in this video".
+- Use REAL, checkable facts. Write numbers as digits with their unit (45 million, $100 a barrel, 34%, March 2026). Name the source in the sentence when a number comes from one ("the World Food Programme estimates…"). Never invent numbers, quotes or sources; if you are not sure of a figure, leave it out.
+- About half of the paragraphs should carry something the app can draw: one big number; a comparison of two places or two years with both numbers; a share of people ("1 in 3 families"); 3-5 years or dates; or PLACES — name the countries, seas, straits, ports or cities involved so the map can show them and the routes between them.
+- Explain cause and effect step by step, like a patient narrator: what happened, why it matters, who is hit, what comes next. Short sentences, neutral and calm — no hype, no "guys", no clickbait.
+- Every few paragraphs, start a new part with a clear turn ("But the real problem started on land.").
+- The LAST paragraph: the one thing to watch next, then a short, natural ask to subscribe.
+
+After the script, on its own line, write SOURCES: and list the links of the articles/reports you used (I paste them into the app so the video can show them as clippings).
+
+FORMAT: plain spoken narration only. No title, no headings, no labels like "Narrator:" or "Scene 1", no stage directions, no [brackets], no emojis, no bullet points, no markdown — except the SOURCES list at the very end.`;
+  // Visual Explainer (user, 2026-11-19): every paragraph becomes an animated scene of drawn objects.
+  const visualPrompt = `Write the narration for an animated EXPLAINER video for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
+
+LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
+
+HOW MY VIDEO APP ANIMATES YOUR SCRIPT (follow this exactly):
+- Every paragraph becomes ONE animated scene drawn with simple illustrated things (factories, coins, people, ships, cities, charts, houses, phones…) that MOVE to show the idea: a company splitting into pieces, coins flowing to people, a city growing, a chart falling. So every paragraph explains ONE idea through concrete things and actions that can be drawn — not abstract talk. 2-4 sentences, about 25-45 words.
+- Paragraph 1 is the HOOK: a surprising fact, a bold claim or a direct question, in 1-2 short sentences. No greeting.
+- Use real numbers as digits ($3,000, 35%, 1998 vs 2026) where they help — they are animated as counting numbers. Never invent facts; when a number is only an example, say so ("say you earn $3,000 a month").
+- Use comparisons and cause → effect ("when X happens, Y moves to Z") — they make the best animations.
+- Simple everyday words, short sentences, speak to the viewer ("you"). Use ! ? and … where the feeling changes.
+- Each paragraph should make the viewer want the next one.
+- The LAST paragraph: one clear takeaway, then a short, natural ask to subscribe.
+
+FORMAT: plain spoken narration only. No title, no headings, no labels, no stage directions, no [brackets], no emojis, no bullet points, no markdown. Only the words that will be spoken.`;
   const [subtitles, setSubtitles] = useState(true);
   // Mood music + transitions (2026-11-08): a mood-matched
   // background track (needs the Freesound key below) and a
@@ -385,33 +600,13 @@ function AutoVideo() {
   // Stock-media keys (Pexels / Pixabay, free): shared with the
   // Stock and Music tools via localStorage — entering one here
   // connects it everywhere, and vice versa. Empty = Commons only.
-  const [pexelsKey, setPexelsKeyState] = useState("");
-  const [pixabayKey, setPixabayKeyState] = useState("");
-  const [freesoundKey, setFreesoundKeyState] = useState("");
+  // keys come from the Dashboard (user, 2026-11-19)
+  const pexelsKey = useKey("pexels");
+  const pixabayKey = useKey("pixabay");
+  const freesoundKey = useKey("freesound");
   // Key validation (user, 2026-11-08): a wrong key must be
   // caught here, not weeks later when videos silently miss
   // the stock footage and fall back to Commons.
-  const [keyTest, setKeyTest] = useState<string | null>(null);
-  const [keyTesting, setKeyTesting] = useState(false);
-
-  const testKeys = async () => {
-    setKeyTesting(true);
-    setKeyTest(null);
-    const parts: string[] = [];
-    for (const [label, source, key] of [["Pexels", "pexels", pexelsKey], ["Pixabay", "pixabay", pixabayKey], ["Freesound", "freesound", freesoundKey]] as const) {
-      if (!key.trim()) { parts.push(`${label}: — (no key)`); continue; }
-      try {
-        const res = await validateStockKey(source, key.trim());
-        if (res.valid) parts.push(`${label}: ✓ valid`);
-        else if (res.reason === "invalid") parts.push(`${label}: ✗ invalid — wrong or revoked key`);
-        else parts.push(`${label}: ⚠ could not verify right now`);
-      } catch {
-        parts.push(`${label}: ⚠ could not verify right now`);
-      }
-    }
-    setKeyTest(parts.join(" · "));
-    setKeyTesting(false);
-  };
   // Step flow (user, 2026-11-09): Setup -> Footage -> Audio ->
   // Render & Review. "build" is the working state (collecting
   // footage / voicing / rendering); "footage", "audio" and
@@ -525,7 +720,7 @@ function AutoVideo() {
     setRevoicing(true);
     setRevoiceError("");
     try {
-      await autovideoRevoice(job.id, ttsProvider, voice, getTtsKey(ttsProvider));
+      await autovideoRevoice(job.id, ttsProvider, voice, getKey(ttsProvider as KeyId));
       for (let i = 0; i < 900; i++) {
         await new Promise((r) => setTimeout(r, 3000));
         const j = await autovideoJob(job.id);
@@ -956,9 +1151,6 @@ function AutoVideo() {
   // Load the shared stock-media keys (entered here, in the
   // Stock tool or in the Music tool — one key works everywhere).
   useEffect(() => {
-    setPexelsKeyState(getPexelsKey());
-    setPixabayKeyState(getPixabayKey());
-    setFreesoundKeyState(getFreesoundKey());
   }, []);
 
   // Restore a job that was started earlier and is still in the
@@ -966,8 +1158,9 @@ function AutoVideo() {
   // top progress bar, or refreshed). The backend job kept
   // running the whole time.
   useEffect(() => {
-    const active = jobs.find((j) => j.tool === "auto-video" && j.status === "running");
-    const finished = jobs.find((j) => j.tool === "auto-video" && j.status === "done");
+    const mine = (j: { tool: string; route?: string }) => j.tool === "auto-video" && (j.route || "/auto-video") === ROUTE;
+    const active = jobs.find((j) => mine(j) && j.status === "running");
+    const finished = jobs.find((j) => mine(j) && j.status === "done");
     const found = active ?? finished;
     if (!found || jobId) return;
     jobKey.current = found.key;
@@ -1011,13 +1204,14 @@ function AutoVideo() {
     setJob(null);
     setPhase("build");
     try {
-      const data = await autovideoPlan(title.trim(), dur, voice.startsWith("clone:") ? "en-US-AriaNeural" : voice, pexelsKey, pixabayKey, customScript, ttsProvider, getTtsKey(ttsProvider), videoType, shortSecs);
+      try { await saveGfxLevel(localStorage.getItem(gfxKey(docu)) || (docu ? "many" : "medium"), docu, visual); } catch { /* keep going */ }
+      const data = await autovideoPlan(title.trim(), dur, voice.startsWith("clone:") ? "en-US-AriaNeural" : voice, pexelsKey, pixabayKey, customScript, ttsProvider, getKey(ttsProvider as KeyId), videoType, shortSecs);
       setJobId(data.job_id);
       // Background job: the step keeps running if the user
       // leaves this page, and the top bar shows its progress.
       const key = `autovideo:${data.job_id}`;
       jobKey.current = key;
-      registerJob({ key, tool: "auto-video", title: title.trim(), route: "/auto-video", jobId: data.job_id });
+      registerJob({ key, tool: "auto-video", title: title.trim(), route: ROUTE, jobId: data.job_id });
       poll(data.job_id);
     } catch (e) {
       setPhase("form");
@@ -1035,7 +1229,7 @@ function AutoVideo() {
     setError("");
     setPhase("build");
     try {
-      await autovideoPrepareAudio(job.id, freesoundKey, music, ttsProvider, voice, getTtsKey(ttsProvider));
+      await autovideoPrepareAudio(job.id, freesoundKey, music, ttsProvider, voice, getKey(ttsProvider as KeyId));
       poll(job.id);
     } catch (e) {
       setPhase("footage");
@@ -1062,13 +1256,44 @@ function AutoVideo() {
 
   return (
     <div data-tool="auto-video">
-      <PageHeader icon="🎬" title="Auto Video from Title" sub="Five steps: setup, footage, audio, realistic, then render — change anything before the video is built." />
+      {visual
+        ? <PageHeader icon="🎨" title="Visual Explainer" sub="Explainer videos made only of animated drawings — things that move to show the idea, with a sound for every motion. No stock footage." />
+        : docu
+        ? <PageHeader icon="🎞️" title="Documentary Explainer" sub="Research-documentary videos on any topic: paper cards with big numbers, real maps, news clippings and cinematic footage — five steps, like Auto Video." />
+        : <PageHeader icon="🎬" title="Auto Video from Title" sub="Five steps: setup, footage, audio, realistic, then render — change anything before the video is built." />}
+      {/* (user, 2026-11-20) My videos on every video tool, and close the open video at any step */}
+      <div className="mx-auto mb-3 flex max-w-2xl flex-wrap justify-end gap-2">
+        <MyVideosLink tool={visual ? "visual" : "autovideo"} />
+        {job && phase !== "form" && (
+          <button className="btn btn-ghost btn-sm" onClick={() => {
+            if (!confirm("Close this video and start a new one?\nIts files stay in 📁 My videos (open or delete it there). A step that is still running on this computer keeps running until it ends.")) return;
+            if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null);
+          }}>✕ Close this video</button>
+        )}
+      </div>
+      <div className="mx-auto mb-4 max-w-2xl space-y-2">
+        {visual && design === "script" && (
+          <div className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-4 py-3 text-sm">
+            <b>ℹ Script mode:</b> no Gemini is needed. After step 2 you copy one prompt into any AI (Claude, ChatGPT, Gemini),
+            paste its scene code back, and every scene is drawn from that code — made only for your script.
+          </div>
+        )}
+        {visual && design === "gemini" && (
+          <div className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-4 py-3 text-sm">
+            <b>ℹ This tool works only with Gemini.</b> Every animation is designed by Gemini (your free key) — the free AI is never used here.
+            When Google's Gemini servers are busy, the app waits and keeps trying for up to 10 minutes; if Gemini is still busy it
+            stops and tells you, and nothing is made from guesses. Then try again later (mornings are usually best) or pick another
+            model under <b>⚙ Gemini model</b>.
+          </div>
+        )}
+        {(!visual || design === "gemini") && <AiStatusBox geminiOnly={visual} />}
+      </div>
 
       {/* Stepper (user, 2026-11-09): the five steps, with the
           current one highlighted. */}
       {phase !== "form" && (
         <div className="mx-auto mb-6 flex max-w-2xl items-center gap-2">
-          {["1 · Setup", "2 · Footage", "3 · Audio", "4 · Realistic", "5 · Render"].map((label, i) => {
+          {["1 · Setup", visual ? "2 · Storyboard" : "2 · Footage", "3 · Audio", "4 · Realistic", "5 · Render"].map((label, i) => {
             const n = i + 1;
             const done = n < step;
             const now = n === step;
@@ -1084,11 +1309,21 @@ function AutoVideo() {
       {phase === "form" && (
         <div className="glass mx-auto max-w-2xl space-y-6 p-8">
           <div>
+            <label className="mb-2 block text-sm font-semibold">✨ AI prompts are for</label>
+            <div className="seg">
+              <button data-on={forChannel} onClick={() => setPromptFor("channel")}>📺 My selected channel{activeChannelTitle ? ` (${activeChannelTitle})` : ""}</button>
+              <button data-on={!forChannel} onClick={() => setPromptFor("topic")}>🌐 Any other topic</button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {forChannel ? "Title ideas and the script follow your channel's topic." : "Write your own title (or a topic) below — the prompts follow only that title and the length, not your channel."}
+            </p>
+          </div>
+          <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="font-semibold">Video title</label>
               <button
                 className="btn btn-ghost btn-sm"
-                title="Prompt for AI — copy a prompt for Gemini or any AI to get video title ideas for the selected channel"
+                title={forChannel ? "Prompt for AI — title ideas for the selected channel" : "Prompt for AI — title ideas about the topic you typed in the title box"}
                 onClick={() => void copyText(titleIdeasPrompt)}
               >
                 {copied ? "✓ Copied" : "✨ Prompt for AI"}
@@ -1096,7 +1331,7 @@ function AutoVideo() {
             </div>
             <input className="field text-lg" value={title} autoComplete="off" onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 5 Secrets of the Ocean" />
           </div>
-          <div>
+          {forChannel && <div>
             <label className="mb-2 block text-sm font-semibold">Channel topic / niche <span className="text-muted-foreground">(auto-filled from the selected channel — edit if needed)</span></label>
             <input
               className="field"
@@ -1108,14 +1343,14 @@ function AutoVideo() {
               }}
               placeholder="e.g. personal finance, amazing facts"
             />
-          </div>
+          </div>}
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="font-semibold">Script <span className="text-muted-foreground">(optional — leave empty to auto-write it)</span></label>
               <button
                 className="btn btn-ghost btn-sm"
                 title="Prompt for AI — copy a prompt for Gemini or any AI to write this video's script"
-                onClick={() => void copyText(scriptPrompt)}
+                onClick={() => void copyText(visual ? visualPrompt : docu ? docuPrompt : scriptPrompt)}
               >
                 {copied ? "✓ Copied" : "✨ Prompt for AI"}
               </button>
@@ -1179,6 +1414,10 @@ function AutoVideo() {
             <label className="mb-2 block font-semibold">Narration voice <span className="text-sm font-normal text-muted-foreground">(optional — who reads the script. No pick = the default Edge voice, Aria. Pick a provider below to hear each variant and choose.)</span></label>
             <VoicePicker provider={ttsProvider} voice={voice} onChange={handleVoiceChange} />
           </div>
+          {visual && <DesignChoice value={design} onChange={chooseDesign} />}
+          {!visual && !docu && <AvDesignChoice value={avDesign} onChange={chooseAvDesign} />}
+          {visual ? <MyShapes /> : <GraphicsAmount docu={docu} />}
+          {docu && <DocuSources text={sourcesText} setText={setSourcesText} />}
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={subtitles} onChange={(e) => setSubtitles(e.target.checked)} />
             <span>
@@ -1190,55 +1429,29 @@ function AutoVideo() {
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={music} onChange={(e) => setMusic(e.target.checked)} />
             <span>
               <span className="block font-semibold">🎵 Background music by mood</span>
-              <span className="block text-sm text-muted-foreground">A royalty-free track that fits the script's mood (suspense, happy, motivational…) plays softly under the voice. Needs your Freesound key below — without it, the video has no music.</span>
+              <span className="block text-sm text-muted-foreground">A royalty-free track that fits the script's mood (suspense, happy, motivational…) plays softly under the voice. Needs your Freesound key (Dashboard) — without it, the video has no music.</span>
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3">
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={transitions} onChange={(e) => setTransitions(e.target.checked)} />
             <span>
               <span className="block font-semibold">✨ Transitions + sounds</span>
-              <span className="block text-sm text-muted-foreground">A different transition style (fade, wipe, slide, circle…) and a different sound effect at every scene change, so the video never repeats the same look or sound. Sounds need your Freesound key below.</span>
+              <span className="block text-sm text-muted-foreground">A different transition style (fade, wipe, slide, circle…) and a different sound effect at every scene change, so the video never repeats the same look or sound. Sounds need your Freesound key (Dashboard).</span>
             </span>
           </label>
-          <div className="rounded-xl border border-border px-4 py-3">
-            <div className="font-semibold">🎞️ Richer stock footage (optional)</div>
-            <p className="mt-1 text-sm text-muted-foreground">Add your free Pexels / Pixabay API keys and the video uses their professional clips first (Commons is the fallback). The Freesound key is for the background music and transition sounds — Pixabay's API has no audio, so music and sounds come from Freesound. A key entered here works in the Stock and Music tools too — never enter it twice.</p>
-            <div className="mt-3 space-y-2">
-              <input
-                className="field"
-                type="password"
-                autoComplete="off"
-                placeholder="Pexels API key (optional)"
-                value={pexelsKey}
-                onChange={(e) => { setPexelsKeyState(e.target.value); setPexelsKey(e.target.value); }}
-              />
-              <input
-                className="field"
-                type="password"
-                autoComplete="off"
-                placeholder="Pixabay API key (optional)"
-                value={pixabayKey}
-                onChange={(e) => { setPixabayKeyState(e.target.value); setPixabayKey(e.target.value); }}
-              />
-              <input
-                className="field"
-                type="password"
-                autoComplete="off"
-                placeholder="Freesound API key — for music + sounds (optional)"
-                value={freesoundKey}
-                onChange={(e) => { setFreesoundKeyState(e.target.value); setFreesoundKey(e.target.value); }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">Free keys: pexels.com/api · pixabay.com/api/docs · freesound.org/apiv2/apply — stored only in this browser.</p>
-            <div className="mt-3 flex items-center gap-3">
-              <button type="button" className="btn btn-ghost btn-sm" disabled={keyTesting || (!pexelsKey.trim() && !pixabayKey.trim() && !freesoundKey.trim())} onClick={() => void testKeys()}>
-                {keyTesting ? "Testing…" : "🔑 Test my keys"}
-              </button>
-              {keyTest && <span className="text-sm text-muted-foreground">{keyTest}</span>}
-            </div>
-          </div>
-          <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim()} onClick={() => void startPlan()}>🎬 Collect footage →</button>
-          <p className="text-center text-sm text-muted-foreground">Step 2 collects the footage scene by scene — you review and change it before any voice or rendering happens. 1 credit.</p>
+          {!visual && <div className="rounded-xl border border-border px-4 py-3">
+            <div className="font-semibold">🎞️ Richer stock footage, music & sounds</div>
+            <p className="mt-1 mb-2 text-sm text-muted-foreground">Pexels / Pixabay give professional clips first (Commons is the fallback); Freesound gives the music and transition sounds. Set them once in the Dashboard.</p>
+            <KeysNeeded ids={["pexels", "pixabay", "freesound"]} />
+          </div>}
+          {visual && design === "gemini" && !getKey("gemini") && (
+            <p className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-3 text-sm">⚠ The Visual Explainer needs your free Gemini key — the free AI cannot design good animations. <Link to="/dashboard" className="underline">Add it in the Dashboard</Link> (get one at aistudio.google.com/apikey).</p>
+          )}
+          <button className="btn btn-primary w-full py-4 text-lg" disabled={!title.trim() || (visual && design === "gemini" && !getKey("gemini"))} onClick={() => void startPlan()}>{visual ? "🎨 Make the storyboard →" : "🎬 Collect footage →"}</button>
+          <p className="text-center text-sm text-muted-foreground">{visual
+            ? design === "script" ? "Step 2 splits your script into scenes — then you copy the prompt, paste your AI's scene code and test every scene before the voice and the render. No footage is downloaded. 1 credit."
+            : "Step 2 designs every scene's animation and shows a storyboard — redo any scene you don't like before the voice and the render. No footage is downloaded. 1 credit."
+            : "Step 2 collects the footage scene by scene — you review and change it before any voice or rendering happens. 1 credit."}</p>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
       )}
@@ -1286,13 +1499,24 @@ function AutoVideo() {
                   <span className="truncate text-sm text-muted-foreground">{s.visual_source || ""}</span>
                 </div>
                 <p className="mt-1 line-clamp-2 text-sm">{s.narration || ""}</p>
-                <button className="btn btn-ghost btn-sm mt-2" onClick={() => openBrowser(i)}>🔄 Change footage</button>
+                {visual && (s as { graphic_file?: string }).graphic_file
+                  ? <RedoScene jobId={job.id} index={i} onDone={(sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...sc } : x)) } : j))} />
+                  : <button className="btn btn-ghost btn-sm mt-2" onClick={() => openBrowser(i)}>🔄 Change footage</button>}
               </div>
             </div>
           ))}
+          {!visual && !docu && <AvScriptMode jobId={job.id} startOpen={avDesign === "script"}
+            onChanged={() => { void autovideoJob(job.id).then((j) => setJob(j)).catch(() => undefined); }} />}
+          {visual && <ScriptMode jobId={job.id} startOpen={design === "script"} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...(sc as Partial<AvScene>) } : x)) } : j))} />}
+          {visual && design === "gemini" && <SimpleScenesBar job={job} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...sc } : x)) } : j))} />}
+          {visual && <MyShapes jobId={job.id} />}
           <div className="flex gap-3">
             <button className="btn btn-ghost" onClick={() => { setJob(null); setJobId(null); setPhase("form"); }}>← Back to setup</button>
-            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startAudio()}>🎙️ Next: Audio →</button>
+            <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => {
+              const n = visual ? (job.scenes || []).filter((sc) => (sc as { graphic?: { basic?: boolean } }).graphic?.basic).length : 0;
+              if (n && !window.confirm(`${n} scene(s) still have the plain "simple version". Continue anyway?`)) return;
+              void startAudio();
+            }}>🎙️ Next: Audio →</button>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
@@ -1391,6 +1615,7 @@ function AutoVideo() {
             </div>
           </div>
           <StudioPresenter jobId={job.id} sceneCount={(job.scenes || []).length} onBusy={setStudioBusy} />
+          <VideoPreview jobId={job.id} />
           <div className="flex gap-3">
             <button className="btn btn-ghost" onClick={() => setPhase("audio")} disabled={studioBusy}>← Back to audio</button>
             <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startRender()} disabled={studioBusy}>🎬 Render video →</button>
@@ -1416,6 +1641,7 @@ function AutoVideo() {
                 from the UI. The button ONLY appears 3 minutes after
                 the audio step started — never during a normal run,
                 so it can't be clicked too early by mistake. */}
+            {job?.phase === "audio" && voice.startsWith("clone:") && <div className="mb-4"><CloneGpuHint /></div>}
             {job?.phase === "audio" && (Date.now() / 1000 - (job.audio_started_at || 0) > 180) && (
               <button className="btn btn-ghost btn-sm mb-4" onClick={() => void startAudio()}>
                 ↻ Audio step stuck? Retry it
@@ -1458,7 +1684,7 @@ function AutoVideo() {
                 ? (/\.(mp4|webm|mov)$/i.test(job.scenes[current].visual_file as string)
                   ? <video src={autovideoSceneFileUrl(job.id, job.scenes[current].visual_file as string)} muted autoPlay loop playsInline className="h-full w-full object-cover" />
                   : <img src={autovideoSceneFileUrl(job.id, job.scenes[current].visual_file as string)} alt="" className="h-full w-full object-cover animate-kenburns" />)
-                : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-sm text-muted-foreground">🔎 Finding footage that matches each scene of your script…</div>}
+                : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-sm text-muted-foreground">{visual ? "🎨 Designing the animation of each scene of your script…" : "🔎 Finding footage that matches each scene of your script…"}</div>}
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background p-5">
                 <p className="text-lg font-semibold">{stageIdx >= 3 ? caption : "…"}</p>
               </div>
@@ -1475,7 +1701,7 @@ function AutoVideo() {
               })}
             </div>
           </div>
-          <SceneList count={sceneCount} current={current} scenes={job?.scenes} done={false} jobId={job?.id} />
+          <SceneList count={sceneCount} current={current} scenes={job?.scenes} done={false} jobId={job?.id} visual={visual} />
         </div>
       )}
 
@@ -1500,9 +1726,9 @@ function AutoVideo() {
             {/* Browse ALL footage (user, 2026-11-09): not just
                 one scene — flip through EVERY scene's footage
                 from scene 1 and fix any scene right there. */}
-            <button className="btn btn-primary mt-4" onClick={() => openBrowser(0)}>
+            {!visual && <button className="btn btn-primary mt-4" onClick={() => openBrowser(0)}>
               🎬 Browse all footage — flip through every scene & fix any
-            </button>
+            </button>}
             {/* Change background music (user, 2026-11-09): it
                 used to sit at the very bottom, below Upload —
                 moved up here, right under the video, where it
@@ -1860,7 +2086,7 @@ function AutoVideo() {
               {job.revoice_error && !revoiceError && <p className="mt-2 text-sm text-destructive">{job.revoice_error}</p>}
             </div>
           </div>
-          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={(i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={() => openBrowser(0)} jobId={job.id} />
+          <SceneList count={sceneCount} current={-1} scenes={job.scenes} done onChange={visual ? undefined : (i) => openBrowser(i)} activeScene={activeScene} onBrowseAll={visual ? undefined : () => openBrowser(0)} jobId={job.id} visual={visual} />
         </div>
         </>
       )}
@@ -2063,7 +2289,7 @@ function AutoVideo() {
   );
 }
 
-function SceneList({ count, current, scenes, done, onChange, activeScene, onBrowseAll, jobId }: { jobId?: string; count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number; onBrowseAll?: () => void }) {
+function SceneList({ count, current, scenes, done, onChange, activeScene, onBrowseAll, jobId, visual = false }: { jobId?: string; count: number; current: number; scenes?: AvScene[] | undefined; done: boolean; onChange?: (idx: number) => void; activeScene?: number; onBrowseAll?: () => void; visual?: boolean }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   // Scene sync (user, 2026-11-09): when the video reaches a
   // scene, scroll that row into view in the panel.
@@ -2091,18 +2317,23 @@ function SceneList({ count, current, scenes, done, onChange, activeScene, onBrow
           const line = s?.caption || s?.narration || lines[i % lines.length];
           // Duplicate footage badge (user, 2026-11-09): how many
           // scenes share this scene's footage.
-          const dupCount = s?.visual_source
+          const dupCount = s?.visual_source && !visual
             ? (scenes || []).filter((o) => (o.visual_source || "").trim() === (s.visual_source || "").trim()).length
             : 0;
+          // Visual Explainer (user, 2026-11-20): a short, tidy line — "Scene 3 · animation · 12.2s" (+ "simple" when it should be redone)
+          const g = (s as { graphic?: { basic?: boolean } } | undefined)?.graphic;
+          const head = visual
+            ? `Scene ${i + 1}${s ? " · animation" : ""}${s?.duration_sec ? ` · ${s.duration_sec}s` : ""}`
+            : `Scene ${i + 1}${s?.kind ? ` · ${s.kind}` : ""}${s?.visual_source ? ` · ${s.visual_source}` : ""}${s?.duration_sec ? ` · ${s.duration_sec}s` : ""}${dupCount > 1 ? ` · ⚠️ ×${dupCount} same` : ""}`;
           return (
             <div key={i} data-scene-row={i} className={`flex items-center gap-3 rounded-xl p-2 ${playing ? "bg-primary/20 ring-1 ring-primary" : active ? "bg-accent" : ""}`}>
               {s?.visual_file && jobId ? (/\.(mp4|webm|mov)$/i.test(s.visual_file as string)
                 ? <video src={autovideoSceneFileUrl(jobId, s.visual_file as string)} muted playsInline preload="metadata" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
                 : <img src={autovideoSceneFileUrl(jobId, s.visual_file as string)} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />)
-                : s ? <img src={imgs[i % 3]} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
+                : s && !visual ? <img src={imgs[i % 3]} alt="" className={`h-12 w-20 rounded-lg object-cover ${isDone || active ? "" : "opacity-30 grayscale"}`} />
                 : <div className="h-12 w-20 rounded-lg bg-slate-800" />}
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">Scene {i + 1}{s?.kind ? ` · ${s.kind}` : ""}{s?.visual_source ? ` · ${s.visual_source}` : ""}{s?.duration_sec ? ` · ${s.duration_sec}s` : ""}{dupCount > 1 ? ` · ⚠️ ×${dupCount} same` : ""}</div>
+                <div className="text-sm font-semibold">{head}{visual && g?.basic && <span className="ml-1.5 rounded-full border border-amber-500/60 px-1.5 text-[10px] text-amber-300">simple — redo it</span>}</div>
                 <div className="truncate text-xs text-muted-foreground">{line}</div>
               </div>
               {done && onChange && (

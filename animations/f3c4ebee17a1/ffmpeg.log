@@ -1,88 +1,0 @@
-ffmpeg version 9.0.2-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
-  built with gcc 16.2.0 (Rev3, Built by MSYS2 project)
-  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-cairo --enable-fontconfig --enable-iconv --enable-gnutls --enable-lcms2 --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-libsnappy --enable-zlib --enable-librist --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-libbluray --enable-libcaca --enable-libdvdnav --enable-libdvdread --enable-sdl2 --enable-libaribb24 --enable-libaribcaption --enable-libdav1d --enable-libdavs2 --enable-libopenjpeg --enable-libquirc --enable-libuavs3d --enable-libxevd --enable-libzvbi --enable-liboapv --enable-libqrencode --enable-librav1e --enable-libsvtav1 --enable-libvvenc --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxeve --enable-libxvid --enable-libaom --enable-libjxl --enable-libsvtjpegxs --enable-libvpx --enable-mediafoundation --enable-libass --enable-frei0r --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-liblensfun --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-vulkan --enable-libplacebo --enable-opencl --enable-libcdio --enable-openal --enable-libgme --enable-libmodplug --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libshine --enable-libtheora --enable-libtwolame --enable-libvo-amrwbenc --enable-libcodec2 --enable-libilbc --enable-libgsm --enable-liblc3 --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-ladspa --enable-libbs2b --enable-libflite --enable-libmysofa --enable-librubberband --enable-libsoxr --enable-chromaprint --enable-whisper
-  libavutil      61.  1.102 / 61.  1.102
-  libavcodec     63.  1.102 / 63.  1.102
-  libavformat    63.  1.102 / 63.  1.102
-  libavdevice    63.  1.102 / 63.  1.102
-  libavfilter    12.  1.102 / 12.  1.102
-  libswscale     10.  1.102 / 10.  1.102
-  libswresample   7.  1.102 /  7.  1.102
-[Parsed_ass_0 @ 000001d5e97c62c0] libass API version: 0x1705000
-[Parsed_ass_0 @ 000001d5e97c62c0] libass source: commit: 0.17.5-8-gb2fe9d8770678a7b5271387d38c20657ebf3429a
-[Parsed_ass_0 @ 000001d5e97c62c0] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.4.0 (COMPLEX)
-[Parsed_ass_0 @ 000001d5e97c62c0] Using font provider directwrite (with GDI)
-[Parsed_ass_0 @ 000001d5e97c62c0] Added subtitle file: 'subs.ass' (2 styles, 11 events)
-Input #0, rawvideo, from 'fd:':
-  Duration: N/A, start: 0.000000, bitrate: 530841 kb/s
-  Stream #0:0: Video: rawvideo (RGB[24] / 0x18424752), rgb24, 1280x720, 530841 kb/s, 24 tbr, 24 tbn
-[aist#1:0/pcm_s16le @ 000001d5eb7e0cc0] Guessed Channel Layout: mono
-Input #1, wav, from 'voice.wav':
-  Duration: 00:00:50.58, bitrate: 384 kb/s
-  Stream #1:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 24000 Hz, mono, s16, 384 kb/s
-[aist#2:0/pcm_s16le @ 000001d5e97e27c0] Guessed Channel Layout: mono
-Input #2, wav, from 'sfx.wav':
-  Duration: 00:00:50.58, bitrate: 384 kb/s
-  Stream #2:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 24000 Hz, mono, s16, 384 kb/s
-[in#3/mp3 @ 000001d5e97e1c40] Estimating duration from bitrate, this may be inaccurate
-Input #3, mp3, from 'G:\Web Apps\youtube-cover-video-tool\backend\music_pack\bicycle.mp3':
-  Metadata:
-    title           : Bicycle
-    artist          : Kevin MacLeod
-    album           : Royalty Free
-    iTunSMPB        :  00000000 00000210 00000770 0000000000BE0000 00000000 00AC3DE1 00000000 00000000 00000000 00000000 00000000 00000000
-    TBP             : 118
-    genre           : Contemporary
-    comment         : Bassman project
-    iTunPGAP        : 0
-    encoded_by      : iTunes 10.4.1
-    iTunNORM        :  000000E9 00000102 00000CAB 00000F07 0003E368 0003E41F 000078EC 00007FFF 0002F058 0003F79C
-    date            : 2011
-  Duration: 00:04:42.41, start: 0.000000, bitrate: 320 kb/s
-  Stream #3:0: Audio: mp3 (mp3float), 44100 Hz, stereo, fltp, 320 kb/s
-Stream mapping:
-  Stream #0:0 (rawvideo) -> ass:default
-  Stream #1:0 (pcm_s16le) -> asplit:default
-  Stream #2:0 (pcm_s16le) -> amix
-  Stream #3:0 (mp3float) -> aformat:default
-  ass:default -> Stream #0:0 (libx264)
-  alimiter:default -> Stream #0:1 (aac)
-[Parsed_ass_0 @ 000001d5e97f3140] libass API version: 0x1705000
-[Parsed_ass_0 @ 000001d5e97f3140] libass source: commit: 0.17.5-8-gb2fe9d8770678a7b5271387d38c20657ebf3429a
-[Parsed_ass_0 @ 000001d5e97f3140] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.4.0 (COMPLEX)
-[Parsed_ass_0 @ 000001d5e97f3140] Using font provider directwrite (with GDI)
-[Parsed_ass_0 @ 000001d5e97f3140] Added subtitle file: 'subs.ass' (2 styles, 11 events)
-[libx264 @ 000001d5e97fd340] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
-[libx264 @ 000001d5e97fd340] profile High, level 3.1, 4:2:0, 8-bit
-[libx264 @ 000001d5e97fd340] 264 - core 165 r3223 0480cb0 - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 - http://www.videolan.org/x264.html - options: cabac=1 ref=1 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=2 psy=1 psy_rd=1.00:0.00 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=6 lookahead_threads=2 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=1 keyint=250 keyint_min=24 scenecut=40 intra_refresh=0 rc_lookahead=10 rc=crf mbtree=1 crf=22.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
-Output #0, mp4, to 'video.mp4':
-  Metadata:
-    encoder         : Lavf63.1.102
-  Stream #0:0: Video: h264 (avc1 / 0x31637661), yuv420p(tv, progressive), 1280x720, q=2-31, 24 fps, 12288 tbn
-    Metadata:
-      encoder         : Lavc63.1.102 libx264
-    Side data:
-      CPB properties: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
-  Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 24000 Hz, stereo, fltp, 160 kb/s
-    Metadata:
-      encoder         : Lavc63.1.102 aac
-[Parsed_ass_0 @ 000001d5e97f3140] fontselect: (Arial, 700, 0) -> Arial-BoldMT, 0, Arial-BoldMT
-frame=   44 fps=0.0 q=27.0 size=       0KiB time=00:00:02.68 bitrate=   0.1kbits/s speed=5.12x elapsed=0:00:00.52    frame=  113 fps=108 q=27.0 size=       0KiB time=00:00:05.54 bitrate=   0.1kbits/s speed= 5.3x elapsed=0:00:01.04    frame=  181 fps=116 q=27.0 size=       0KiB time=00:00:08.36 bitrate=   0.0kbits/s speed=5.35x elapsed=0:00:01.56    frame=  248 fps=119 q=27.0 size=     256KiB time=00:00:11.17 bitrate= 187.6kbits/s speed=5.38x elapsed=0:00:02.07    frame=  305 fps=118 q=27.0 size=     256KiB time=00:00:13.56 bitrate= 154.6kbits/s speed=5.24x elapsed=0:00:02.58    frame=  331 fps=107 q=27.0 size=     256KiB time=00:00:14.59 bitrate= 143.7kbits/s speed= 4.7x elapsed=0:00:03.10    frame=  358 fps= 99 q=27.0 size=     256KiB time=00:00:15.78 bitrate= 132.9kbits/s speed=4.35x elapsed=0:00:03.62    frame=  384 fps= 93 q=27.0 size=     512KiB time=00:00:16.81 bitrate= 249.5kbits/s speed=4.07x elapsed=0:00:04.13    frame=  411 fps= 88 q=27.0 size=     512KiB time=00:00:17.92 bitrate= 234.1kbits/s speed=3.86x elapsed=0:00:04.64    frame=  437 fps= 85 q=27.0 size=     512KiB time=00:00:19.02 bitrate= 220.4kbits/s speed=3.68x elapsed=0:00:05.16    frame=  464 fps= 82 q=27.0 size=     512KiB time=00:00:20.22 bitrate= 207.4kbits/s speed=3.56x elapsed=0:00:05.68    frame=  490 fps= 79 q=27.0 size=     512KiB time=00:00:21.24 bitrate= 197.4kbits/s speed=3.43x elapsed=0:00:06.20    frame=  518 fps= 77 q=27.0 size=     768KiB time=00:00:22.44 bitrate= 280.4kbits/s speed=3.34x elapsed=0:00:06.71    frame=  565 fps= 78 q=27.0 size=     768KiB time=00:00:24.40 bitrate= 257.8kbits/s speed=3.38x elapsed=0:00:07.22    frame=  624 fps= 81 q=27.0 size=    1024KiB time=00:00:26.79 bitrate= 313.1kbits/s speed=3.46x elapsed=0:00:07.74    frame=  682 fps= 82 q=27.0 size=    1024KiB time=00:00:29.26 bitrate= 286.6kbits/s speed=3.54x elapsed=0:00:08.26    frame=  723 fps= 82 q=27.0 size=    1024KiB time=00:00:30.89 bitrate= 271.6kbits/s speed=3.52x elapsed=0:00:08.77    frame=  786 fps= 85 q=27.0 size=    1280KiB time=00:00:33.62 bitrate= 311.9kbits/s speed=3.62x elapsed=0:00:09.29    frame=  855 fps= 87 q=27.0 size=    1280KiB time=00:00:36.52 bitrate= 287.1kbits/s speed=3.72x elapsed=0:00:09.81    frame=  922 fps= 89 q=27.0 size=    1280KiB time=00:00:39.21 bitrate= 267.4kbits/s speed= 3.8x elapsed=0:00:10.33    frame=  985 fps= 91 q=27.0 size=    1280KiB time=00:00:41.85 bitrate= 250.5kbits/s speed=3.86x elapsed=0:00:10.83    frame= 1038 fps= 91 q=27.0 size=    1536KiB time=00:00:44.11 bitrate= 285.2kbits/s speed=3.88x elapsed=0:00:11.36    frame= 1068 fps= 90 q=27.0 size=    1536KiB time=00:00:45.31 bitrate= 277.7kbits/s speed=3.82x elapsed=0:00:11.87    frame= 1096 fps= 89 q=27.0 size=    1792KiB time=00:00:46.50 bitrate= 315.7kbits/s speed=3.76x elapsed=0:00:12.38    frame= 1170 fps= 91 q=27.0 size=    2048KiB time=00:00:49.53 bitrate= 338.7kbits/s speed=3.84x elapsed=0:00:12.90    [mp4 @ 000001d5eb5601c0] Starting second pass: moving the moov atom to the beginning of the file
-[out#0/mp4 @ 000001d5e97a6180] video:1357KiB audio:757KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 1.404185%
-frame= 1214 fps= 93 q=-1.0 Lsize=    2144KiB time=00:00:50.58 bitrate= 347.2kbits/s speed=3.85x elapsed=0:00:13.12    
-[libx264 @ 000001d5e97fd340] frame I:6     Avg QP:10.77  size: 27358
-[libx264 @ 000001d5e97fd340] frame P:379   Avg QP:18.00  size:  2600
-[libx264 @ 000001d5e97fd340] frame B:829   Avg QP:17.22  size:   288
-[libx264 @ 000001d5e97fd340] consecutive B-frames:  6.3%  6.3%  4.7% 82.7%
-[libx264 @ 000001d5e97fd340] mb I  I16..4: 80.2%  5.1% 14.6%
-[libx264 @ 000001d5e97fd340] mb P  I16..4:  6.2%  1.9%  0.6%  P16..4:  3.4%  1.3%  0.7%  0.0%  0.0%    skip:86.1%
-[libx264 @ 000001d5e97fd340] mb B  I16..4:  0.4%  0.0%  0.0%  B16..8:  2.2%  0.3%  0.0%  direct: 0.2%  skip:96.8%  L0:48.5% L1:43.7% BI: 7.7%
-[libx264 @ 000001d5e97fd340] 8x8 transform intra:17.7% inter:14.0%
-[libx264 @ 000001d5e97fd340] coded y,uvDC,uvAC intra: 15.4% 12.4% 9.2% inter: 0.5% 0.6% 0.3%
-[libx264 @ 000001d5e97fd340] i16 v,h,dc,p: 66% 32%  2%  0%
-[libx264 @ 000001d5e97fd340] i8 v,h,dc,ddl,ddr,vr,hd,vl,hu: 19% 44% 36%  0%  0%  0%  0%  0%  0%
-[libx264 @ 000001d5e97fd340] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 33% 30% 22%  2%  2%  3%  3%  3%  2%
-[libx264 @ 000001d5e97fd340] i8c dc,h,v,p: 48% 34% 18%  0%
-[libx264 @ 000001d5e97fd340] Weighted P-Frames: Y:0.0% UV:0.0%
-[libx264 @ 000001d5e97fd340] kb/s:219.65
-[aac @ 000001d5eb51fd00] Qavg: 65155.688

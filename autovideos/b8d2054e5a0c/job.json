@@ -1,0 +1,615 @@
+{
+  "id": "b8d2054e5a0c",
+  "status": "planned",
+  "phase": "planned",
+  "stage": "Footage ready \u2014 review the scenes.",
+  "progress": 100,
+  "title": "5 Ways People Will Make Money From GTA 6 (Start Now)",
+  "minutes": 2,
+  "visuals": "both",
+  "video_type": "long",
+  "short_seconds": 60,
+  "voice": "en-US-AriaNeural",
+  "tts_provider": "edge",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NTEyNzQ0Ni44Mzg5OTUsImpvYl9yZWYiOiJiOGQyMDU0ZTVhMGMiLCJub25jZSI6ImUxMTYyOWUwNGI1MjVmZDkifQ==.7bec3d615b3e912631dd933fd49c5bce4c5dbbe468e2261c1d7b16d28a8b677b",
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use the same launch to fill their bank accounts. Which side of that trade do you want to be on?",
+      "visual": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use the same launch to fill their bank accounts.",
+      "caption": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use\u2026",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-00-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "gamers",
+        "spend",
+        "hundreds",
+        "dollars",
+        "gta",
+        "week",
+        "smaller",
+        "group"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-00-visual.png"
+    },
+    {
+      "index": 1,
+      "narration": "Since GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue. Now that GTA 6 has finally arrived on November 19, 2026, an even bigger wave of attention and money is moving across the globe.",
+      "visual": "Since GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue.",
+      "caption": "Since GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-01-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "since",
+        "gta",
+        "launched",
+        "2013",
+        "sold",
+        "235",
+        "million",
+        "copies"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-01-visual.png"
+    },
+    {
+      "index": 2,
+      "narration": "When millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets. If you position yourself early, you can capture a slice of that flow instead of just paying for it.",
+      "visual": "When millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets.",
+      "caption": "When millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-02-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "millions",
+        "players",
+        "rush",
+        "toward",
+        "massive",
+        "entertainment",
+        "launch",
+        "cash"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-02-visual.png"
+    },
+    {
+      "index": 3,
+      "narration": "The first way is owning pieces of the companies behind the screen. Rockstar Games is owned by Take-Two Interactive, a public company traded under the ticker TTWO.",
+      "visual": "The first way is owning pieces of the companies behind the screen.",
+      "caption": "The first way is owning pieces of the companies behind the screen.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-03-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "owning",
+        "pieces",
+        "companies",
+        "screen",
+        "rockstar",
+        "games",
+        "owned",
+        "interactive"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-03-visual.png"
+    },
+    {
+      "index": 4,
+      "narration": "When a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term value. You do not need to buy a whole factory\u2014buying even one share or a gaming index fund lets coins flow toward you as sales grow.",
+      "visual": "When a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term value.",
+      "caption": "When a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term\u2026",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-04-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "game",
+        "sells",
+        "tens",
+        "millions",
+        "copies",
+        "profits",
+        "flow",
+        "parent"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-04-visual.png"
+    },
+    {
+      "index": 5,
+      "narration": "Keep in mind that stock prices often jump before release day and swing wildly right after launch. Smart investors buy steadily over time instead of chasing hype on a single morning.",
+      "visual": "Keep in mind that stock prices often jump before release day and swing wildly right after launch.",
+      "caption": "Keep in mind that stock prices often jump before release day and swing wildly right after launch.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-05-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "stock",
+        "prices",
+        "jump",
+        "before",
+        "release",
+        "swing",
+        "wildly",
+        "right"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-05-visual.png"
+    },
+    {
+      "index": 6,
+      "narration": "The second way is building content around the massive wave of search traffic. Every time players get stuck on a mission, look for hidden cars, or compare console settings, they open YouTube, TikTok, or search engines.",
+      "visual": "The second way is building content around the massive wave of search traffic.",
+      "caption": "The second way is building content around the massive wave of search traffic.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-06-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "building",
+        "content",
+        "massive",
+        "wave",
+        "search",
+        "traffic",
+        "players",
+        "stuck"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-06-visual.png"
+    },
+    {
+      "index": 7,
+      "narration": "Each view places small ads next to those guides, turning viewer attention into monthly ad payouts. For example, say a beginner guide channel gets 100,000 views in a month\u2014at a $5 ad rate, that equals $500 from one helpful video.",
+      "visual": "Each view places small ads next to those guides, turning viewer attention into monthly ad payouts.",
+      "caption": "Each view places small ads next to those guides, turning viewer attention into monthly ad payouts.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-07-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "view",
+        "places",
+        "ads",
+        "guides",
+        "turning",
+        "viewer",
+        "attention",
+        "monthly"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-07-visual.png"
+    },
+    {
+      "index": 8,
+      "narration": "You do not even need to show your face or own the newest console to start. Clipping news updates, mapping out Vice City locations, or breaking down game mechanics works from a simple laptop.",
+      "visual": "You do not even need to show your face or own the newest console to start.",
+      "caption": "You do not even need to show your face or own the newest console to start.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-08-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "show",
+        "face",
+        "own",
+        "newest",
+        "console",
+        "clipping",
+        "news",
+        "updates"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-08-visual.png"
+    },
+    {
+      "index": 9,
+      "narration": "The third way is selling digital tools, servers, and custom mods to the player community. In GTA 5, thousands of creators earned full-time incomes building custom roleplay servers, car designs, and scripts for online worlds.",
+      "visual": "The third way is selling digital tools, servers, and custom mods to the player community.",
+      "caption": "The third way is selling digital tools, servers, and custom mods to the player community.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-09-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "third",
+        "selling",
+        "digital",
+        "tools",
+        "servers",
+        "custom",
+        "mods",
+        "player"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-09-visual.png"
+    },
+    {
+      "index": 10,
+      "narration": "As GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps, clothing packs, and in-game scripts. One digital file built once can be sold to hundreds of server admins over and over.",
+      "visual": "As GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps, clothing packs, and in-game scripts.",
+      "caption": "As GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps,\u2026",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-10-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "gta",
+        "rolls",
+        "online",
+        "multiplayer",
+        "ecosystem",
+        "server",
+        "owners",
+        "pay"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-10-visual.png"
+    },
+    {
+      "index": 11,
+      "narration": "The fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle. Because GTA 6 launched on PlayStation 5 and Xbox Series consoles before PC, millions of players are upgrading controllers, headsets, and desks right now.",
+      "visual": "The fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle.",
+      "caption": "The fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-11-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "fourth",
+        "selling",
+        "physical",
+        "gear",
+        "setup",
+        "upgrades",
+        "gamers",
+        "buy"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-11-visual.png"
+    },
+    {
+      "index": 12,
+      "narration": "You do not need to manufacture electronics in a warehouse to profit from that shopping spree. Through affiliate links on review pages or social posts, stores pay you a 3% to 8% commission every time someone buys through your link.",
+      "visual": "You do not need to manufacture electronics in a warehouse to profit from that shopping spree.",
+      "caption": "You do not need to manufacture electronics in a warehouse to profit from that shopping spree.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-12-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "manufacture",
+        "electronics",
+        "warehouse",
+        "shopping",
+        "spree",
+        "affiliate",
+        "links",
+        "review"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-12-visual.png"
+    },
+    {
+      "index": 13,
+      "narration": "The fifth way is flipping limited collector items and rare physical editions. Whenever a historic franchise drops after a 13-year wait, special steelbooks, controller bundles, and launch-week merchandise sell out fast in local stores.",
+      "visual": "The fifth way is flipping limited collector items and rare physical editions.",
+      "caption": "The fifth way is flipping limited collector items and rare physical editions.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-13-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "fifth",
+        "flipping",
+        "limited",
+        "collector",
+        "items",
+        "rare",
+        "physical",
+        "editions"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-13-visual.png"
+    },
+    {
+      "index": 14,
+      "narration": "Buyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later. The key is keeping boxes sealed and never spending rent money on risky inventory.",
+      "visual": "Buyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later.",
+      "caption": "Buyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-14-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "buyers",
+        "miss",
+        "store",
+        "shelves",
+        "pay",
+        "above",
+        "retail",
+        "price"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-14-visual.png"
+    },
+    {
+      "index": 15,
+      "narration": "Notice how all five paths share one simple money rule. Consumers spend cash for instant fun, while builders and investors set up assets before the crowd arrives.",
+      "visual": "Notice how all five paths share one simple money rule.",
+      "caption": "Notice how all five paths share one simple money rule.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-15-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "five",
+        "paths",
+        "share",
+        "money",
+        "consumers",
+        "spend",
+        "cash",
+        "instant"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-15-visual.png"
+    },
+    {
+      "index": 16,
+      "narration": "You do not have to chase all five at once\u2014pick one lane that matches your budget and skills today. If you have spare savings, research gaming stocks or broad funds; if you have zero cash, start creating helpful guides or digital assets.",
+      "visual": "You do not have to chase all five at once\u2014pick one lane that matches your budget and skills today.",
+      "caption": "You do not have to chase all five at once\u2014pick one lane that matches your budget and skills today.",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-16-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "chase",
+        "five",
+        "pick",
+        "lane",
+        "matches",
+        "budget",
+        "skills",
+        "spare"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-16-visual.png"
+    },
+    {
+      "index": 17,
+      "narration": "Every major cultural launch creates a temporary river of money, and the people who prepare early are the ones who get paid. Subscribe to PocketIQ for more simple, bite-sized ways to build smarter money habits.",
+      "visual": "Every major cultural launch creates a temporary river of money, and the people who prepare early are the ones who get paid.",
+      "caption": "Every major cultural launch creates a temporary river of money, and the people who prepare early are the ones\u2026",
+      "kind": "image",
+      "visual_source": "Script mode \u2014 paste your scene code (Script mode box below)",
+      "visual_file": "scene-17-visual.png",
+      "visual_url": "",
+      "duration_sec": 0,
+      "keywords": [
+        "major",
+        "cultural",
+        "launch",
+        "creates",
+        "temporary",
+        "river",
+        "money",
+        "prepare"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-17-visual.png"
+    }
+  ],
+  "script": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use the same launch to fill their bank accounts. Which side of that trade do you want to be on?\n\nSince GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue. Now that GTA 6 has finally arrived on November 19, 2026, an even bigger wave of attention and money is moving across the globe.\n\nWhen millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets. If you position yourself early, you can capture a slice of that flow instead of just paying for it.\n\nThe first way is owning pieces of the companies behind the screen. Rockstar Games is owned by Take-Two Interactive, a public company traded under the ticker TTWO.\n\nWhen a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term value. You do not need to buy a whole factory\u2014buying even one share or a gaming index fund lets coins flow toward you as sales grow.\n\nKeep in mind that stock prices often jump before release day and swing wildly right after launch. Smart investors buy steadily over time instead of chasing hype on a single morning.\n\nThe second way is building content around the massive wave of search traffic. Every time players get stuck on a mission, look for hidden cars, or compare console settings, they open YouTube, TikTok, or search engines.\n\nEach view places small ads next to those guides, turning viewer attention into monthly ad payouts. For example, say a beginner guide channel gets 100,000 views in a month\u2014at a $5 ad rate, that equals $500 from one helpful video.\n\nYou do not even need to show your face or own the newest console to start. Clipping news updates, mapping out Vice City locations, or breaking down game mechanics works from a simple laptop.\n\nThe third way is selling digital tools, servers, and custom mods to the player community. In GTA 5, thousands of creators earned full-time incomes building custom roleplay servers, car designs, and scripts for online worlds.\n\nAs GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps, clothing packs, and in-game scripts. One digital file built once can be sold to hundreds of server admins over and over.\n\nThe fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle. Because GTA 6 launched on PlayStation 5 and Xbox Series consoles before PC, millions of players are upgrading controllers, headsets, and desks right now.\n\nYou do not need to manufacture electronics in a warehouse to profit from that shopping spree. Through affiliate links on review pages or social posts, stores pay you a 3% to 8% commission every time someone buys through your link.\n\nThe fifth way is flipping limited collector items and rare physical editions. Whenever a historic franchise drops after a 13-year wait, special steelbooks, controller bundles, and launch-week merchandise sell out fast in local stores.\n\nBuyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later. The key is keeping boxes sealed and never spending rent money on risky inventory.\n\nNotice how all five paths share one simple money rule. Consumers spend cash for instant fun, while builders and investors set up assets before the crowd arrives.\n\nYou do not have to chase all five at once\u2014pick one lane that matches your budget and skills today. If you have spare savings, research gaming stocks or broad funds; if you have zero cash, start creating helpful guides or digital assets.\n\nEvery major cultural launch creates a temporary river of money, and the people who prepare early are the ones who get paid. Subscribe to PocketIQ for more simple, bite-sized ways to build smarter money habits.",
+  "script_source": "custom-scenes",
+  "script_words": 658,
+  "scene_total": 18
+}

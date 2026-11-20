@@ -1,6 +1,0 @@
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ad7318ffd95c\f89d03593043.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ad7318ffd95c\cfdef9008f60.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ad7318ffd95c\5a1fe2256fe3.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ad7318ffd95c\962d68e7a507.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ad7318ffd95c\cde496614ec5.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\ad7318ffd95c\becaae1c0e5d.mp3'

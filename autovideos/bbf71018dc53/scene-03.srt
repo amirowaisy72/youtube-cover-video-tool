@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:01,200
+The first way is owning
+
+2
+00:00:01,200 --> 00:00:02,580
+pieces of the companies behind
+
+3
+00:00:02,580 --> 00:00:03,320
+the screen.
+
+4
+00:00:03,820 --> 00:00:05,040
+Rockstar Games is owned by
+
+5
+00:00:05,040 --> 00:00:07,060
+Take-Two Interactive, a public company
+
+6
+00:00:07,060 --> 00:00:08,500
+traded under the ticker TTWO.

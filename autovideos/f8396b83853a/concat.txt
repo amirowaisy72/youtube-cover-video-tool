@@ -1,4 +1,0 @@
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\f8396b83853a\231d5a8b5c7b.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\f8396b83853a\b0bf0aabb7b5.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\f8396b83853a\ac5653f19605.mp3'
-file 'G:\Web Apps\youtube-cover-video-tool\autovideos\f8396b83853a\b501642e7848.mp3'

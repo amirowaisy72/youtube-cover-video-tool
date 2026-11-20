@@ -143,7 +143,8 @@ SIT_DROP_UNITS = 56
 # without a key (2026). Calls are spaced out, and a refused call is
 # retried after a longer wait, instead of failing in seconds.
 AI_GAP = 16.0
-_AI = {"last": 0.0, "last_error": ""}
+_AI = {"last": 0.0, "last_error": "", "gemini_model": "", "gemini_only": False}
+GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-flash-lite"]
 _AI_LOCK = threading.Lock()
 
 UA = {"User-Agent": "YT-Guru/1.0 (free local tool)"}
@@ -530,6 +531,7 @@ def _eleven_v3(text: str, voice: str, key: str, label: str, out_wav: Path) -> No
         _run_ffmpeg(["-i", str(mp3), "-ac", "1", "-ar", str(SAMPLE_RATE), "-c:a", "pcm_s16le", str(out_wav)])
     finally:
         mp3.unlink(missing_ok=True)
+_SCREEN_RE = re.compile(r"\{\s*screen\s*:\s*([^{}]{1,160})\}", re.I)
 _TAG_RE = re.compile(r"\{\s*([a-zA-Z][a-zA-Z' _\-]*(?:\s*:\s*[a-zA-Z0-9][a-zA-Z0-9' _\-]*){0,2})\s*\}")
 
 # Your own actions (user, 2026-11-18: "if the app cannot show something, it
@@ -632,8 +634,133 @@ def _auto_look(segs: list[dict]) -> list[dict]:
     return [{"wact": "look", "obj": m.group(1).lower()[:40]}] + segs
 
 
+# Motion-graphic inserts in a cartoon (user, 2026-11-19): a small graphic panel over the
+# film for a few seconds — drawn with Manim (tools_graphics), same look as Auto Video.
+INSERT_TAGS = {"meter", "map", "countdown", "chat", "stars", "money", "counter", "pile", "topple", "scatter", "fall",
+               "bounce", "stamp", "chapter", "steps", "list", "compare"}
+INSERT_SECS = {"meter": 3.0, "map": 4.0, "chat": 3.5, "stars": 2.6, "money": 3.2, "counter": 3.0, "pile": 3.6,
+               "topple": 3.2, "scatter": 3.2, "fall": 3.4, "bounce": 3.4, "stamp": 1.8, "chapter": 2.6, "steps": 3.6,
+               "list": 3.6, "compare": 3.4}
+
+
+def _insert_spec(kind: str, raw: str) -> dict | None:
+    """The tag's words → a graphic spec (blocks)."""
+    parts = [p.strip() for p in raw.split(":")]
+    rest = parts[-1] if parts else ""
+
+    def nums(t: str) -> list[float]:
+        return [float(x.replace(",", "")) for x in re.findall(r"-?\d[\d,]*(?:\.\d+)?", t)]
+    b: dict | None = None
+    if kind == "meter":
+        label = parts[0] if len(parts) > 1 else "Level"
+        v = nums(rest) or [90, 5]
+        b = {"type": "meter", "label": label[:40], "from": v[0] if len(v) > 1 else 100, "to": v[-1]}
+    elif kind == "map":
+        stops = [x.strip() for x in re.split(r">|->|,", raw) if x.strip()]
+        b = {"type": "map", "stops": stops[:6]} if len(stops) >= 2 else None
+    elif kind == "countdown":
+        b = {"type": "countdown", "from": int((nums(raw) or [3])[0])}
+    elif kind == "chat":
+        who, _, text = raw.partition(":")
+        b = {"type": "chat", "messages": [{"who": who.strip()[:16], "text": (text or who).strip()[:60]}]} if raw else None
+    elif kind == "stars":
+        b = {"type": "stars", "count": int((nums(raw) or [3])[0])}
+    elif kind in ("money", "counter"):
+        cur = re.match(r"\s*([$₹£€]|rs\.?)", rest, re.I)
+        v = nums(rest) or [0, 100]
+        label = parts[0] if len(parts) > 1 else ("Money" if kind == "money" else "")
+        if kind == "money":
+            b = {"type": "money", "label": label[:40], "currency": (cur.group(1) if cur else "Rs").replace(".", "").title(),
+                 "start": v[0], "steps": [{"value": x} for x in v[1:4]]}
+        else:
+            b = {"type": "counter", "label": label[:40], "from": v[0] if len(v) > 1 else 0, "to": v[-1],
+                 "prefix": (cur.group(1) if cur else "")}
+    elif kind in ("pile", "topple", "scatter", "fall", "bounce"):
+        b = {"type": "physics", "kind": kind, "icon": (parts[0] or "coin")[:24], "count": int((nums(raw) or [12])[0]),
+             "label": parts[1][:40] if len(parts) > 1 else ""}
+    elif kind == "stamp":
+        b = {"type": "stamp", "text": (raw or "WOW")[:14]}
+    elif kind == "chapter":
+        b = {"type": "headline", "text": (raw or "Chapter 1")[:50], "solo": True}
+    elif kind in ("steps", "list"):
+        items = [x.strip() for x in re.split(r">|->|,", raw) if x.strip()]
+        b = {"type": kind, "items": [{"text": x[:30]} for x in items[:5]]} if len(items) >= 2 else None
+    elif kind == "compare":
+        items = []
+        for x in re.split(r",|\bvs\b", raw):
+            lab, _, val = x.partition("=")
+            if lab.strip() and nums(val):
+                items.append({"label": lab.strip()[:20], "value": nums(val)[0]})
+        b = {"type": "compare", "items": items} if len(items) >= 2 else None
+    if not b:
+        return None
+    return {"kind": kind, "blocks": [b], "secs": INSERT_SECS.get(kind, 3.0), "text": raw[:80]}
+
+
+INSERT_FPS = 12
+_INSERT_RE = re.compile(r"\{\s*(" + "|".join(sorted(INSERT_TAGS, key=len, reverse=True)) + r")\s*(?::([^{}]{0,160}))?\}", re.I)
+
+
+def _render_inserts(job: dict, jdir: Path, inserts: list[dict], timeline: dict) -> list[dict]:
+    """Every {meter:…}/{map:…}… panel drawn once with Manim as picture frames. Without the free
+    graphics engine the panel's words are shown on a screen instead (never lost)."""
+    if not inserts:
+        return []
+    out: list[dict] = []
+    try:
+        import tools_graphics
+        ok = tools_graphics.available()
+    except Exception:  # noqa: BLE001
+        ok = False
+    for i, ins in enumerate(inserts):
+        spec = ins["spec"]
+        secs = (ins["end"] - ins["start"]) / FPS
+        if not ok:
+            timeline.setdefault("screens", []).append({"start": ins["start"], "end": ins["end"], "text": f"{spec['kind'].upper()}: {spec['text']}"})
+            continue
+        _update(job, message=f"Drawing the graphics… {i + 1} of {len(inserts)}")
+        d = jdir / "inserts" / f"{i:02d}"
+        try:
+            if not (d / "0000.png").exists():
+                blocks = [dict(b, at=0.2) for b in spec["blocks"]]
+                for b in blocks:
+                    if b["type"] == "money":
+                        b["steps"] = [dict(st, at=1.0 + k * 0.7) for k, st in enumerate(b.get("steps") or [])]
+                    if b["type"] in ("map", "timeline"):
+                        b["dur"] = max(1.2, secs - 1.6)
+                    if b["type"] in ("meter", "counter"):
+                        b["dur"] = max(0.8, secs - 1.4)
+                tools_graphics.render({"blocks": blocks, "duration": secs}, d / "x.mp4", 640, 360, fps=INSERT_FPS, png_dir=d, timeout=300)
+            n = len(list(d.glob("*.png")))
+            if n:
+                out.append({"start": ins["start"], "end": ins["end"], "dir": f"{i:02d}", "n": n, "fps": INSERT_FPS, "kind": spec["kind"]})
+        except Exception as exc:  # noqa: BLE001
+            _VOICE_PROBLEMS.append(f"graphic {spec['kind']}: {str(exc)[:120]}")
+            timeline.setdefault("screens", []).append({"start": ins["start"], "end": ins["end"], "text": f"{spec['kind'].upper()}: {spec['text']}"})
+    return out
+
+
+def _pack_aliases() -> dict:
+    try:
+        import tools_planner
+        return tools_planner.aliases()
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _segments(raw_text: str) -> list[dict]:
     """'Deal. {turn-page} {sniff} Samosa?' -> say / act / act / say."""
+    # {screen:Installing GTA 6 — 99%}: a computer / TV / phone screen shows this
+    # text (2026-11-18); its text keeps capitals, numbers and punctuation.
+    im_ = _INSERT_RE.search(raw_text or "")
+    if im_:
+        spec_ = _insert_spec(im_.group(1).lower(), (im_.group(2) or "").strip())
+        return (_segments(raw_text[:im_.start()]) + ([{"insert": spec_}] if spec_ else [])
+                + _segments(raw_text[im_.end():]))
+    sm_ = _SCREEN_RE.search(raw_text or "")
+    if sm_:
+        return (_segments(raw_text[:sm_.start()]) + [{"screen": sm_.group(1).strip()[:120]}]
+                + _segments(raw_text[sm_.end():]))
     segs: list[dict] = []
     pos = 0
     for m in _TAG_RE.finditer(raw_text):
@@ -643,6 +770,12 @@ def _segments(raw_text: str) -> list[dict]:
         name = re.sub(r"\s+", " ", m.group(1).lower().replace("_", " ")).strip()
         verb, _, obj = name.partition(":")
         verb, obj = verb.strip(), obj.strip()
+        # an add-on pack says what a new tag means ({sprint} = {run}, {surf} = {swim:sea}) (2026-11-19)
+        al = _pack_aliases().get(verb.replace(" ", "-"))
+        if al:
+            av, _, ao = al.partition(":")
+            verb, obj = av.strip(), (obj or ao.strip())
+            name = verb + (":" + obj if obj else "")
         # Script doctor (user, 2026-11-18: the AI wrote "{frog}", "{become frog}"…):
         # loose words inside a tag still mean the right thing.
         if " " in verb and not obj and verb.replace(" ", "-") in ACTIONS:
@@ -657,6 +790,19 @@ def _segments(raw_text: str) -> list[dict]:
                 verb, obj = first, re.sub(r"^(?:the|a|an|to|on|at|in|into)\s+", "", rest)
             else:
                 verb = verb.replace(" ", "-")
+        if verb.replace(" ", "-") in INSERT_TAGS:
+            # {meter:Patience:90>2} {map:beach>airport} {countdown:3} {chat:Mom:Where are you?} {stars:3}
+            # {money:80000>5000} {pile:coin} {topple:coin} {scatter:coin} {stamp:BUSTED} {chapter:Part 2}
+            raw_inner = m.group(1).split(":", 1)[1].strip() if ":" in m.group(1) else ""
+            spec = _insert_spec(verb.replace(" ", "-"), raw_inner)
+            if spec:
+                segs.append({"insert": spec})
+            pos = m.end()
+            continue
+        if verb in ("wear", "dress", "put-on", "change-clothes", "outfit"):
+            segs.append({"wear": (obj or "vice").strip()[:30]})  # {wear:vice} / {wear:jacket}: new clothes from now on
+            pos = m.end()
+            continue
         if not obj and verb in TONE_TAGS:
             segs.append({"tone": TONE_TAGS[verb]})  # {whisper}: the whole line is whispered
             pos = m.end()
@@ -861,17 +1007,25 @@ def _ask_ai(prompt: str, timeout: int = 150, attempts: int = 4) -> str:
     """The story writer's AI: your Gemini key first (best, long prompts OK), then the
     free Pollinations AI by POST (long prompts OK), then the old short GET way."""
     key = str(_AI.get("gemini_key") or "")
-    if key:
+    if key and _gemini_ready(key):
         try:
-            return _ai_text(prompt, key)
-        except Exception:  # noqa: BLE001
-            pass
+            return _gemini_only(prompt, key)
+        except Exception:  # noqa: BLE001 — the status box shows why; the free AI answers meanwhile
+            if _AI.get("gemini_only"):
+                raise
+    elif key and _AI.get("gemini_only"):
+        raise RuntimeError(_AI_STATUS["gemini_error"] or "Gemini is paused for a moment")
     if len(prompt) > 1800:
         try:
-            return _pollinations_post(prompt)
+            out = _pollinations_post(prompt)
+            _free_ok()
+            return out
         except Exception as exc:  # noqa: BLE001
             _AI["last_error"] = f"{type(exc).__name__}: {str(exc)[-200:]}"
-    return _ask_ai_get(_shorten_prompt(prompt), timeout, attempts)
+            _AI_STATUS["free_error"] = _AI["last_error"][:160]
+    out = _ask_ai_get(_shorten_prompt(prompt), timeout, attempts)
+    _free_ok()
+    return out
 
 
 def _pollinations_post(prompt: str) -> str:
@@ -1050,7 +1204,27 @@ def capabilities_text(story: str = "") -> str:
             "Magic: {turn:Name:frog} turns someone into an animal (cat, dog, frog, monkey, lion, pig, chicken, fish…) "
             "until {turn:Name:back}. Animals that can appear or talk: cat, dog, monkey, lion, tiger, elephant, cow, pig, "
             "horse, rabbit, frog, duck, chicken, parrot, fish, crab, bear, fox, deer, penguin, giraffe. "
-            "Camera: {closeup:Name}, {wide}. " + (mine or ""))
+            "Camera: {closeup:Name}, {wide}. " + _pack_caps() + (mine or ""))
+
+
+def _pack_caps() -> str:
+    """Clothes, screens and add-on pack things (2026-11-19)."""
+    extra = ""
+    try:
+        import tools_planner
+        p = tools_planner.pack()
+        extra = ", ".join("{wear:" + k + "}" for k in (p.get("outfits") or {}))
+        if p.get("aliases"):
+            extra += (", " if extra else "") + ", ".join("{" + k + "}" for k in p["aliases"])
+    except Exception:  # noqa: BLE001
+        pass
+    return ("Clothes: {wear:vice} (loud shirt + shades), {wear:jacket}, {wear:suit}, {wear:police}, {wear:normal}"
+            + (", " + extra if extra else "") + ". A TV / computer / phone screen shows text: {screen:BREAKING NEWS}. "
+            "Motion-graphic panels (a small animated graphic over the film for a few seconds — use about one per minute, at "
+            "funny or important moments): {meter:Teddy's patience:90>2}, {map:beach>airport>jungle}, {countdown:3}, "
+            "{chat:Mom:Where are you?}, {stars:3} (wanted level), {money:Rs 80000>5000}, {counter:Views:0>1000000}, "
+            "{pile:coin} (things pile up), {topple:books} (a stack falls), {scatter:money} (flies apart), "
+            "{compare:Spending=9, Saving=2}, {steps:Plan>Steal>Run}, {stamp:BUSTED}, {chapter:Part 2 — The Heist}. ")
 
 
 def capabilities_short() -> str:
@@ -1440,6 +1614,7 @@ def _normalize_story(scenes: list[dict], chars: list[dict]) -> list[dict]:
             # your world by its exact name / your own choice — else a ready-made place may fit better
             "world_exact": bool(world) and (bool(chosen) or _world_exact(f"{raw.get('place') or ''} {location}", world)),
             "time_skip": re.sub(r"\s+", " ", str(raw.get("time_skip") or "")).strip()[:60],
+            "clock": str(raw.get("clock") or "") if raw.get("clock") in ("night", "day") else "",
             "holding": holding,
             "background": str(raw.get("background") or location or place)[:80],
             "characters": list(dict.fromkeys(on_screen))[:MAX_ON_SCREEN],
@@ -1480,7 +1655,8 @@ def _small_thing(word: str) -> bool:
 
 def _same_place(a: dict, b: dict) -> bool:
     la, lb = str(a.get("location") or "").lower().strip(), str(b.get("location") or "").lower().strip()
-    return bool(la) and la == lb and a.get("place") == b.get("place") and a.get("world") == b.get("world")
+    return (bool(la) and la == lb and a.get("place") == b.get("place") and a.get("world") == b.get("world")
+            and (a.get("clock") or "") == (b.get("clock") or ""))
 
 
 def _tidy_scenes(scenes: list[dict]) -> list[dict]:
@@ -1596,6 +1772,8 @@ def parse_custom_script(text: str, chars: list[dict]) -> list[dict]:
             scenes.append({"location": location or "a street",
                            "place": _guess_place(location, len(scenes)), "sitting": sitting,
                            "holding": hold, "time_skip": pending_skip,
+                           # "(night)" / "(sunset)" in the scene line: the time of day you asked for
+                           "clock": _clock_of(options) or ("day" if re.search(r"\b(sunset|dusk|golden hour)\b", options) else ""),
                            "background": (bg.strip() or location or "cartoon street"),
                            "characters": [], "lines": []})
             pending_skip = ""
@@ -1623,6 +1801,9 @@ def parse_custom_script(text: str, chars: list[dict]) -> list[dict]:
                     tone = word
                 elif word in SFX_NAMES:
                     sfx = word
+                elif word in ACTIONS and not word.startswith("w-") and "{" + word not in said:
+                    # "[sad, facepalm]": an action written in the brackets is still acted (2026-11-19)
+                    said = "{" + word + "} " + said
         if not scenes:
             scenes.append({"location": "a street", "place": "street", "sitting": False,
                            "background": "cartoon street", "characters": [], "lines": []})
@@ -1695,6 +1876,196 @@ def _speakable(text: str) -> str:
     return out[:1].upper() + out[1:]
 
 
+_TOKEN_CAP: dict = {"n": 0}
+_REF_CONDS: dict = {}  # reference voice file -> its prepared voice (Chatterbox "conds")
+
+
+def _speed_up(model) -> None:
+    """Long videos (user, 2026-11-19: 3 hours for a third of the lines).
+    Chatterbox always allows 1000 speech tokens (40 s): cap each take at
+    what the sentence can need."""
+    t3 = getattr(model, "t3", None)
+    if t3 is None or getattr(t3, "_ytguru_capped", False):
+        return
+    orig = t3.inference
+
+    def inference(*args, **kwargs):
+        cap = _TOKEN_CAP.get("n") or 0
+        if cap and kwargs.get("max_new_tokens"):
+            kwargs["max_new_tokens"] = min(int(kwargs["max_new_tokens"]), cap)
+        return orig(*args, **kwargs)
+    try:
+        t3.inference = inference
+        t3._ytguru_capped = True
+    except Exception:  # noqa: BLE001 — just slower
+        pass
+
+
+def _ref_prompt(model, ref: Path, exaggeration: float):
+    """Chatterbox re-reads and re-analyses the reference voice for EVERY
+    line (several seconds on a CPU). Prepare each voice once, then reuse
+    it: returns None (= use the prepared voice) or the path (old way)."""
+    try:
+        key = (str(ref), ref.stat().st_mtime)
+        if key in _REF_CONDS:
+            model.conds = _REF_CONDS[key]
+        else:
+            model.prepare_conditionals(str(ref), exaggeration=exaggeration)
+            if len(_REF_CONDS) > 80:
+                _REF_CONDS.clear()
+            _REF_CONDS[key] = model.conds
+        return None
+    except Exception:  # noqa: BLE001 — the normal (slower) way
+        return str(ref)
+
+
+_COLAB_STATE: dict = {"dead_until": 0.0, "sent": set()}
+# Where the voices are being made RIGHT NOW (user, 2026-11-19: "show me if it runs on
+# Google or on my CPU, why not on Google, when it retries and what the retry gave").
+_ENGINE: dict = {"where": "", "reason": "", "retry_at": 0.0, "last_retry": "",
+                 "avg": {"colab": 0.0, "cpu": 0.0}, "n": {"colab": 0, "cpu": 0}, "updated": 0.0}
+
+
+def _engine_note(where: str, secs: float | None = None, reason: str | None = None) -> None:
+    import time
+    _ENGINE["where"] = where
+    _ENGINE["updated"] = time.time()
+    if reason is not None:
+        _ENGINE["reason"] = reason
+    if secs is not None and where in _ENGINE["avg"]:
+        n = min(_ENGINE["n"][where], 19)
+        _ENGINE["avg"][where] = (_ENGINE["avg"][where] * n + secs) / (n + 1)  # about the last 20 lines
+        _ENGINE["n"][where] += 1
+
+
+def voice_engine_status() -> dict:
+    import time
+    f = BASE_DIR / "colab_voice.txt"
+    colab_set = f.exists() and f.read_text(encoding="utf-8", errors="ignore").strip().startswith("http")
+    wait = max(0, int(_ENGINE["retry_at"] - time.time())) if colab_set and _ENGINE["where"] != "colab" else 0
+    return {"where": _ENGINE["where"], "reason": _ENGINE["reason"] if _ENGINE["where"] != "colab" else "",
+            "retry_in": wait, "last_retry": _ENGINE["last_retry"], "colab_set": colab_set,
+            "avg_colab": round(_ENGINE["avg"]["colab"], 1), "avg_cpu": round(_ENGINE["avg"]["cpu"], 1),
+            "gpu": round(float(_ENGINE.get("gpu") or 0), 1), "link": round(float(_ENGINE.get("link") or 0), 1),
+            "age": int(time.time() - _ENGINE["updated"]) if _ENGINE["updated"] else None}
+
+
+def _colab_target() -> tuple[str, str] | None:
+    """colab_voice.txt in the project folder: "<url> <token>" printed by
+    the YTGuru Colab notebook. Read on every line, so it can be added,
+    changed or removed while a video is being made."""
+    import time
+    f = BASE_DIR / "colab_voice.txt"
+    if time.time() < _COLAB_STATE["dead_until"] or not f.exists():
+        return None
+    parts = f.read_text(encoding="utf-8", errors="ignore").split()
+    if len(parts) < 2 or not parts[0].startswith("http"):
+        return None
+    return parts[0].rstrip("/"), parts[1]
+
+
+def _colab_log(msg: str) -> None:
+    """colab_voice.log in the project folder: every Colab line (time / error), to see what is slow."""
+    import time
+    try:
+        f = BASE_DIR / "colab_voice.log"
+        if f.exists() and f.stat().st_size > 400_000:
+            f.write_text("", encoding="utf-8")
+        with f.open("a", encoding="utf-8") as fh:
+            fh.write(time.strftime("%H:%M:%S ") + msg + "\n")
+    except OSError:
+        pass
+
+
+def _colab_failed(exc: Exception) -> None:
+    import time
+    _COLAB_STATE["dead_until"] = time.time() + 20  # try Colab again soon
+    _ENGINE["retry_at"] = _COLAB_STATE["dead_until"]
+    _ENGINE["reason"] = "Google did not answer: " + _colab_reason(exc)
+    _ENGINE["last_retry"] = time.strftime("%H:%M:%S") + " ✗ " + _colab_reason(exc)
+
+
+def _colab_reason(exc: Exception) -> str:
+    """The error in simple words."""
+    t = str(exc)
+    low = t.lower()
+    if "403" in t:
+        return "wrong code — paste the whole line from Colab again in the Dashboard"
+    if "timed out" in low or "timeout" in low:
+        return "it took too long (the free link was slow)"
+    if any(x in t for x in ("502", "530", "1033")) or "refused" in low or "getaddrinfo" in low or "name or service" in low:
+        return "the Colab link is closed — is the Colab tab still running?"
+    if "500" in t:
+        return "the voice server on Colab had an error"
+    return t[:120]
+    _VOICE_PROBLEMS.append(f"Colab voice: {str(exc)[:150]} (this computer made the line)")
+
+
+def _colab_post(remote: tuple[str, str], path: str, body: dict, timeout: int = 90) -> dict:
+    import urllib.request
+    req = urllib.request.Request(remote[0] + path, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json", "X-Token": remote[1],
+                                          "User-Agent": "YTGuru"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode())
+
+
+def _colab_best(remote: tuple[str, str], text: str, ref: Path, exag: float, expected: float, cap: int):
+    """The whole line in ONE call (newer Colab notebook): the same takes and the same
+    clean-take check, done on Colab. None = an older notebook (use one call per take)."""
+    import base64
+    import hashlib
+    import urllib.error
+    import numpy as np
+    if _COLAB_STATE.get("no_best"):
+        return None
+    data = ref.read_bytes()
+    sha = hashlib.sha1(data).hexdigest()
+    body = {"text": text, "sha": sha, "language_id": "en", "exag": exag, "expected": expected, "max_new_tokens": cap}
+    for _ in range(2):
+        if sha not in _COLAB_STATE["sent"]:
+            _colab_post(remote, "/ref", {"sha": sha, "wav_b64": base64.b64encode(data).decode()})
+            _COLAB_STATE["sent"].add(sha)
+        try:
+            out = _colab_post(remote, "/best", body, timeout=150)
+            sig = np.frombuffer(base64.b64decode(out["wav_b64"]), dtype="<f4").astype(np.float32)
+            return sig, int(out["sr"]), float(out.get("gpu_secs") or 0), int(out.get("takes") or 1)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                detail = exc.read().decode("utf-8", "ignore")
+                if "voice sample" in detail:
+                    _COLAB_STATE["sent"].discard(sha)
+                    continue
+                _COLAB_STATE["no_best"] = True  # an older notebook
+                return None
+            raise
+    raise RuntimeError("Colab did not accept the voice sample")
+
+
+def _colab_take(remote: tuple[str, str], text: str, ref: Path, settings: dict, cap: int):
+    import base64
+    import hashlib
+    import urllib.error
+    import numpy as np
+    data = ref.read_bytes()
+    sha = hashlib.sha1(data).hexdigest()
+    body = {"text": text, "sha": sha, "language_id": "en", "max_new_tokens": cap, **settings}
+    for _ in range(2):
+        if sha not in _COLAB_STATE["sent"]:
+            _colab_post(remote, "/ref", {"sha": sha, "wav_b64": base64.b64encode(data).decode()})
+            _COLAB_STATE["sent"].add(sha)
+        try:
+            out = _colab_post(remote, "/gen", body)
+            sig = np.frombuffer(base64.b64decode(out["wav_b64"]), dtype="<f4").astype(np.float32)
+            return sig, int(out["sr"])
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:  # Colab restarted and forgot the voice: send it again
+                _COLAB_STATE["sent"].discard(sha)
+                continue
+            raise
+    raise RuntimeError("Colab did not accept the voice sample")
+
+
 def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
     """A cloned voice WITHOUT stray sounds (user, 2026-11-16).
     Chatterbox sometimes keeps "talking" after the sentence (mumbles,
@@ -1707,20 +2078,104 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
     words = max(1, len(re.findall(r"[A-Za-z']+", text)))
     expected = 0.25 + words * 0.36  # seconds, normal talking pace
     exag = min(0.85, float((prosody or {}).get("exaggeration", 0.45)))
-    model = vc._get_model()
+    remote = _colab_target()
+    why = ""
+    if remote is None:
+        import time as _t0
+        if not (BASE_DIR / "colab_voice.txt").exists():
+            why = "Google GPU is not connected"
+        elif _t0.time() < _COLAB_STATE["dead_until"]:
+            why = _ENGINE["reason"] or "Google did not answer — waiting to try again"
+        else:
+            why = "the Colab line in the Dashboard is not complete"
+    cap0 = int(25 * (expected * 2.0 + 1.5)) + 40
+    if remote:
+        # newer Colab notebook: the whole line (all takes) in one call
+        import time as _tb
+        for attempt_b in range(3):
+            try:
+                t0 = _tb.time()
+                res = _colab_best(remote, _speakable(text), ref, exag, expected, cap0)
+                if res is None:
+                    break
+                sig, sr, gpu, takes = res
+                if sr != SAMPLE_RATE:
+                    idx = np.linspace(0, len(sig) - 1, int(len(sig) * SAMPLE_RATE / sr))
+                    sig = np.interp(idx, np.arange(len(sig)), sig).astype(np.float32)
+                total = _tb.time() - t0
+                _colab_log(f"ok {total:.1f}s (gpu {gpu:.1f}s, {takes} take(s), link {max(0.0, total - gpu):.1f}s) {len(text)} chars")
+                if _ENGINE["where"] == "cpu" or attempt_b:
+                    _ENGINE["last_retry"] = _tb.strftime("%H:%M:%S") + " ✓ Google answered again"
+                _engine_note("colab", total, "")
+                _ENGINE["gpu"] = gpu
+                _ENGINE["link"] = max(0.0, total - gpu)
+                peak = float(np.max(np.abs(sig))) if len(sig) else 1.0
+                sig = sig if len(sig) else np.zeros(SAMPLE_RATE // 4, dtype=np.float32)
+                return array("h", (sig / (peak or 1.0) * 0.9 * 32767).astype(np.int16).tobytes())
+            except Exception as exc:  # noqa: BLE001
+                _colab_log(f"line try {attempt_b + 1} failed: {str(exc)[:200]}")
+                if attempt_b < 2:
+                    _tb.sleep(3 + attempt_b * 5)
+                else:
+                    _colab_failed(exc)
+                    why = _ENGINE["reason"]
+                    remote = None
+    model = None if remote else vc._get_model()
+    if model is not None:
+        _speed_up(model)
     best: tuple[float, np.ndarray] | None = None
     for attempt in range(3):
         kwargs = {"exaggeration": max(0.3, exag - 0.12 * attempt),
                   "cfg_weight": 0.4 if exag >= 0.7 else 0.5}
-        with vc._gen_lock:
-            try:
-                wav = model.generate(_speakable(text), language_id="en", audio_prompt_path=str(ref),
-                                     temperature=0.65 - 0.1 * attempt, repetition_penalty=1.6, **kwargs)
-            except TypeError:  # older chatterbox without these settings
-                wav = model.generate(_speakable(text), language_id="en", audio_prompt_path=str(ref), **kwargs)
-        sig = wav.squeeze().detach().cpu().numpy().astype(np.float32)
-        if model.sr != SAMPLE_RATE:
-            idx = np.linspace(0, len(sig) - 1, int(len(sig) * SAMPLE_RATE / model.sr))
+        settings = {"temperature": 0.65 - 0.1 * attempt, "repetition_penalty": 1.6, **kwargs}
+        # Speech is ~25 tokens a second: never let a take run on far past
+        # the sentence (a runaway take could be 40 s of mumbling).
+        cap = int(25 * (expected * 2.0 + 1.5)) + 40
+        got = None
+        if remote:
+            # The SAME Chatterbox model on Google Colab's free GPU (user,
+            # 2026-11-19): same settings, same takes, same cleaning below.
+            # A hiccup of the free link is retried (Colab is ~4x faster than this
+            # computer, so waiting a few seconds beats making the line here).
+            import time as _t
+            for attempt_c in range(3):
+                try:
+                    t0 = _t.time()
+                    got = _colab_take(remote, _speakable(text), ref, settings, cap)
+                    _colab_log(f"ok {(_t.time() - t0):.1f}s {len(text)} chars")
+                    if _ENGINE["where"] == "cpu" or attempt_c:
+                        _ENGINE["last_retry"] = _t.strftime("%H:%M:%S") + " ✓ Google answered again"
+                    _engine_note("colab", _t.time() - t0, "")
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    _colab_log(f"try {attempt_c + 1} failed: {str(exc)[:200]}")
+                    if attempt_c < 2:
+                        _t.sleep(3 + attempt_c * 5)
+                    else:
+                        _colab_failed(exc)  # this computer makes the line; Colab is tried again soon
+                        why = _ENGINE["reason"]
+                        remote = None
+        if got is None:
+            if model is None:
+                model = vc._get_model()
+                _speed_up(model)
+            import time as _t1
+            t_cpu = _t1.time()
+            _engine_note("cpu", None, why or "Google GPU is not connected")
+            with vc._gen_lock:
+                _TOKEN_CAP["n"] = cap
+                prompt = _ref_prompt(model, ref, kwargs["exaggeration"])
+                try:
+                    wav = model.generate(_speakable(text), language_id="en", audio_prompt_path=prompt, **settings)
+                except TypeError:  # older chatterbox without these settings
+                    wav = model.generate(_speakable(text), language_id="en", audio_prompt_path=prompt, **kwargs)
+                finally:
+                    _TOKEN_CAP["n"] = 0
+            got = (wav.squeeze().detach().cpu().numpy().astype(np.float32), int(model.sr))
+            _engine_note("cpu", _t1.time() - t_cpu)
+        sig, sr = got
+        if sr != SAMPLE_RATE:
+            idx = np.linspace(0, len(sig) - 1, int(len(sig) * SAMPLE_RATE / sr))
             sig = np.interp(idx, np.arange(len(sig)), sig).astype(np.float32)
         sig = _cut_tail(sig, expected)
         dur = len(sig) / SAMPLE_RATE
@@ -2692,6 +3147,9 @@ def _direct(job: dict, story: list[dict], plans: list[dict], chars: dict, audio_
     cues: list[dict] = []
     events: list[tuple[int, str]] = []
     pops: list[dict] = []
+    screens: list[dict] = []  # {screen:…} inserts: [{start, end, text}] in frames
+    inserts: list[dict] = []  # motion-graphic panels ({meter:…}, {map:…}…): [{start, end, spec}]
+    outfit_now: dict[str, str] = {}  # {wear:…}: clothes stay on until changed
     pop_seen: set[str] = set()  # each thing pops up once per video
     forms: dict[str, str] = {}  # cid -> what they were turned into (frog…), kept across scenes
     morph_words = {seg["morph"].lower() for sc in story for ln in sc["lines"] for seg in ln["segments"] if seg.get("morph")}
@@ -3054,6 +3512,7 @@ def _direct(job: dict, story: list[dict], plans: list[dict], chars: dict, audio_
                     "act": cur["name"] if cur else None,
                     "wact": ({**cur["wact"], "t": cur["t"]} if cur and cur.get("wact") else None),
                     "form": forms.get(cid) or None,
+                    "outfit": outfit_now.get(cid) or None,
                     "hand": hand_now.get(cid) or None,
                     "morph": ({k: morph_now[k] for k in ("t", "n", "to", "was", "swap")}
                               if morph_now.get("cid") == cid else None),
@@ -3156,6 +3615,23 @@ def _direct(job: dict, story: list[dict], plans: list[dict], chars: dict, audio_
                     voice.extend(pcm[:len(mouths) * per_frame])
                 elif "show" in seg:
                     bring_extra(seg["show"], speaker, len(frames), forced=True)
+                    continue
+                elif "insert" in seg:
+                    st0 = len(frames)
+                    if inserts and inserts[-1]["end"] > st0:
+                        inserts[-1]["end"] = max(inserts[-1]["start"] + int(FPS * 1.2), st0)  # the next one takes over
+                        if inserts[-1]["end"] > st0:
+                            st0 = inserts[-1]["end"]
+                    inserts.append({"start": st0, "end": st0 + int(FPS * seg["insert"]["secs"]), "spec": seg["insert"]})
+                    continue
+                elif "screen" in seg:
+                    st0 = len(frames)
+                    if screens and screens[-1]["end"] > st0:
+                        screens[-1]["end"] = st0  # the next screen replaces it
+                    screens.append({"start": st0, "end": st0 + int(FPS * 3.2), "text": seg["screen"]})
+                    continue
+                elif "wear" in seg:
+                    outfit_now[speaker] = "" if seg["wear"].lower() in ("normal", "own", "usual", "back") else seg["wear"].lower()
                     continue
                 elif "unknown" in seg or "hold" in seg or "place" in seg:
                     continue  # skipped / shown by the 3D world (a thing in the hand, a thing put down)
@@ -3278,7 +3754,7 @@ def _direct(job: dict, story: list[dict], plans: list[dict], chars: dict, audio_
         frames += [last] * hold
         silence(hold)
     return {"frames": frames, "cues": cues, "events": events, "voice": voice, "pops": pops, "extras": extras,
-            "effects": effects}
+            "effects": effects, "screens": screens, "inserts": inserts}
 
 
 def _sprite_key(s: dict) -> str:
@@ -3340,7 +3816,8 @@ def _step_story(job: dict, chars: list[dict]) -> None:
         def prog(i: int, n: int) -> None:
             _update(job, progress=3 + int(12 * i / max(1, n)),
                     message=f"Writing scene {i + 1} of {n}…")
-        _AI["gemini_key"] = job.get("gemini_key") or ""
+        if job.get("gemini_key"):  # a job without a key keeps the key the Dashboard gave
+            _AI["gemini_key"] = job.get("gemini_key")
         # your own idea goes to the writer with the title (user, 2026-11-18)
         brief = job["title"] + (f' — STORY IDEA FROM THE USER (follow it closely, make it a full, refined story): {job["idea"]}' if job.get("idea") else "")
         story, source = write_story(brief, job["minutes"], chars, job["language"], prog)
@@ -3437,7 +3914,7 @@ def _layouts_3d(job: dict, plans: list[dict], story: list[dict]) -> list[dict]:
         sc = story[i] if i < len(story) else {}
         card = " ".join([str(sc.get("time_skip") or ""), str(sc.get("location") or ""), str(p["layout"].get("name") or "")])
         said = " ".join(str(ln.get("text") or "") for ln in sc.get("lines") or [])
-        clock = _clock_of(card) or _clock_of(said) or clock
+        clock = str(sc.get("clock") or "") or _clock_of(card) or _clock_of(said) or clock
         if clock == "night":
             lay["night"] = True
         elif clock == "day":
@@ -3461,6 +3938,10 @@ def _layouts_3d(job: dict, plans: list[dict], story: list[dict]) -> list[dict]:
                     need.append(item)
         if need:
             lay["need"] = need
+        # what the story writes on screens also lights up the city's billboards (GTA 6 launch night…)
+        signs = [str(seg["screen"]) for ln in sc.get("lines") or [] for seg in ln.get("segments") or [] if seg.get("screen")]
+        if signs:
+            lay["signs"] = signs[:4]
         # sneaking at night, "dark and quiet", hiding: no strangers walking about
         if clock == "night" or re.search(r"\b(quiet|silent|alone|secret|sneak|sneaking|hide|hiding|empty|deserted|nobody|no one|tiptoe|shh)\b", said, re.I):
             lay["quiet"] = True
@@ -3638,7 +4119,7 @@ def _step_prepare(job: dict) -> None:
     used = {seg["wact"] for sc in story for ln in sc["lines"] for seg in ln["segments"] if seg.get("custom")}
     acts = custom_actions()
     timeline = {"actions": {k: acts[k] for k in used if k in acts}, "frames": directed["frames"], "cues": directed["cues"], "pops": directed["pops"],
-                "extras": directed["extras"], "effects": directed["effects"],
+                "extras": directed["extras"], "effects": directed["effects"], "screens": directed.get("screens") or [],
                 "auto_chars": [{"id": c["id"], "name": c["name"], "species": c.get("species", ""),
                                 "female": c.get("female", False)} for c in chars.values() if c.get("auto")], "sprites": sprites,
                 "emotes": emotes,
@@ -3651,6 +4132,7 @@ def _step_prepare(job: dict) -> None:
                          "seat_end": next((pr.get("x2", pr["x"]) for pr in p["layout"]["props"]
                                            if pr["type"] in ("bed", "sofa", "bench")), None)}
                         for p in plans]}
+    timeline["inserts"] = _render_inserts(job, jdir, directed.get("inserts") or [], timeline)
     _write_json(jdir / "timeline.json", timeline)
     duration = len(directed["frames"]) / FPS
     _update(job, status="voicing", progress=70, message="Mixing voices, sounds and music…")
@@ -3995,22 +4477,76 @@ def _run(job_id: str, step: str) -> None:
                     finished_at=_now(), video_url=f"/api/animator/jobs/{job_id}/video")
     except Exception as exc:  # noqa: BLE001
         _update(job, status="error", message=f"Failed: {str(exc)[-800:]}")
+    finally:
+        _queue_next()
 
 
 def _start_thread(job_id: str, step: str) -> None:
     threading.Thread(target=_run, args=(job_id, step), daemon=True).start()
 
 
+# ---- the queue (user, 2026-11-19: "submit several scripts, it makes them one by one
+# while I am away"). Only ONE video is written / voiced at a time (a weak PC); the
+# others wait their turn. The browser films finished ones (3D) one by one.
+_BUSY = ("queued", "writing", "voicing", "backgrounds")
+_queue_lock = threading.Lock()
+
+
+def _all_jobs() -> list[dict]:
+    out = []
+    for f in ANIM_DIR.glob("*/job.json"):
+        j = _read_json(f, None)
+        if isinstance(j, dict) and j.get("id"):
+            out.append(j)
+    return sorted(out, key=lambda j: str(j.get("created_at") or ""))
+
+
+def _busy_job(exclude: str = "") -> dict | None:
+    return next((j for j in _all_jobs() if j.get("status") in _BUSY and j.get("id") != exclude), None)
+
+
+def _queue_next() -> None:
+    with _queue_lock:
+        if _busy_job():
+            return
+        waiting = [j for j in _all_jobs() if j.get("status") == "waiting"]
+        if not waiting:
+            return
+        nxt = waiting[0]
+        step = nxt.get("queued_step") or "start"
+        _update(nxt, status="queued" if step == "start" else "voicing", message="Starting (from the queue)…")
+        _start_thread(nxt["id"], step)
+    _queue_positions()
+
+
+def _queue_positions() -> None:
+    for i, j in enumerate([j for j in _all_jobs() if j.get("status") == "waiting"]):
+        _update(j, message=f"In the queue — #{i + 1}. It starts by itself when the video before it has its voices.")
+
+
+def _queue_or_start(job: dict, step: str) -> bool:
+    """Start now, or wait in the queue when another video is being made. True = queued."""
+    with _queue_lock:
+        queued = _busy_job(exclude=job["id"]) is not None
+        if queued:
+            _update(job, status="waiting", queued_step=step)
+    if queued:
+        _queue_positions()
+        return True
+    _start_thread(job["id"], step)
+    return False
+
+
 # ----------------------------------------------------------- endpoints
 class StartRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=150)
-    minutes: float = Field(1, ge=0.25, le=10)
+    minutes: float = Field(1, ge=0.25, le=90)
     format: str = Field("long", pattern="^(long|reel)$")
     language: str = Field("en", pattern="^(en|ur)$")
     character_ids: list[str] = Field(..., min_length=1, max_length=6)
     review: bool = False
     subtitles: bool = True
-    custom_script: str = Field("", max_length=30000)
+    custom_script: str = Field("", max_length=200000)
     backgrounds: str = Field("drawn", pattern="^(drawn|pixabay)$")
     pixabay_key: str = Field("", max_length=100)
     music: str = Field("auto", max_length=80)
@@ -4020,6 +4556,7 @@ class StartRequest(BaseModel):
     acting: bool = True  # free acting voices (Chatterbox) for every character
     idea: str = Field("", max_length=4000)  # your own rough idea / direction for the story
     gemini_key: str = Field("", max_length=100)  # the writer uses it when given (better + longer prompts)
+    mode: str = Field("2d", pattern="^(2d|3d)$")  # cartoon or 3D film (the queue films it the same way)
 
 
 @router.post("/start")
@@ -4044,10 +4581,12 @@ def start(payload: StartRequest) -> dict:
            "freesound_key": payload.freesound_key.strip(),
            "tts_keys": {k: str(v).strip()[:200] for k, v in payload.tts_keys.items()
                         if k in ("google", "unreal", "elevenlabs") and v},
-           "created_at": _now()}
+           "mode": payload.mode, "created_at": _now()}
     _write_json(ANIM_DIR / job_id / "job.json", job)
-    _start_thread(job_id, "start")
-    return {"job_id": job_id}
+    queued = _queue_or_start(job, "start")
+    if not queued:
+        _update(job, status="queued")
+    return {"job_id": job_id, "queued": queued}
 
 
 def _public(job: dict) -> dict:
@@ -4055,9 +4594,28 @@ def _public(job: dict) -> dict:
             if k not in ("pixabay_key", "freesound_key", "custom_script", "music_file", "tts_keys")}
 
 
+@router.get("/jobs")
+def list_jobs() -> dict:
+    """My videos: every video, newest first (open any of them again)."""
+    keep = ("id", "title", "status", "progress", "message", "format", "mode", "created_at", "finished_at", "video_url")
+    return {"jobs": [{k: j.get(k) for k in keep} for j in reversed(_all_jobs())][:80]}
+
+
+@router.post("/jobs/{job_id}/unqueue")
+def unqueue(job_id: str) -> dict:
+    job = _read_job(job_id)
+    if job.get("status") == "waiting":
+        _update(job, status="error", message="Taken out of the queue. Press ↻ Try again to add it back.")
+        _queue_positions()
+    return {"ok": True}
+
+
 @router.get("/jobs/{job_id}")
 def get_job(job_id: str) -> dict:
-    return _public(_read_job(job_id))
+    out = _public(_read_job(job_id))
+    if out.get("status") == "voicing":
+        out["voice_engine"] = voice_engine_status()  # Google GPU or this computer, and why
+    return out
 
 
 class CustomAction(BaseModel):
@@ -4079,34 +4637,154 @@ class CustomAction(BaseModel):
     thing: str = Field("", max_length=40)
 
 
+# ---- AI engine status (user, 2026-11-19): which AI answered, why Gemini did not, when it retries.
+_AI_STATUS = {"engine": "", "model": "", "ok_at": 0.0, "last_try": 0.0, "gemini_error": "", "gemini_error_at": 0.0,
+              "retry_at": 0.0, "fails": 0, "free_error": ""}
+
+
+def _gemini_reason(text: str) -> tuple[str, float]:
+    """A plain reason for a Gemini failure, and how long to wait before trying Gemini again."""
+    t = text.lower()
+    if "api key not valid" in t or "api_key_invalid" in t or "permission_denied" in t or "403" in t:
+        return "Your Gemini key is not valid (check it in the Dashboard).", 600
+    if "perday" in t.replace(" ", "") or "per day" in t or "daily" in t:
+        return "Gemini's free daily limit is used up — it resets tomorrow.", 3600
+    if "429" in t or "resource_exhausted" in t or "quota" in t or "rate" in t:
+        return "Gemini is busy (too many requests per minute on the free plan).", 60 * min(5, 1 + _AI_STATUS["fails"])
+    if "timed out" in t or "timeout" in t:
+        return "Gemini did not answer in time.", 20
+    if "503" in t or "500" in t or "overloaded" in t or "unavailable" in t:
+        return "Google's Gemini servers are overloaded right now.", 45
+    return "Gemini error: " + text[:140], 30
+
+
+def _gemini_only(prompt: str, gemini_key: str) -> str:
+    """One answer from Gemini (several models), or an exception with the reason. Records the status."""
+    import urllib.error
+    now = time.time()
+    _AI_STATUS["last_try"] = now
+    errs = []
+    chosen = str(_AI.get("gemini_model") or "").strip()
+    for model in ([chosen] if chosen else GEMINI_MODELS):
+        try:
+            body = json.dumps({"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.4}}).encode("utf-8")
+            req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key="
+                                         + urllib.request.quote(gemini_key.strip()), data=body, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=90) as res:
+                data = json.loads(res.read().decode("utf-8", "ignore"))
+            text = "".join(p.get("text", "") for p in data["candidates"][0]["content"]["parts"])
+            if text.strip():
+                _AI_STATUS.update(engine="gemini", model=model, ok_at=time.time(), gemini_error="", retry_at=0.0, fails=0)
+                return text
+            errs.append(f"{model}: empty answer")
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = exc.read().decode("utf-8", "ignore")[:300]
+            except Exception:  # noqa: BLE001
+                detail = ""
+            errs.append(f"{model}: HTTP {exc.code} {detail}")
+            if exc.code in (400, 403):
+                break  # a bad key fails the same on every model
+        except Exception as exc:  # noqa: BLE001
+            errs.append(f"{model}: {str(exc)[:120]}")
+    reason, wait = _gemini_reason(" | ".join(errs))
+    _AI_STATUS.update(gemini_error=reason, gemini_error_at=time.time(), retry_at=time.time() + wait, fails=_AI_STATUS["fails"] + 1)
+    raise RuntimeError(reason)
+
+
+def _gemini_ready(gemini_key: str) -> bool:
+    return bool(gemini_key.strip()) and time.time() >= _AI_STATUS["retry_at"]
+
+
+def _free_ok():
+    _AI_STATUS.update(engine="pollinations", model="free", ok_at=time.time(), free_error="")
+
+
+def ai_status() -> dict:
+    key = str(_AI.get("gemini_key") or "")
+    now = time.time()
+    using = "gemini" if key and now >= _AI_STATUS["retry_at"] else ("waiting" if key and _AI.get("gemini_only") else "pollinations")
+    reason = ""
+    if not key:
+        reason = "No Gemini key yet — add your free key in the Dashboard (aistudio.google.com/apikey)."
+    elif now < _AI_STATUS["retry_at"]:
+        reason = _AI_STATUS["gemini_error"]
+    return {"using": using, "has_key": bool(key), "last_engine": _AI_STATUS["engine"], "last_model": _AI_STATUS["model"],
+            "last_ok_ago": round(now - _AI_STATUS["ok_at"]) if _AI_STATUS["ok_at"] else None,
+            "last_try_ago": round(now - _AI_STATUS["last_try"]) if _AI_STATUS["last_try"] else None,
+            "reason": reason, "retry_in": max(0, round(_AI_STATUS["retry_at"] - now)) if key else None,
+            "free_error": _AI_STATUS["free_error"], "model": str(_AI.get("gemini_model") or ""), "gemini_only": bool(_AI.get("gemini_only"))}
+
+
+def gemini_models(key: str) -> list[dict]:
+    """The Gemini models this key can really use (from Google), for the model switcher."""
+    import urllib.error
+    req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=" + urllib.request.quote(key.strip()))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            data = json.loads(res.read().decode("utf-8", "ignore"))
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(_gemini_reason(f"HTTP {exc.code} " + exc.read().decode("utf-8", "ignore")[:200])[0]) from None
+    out = []
+    for m in data.get("models") or []:
+        name = str(m.get("name", "")).replace("models/", "")
+        if "gemini" not in name or "generateContent" not in (m.get("supportedGenerationMethods") or []):
+            continue
+        if any(x in name for x in ("embedding", "image", "tts", "audio", "live", "vision")):
+            continue
+        out.append({"id": name, "label": m.get("displayName") or name})
+    return out
+
+
+def gemini_test(key: str, model: str) -> dict:
+    """One tiny request to one model: does it answer, and how fast."""
+    old = _AI.get("gemini_model")
+    snap = dict(_AI_STATUS)
+    _AI["gemini_model"] = model
+    t = time.time()
+    try:
+        _gemini_only('Reply with only the word: OK', key)
+        return {"ok": True, "seconds": round(time.time() - t, 1)}
+    except Exception as exc:  # noqa: BLE001
+        _AI_STATUS.update(snap)  # a failed test does not pause the real work
+        return {"ok": False, "error": str(exc)[:200]}
+    finally:
+        _AI["gemini_model"] = old
+
+
+def ai_retry_now() -> dict:
+    _AI_STATUS.update(retry_at=0.0, fails=0)
+    return ai_status()
+
+
 def _ai_text(prompt: str, gemini_key: str = "") -> str:
     """Your Gemini key first (the best free one), else the free Pollinations AI."""
-    import urllib.error
     errs = []
-    if gemini_key.strip():
-        for model in ("gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-flash-lite"):
-            try:
-                body = json.dumps({"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.4}}).encode("utf-8")
-                req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key="
-                                             + urllib.request.quote(gemini_key.strip()), data=body, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=90) as res:
-                    data = json.loads(res.read().decode("utf-8", "ignore"))
-                text = "".join(p.get("text", "") for p in data["candidates"][0]["content"]["parts"])
-                if text.strip():
-                    return text
-            except Exception as exc:  # noqa: BLE001
-                errs.append(f"{model}: {str(exc)[:80]}")
+    if gemini_key.strip() and _gemini_ready(gemini_key):
+        try:
+            return _gemini_only(prompt, gemini_key)
+        except Exception as exc:  # noqa: BLE001
+            errs.append(str(exc)[:160])
+    elif gemini_key.strip():
+        errs.append(_AI_STATUS["gemini_error"] or "Gemini paused")
     else:
         errs.append("no Gemini key")
+    if _AI.get("gemini_only") and gemini_key.strip():
+        raise HTTPException(503, "Gemini only (your setting): " + " | ".join(errs)[:300] + " — try again in a minute.")
     try:
-        return _pollinations_post(prompt)
+        out = _pollinations_post(prompt)
+        _free_ok()
+        return out
     except Exception as exc:  # noqa: BLE001
         errs.append(f"free AI (long): {str(exc)[:120]}")
     try:
-        return _ask_ai_get(_shorten_prompt(prompt), 120, 2)
+        out = _ask_ai_get(_shorten_prompt(prompt), 120, 2)
+        _free_ok()
+        return out
     except Exception as exc:  # noqa: BLE001
         errs.append(f"free AI (short): {str(exc)[:120]}")
-    raise HTTPException(502, "No AI answered (" + " | ".join(errs)[:500] + "). Add a free Gemini key in the Animator (aistudio.google.com/apikey), or try again in a minute.")
+        _AI_STATUS["free_error"] = str(exc)[:160]
+    raise HTTPException(502, "No AI answered (" + " | ".join(errs)[:500] + "). Add a free Gemini key in the Dashboard (aistudio.google.com/apikey), or try again in a minute.")
 
 
 def _json_in(text: str):
@@ -4180,7 +4858,7 @@ def fix_prompt(story: list[dict], chars: dict, scene: int, line: int, said: str,
     return (
         "You edit the script of my animated cartoon. The video was made from this script; the viewer paused at the line "
         f"marked <<< HERE (scene {scene}, line {line}, while this was said: \"{said}\") and says what must change there:\n"
-        f"INSTRUCTION: {instruction}\n\nSCRIPT:\n" + "\n".join(lines) + "\n\n"
+        f"INSTRUCTION (it may be written in Urdu or English — understand it): {instruction}\n\nSCRIPT:\n" + "\n".join(lines) + "\n\n"
         "How the script works: inside a line, tags in curly braces are acted where they stand. Actions: " + acts + ". "
         "World actions: " + wacts + ". Story actions: " + custom + ". Magic: {turn:Name:frog}, {turn:Name:back}. "
         "Camera for the line: {closeup:Name} (close on that face), {wide} (whole place). {show:thing} brings a thing in. "
@@ -4289,7 +4967,7 @@ def fix_moment(job_id: str, req: FixRequest) -> dict:
 
 
 class FixApply(BaseModel):
-    changes: list[dict] = Field(..., min_length=1, max_length=40)
+    changes: list[dict] = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/jobs/{job_id}/fix/apply")
@@ -4314,6 +4992,74 @@ def fix_apply(job_id: str, req: FixApply) -> dict:
     _update(job, status="voicing", progress=15, message="Fixing… (only the changed lines get new voices)")
     _start_thread(job_id, "prepare")
     return {"ok": True, "missing": [], "told": told}
+
+
+# ---- (user, 2026-11-20) the preview's "Want to fix this part?": many parts are marked one by one (each with
+# the AI's answer), then "Fix all the modified parts" changes them all at once — one new voicing for all.
+class FixMark(BaseModel):
+    instruction: str = Field(..., min_length=2, max_length=1000)
+    time: float = Field(0, ge=0)
+    answer: str = Field(..., min_length=2, max_length=20000)
+
+
+def _pending_file(job_id: str) -> Path:
+    return _job_dir(job_id) / "pending_fixes.json"
+
+
+def _pending(job_id: str) -> list[dict]:
+    d = _read_json(_pending_file(job_id), [])
+    return d if isinstance(d, list) else []
+
+
+@router.post("/jobs/{job_id}/fix/mark")
+def fix_mark(job_id: str, req: FixMark) -> dict:
+    """The AI's answer for one paused moment: checked against the script and kept (not applied yet)."""
+    job = _read_job(job_id)
+    data = _read_json(_job_dir(job_id) / "script.json", {"scenes": []})
+    si, li, said = _moment(job_id, req.time)
+    chars = {c["id"]: c for c in _job_characters(job)}
+    plan = _json_in(req.answer)
+    if isinstance(plan, dict) and not isinstance(plan.get("changes"), list):
+        for k in ("edits", "change", "patch", "operations", "ops"):
+            if isinstance(plan.get(k), list):
+                plan["changes"] = plan[k]
+                break
+    if not isinstance(plan, dict) or not isinstance(plan.get("changes"), list) or not plan["changes"]:
+        raise HTTPException(400, "The answer has no list of changes in it — paste the AI's WHOLE reply (from { to }).")
+    _new, told = _apply_changes(data["scenes"], plan["changes"], chars)
+    if not told:
+        raise HTTPException(400, "The AI's changes do not fit the script (wrong scene or line numbers) — ask it again.")
+    items = _pending(job_id)
+    items.append({"id": f"p{int(time.time() * 1000) % 10_000_000}", "time": round(req.time, 2), "scene": si, "line": li,
+                  "said": said[:200], "instruction": req.instruction[:300], "summary": str(plan.get("summary", ""))[:300],
+                  "changes": plan["changes"][:40], "told": told})
+    _write_json(_pending_file(job_id), items)
+    return {"ok": True, "told": told, "pending": items}
+
+
+@router.get("/jobs/{job_id}/fix/pending")
+def fix_pending(job_id: str) -> dict:
+    return {"pending": _pending(job_id)}
+
+
+@router.delete("/jobs/{job_id}/fix/pending/{pid}")
+def fix_unmark(job_id: str, pid: str) -> dict:
+    items = [p for p in _pending(job_id) if p.get("id") != pid]
+    _write_json(_pending_file(job_id), items)
+    return {"pending": items}
+
+
+@router.post("/jobs/{job_id}/fix/apply-all")
+def fix_apply_all(job_id: str) -> dict:
+    """All the marked parts at once (their line numbers all point at the same script, so they are applied
+    together), then the video is made again — only the changed lines get new voices."""
+    items = _pending(job_id)
+    if not items:
+        raise HTTPException(400, "No part is marked to fix yet.")
+    changes = [c for p in items for c in p.get("changes") or []]
+    res = fix_apply(job_id, FixApply(changes=changes[:200]))
+    _write_json(_pending_file(job_id), [])
+    return {**res, "parts": len(items)}
 
 
 THEMES = ["a funny misunderstanding", "a race against time", "a magic trick that goes wrong", "a lost thing they must find",
@@ -4466,7 +5212,7 @@ class ContinueRequest(BaseModel):
 def continue_job(job_id: str, payload: ContinueRequest) -> dict:
     job = _read_job(job_id)
 
-    if job.get("status") not in ("script_ready", "error", "ready", "done"):
+    if job.get("status") not in ("script_ready", "error", "ready", "done", "waiting"):
         raise HTTPException(400, "This video is already being made.")
     _update(job, status="voicing", progress=15, message="Starting voices…",
             pixabay_key=payload.pixabay_key.strip() or job.get("pixabay_key", ""),
@@ -4474,8 +5220,8 @@ def continue_job(job_id: str, payload: ContinueRequest) -> dict:
             tts_keys={**(job.get("tts_keys") or {}),
                       **{k: str(v).strip()[:200] for k, v in payload.tts_keys.items()
                          if k in ("google", "unreal", "elevenlabs") and v}})
-    _start_thread(job_id, "prepare")
-    return {"ok": True}
+    queued = _queue_or_start(job, "prepare")
+    return {"ok": True, "queued": queued}
 
 
 @router.get("/jobs/{job_id}/sprites")
@@ -4529,9 +5275,28 @@ def get_timeline(job_id: str) -> dict:
     timeline = _read_json(_job_dir(job_id) / "timeline.json", None)
     if not timeline:
         raise HTTPException(400, "Not ready yet.")
-    keep = ("actions", "frames", "cues", "pops", "extras", "effects", "auto_chars", "layouts", "lie", "fps", "format", "size", "width", "height",
+    keep = ("actions", "frames", "cues", "pops", "extras", "effects", "screens", "inserts", "auto_chars", "layouts", "lie", "fps", "format", "size", "width", "height",
             "feetY", "geometry", "scenes", "subtitles")
-    return {**{k: timeline.get(k) for k in keep}, "character_ids": job.get("character_ids", [])}
+    out = {**{k: timeline.get(k) for k in keep}, "character_ids": job.get("character_ids", [])}
+    for ins in out.get("inserts") or []:
+        ins["url"] = f"/api/animator/jobs/{job_id}/insert/{ins['dir']}/"
+    try:  # add-on packs: outfits and the looks of side characters (2026-11-19)
+        import tools_planner
+        out["pack"] = tools_planner.player_pack()
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+@router.get("/jobs/{job_id}/insert/{d}/{k}")
+def insert_frame(job_id: str, d: str, k: str):
+    from fastapi.responses import FileResponse
+    if not re.fullmatch(r"\d{2}", d) or not re.fullmatch(r"\d{4}\.png", k):
+        raise HTTPException(404, "No such picture.")
+    p = _job_dir(job_id) / "inserts" / d / k
+    if not p.exists():
+        raise HTTPException(404, "No such picture.")
+    return FileResponse(p, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
 
 
 @router.get("/jobs/{job_id}/audio")
@@ -4717,6 +5482,67 @@ try:
     router.routes.extend(_tools_studio.router.routes)
 except Exception as _exc:  # noqa: BLE001
     print("Studio presenter not loaded:", _exc)
+# Topic Research Lab + New Channel Wizard (2026-11-19).
+try:
+    import tools_research as _tools_research  # noqa: E402
+    router.routes.extend(_tools_research.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Research tools not loaded:", _exc)
+# Channel Doctor + CPM estimates (2026-11-19).
+try:
+    import tools_doctor as _tools_doctor  # noqa: E402
+    router.routes.extend(_tools_doctor.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Channel Doctor not loaded:", _exc)
+# Visual Explainer (2026-11-19).
+try:
+    import tools_visual as _tools_visual  # noqa: E402
+    router.routes.extend(_tools_visual.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Visual Explainer not loaded:", _exc)
+# Visual Explainer — Script mode: the user's own AI-written scene code (2026-11-20).
+try:
+    import tools_script as _tools_script  # noqa: E402
+    router.routes.extend(_tools_script.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Script mode not loaded:", _exc)
+# Visual Explainer — whole-video preview + "fix this part" (2026-11-20).
+try:
+    import tools_preview as _tools_preview  # noqa: E402
+    router.routes.extend(_tools_preview.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Preview not loaded:", _exc)
+# Auto Video — Script mode: the user's AI plans the footage of every scene (2026-11-20).
+try:
+    import tools_avscript as _tools_avscript  # noqa: E402
+    router.routes.extend(_tools_avscript.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Auto Video script mode not loaded:", _exc)
+# My Videos — every tool's videos in one list, with delete to free the disk (2026-11-20).
+try:
+    import tools_library as _tools_library  # noqa: E402
+    router.routes.extend(_tools_library.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("My Videos not loaded:", _exc)
+# Motion graphics engine status / install (2026-11-19).
+try:
+    import tools_graphics as _tools_graphics  # noqa: E402
+    router.routes.extend(_tools_graphics.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Motion graphics not loaded:", _exc)
+# Script Planner + add-on packs (2026-11-19).
+try:
+    import tools_planner as _tools_planner  # noqa: E402
+    router.routes.extend(_tools_planner.router.routes)
+    _tools_planner.apply_sounds()
+except Exception as _exc:  # noqa: BLE001
+    print("Script Planner not loaded:", _exc)
+# Dashboard settings kept on this computer (Colab voice link…) (2026-11-19).
+try:
+    import tools_config as _tools_config  # noqa: E402
+    router.routes.extend(_tools_config.router.routes)
+except Exception as _exc:  # noqa: BLE001
+    print("Dashboard settings not loaded:", _exc)
 
 
 # A video that was being made when the app was closed / restarted (user,
@@ -4736,3 +5562,4 @@ def _recover_interrupted_jobs() -> None:
 
 
 _recover_interrupted_jobs()
+threading.Timer(4.0, _queue_next).start()  # waiting videos carry on after a restart

@@ -137,6 +137,13 @@ def world_score(text: str, d: dict) -> float:
     """How well a place description fits a saved world (0 = not at all)."""
     low = f" {str(text or '').lower()} "
     nm = str(d.get("name", "")).strip().lower()
+    if d.get("exact_place"):
+        # a place made for ONE script's scene (Script Planner): only that exact place text
+        # ("river" never takes over "jungle by the river")
+        t = re.sub(r"\s+", " ", low).strip()
+        if t == nm or (t.endswith(" " + nm) and " " not in t[: -len(nm) - 1].strip()):
+            return 100 + len(nm)
+        return 0
     if len(nm) >= 3 and re.search(r"(?<![a-z0-9])" + re.escape(nm) + r"(?![a-z0-9])", low):
         return 100 + len(nm)  # its exact name
     t = _tokens(text)
@@ -297,6 +304,8 @@ def _clean(doc: dict, name: str) -> dict:
         extra["room"] = {k: v for k, v in doc["room"].items() if isinstance(v, (int, float, bool, str))}
     if doc.get("fresh") is True:
         extra["fresh"] = True
+    if doc.get("exact_place") is True:
+        extra["exact_place"] = True
     if isinstance(doc.get("recipe"), dict) and len(json.dumps(doc["recipe"])) < 60000:
         extra["recipe"] = doc["recipe"]
     return {

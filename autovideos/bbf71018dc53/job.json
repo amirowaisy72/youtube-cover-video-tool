@@ -1,0 +1,1666 @@
+{
+  "id": "bbf71018dc53",
+  "status": "done",
+  "phase": "done",
+  "stage": "done",
+  "progress": 100,
+  "title": "5 Ways People Will Make Money From GTA 6 (Start Now)",
+  "minutes": 2,
+  "visuals": "both",
+  "video_type": "long",
+  "short_seconds": 60,
+  "voice": "en-GB-RyanNeural",
+  "tts_provider": "edge",
+  "job_token": "eyJhY3Rpb24iOiJhdXRvdmlkZW8iLCJjcmVkaXRzIjoxLCJjdXN0b21lcl9pZCI6IjUyNGI5MWE3NjM0ZSIsImV4cCI6MTc5NTEyNzgzMy4wNTIzMjY3LCJqb2JfcmVmIjoiYmJmNzEwMThkYzUzIiwibm9uY2UiOiJiNGU5ZjJmNjBlNGM2NTNlIn0=.192e2f23b52f0e5dead9acec13caadd7e535cde8b0398f16b75d6cd071ca0da4",
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use the same launch to fill their bank accounts. Which side of that trade do you want to be on?",
+      "visual": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use the same launch to fill their bank accounts.",
+      "caption": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-00-script-27275.mp4",
+      "visual_url": "",
+      "duration_sec": 10.4,
+      "keywords": [
+        "gamers",
+        "spend",
+        "hundreds",
+        "dollars",
+        "gta",
+        "week",
+        "smaller",
+        "group"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-00-script-27275.mp4",
+      "code": "crowd1 = thing(\"crowd\", x=-3.6, h=2.8, count=5, color=\"blue\")\nwallet1 = thing(\"wallet\", x=3.2, h=2.6, color=\"gold\")\nenter(crowd1, \"left\", dur=0.7)\nwhen(\"Most gamers\")\nenter(wallet1, \"right\", dur=0.7)\nflow(crowd1, wallet1, item=\"coin\", n=8)\nwhen(\"of dollars on GTA 6 this week, while a much smaller group will quietly use\")\nbadge(\"GAME LAUNCH\")\ng6_icon = VGroup(\n    RoundedRectangle(width=1.7, height=1.1, corner_radius=0.2, color=PINK, fill_color=PURPLE, fill_opacity=0.9),\n    Text(\"6\", font=FONT, color=GOLD).scale(0.85)\n).move_to((0.0, 2.5, 0))\nplay(GrowFromCenter(g6_icon), run_time=0.5, sound=\"pop\")\nclear()\nbank1 = thing(\"bank\", x=3.2, h=3.4, color=\"teal\")\nperson1 = thing(\"person\", x=-3.4, h=3.2, color=\"orange\")\nenter(person1, \"pop\", dur=0.6)\nenter(bank1, \"grow\", dur=0.8)\nflow(person1, bank1, item=\"coin\", n=8)\nwhen(\"Which side\")\npulse(person1)\npulse(bank1)\n",
+      "pv_file": "scene-00-preview-53093d497f09.mp4",
+      "pv_dur": 10.4,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.44,
+          "text": "Most gamers will spend hundreds"
+        },
+        {
+          "start": 1.44,
+          "end": 2.96,
+          "text": "of dollars on GTA 6"
+        },
+        {
+          "start": 2.96,
+          "end": 4.22,
+          "text": "this week, while a much"
+        },
+        {
+          "start": 4.22,
+          "end": 5.7,
+          "text": "smaller group will quietly use"
+        },
+        {
+          "start": 5.7,
+          "end": 6.74,
+          "text": "the same launch to fill"
+        },
+        {
+          "start": 6.74,
+          "end": 7.74,
+          "text": "their bank accounts."
+        },
+        {
+          "start": 8.22,
+          "end": 9.24,
+          "text": "Which side of that trade"
+        },
+        {
+          "start": 9.24,
+          "end": 9.84,
+          "text": "do you want to be"
+        },
+        {
+          "start": 9.84,
+          "end": 10.14,
+          "text": "on?"
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128245.303925
+      }
+    },
+    {
+      "index": 1,
+      "narration": "Since GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue. Now that GTA 6 has finally arrived on November 19, 2026, an even bigger wave of attention and money is moving across the globe.",
+      "visual": "Since GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue.",
+      "caption": "Since GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-01-script-27280.mp4",
+      "visual_url": "",
+      "duration_sec": 17.1,
+      "keywords": [
+        "since",
+        "gta",
+        "launched",
+        "2013",
+        "sold",
+        "235",
+        "million",
+        "copies"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-01-script-27280.mp4",
+      "code": "game_box = thing(\"game_case\", x=-3.5, h=3.2, color=\"purple\")\nenter(game_box, \"grow\", dur=0.7)\nwhen(\"235 million\")\nn2 = text(\"0 million\", x=-3.5, y=2.6, size=0.95, style=\"number\", color=\"gold\")\nadd(n2)\ncount(n2, to=235, frm=0, suffix=\" million\", dur=1.3)\nwhen(\"$10 billion\")\nrev2 = text(\"$0 billion\", x=2.6, y=2.6, size=0.95, style=\"number\", color=\"green\")\npile(\"gold_bar\", n=8, x=2.6, size=0.7)\nadd(rev2)\ncount(rev2, to=10, frm=0, prefix=\"$\", suffix=\" billion\", dur=1.3)\nwhen(\"November 19, 2026\")\nclear()\nglobe2 = thing(\"globe\", x=0, h=3.5, color=\"blue\")\nenter(globe2, \"pop\", dur=0.7)\nbadge(\"NOV 19, 2026\")\nclone(globe2, n=4)\n",
+      "pv_file": "scene-01-preview-dd8617f7fb48.mp4",
+      "pv_dur": 17.1,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.7,
+          "text": "Since GTA 5 launched in"
+        },
+        {
+          "start": 1.7,
+          "end": 4.56,
+          "text": "2013, it has sold 235"
+        },
+        {
+          "start": 4.56,
+          "end": 6.06,
+          "text": "million copies and brought in"
+        },
+        {
+          "start": 6.06,
+          "end": 7.92,
+          "text": "over $10 billion in revenue."
+        },
+        {
+          "start": 8.86,
+          "end": 10.26,
+          "text": "Now that GTA 6 has"
+        },
+        {
+          "start": 10.26,
+          "end": 12.02,
+          "text": "finally arrived on November 19,"
+        },
+        {
+          "start": 12.5,
+          "end": 14.54,
+          "text": "2026, an even bigger wave"
+        },
+        {
+          "start": 14.54,
+          "end": 15.72,
+          "text": "of attention and money is"
+        },
+        {
+          "start": 15.72,
+          "end": 16.88,
+          "text": "moving across the globe."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128338.191754
+      }
+    },
+    {
+      "index": 2,
+      "narration": "When millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets. If you position yourself early, you can capture a slice of that flow instead of just paying for it.",
+      "visual": "When millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets.",
+      "caption": "When millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-02-script-27290.mp4",
+      "visual_url": "",
+      "duration_sec": 10.8,
+      "keywords": [
+        "millions",
+        "players",
+        "rush",
+        "toward",
+        "massive",
+        "entertainment",
+        "launch",
+        "cash"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-02-script-27290.mp4",
+      "code": "crowd3 = thing(\"crowd\", x=-4.2, h=2.6, count=5, color=\"teal\")\nenter(crowd3, \"left\", dur=0.7)\nwhen(\"cash flows into five distinct buckets. If you position yourself early,\")\nb1 = thing(\"box\", x=-1.4, y=2.2, h=1.6, color=\"orange\")\nb2 = thing(\"box\", x=0.2, y=2.2, h=1.6, color=\"gold\")\nb3 = thing(\"box\", x=1.8, y=2.2, h=1.6, color=\"blue\")\nb4 = thing(\"box\", x=3.4, y=2.2, h=1.6, color=\"purple\")\nb5 = thing(\"box\", x=5.0, y=2.2, h=1.6, color=\"green\")\nenter(b1, \"top\", dur=0.4)\nenter(b2, \"top\", dur=0.4)\nenter(b3, \"top\", dur=0.4)\nenter(b4, \"top\", dur=0.4)\nenter(b5, \"top\", dur=0.4)\nwhen(\"capture a slice\")\nexit(b2)\npie3 = thing(\"pie\", x=4.6, h=2.4, share=0.25, color=\"gold\")\nenter(pie3, \"pop\", dur=0.5)\npulse(pie3)\n",
+      "pv_file": "scene-02-preview-28721be81244.mp4",
+      "pv_dur": 10.8,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.44,
+          "text": "When millions of players rush"
+        },
+        {
+          "start": 1.44,
+          "end": 3.28,
+          "text": "toward one massive entertainment launch,"
+        },
+        {
+          "start": 3.64,
+          "end": 5.12,
+          "text": "cash flows into five distinct"
+        },
+        {
+          "start": 5.12,
+          "end": 5.56,
+          "text": "buckets."
+        },
+        {
+          "start": 6.12,
+          "end": 7.44,
+          "text": "If you position yourself early,"
+        },
+        {
+          "start": 7.74,
+          "end": 8.74,
+          "text": "you can capture a slice"
+        },
+        {
+          "start": 8.74,
+          "end": 9.8,
+          "text": "of that flow instead of"
+        },
+        {
+          "start": 9.8,
+          "end": 10.68,
+          "text": "just paying for it."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128450.0917928
+      }
+    },
+    {
+      "index": 3,
+      "narration": "The first way is owning pieces of the companies behind the screen. Rockstar Games is owned by Take-Two Interactive, a public company traded under the ticker TTWO.",
+      "visual": "The first way is owning pieces of the companies behind the screen.",
+      "caption": "The first way is owning pieces of the companies behind the screen.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-03-script-27295.mp4",
+      "visual_url": "",
+      "duration_sec": 8.5,
+      "keywords": [
+        "owning",
+        "pieces",
+        "companies",
+        "screen",
+        "rockstar",
+        "games",
+        "owned",
+        "interactive"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-03-script-27295.mp4",
+      "code": "building4 = thing(\"building\", x=-3.2, h=3.2, color=\"blue\")\nenter(building4, \"grow\", dur=0.8)\nwhen(\"Rockstar Games\")\nbadge(\"ROCKSTAR GAMES\")\nwhen(\"Take-Two Interactive\")\nswap(building4, name=\"bank\")\nt4 = text(\"TTWO\", x=2.6, y=2.5, size=1.05, style=\"title\", color=\"teal\")\nenter(t4, \"pop\", dur=0.6)\npulse(t4)\n",
+      "pv_file": "scene-03-preview-b7e84f37e68a.mp4",
+      "pv_dur": 8.5,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.2,
+          "text": "The first way is owning"
+        },
+        {
+          "start": 1.2,
+          "end": 2.58,
+          "text": "pieces of the companies behind"
+        },
+        {
+          "start": 2.58,
+          "end": 3.32,
+          "text": "the screen."
+        },
+        {
+          "start": 3.82,
+          "end": 5.04,
+          "text": "Rockstar Games is owned by"
+        },
+        {
+          "start": 5.04,
+          "end": 7.06,
+          "text": "Take-Two Interactive, a public company"
+        },
+        {
+          "start": 7.06,
+          "end": 8.5,
+          "text": "traded under the ticker TTWO."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128582.5609627
+      }
+    },
+    {
+      "index": 4,
+      "narration": "When a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term value. You do not need to buy a whole factory\u2014buying even one share or a gaming index fund lets coins flow toward you as sales grow.",
+      "visual": "When a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term value.",
+      "caption": "When a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-04-script-27300.mp4",
+      "visual_url": "",
+      "duration_sec": 13.7,
+      "keywords": [
+        "game",
+        "sells",
+        "tens",
+        "millions",
+        "copies",
+        "profits",
+        "flow",
+        "parent"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-04-script-27300.mp4",
+      "code": "chart5 = thing(\"line_chart\", x=-3.2, h=3.2, points=[0.3, 0.5, 0.8, 1.3, 2.0], color=\"green\")\nenter(chart5, \"draw\", dur=0.8)\nwhen(\"profits flow back\")\ngrow(chart5, k=1.4, axis=\"y\")\nwhen(\"buying even one share\")\nperson5 = thing(\"person\", x=3.2, h=3.2, color=\"teal\")\nenter(person5, \"pop\", dur=0.6)\ngive(chart5, to=person5, label=\"1 share\")\nwhen(\"coins flow\")\nflow(chart5, person5, item=\"coin\", n=8)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127502.6940882
+      },
+      "pv_file": "scene-04-preview-994b06f8c2f3.mp4",
+      "pv_dur": 13.7,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.2,
+          "text": "When a game sells tens"
+        },
+        {
+          "start": 1.2,
+          "end": 2.86,
+          "text": "of millions of copies, profits"
+        },
+        {
+          "start": 2.86,
+          "end": 3.96,
+          "text": "flow back to the parent"
+        },
+        {
+          "start": 3.96,
+          "end": 5.56,
+          "text": "company and lift its long-term"
+        },
+        {
+          "start": 5.56,
+          "end": 6.14,
+          "text": "value."
+        },
+        {
+          "start": 7.04,
+          "end": 7.7,
+          "text": "You do not need to"
+        },
+        {
+          "start": 7.7,
+          "end": 9.62,
+          "text": "buy a whole factory\u2014buying even"
+        },
+        {
+          "start": 9.62,
+          "end": 10.62,
+          "text": "one share or a gaming"
+        },
+        {
+          "start": 10.62,
+          "end": 12.1,
+          "text": "index fund lets coins flow"
+        },
+        {
+          "start": 12.1,
+          "end": 13.5,
+          "text": "toward you as sales grow."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 5,
+      "narration": "Keep in mind that stock prices often jump before release day and swing wildly right after launch. Smart investors buy steadily over time instead of chasing hype on a single morning.",
+      "visual": "Keep in mind that stock prices often jump before release day and swing wildly right after launch.",
+      "caption": "Keep in mind that stock prices often jump before release day and swing wildly right after launch.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-05-script-27369.mp4",
+      "visual_url": "",
+      "duration_sec": 10.3,
+      "keywords": [
+        "stock",
+        "prices",
+        "jump",
+        "before",
+        "release",
+        "swing",
+        "wildly",
+        "right"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-05-script-27369.mp4",
+      "code": "chart6 = thing(\"line_chart\", x=0, h=3.4, points=[0.8, 1.6, 0.7, 1.8, 1.1, 1.5], color=\"gold\")\nenter(chart6, \"draw\", dur=0.8)\nwhen(\"swing wildly\")\nshake(chart6)\nwhen(\"buy steadily\")\nclear()\ncoin6 = thing(\"coin\", x=-2.2, h=1.2, color=\"gold\")\ncalendar6 = thing(\"calendar\", x=2.8, h=2.8, color=\"blue\")\nenter(calendar6, \"pop\", dur=0.6)\nenter(coin6, \"pop\", dur=0.5)\nflow(coin6, calendar6, item=\"coin\", n=8)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127506.6338375
+      },
+      "pv_file": "scene-05-preview-d4ec4d78c412.mp4",
+      "pv_dur": 10.3,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.1,
+          "text": "Keep in mind that stock"
+        },
+        {
+          "start": 1.1,
+          "end": 2.7,
+          "text": "prices often jump before release"
+        },
+        {
+          "start": 2.7,
+          "end": 4.32,
+          "text": "day and swing wildly right"
+        },
+        {
+          "start": 4.32,
+          "end": 5.12,
+          "text": "after launch."
+        },
+        {
+          "start": 6.14,
+          "end": 7.72,
+          "text": "Smart investors buy steadily over"
+        },
+        {
+          "start": 7.72,
+          "end": 9.14,
+          "text": "time instead of chasing hype"
+        },
+        {
+          "start": 9.14,
+          "end": 10.1,
+          "text": "on a single morning."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 6,
+      "narration": "The second way is building content around the massive wave of search traffic. Every time players get stuck on a mission, look for hidden cars, or compare console settings, they open YouTube, TikTok, or search engines.",
+      "visual": "The second way is building content around the massive wave of search traffic.",
+      "caption": "The second way is building content around the massive wave of search traffic.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-06-script-27308.mp4",
+      "visual_url": "",
+      "duration_sec": 12.4,
+      "keywords": [
+        "building",
+        "content",
+        "massive",
+        "wave",
+        "search",
+        "traffic",
+        "players",
+        "stuck"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-06-script-27308.mp4",
+      "code": "crowd7 = thing(\"crowd\", x=-3.8, h=2.8, count=5, color=\"blue\")\nenter(crowd7, \"left\", dur=0.7)\nwhen(\"hidden cars\")\ncar7 = thing(\"car\", x=0.8, h=2.2, color=\"red\")\nmagnifier7 = thing(\"magnifier\", x=4.0, h=2.4, color=\"gold\")\nenter(car7, \"pop\", dur=0.5)\nenter(magnifier7, \"pop\", dur=0.5)\nwhen(\"YouTube, TikTok\")\nclear()\ntv7 = thing(\"tv\", x=-3.2, h=3.0, color=\"red\")\nphone7 = thing(\"phone\", x=0.2, h=2.8, color=\"pink\")\nmag7 = thing(\"magnifier\", x=3.4, h=2.8, color=\"teal\")\nenter(tv7, \"grow\", dur=0.5)\nenter(phone7, \"grow\", dur=0.5)\nenter(mag7, \"grow\", dur=0.5)\n",
+      "pv_file": "scene-06-preview-a9143990459e.mp4",
+      "pv_dur": 12.4,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.24,
+          "text": "The second way is building"
+        },
+        {
+          "start": 1.24,
+          "end": 2.68,
+          "text": "content around the massive wave"
+        },
+        {
+          "start": 2.68,
+          "end": 3.72,
+          "text": "of search traffic."
+        },
+        {
+          "start": 4.06,
+          "end": 5.38,
+          "text": "Every time players get stuck"
+        },
+        {
+          "start": 5.38,
+          "end": 6.46,
+          "text": "on a mission, look for"
+        },
+        {
+          "start": 6.46,
+          "end": 8.34,
+          "text": "hidden cars, or compare console"
+        },
+        {
+          "start": 8.34,
+          "end": 10.66,
+          "text": "settings, they open YouTube, TikTok,"
+        },
+        {
+          "start": 11.14,
+          "end": 11.98,
+          "text": "or search engines."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127827.4643223
+      }
+    },
+    {
+      "index": 7,
+      "narration": "Each view places small ads next to those guides, turning viewer attention into monthly ad payouts. For example, say a beginner guide channel gets 100,000 views in a month\u2014at a $5 ad rate, that equals $500 from one helpful video.",
+      "visual": "Each view places small ads next to those guides, turning viewer attention into monthly ad payouts.",
+      "caption": "Each view places small ads next to those guides, turning viewer attention into monthly ad payouts.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-07-script-27312.mp4",
+      "visual_url": "",
+      "duration_sec": 14.6,
+      "keywords": [
+        "view",
+        "places",
+        "ads",
+        "guides",
+        "turning",
+        "viewer",
+        "attention",
+        "monthly"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-07-script-27312.mp4",
+      "code": "tv8 = thing(\"tv\", x=-3.5, h=3.0, color=\"teal\")\nenter(tv8, \"pop\", dur=0.7)\nwhen(\"monthly ad payouts\")\nv8 = text(\"0 views\", x=1.5, y=2.5, size=0.95, style=\"number\", color=\"blue\")\nadd(v8)\ncount(v8, to=100000, frm=0, suffix=\" views\", dur=1.3)\nwhen(\"$500 from one\")\np8 = text(\"$0\", x=1.5, y=0.6, size=1.15, style=\"number\", color=\"gold\")\npile(\"coin\", n=8, x=1.5, size=0.6)\nadd(p8)\ncount(p8, to=500, frm=0, prefix=\"$\", dur=1.3)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127517.5469136
+      },
+      "pv_file": "scene-07-preview-9dec49b57656.mp4",
+      "pv_dur": 14.6,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.54,
+          "text": "Each view places small ads"
+        },
+        {
+          "start": 1.54,
+          "end": 3.08,
+          "text": "next to those guides, turning"
+        },
+        {
+          "start": 3.08,
+          "end": 4.9,
+          "text": "viewer attention into monthly ad"
+        },
+        {
+          "start": 4.9,
+          "end": 5.5,
+          "text": "payouts."
+        },
+        {
+          "start": 5.96,
+          "end": 7.36,
+          "text": "For example, say a beginner"
+        },
+        {
+          "start": 7.36,
+          "end": 9.52,
+          "text": "guide channel gets 100,000 views"
+        },
+        {
+          "start": 9.52,
+          "end": 10.96,
+          "text": "in a month\u2014at a $5"
+        },
+        {
+          "start": 10.96,
+          "end": 12.84,
+          "text": "ad rate, that equals $500"
+        },
+        {
+          "start": 12.84,
+          "end": 14.42,
+          "text": "from one helpful video."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 8,
+      "narration": "You do not even need to show your face or own the newest console to start. Clipping news updates, mapping out Vice City locations, or breaking down game mechanics works from a simple laptop.",
+      "visual": "You do not even need to show your face or own the newest console to start.",
+      "caption": "You do not even need to show your face or own the newest console to start.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-08-script-27322.mp4",
+      "visual_url": "",
+      "duration_sec": 11.1,
+      "keywords": [
+        "show",
+        "face",
+        "own",
+        "newest",
+        "console",
+        "clipping",
+        "news",
+        "updates"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-08-script-27322.mp4",
+      "code": "laptop9 = thing(\"laptop\", x=0, h=3.2, color=\"slate\")\nenter(laptop9, \"grow\", dur=0.7)\nwhen(\"Vice City locations\")\nmap9 = thing(\"map\", x=-3.5, h=2.8, color=\"green\")\nenter(map9, \"left\", dur=0.6)\nbadge(\"VICE CITY\")\nwhen(\"simple laptop\")\npulse(laptop9)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127512.434872
+      },
+      "pv_file": "scene-08-preview-4bf29bfeba3e.mp4",
+      "pv_dur": 11.1,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.02,
+          "text": "You do not even need"
+        },
+        {
+          "start": 1.02,
+          "end": 2.02,
+          "text": "to show your face or"
+        },
+        {
+          "start": 2.02,
+          "end": 3.26,
+          "text": "own the newest console to"
+        },
+        {
+          "start": 3.26,
+          "end": 3.88,
+          "text": "start."
+        },
+        {
+          "start": 4.66,
+          "end": 6.5,
+          "text": "Clipping news updates, mapping out"
+        },
+        {
+          "start": 6.5,
+          "end": 8.46,
+          "text": "Vice City locations, or breaking"
+        },
+        {
+          "start": 8.46,
+          "end": 10.02,
+          "text": "down game mechanics works from"
+        },
+        {
+          "start": 10.02,
+          "end": 10.74,
+          "text": "a simple laptop."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 9,
+      "narration": "The third way is selling digital tools, servers, and custom mods to the player community. In GTA 5, thousands of creators earned full-time incomes building custom roleplay servers, car designs, and scripts for online worlds.",
+      "visual": "The third way is selling digital tools, servers, and custom mods to the player community.",
+      "caption": "The third way is selling digital tools, servers, and custom mods to the player community.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-09-script-27325.mp4",
+      "visual_url": "",
+      "duration_sec": 13.7,
+      "keywords": [
+        "third",
+        "selling",
+        "digital",
+        "tools",
+        "servers",
+        "custom",
+        "mods",
+        "player"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-09-script-27325.mp4",
+      "code": "person10 = thing(\"person\", x=-3.4, h=3.2, color=\"orange\")\nenter(person10, \"pop\", dur=0.7)\nwhen(\"roleplay servers\")\ngear10 = thing(\"gear\", x=2.8, h=3.0, color=\"purple\")\nenter(gear10, \"grow\", dur=0.7)\nplay(Rotate(gear10, angle=3.14), run_time=1.0, sound=\"whoosh\")\nwhen(\"full-time incomes\")\nbag10 = thing(\"money_bag\", x=3.2, h=2.8, color=\"gold\")\nswap(gear10, name=\"money_bag\")\npulse(bag10)\nwhen(\"custom roleplay servers, car designs, and scripts for online worlds.\")\ncar10 = thing(\"car\", x=0.0, h=2.0, color=\"red\")\ndoc10 = thing(\"document\", x=3.4, h=2.5, color=\"teal\")\nenter(car10, \"right\", dur=0.5)\nenter(doc10, \"pop\", dur=0.5)\npulse(car10)\n",
+      "pv_file": "scene-09-preview-d650d0589fbb.mp4",
+      "pv_dur": 13.7,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.22,
+          "text": "The third way is selling"
+        },
+        {
+          "start": 1.22,
+          "end": 3.52,
+          "text": "digital tools, servers, and custom"
+        },
+        {
+          "start": 3.52,
+          "end": 4.92,
+          "text": "mods to the player community."
+        },
+        {
+          "start": 5.52,
+          "end": 7.18,
+          "text": "In GTA 5, thousands of"
+        },
+        {
+          "start": 7.18,
+          "end": 9.18,
+          "text": "creators earned full-time incomes building"
+        },
+        {
+          "start": 9.18,
+          "end": 11.6,
+          "text": "custom roleplay servers, car designs,"
+        },
+        {
+          "start": 11.94,
+          "end": 13.44,
+          "text": "and scripts for online worlds."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128726.5884569
+      }
+    },
+    {
+      "index": 10,
+      "narration": "As GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps, clothing packs, and in-game scripts. One digital file built once can be sold to hundreds of server admins over and over.",
+      "visual": "As GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps, clothing packs, and in-game scripts.",
+      "caption": "As GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps,\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-10-script-27329.mp4",
+      "visual_url": "",
+      "duration_sec": 13.2,
+      "keywords": [
+        "gta",
+        "rolls",
+        "online",
+        "multiplayer",
+        "ecosystem",
+        "server",
+        "owners",
+        "pay"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-10-script-27329.mp4",
+      "code": "doc11 = thing(\"document\", x=-3.2, h=3.0, color=\"blue\")\nenter(doc11, \"pop\", dur=0.7)\nwhen(\"custom maps\")\ngear11 = thing(\"gear\", x=0.4, h=2.6, color=\"teal\")\nenter(gear11, \"grow\", dur=0.6)\nwhen(\"hundreds of server admins\")\nclone(doc11, n=5)\nflow(doc11, gear11, item=\"coin\", n=8)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127521.5441306
+      },
+      "pv_file": "scene-10-preview-a09a13b56b24.mp4",
+      "pv_dur": 13.2,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.62,
+          "text": "As GTA 6 rolls out"
+        },
+        {
+          "start": 1.62,
+          "end": 3.94,
+          "text": "its online multiplayer ecosystem, server"
+        },
+        {
+          "start": 3.94,
+          "end": 5.38,
+          "text": "owners will pay designers for"
+        },
+        {
+          "start": 5.38,
+          "end": 7.46,
+          "text": "custom maps, clothing packs, and"
+        },
+        {
+          "start": 7.46,
+          "end": 8.28,
+          "text": "in-game scripts."
+        },
+        {
+          "start": 8.88,
+          "end": 10.3,
+          "text": "One digital file built once"
+        },
+        {
+          "start": 10.3,
+          "end": 11.3,
+          "text": "can be sold to hundreds"
+        },
+        {
+          "start": 11.3,
+          "end": 12.78,
+          "text": "of server admins over and"
+        },
+        {
+          "start": 12.78,
+          "end": 13.02,
+          "text": "over."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 11,
+      "narration": "The fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle. Because GTA 6 launched on PlayStation 5 and Xbox Series consoles before PC, millions of players are upgrading controllers, headsets, and desks right now.",
+      "visual": "The fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle.",
+      "caption": "The fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-11-script-27415.mp4",
+      "visual_url": "",
+      "duration_sec": 15.4,
+      "keywords": [
+        "fourth",
+        "selling",
+        "physical",
+        "gear",
+        "setup",
+        "upgrades",
+        "gamers",
+        "buy"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-11-script-27415.mp4",
+      "code": "console12 = thing(\"console\", x=-3.5, h=3.0, color=\"blue\")\nenter(console12, \"grow\", dur=0.7)\nwhen(\"PlayStation 5 and Xbox\")\nbadge(\"PS5\")\npulse(console12)\nwhen(\"controllers, headsets\")\nctrl12 = thing(\"controller\", x=-0.2, h=2.2, color=\"teal\")\nheadset12 = thing(\"headset\", x=2.6, h=2.6, color=\"orange\")\nenter(ctrl12, \"pop\", dur=0.5)\nenter(headset12, \"right\", dur=0.6)\nwhen(\"and desks right now\")\nclear()\ncrowd12 = thing(\"crowd\", x=-3.5, h=2.6, count=5, color=\"purple\")\nshop12 = thing(\"shop\", x=2.8, h=3.2, color=\"gold\")\nenter(crowd12, \"left\", dur=0.6)\nenter(shop12, \"grow\", dur=0.7)\nflow(crowd12, shop12, item=\"coin\", n=8)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127522.10303
+      },
+      "pv_file": "scene-11-preview-6ab0e2e06aaa.mp4",
+      "pv_dur": 15.4,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.24,
+          "text": "The fourth way is selling"
+        },
+        {
+          "start": 1.24,
+          "end": 3.0,
+          "text": "physical gear and setup upgrades"
+        },
+        {
+          "start": 3.0,
+          "end": 4.46,
+          "text": "that gamers buy during a"
+        },
+        {
+          "start": 4.46,
+          "end": 5.54,
+          "text": "major console cycle."
+        },
+        {
+          "start": 6.02,
+          "end": 7.56,
+          "text": "Because GTA 6 launched on"
+        },
+        {
+          "start": 7.56,
+          "end": 9.42,
+          "text": "PlayStation 5 and Xbox Series"
+        },
+        {
+          "start": 9.42,
+          "end": 11.6,
+          "text": "consoles before PC, millions of"
+        },
+        {
+          "start": 11.6,
+          "end": 13.96,
+          "text": "players are upgrading controllers, headsets,"
+        },
+        {
+          "start": 14.2,
+          "end": 15.18,
+          "text": "and desks right now."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 12,
+      "narration": "You do not need to manufacture electronics in a warehouse to profit from that shopping spree. Through affiliate links on review pages or social posts, stores pay you a 3% to 8% commission every time someone buys through your link.",
+      "visual": "You do not need to manufacture electronics in a warehouse to profit from that shopping spree.",
+      "caption": "You do not need to manufacture electronics in a warehouse to profit from that shopping spree.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-12-script-27338.mp4",
+      "visual_url": "",
+      "duration_sec": 12.3,
+      "keywords": [
+        "manufacture",
+        "electronics",
+        "warehouse",
+        "shopping",
+        "spree",
+        "affiliate",
+        "links",
+        "review"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-12-script-27338.mp4",
+      "code": "link13 = thing(\"link\", x=-3.0, h=2.6, color=\"teal\")\nenter(link13, \"pop\", dur=0.7)\nwhen(\"Through affiliate links on review pages or social posts, stores pay you a 3% to\")\nshop13 = thing(\"shop\", x=0.3, h=2.6, color=\"blue\")\nenter(shop13, \"right\", dur=0.6)\nrate13 = text(\"3% - 8%\", x=3.2, y=2.2, size=1.1, style=\"number\", color=\"gold\")\nadd(rate13)\npulse(rate13)\nwhen(\"every time someone buys\")\npile(\"coin\", n=8, x=3.2, size=0.65)\n",
+      "pv_file": "scene-12-preview-257feb739835.mp4",
+      "pv_dur": 12.3,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 0.88,
+          "text": "You do not need to"
+        },
+        {
+          "start": 0.88,
+          "end": 2.68,
+          "text": "manufacture electronics in a warehouse"
+        },
+        {
+          "start": 2.68,
+          "end": 3.88,
+          "text": "to profit from that shopping"
+        },
+        {
+          "start": 3.88,
+          "end": 4.46,
+          "text": "spree."
+        },
+        {
+          "start": 4.78,
+          "end": 6.14,
+          "text": "Through affiliate links on review"
+        },
+        {
+          "start": 6.14,
+          "end": 8.02,
+          "text": "pages or social posts, stores"
+        },
+        {
+          "start": 8.02,
+          "end": 9.2,
+          "text": "pay you a 3% to"
+        },
+        {
+          "start": 9.2,
+          "end": 11.02,
+          "text": "8% commission every time someone"
+        },
+        {
+          "start": 11.02,
+          "end": 12.08,
+          "text": "buys through your link."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128804.5358963
+      }
+    },
+    {
+      "index": 13,
+      "narration": "The fifth way is flipping limited collector items and rare physical editions. Whenever a historic franchise drops after a 13-year wait, special steelbooks, controller bundles, and launch-week merchandise sell out fast in local stores.",
+      "visual": "The fifth way is flipping limited collector items and rare physical editions.",
+      "caption": "The fifth way is flipping limited collector items and rare physical editions.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-13-script-27343.mp4",
+      "visual_url": "",
+      "duration_sec": 13.4,
+      "keywords": [
+        "fifth",
+        "flipping",
+        "limited",
+        "collector",
+        "items",
+        "rare",
+        "physical",
+        "editions"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-13-script-27343.mp4",
+      "code": "box14 = thing(\"box\", x=-3.0, h=3.0, color=\"gold\")\nenter(box14, \"grow\", dur=0.7)\nwhen(\"steelbooks, controller bundles\")\nbadge(\"COLLECTOR EDITION\")\npulse(box14)\nwhen(\"sell out fast\")\nshop14 = thing(\"shop\", x=3.2, h=3.2, color=\"red\")\nenter(shop14, \"right\", dur=0.7)\nmove(box14, to=shop14, side=\"left\", dur=0.9)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127527.1980329
+      },
+      "pv_file": "scene-13-preview-55e17f7f1140.mp4",
+      "pv_dur": 13.4,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.24,
+          "text": "The fifth way is flipping"
+        },
+        {
+          "start": 1.24,
+          "end": 3.02,
+          "text": "limited collector items and rare"
+        },
+        {
+          "start": 3.02,
+          "end": 3.86,
+          "text": "physical editions."
+        },
+        {
+          "start": 4.42,
+          "end": 6.08,
+          "text": "Whenever a historic franchise drops"
+        },
+        {
+          "start": 6.08,
+          "end": 8.02,
+          "text": "after a 13-year wait, special"
+        },
+        {
+          "start": 8.02,
+          "end": 10.32,
+          "text": "steelbooks, controller bundles, and"
+        },
+        {
+          "start": 10.32,
+          "end": 12.2,
+          "text": "launch-week merchandise sell out fast"
+        },
+        {
+          "start": 12.2,
+          "end": 13.04,
+          "text": "in local stores."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 14,
+      "narration": "Buyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later. The key is keeping boxes sealed and never spending rent money on risky inventory.",
+      "visual": "Buyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later.",
+      "caption": "Buyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-14-script-27347.mp4",
+      "visual_url": "",
+      "duration_sec": 11.9,
+      "keywords": [
+        "buyers",
+        "miss",
+        "store",
+        "shelves",
+        "pay",
+        "above",
+        "retail",
+        "price"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-14-script-27347.mp4",
+      "code": "tag15 = thing(\"price_tag\", x=-2.5, h=2.8, text=\"+40%\", color=\"green\")\nenter(tag15, \"pop\", dur=0.7)\nwhen(\"30% to 50% above\")\np15 = text(\"+30% - 50%\", x=2.5, y=2.2, size=1.05, style=\"number\", color=\"gold\")\nadd(p15)\ngrow(tag15, k=1.3, axis=\"y\")\nwhen(\"keeping boxes sealed\")\nclear()\nlock15 = thing(\"lock\", x=0, h=3.2, color=\"blue\")\nenter(lock15, \"pop\", dur=0.7)\npulse(lock15)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127531.5634775
+      },
+      "pv_file": "scene-14-preview-3644d859b0b3.mp4",
+      "pv_dur": 11.9,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.2,
+          "text": "Buyers who miss the store"
+        },
+        {
+          "start": 1.2,
+          "end": 2.98,
+          "text": "shelves often pay 30% to"
+        },
+        {
+          "start": 2.98,
+          "end": 4.94,
+          "text": "50% above retail price on"
+        },
+        {
+          "start": 4.94,
+          "end": 7.24,
+          "text": "resale marketplaces months later."
+        },
+        {
+          "start": 7.84,
+          "end": 9.0,
+          "text": "The key is keeping boxes"
+        },
+        {
+          "start": 9.0,
+          "end": 10.46,
+          "text": "sealed and never spending rent"
+        },
+        {
+          "start": 10.46,
+          "end": 11.56,
+          "text": "money on risky inventory."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 15,
+      "narration": "Notice how all five paths share one simple money rule. Consumers spend cash for instant fun, while builders and investors set up assets before the crowd arrives.",
+      "visual": "Notice how all five paths share one simple money rule.",
+      "caption": "Notice how all five paths share one simple money rule.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-15-script-27352.mp4",
+      "visual_url": "",
+      "duration_sec": 9.9,
+      "keywords": [
+        "five",
+        "paths",
+        "share",
+        "money",
+        "consumers",
+        "spend",
+        "cash",
+        "instant"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-15-script-27352.mp4",
+      "code": "person16a = thing(\"person\", x=-3.5, h=3.2, color=\"red\")\nperson16b = thing(\"person\", x=3.5, h=3.2, color=\"green\")\nenter(person16a, \"left\", dur=0.6)\nenter(person16b, \"right\", dur=0.6)\nwhen(\"Consumers spend cash\")\ncash16 = thing(\"cash\", x=-1.2, h=2.2, color=\"gold\")\nenter(cash16, \"pop\", dur=0.5)\nmove(cash16, to=person16a, side=\"right\", dur=0.8)\nwhen(\"builders and investors\")\nbag16 = thing(\"money_bag\", x=1.2, h=2.8, color=\"gold\")\nenter(bag16, \"grow\", dur=0.6)\nmove(bag16, to=person16b, side=\"left\", dur=0.8)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127532.1731658
+      },
+      "pv_file": "scene-15-preview-6899e51e3418.mp4",
+      "pv_dur": 9.9,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.66,
+          "text": "Notice how all five paths"
+        },
+        {
+          "start": 1.66,
+          "end": 3.44,
+          "text": "share one simple money rule."
+        },
+        {
+          "start": 4.32,
+          "end": 5.72,
+          "text": "Consumers spend cash for instant"
+        },
+        {
+          "start": 5.72,
+          "end": 7.54,
+          "text": "fun, while builders and investors"
+        },
+        {
+          "start": 7.54,
+          "end": 8.9,
+          "text": "set up assets before the"
+        },
+        {
+          "start": 8.9,
+          "end": 9.52,
+          "text": "crowd arrives."
+        }
+      ],
+      "pv_error": ""
+    },
+    {
+      "index": 16,
+      "narration": "You do not have to chase all five at once\u2014pick one lane that matches your budget and skills today. If you have spare savings, research gaming stocks or broad funds; if you have zero cash, start creating helpful guides or digital assets.",
+      "visual": "You do not have to chase all five at once\u2014pick one lane that matches your budget and skills today.",
+      "caption": "You do not have to chase all five at once\u2014pick one lane that matches your budget and skills today.",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-16-script-27356.mp4",
+      "visual_url": "",
+      "duration_sec": 14.1,
+      "keywords": [
+        "chase",
+        "five",
+        "pick",
+        "lane",
+        "matches",
+        "budget",
+        "skills",
+        "spare"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-16-script-27356.mp4",
+      "code": "b17a = thing(\"box\", x=-4.4, h=2.5, color=\"blue\")\nb17b = thing(\"box\", x=-2.2, h=2.5, color=\"teal\")\nb17c = thing(\"box\", x=0.0, h=2.5, color=\"gold\")\nb17d = thing(\"box\", x=2.2, h=2.5, color=\"purple\")\nb17e = thing(\"box\", x=4.4, h=2.5, color=\"orange\")\nenter(b17a, \"pop\", dur=0.4)\nenter(b17b, \"pop\", dur=0.4)\nenter(b17c, \"pop\", dur=0.4)\nenter(b17d, \"pop\", dur=0.4)\nenter(b17e, \"pop\", dur=0.4)\nwhen(\"pick one lane\")\npulse(b17c)\nwhen(\"gaming stocks or broad funds\")\nmove(b17a, to=(-5.2, 1.8), dur=0.35, arc=True)\nmove(b17b, to=(-2.6, -0.4), dur=0.35, arc=True)\nmove(b17c, to=(0.2, 2.0), dur=0.35, arc=True)\nmove(b17d, to=(2.8, -0.6), dur=0.35, arc=True)\nmove(b17e, to=(5.3, 1.7), dur=0.35, arc=True)\nbank17 = thing(\"bank\", x=-3.0, h=3.2, color=\"green\")\nswap(b17a, name=\"bank\")\nwhen(\"start creating helpful guides\")\nlaptop17 = thing(\"laptop\", x=3.0, h=3.0, color=\"purple\")\nswap(b17c, name=\"laptop\")\n",
+      "pv_file": "scene-16-preview-046bab3bcbc2.mp4",
+      "pv_dur": 14.1,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 0.88,
+          "text": "You do not have to"
+        },
+        {
+          "start": 0.88,
+          "end": 2.58,
+          "text": "chase all five at once\u2014pick"
+        },
+        {
+          "start": 2.58,
+          "end": 3.84,
+          "text": "one lane that matches your"
+        },
+        {
+          "start": 3.84,
+          "end": 5.26,
+          "text": "budget and skills today."
+        },
+        {
+          "start": 5.98,
+          "end": 7.2,
+          "text": "If you have spare savings,"
+        },
+        {
+          "start": 7.84,
+          "end": 9.26,
+          "text": "research gaming stocks or broad"
+        },
+        {
+          "start": 9.26,
+          "end": 10.66,
+          "text": "funds; if you have zero"
+        },
+        {
+          "start": 10.66,
+          "end": 12.78,
+          "text": "cash, start creating helpful guides"
+        },
+        {
+          "start": 12.78,
+          "end": 13.86,
+          "text": "or digital assets."
+        }
+      ],
+      "pv_error": "",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795128137.31535
+      }
+    },
+    {
+      "index": 17,
+      "narration": "Every major cultural launch creates a temporary river of money, and the people who prepare early are the ones who get paid. Subscribe to PocketIQ for more simple, bite-sized ways to build smarter money habits.",
+      "visual": "Every major cultural launch creates a temporary river of money, and the people who prepare early are the ones who get paid.",
+      "caption": "Every major cultural launch creates a temporary river of money, and the people who prepare early are the ones\u2026",
+      "kind": "clip",
+      "visual_source": "Your scene code \u2014 tested \u2713 (low-resolution preview; the final video is sharp and has the voice)",
+      "visual_file": "scene-17-script-27360.mp4",
+      "visual_url": "",
+      "duration_sec": 11.4,
+      "keywords": [
+        "major",
+        "cultural",
+        "launch",
+        "creates",
+        "temporary",
+        "river",
+        "money",
+        "prepare"
+      ],
+      "plan": {
+        "presenter": false
+      },
+      "shots": [],
+      "graphic": {
+        "theme": "visual",
+        "script": true,
+        "objects": [],
+        "beats": []
+      },
+      "missing": [],
+      "graphic_file": "scene-17-script-27360.mp4",
+      "code": "waves18 = thing(\"waves\", x=-3.2, h=2.6, color=\"blue\")\nbag18 = thing(\"money_bag\", x=3.2, h=3.2, color=\"gold\")\nenter(waves18, \"left\", dur=0.7)\nenter(bag18, \"right\", dur=0.7)\nwhen(\"people who prepare early\")\nflow(waves18, bag18, item=\"coin\", n=8)\nwhen(\"Subscribe to PocketIQ\")\nclear()\nt18 = text(\"PocketIQ\", x=0, y=0.6, size=1.4, style=\"title\", color=\"gold\")\nenter(t18, \"pop\", dur=0.7)\npulse(t18)\n",
+      "script_test": {
+        "ok": true,
+        "error": "",
+        "warnings": [],
+        "at": 1795127537.3793182
+      },
+      "pv_file": "scene-17-preview-49b62c38e142.mp4",
+      "pv_dur": 11.4,
+      "pv_cues": [
+        {
+          "start": 0.0,
+          "end": 1.7,
+          "text": "Every major cultural launch creates"
+        },
+        {
+          "start": 1.7,
+          "end": 3.04,
+          "text": "a temporary river of money,"
+        },
+        {
+          "start": 3.26,
+          "end": 4.18,
+          "text": "and the people who prepare"
+        },
+        {
+          "start": 4.18,
+          "end": 5.34,
+          "text": "early are the ones who"
+        },
+        {
+          "start": 5.34,
+          "end": 5.92,
+          "text": "get paid."
+        },
+        {
+          "start": 6.4,
+          "end": 8.14,
+          "text": "Subscribe to PocketIQ for more"
+        },
+        {
+          "start": 8.14,
+          "end": 10.02,
+          "text": "simple, bite-sized ways to build"
+        },
+        {
+          "start": 10.02,
+          "end": 11.1,
+          "text": "smarter money habits."
+        }
+      ],
+      "pv_error": ""
+    }
+  ],
+  "script": "Most gamers will spend hundreds of dollars on GTA 6 this week, while a much smaller group will quietly use the same launch to fill their bank accounts. Which side of that trade do you want to be on?\n\nSince GTA 5 launched in 2013, it has sold 235 million copies and brought in over $10 billion in revenue. Now that GTA 6 has finally arrived on November 19, 2026, an even bigger wave of attention and money is moving across the globe.\n\nWhen millions of players rush toward one massive entertainment launch, cash flows into five distinct buckets. If you position yourself early, you can capture a slice of that flow instead of just paying for it.\n\nThe first way is owning pieces of the companies behind the screen. Rockstar Games is owned by Take-Two Interactive, a public company traded under the ticker TTWO.\n\nWhen a game sells tens of millions of copies, profits flow back to the parent company and lift its long-term value. You do not need to buy a whole factory\u2014buying even one share or a gaming index fund lets coins flow toward you as sales grow.\n\nKeep in mind that stock prices often jump before release day and swing wildly right after launch. Smart investors buy steadily over time instead of chasing hype on a single morning.\n\nThe second way is building content around the massive wave of search traffic. Every time players get stuck on a mission, look for hidden cars, or compare console settings, they open YouTube, TikTok, or search engines.\n\nEach view places small ads next to those guides, turning viewer attention into monthly ad payouts. For example, say a beginner guide channel gets 100,000 views in a month\u2014at a $5 ad rate, that equals $500 from one helpful video.\n\nYou do not even need to show your face or own the newest console to start. Clipping news updates, mapping out Vice City locations, or breaking down game mechanics works from a simple laptop.\n\nThe third way is selling digital tools, servers, and custom mods to the player community. In GTA 5, thousands of creators earned full-time incomes building custom roleplay servers, car designs, and scripts for online worlds.\n\nAs GTA 6 rolls out its online multiplayer ecosystem, server owners will pay designers for custom maps, clothing packs, and in-game scripts. One digital file built once can be sold to hundreds of server admins over and over.\n\nThe fourth way is selling physical gear and setup upgrades that gamers buy during a major console cycle. Because GTA 6 launched on PlayStation 5 and Xbox Series consoles before PC, millions of players are upgrading controllers, headsets, and desks right now.\n\nYou do not need to manufacture electronics in a warehouse to profit from that shopping spree. Through affiliate links on review pages or social posts, stores pay you a 3% to 8% commission every time someone buys through your link.\n\nThe fifth way is flipping limited collector items and rare physical editions. Whenever a historic franchise drops after a 13-year wait, special steelbooks, controller bundles, and launch-week merchandise sell out fast in local stores.\n\nBuyers who miss the store shelves often pay 30% to 50% above retail price on resale marketplaces months later. The key is keeping boxes sealed and never spending rent money on risky inventory.\n\nNotice how all five paths share one simple money rule. Consumers spend cash for instant fun, while builders and investors set up assets before the crowd arrives.\n\nYou do not have to chase all five at once\u2014pick one lane that matches your budget and skills today. If you have spare savings, research gaming stocks or broad funds; if you have zero cash, start creating helpful guides or digital assets.\n\nEvery major cultural launch creates a temporary river of money, and the people who prepare early are the ones who get paid. Subscribe to PocketIQ for more simple, bite-sized ways to build smarter money habits.",
+  "script_source": "custom-scenes",
+  "script_words": 658,
+  "scene_total": 18,
+  "script_code": "# === SCENE 1 ===\ncrowd1 = thing(\"crowd\", x=-3.6, h=2.8, count=5, color=\"blue\")\nwallet1 = thing(\"wallet\", x=3.2, h=2.6, color=\"gold\")\nenter(crowd1, \"left\", dur=0.7)\nwhen(\"Most gamers\")\nenter(wallet1, \"right\", dur=0.7)\nflow(crowd1, wallet1, item=\"coin\", n=8)\nwhen(\"smaller group\")\nclear()\nbank1 = thing(\"bank\", x=3.2, h=3.4, color=\"teal\")\nperson1 = thing(\"person\", x=-3.4, h=3.2, color=\"orange\")\nenter(person1, \"pop\", dur=0.6)\nenter(bank1, \"grow\", dur=0.8)\nflow(person1, bank1, item=\"coin\", n=8)\nwhen(\"Which side\")\npulse(person1)\npulse(bank1)\n\n# === SCENE 2 ===\ngame_box = thing(\"game_case\", x=-3.5, h=3.2, color=\"purple\")\nenter(game_box, \"grow\", dur=0.7)\nwhen(\"235 million\")\nn2 = text(\"0 million\", x=-3.5, y=2.6, size=0.95, style=\"number\", color=\"gold\")\nadd(n2)\ncount(n2, to=235, frm=0, suffix=\" million\", dur=1.3)\nwhen(\"$10 billion\")\nrev2 = text(\"$0 billion\", x=0.2, y=2.6, size=0.95, style=\"number\", color=\"green\")\npile(\"gold_bar\", n=8, x=0.2, size=0.7)\nadd(rev2)\ncount(rev2, to=10, frm=0, prefix=\"$\", suffix=\" billion\", dur=1.3)\nwhen(\"November 19, 2026\")\nclear()\nglobe2 = thing(\"globe\", x=0, h=3.5, color=\"blue\")\nenter(globe2, \"pop\", dur=0.7)\nbadge(\"NOV 19, 2026\")\nclone(globe2, n=4)\n\n# === SCENE 3 ===\ncrowd3 = thing(\"crowd\", x=-4.2, h=2.6, count=5, color=\"teal\")\nenter(crowd3, \"left\", dur=0.7)\nwhen(\"five distinct buckets\")\nb1 = thing(\"box\", x=-1.4, h=2.4, color=\"orange\")\nb2 = thing(\"box\", x=0.4, h=2.4, color=\"gold\")\nb3 = thing(\"box\", x=2.2, h=2.4, color=\"blue\")\nb4 = thing(\"box\", x=4.0, h=2.4, color=\"purple\")\nb5 = thing(\"box\", x=5.6, h=2.4, color=\"green\")\nenter(b1, \"bottom\", dur=0.4)\nenter(b2, \"bottom\", dur=0.4)\nenter(b3, \"bottom\", dur=0.4)\nenter(b4, \"bottom\", dur=0.4)\nenter(b5, \"bottom\", dur=0.4)\nflow(crowd3, b2, item=\"coin\", n=6)\nwhen(\"capture a slice\")\npie3 = thing(\"pie\", x=0.4, h=2.8, share=0.25, color=\"gold\")\nswap(b2, name=\"pie\")\npulse(pie3)\n\n# === SCENE 4 ===\nbuilding4 = thing(\"building\", x=-2.8, h=3.6, color=\"blue\")\nenter(building4, \"grow\", dur=0.8)\nwhen(\"Rockstar Games\")\nbadge(\"ROCKSTAR GAMES\")\nwhen(\"Take-Two Interactive\")\nswap(building4, name=\"bank\")\nbadge(\"TTWO\")\nt4 = text(\"TTWO\", x=2.5, y=0.5, size=1.2, style=\"title\", color=\"gold\")\nenter(t4, \"pop\", dur=0.6)\n\n# === SCENE 5 ===\nchart5 = thing(\"line_chart\", x=-3.2, h=3.2, points=[0.3, 0.5, 0.8, 1.3, 2.0], color=\"green\")\nenter(chart5, \"draw\", dur=0.8)\nwhen(\"profits flow back\")\ngrow(chart5, k=1.4, axis=\"y\")\nwhen(\"buying even one share\")\nperson5 = thing(\"person\", x=3.2, h=3.2, color=\"teal\")\nenter(person5, \"pop\", dur=0.6)\ngive(chart5, to=person5, label=\"1 share\")\nwhen(\"coins flow\")\nflow(chart5, person5, item=\"coin\", n=8)\n\n# === SCENE 6 ===\nchart6 = thing(\"line_chart\", x=0, h=3.4, points=[0.8, 1.6, 0.7, 1.8, 1.1, 1.5], color=\"gold\")\nenter(chart6, \"draw\", dur=0.8)\nwhen(\"swing wildly\")\nshake(chart6)\nwhen(\"buy steadily\")\nclear()\ncoin6 = thing(\"coin\", x=-2.2, h=1.2, color=\"gold\")\ncalendar6 = thing(\"calendar\", x=2.8, h=2.8, color=\"blue\")\nenter(calendar6, \"pop\", dur=0.6)\nenter(coin6, \"pop\", dur=0.5)\nflow(coin6, calendar6, item=\"coin\", n=8)\n\n# === SCENE 7 ===\ncrowd7 = thing(\"crowd\", x=-3.8, h=2.8, count=5, color=\"blue\")\nenter(crowd7, \"left\", dur=0.7)\nwhen(\"hidden cars\")\ncar7 = thing(\"car\", x=-0.5, h=2.2, color=\"red\")\nmagnifier7 = thing(\"magnifier\", x=0.5, h=2.4, color=\"gold\")\nenter(car7, \"pop\", dur=0.5)\nenter(magnifier7, \"pop\", dur=0.5)\nwhen(\"YouTube, TikTok\")\nclear()\ntv7 = thing(\"tv\", x=-3.2, h=3.0, color=\"red\")\nphone7 = thing(\"phone\", x=0.2, h=2.8, color=\"pink\")\nmag7 = thing(\"magnifier\", x=3.4, h=2.8, color=\"teal\")\nenter(tv7, \"grow\", dur=0.5)\nenter(phone7, \"grow\", dur=0.5)\nenter(mag7, \"grow\", dur=0.5)\n\n# === SCENE 8 ===\ntv8 = thing(\"tv\", x=-3.5, h=3.0, color=\"teal\")\nenter(tv8, \"pop\", dur=0.7)\nwhen(\"monthly ad payouts\")\nv8 = text(\"0 views\", x=1.5, y=2.5, size=0.95, style=\"number\", color=\"blue\")\nadd(v8)\ncount(v8, to=100000, frm=0, suffix=\" views\", dur=1.3)\nwhen(\"$500 from one\")\np8 = text(\"$0\", x=1.5, y=0.6, size=1.15, style=\"number\", color=\"gold\")\npile(\"coin\", n=8, x=1.5, size=0.6)\nadd(p8)\ncount(p8, to=500, frm=0, prefix=\"$\", dur=1.3)\n\n# === SCENE 9 ===\nlaptop9 = thing(\"laptop\", x=0, h=3.2, color=\"slate\")\nenter(laptop9, \"grow\", dur=0.7)\nwhen(\"Vice City locations\")\nmap9 = thing(\"map\", x=-3.5, h=2.8, color=\"green\")\nenter(map9, \"left\", dur=0.6)\nbadge(\"VICE CITY\")\nwhen(\"simple laptop\")\npulse(laptop9)\n\n# === SCENE 10 ===\nperson10 = thing(\"person\", x=-3.4, h=3.2, color=\"orange\")\nenter(person10, \"pop\", dur=0.7)\nwhen(\"roleplay servers\")\ngear10 = thing(\"gear\", x=2.8, h=3.0, color=\"purple\")\nenter(gear10, \"grow\", dur=0.7)\nplay(Rotate(gear10, angle=3.14), run_time=1.0, sound=\"whoosh\")\nwhen(\"full-time incomes\")\nbag10 = thing(\"money_bag\", x=3.2, h=2.8, color=\"gold\")\nswap(gear10, name=\"money_bag\")\npulse(bag10)\n\n# === SCENE 11 ===\ndoc11 = thing(\"document\", x=-3.2, h=3.0, color=\"blue\")\nenter(doc11, \"pop\", dur=0.7)\nwhen(\"custom maps\")\ngear11 = thing(\"gear\", x=0.4, h=2.6, color=\"teal\")\nenter(gear11, \"grow\", dur=0.6)\nwhen(\"hundreds of server admins\")\nclone(doc11, n=5)\nflow(doc11, gear11, item=\"coin\", n=8)\n\n# === SCENE 12 ===\nconsole12 = thing(\"console\", x=-3.5, h=3.0, color=\"blue\")\nenter(console12, \"grow\", dur=0.7)\nwhen(\"PlayStation 5 and Xbox\")\nbadge(\"PS5\")\npulse(console12)\nwhen(\"controllers, headsets\")\nctrl12 = thing(\"controller\", x=-0.2, h=2.2, color=\"teal\")\nheadset12 = thing(\"headset\", x=2.6, h=2.6, color=\"orange\")\nenter(ctrl12, \"pop\", dur=0.5)\nenter(headset12, \"right\", dur=0.6)\nwhen(\"and desks right now\")\nclear()\ncrowd12 = thing(\"crowd\", x=-3.5, h=2.6, count=5, color=\"purple\")\nshop12 = thing(\"shop\", x=2.8, h=3.2, color=\"gold\")\nenter(crowd12, \"left\", dur=0.6)\nenter(shop12, \"grow\", dur=0.7)\nflow(crowd12, shop12, item=\"coin\", n=8)\n\n# === SCENE 13 ===\nlink13 = thing(\"link\", x=-3.0, h=2.6, color=\"teal\")\nenter(link13, \"pop\", dur=0.7)\nwhen(\"3% to 8% commission\")\nrate13 = text(\"3% - 8%\", x=2.5, y=2.2, size=1.1, style=\"number\", color=\"gold\")\nadd(rate13)\npulse(rate13)\nwhen(\"every time someone buys\")\npile(\"coin\", n=8, x=2.5, size=0.65)\n\n# === SCENE 14 ===\nbox14 = thing(\"box\", x=-3.0, h=3.0, color=\"gold\")\nenter(box14, \"grow\", dur=0.7)\nwhen(\"steelbooks, controller bundles\")\nbadge(\"COLLECTOR EDITION\")\npulse(box14)\nwhen(\"sell out fast\")\nshop14 = thing(\"shop\", x=3.2, h=3.2, color=\"red\")\nenter(shop14, \"right\", dur=0.7)\nmove(box14, to=shop14, side=\"left\", dur=0.9)\n\n# === SCENE 15 ===\ntag15 = thing(\"price_tag\", x=-2.5, h=2.8, text=\"+40%\", color=\"green\")\nenter(tag15, \"pop\", dur=0.7)\nwhen(\"30% to 50% above\")\np15 = text(\"+30% - 50%\", x=2.5, y=2.2, size=1.05, style=\"number\", color=\"gold\")\nadd(p15)\ngrow(tag15, k=1.3, axis=\"y\")\nwhen(\"keeping boxes sealed\")\nclear()\nlock15 = thing(\"lock\", x=0, h=3.2, color=\"blue\")\nenter(lock15, \"pop\", dur=0.7)\npulse(lock15)\n\n# === SCENE 16 ===\nperson16a = thing(\"person\", x=-3.5, h=3.2, color=\"red\")\nperson16b = thing(\"person\", x=3.5, h=3.2, color=\"green\")\nenter(person16a, \"left\", dur=0.6)\nenter(person16b, \"right\", dur=0.6)\nwhen(\"Consumers spend cash\")\ncash16 = thing(\"cash\", x=-1.2, h=2.2, color=\"gold\")\nenter(cash16, \"pop\", dur=0.5)\nmove(cash16, to=person16a, side=\"right\", dur=0.8)\nwhen(\"builders and investors\")\nbag16 = thing(\"money_bag\", x=1.2, h=2.8, color=\"gold\")\nenter(bag16, \"grow\", dur=0.6)\nmove(bag16, to=person16b, side=\"left\", dur=0.8)\n\n# === SCENE 17 ===\nb17a = thing(\"box\", x=-3.5, h=2.6, color=\"blue\")\nb17b = thing(\"box\", x=0, h=2.6, color=\"teal\")\nb17c = thing(\"box\", x=3.5, h=2.6, color=\"gold\")\nenter(b17a, \"pop\", dur=0.5)\nenter(b17b, \"pop\", dur=0.5)\nenter(b17c, \"pop\", dur=0.5)\nwhen(\"pick one lane\")\npulse(b17b)\nwhen(\"gaming stocks or broad funds\")\nbank17 = thing(\"bank\", x=-3.0, h=3.2, color=\"green\")\nswap(b17a, name=\"bank\")\nwhen(\"start creating helpful guides\")\nlaptop17 = thing(\"laptop\", x=3.0, h=3.0, color=\"purple\")\nswap(b17c, name=\"laptop\")\n\n# === SCENE 18 ===\nwaves18 = thing(\"waves\", x=-3.2, h=2.6, color=\"blue\")\nbag18 = thing(\"money_bag\", x=3.2, h=3.2, color=\"gold\")\nenter(waves18, \"left\", dur=0.7)\nenter(bag18, \"right\", dur=0.7)\nwhen(\"people who prepare early\")\nflow(waves18, bag18, item=\"coin\", n=8)\nwhen(\"Subscribe to PocketIQ\")\nclear()\nt18 = text(\"PocketIQ\", x=0, y=0.6, size=1.4, style=\"title\", color=\"gold\")\nenter(t18, \"pop\", dur=0.7)\npulse(t18)\n",
+  "audio_started_at": 1795127431.653422,
+  "voice_duration_sec": 224.3,
+  "voice_engine": "edge-tts (studio presenter)",
+  "voice_fallback": false,
+  "voice_fallback_note": "",
+  "voice_files": [
+    "scene-00-presenter.mp3",
+    "scene-01-presenter.mp3",
+    "scene-02-presenter.mp3",
+    "scene-03-presenter.mp3",
+    "scene-04-presenter.mp3",
+    "scene-05-presenter.mp3",
+    "scene-06-presenter.mp3",
+    "scene-07-presenter.mp3",
+    "scene-08-presenter.mp3",
+    "scene-09-presenter.mp3",
+    "scene-10-presenter.mp3",
+    "scene-11-presenter.mp3",
+    "scene-12-presenter.mp3",
+    "scene-13-presenter.mp3",
+    "scene-14-presenter.mp3",
+    "scene-15-presenter.mp3",
+    "scene-16-presenter.mp3",
+    "scene-17-presenter.mp3"
+  ],
+  "mood": "suspense",
+  "music": "mood-music.mp3",
+  "music_status": "ok",
+  "music_options": [
+    {
+      "id": 459163,
+      "name": "Thriller Intro",
+      "duration_sec": 80.0,
+      "preview_url": "https://cdn.freesound.org/previews/459/459163_3914271-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 793480,
+      "name": "Dark Tension Atmosphere",
+      "duration_sec": 369.3,
+      "preview_url": "https://cdn.freesound.org/previews/793/793480_16936704-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 743986,
+      "name": "Crime Scene Shadows",
+      "duration_sec": 66.8,
+      "preview_url": "https://cdn.freesound.org/previews/743/743986_16085323-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 447521,
+      "name": "tense synth build up",
+      "duration_sec": 31.2,
+      "preview_url": "https://cdn.freesound.org/previews/447/447521_4256189-hq.mp3",
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": 583732,
+      "name": "Suspense_Strings.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583732_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 583729,
+      "name": "Suspense_Bass.wav",
+      "duration_sec": 32.0,
+      "preview_url": "https://cdn.freesound.org/previews/583/583729_12934769-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 415208,
+      "name": "Dark Suspense",
+      "duration_sec": 67.6,
+      "preview_url": "https://cdn.freesound.org/previews/415/415208_5926389-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": 441523,
+      "name": "strang ambient noise with frogs and crickets.wav",
+      "duration_sec": 24.3,
+      "preview_url": "https://cdn.freesound.org/previews/441/441523_5218363-hq.mp3",
+      "license": "http://creativecommons.org/publicdomain/zero/1.0/"
+    }
+  ],
+  "music_options_status": "ok",
+  "music_volume": 0.2,
+  "transition_sfx": 4,
+  "sfx_status": "ok",
+  "final_minutes": 3.7,
+  "realistic_words": [
+    "__auto__:normal"
+  ],
+  "download_url": "/api/autovideo/download/bbf71018dc53",
+  "final_duration_sec": 224.2,
+  "final_size_mb": 5.3,
+  "transitions": true,
+  "join": "xfade",
+  "images_used": 0,
+  "clips_used": 18,
+  "ai_images": 0,
+  "title_cards": 0,
+  "pipeline": "master-scenes-steps"
+}

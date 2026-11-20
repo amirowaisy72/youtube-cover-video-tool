@@ -1,0 +1,2622 @@
+{
+  "title": "Teddy's Farm Fiasco",
+  "scenes": [
+    {
+      "place": "farm",
+      "sitting": false,
+      "location": "farm",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "farm",
+      "characters": [
+        "6d7bf361b7fd",
+        "8f31b59119cb"
+      ],
+      "lines": [
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{broken:fence} {point} I will fix this broken *fence* today! {fix:fence}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "creak",
+          "tone": "excited",
+          "segments": [
+            {
+              "wact": "broken",
+              "obj": "fence",
+              "custom": true
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "I will fix this broken *fence* today!"
+            },
+            {
+              "wact": "fix",
+              "obj": "fence",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{broken:fence}"
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{walk-to} {laugh} Watch me help with *magic* instead! {turn:Teddy:pig}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "walk-to"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Watch me help with *magic* instead!"
+            },
+            {
+              "morph": "pig",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{oink} {shock} Haan?! Why am I a pig?! {turn:Teddy:back}",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "oink"
+            },
+            {
+              "act": "shock"
+            },
+            {
+              "say": "Haan?! Why am I a pig?!"
+            },
+            {
+              "morph": "back",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} That was too fast! Try this! {turn:Teddy:frog}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "That was too fast! Try this!"
+            },
+            {
+              "morph": "frog",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ribbit} {jump} Ribbit! I cannot hold a hammer! {gasp}",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "ribbit"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Ribbit! I cannot hold a hammer!"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{hmm} {think} Let us make you bigger! {turn:Teddy:cow}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "hmm"
+            },
+            {
+              "act": "think"
+            },
+            {
+              "say": "Let us make you bigger!"
+            },
+            {
+              "morph": "cow",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{moo} {uff} Mooo! Now I am too heavy! {facepalm}",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "thud",
+          "tone": "",
+          "segments": [
+            {
+              "act": "moo"
+            },
+            {
+              "act": "uff"
+            },
+            {
+              "say": "Mooo! Now I am too heavy!"
+            },
+            {
+              "act": "facepalm"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {point} You look so silly! {turn:Teddy:chicken}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "You look so silly!"
+            },
+            {
+              "morph": "chicken",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{broken:fence} {cluck} {flap} Cluck cluck! My *fence* is still broken! {angry}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "wact": "broken",
+              "obj": "fence",
+              "custom": true
+            },
+            {
+              "act": "cluck"
+            },
+            {
+              "unknown": "flap",
+              "obj": ""
+            },
+            {
+              "say": "Cluck cluck! My *fence* is still broken!"
+            },
+            {
+              "act": "angry"
+            }
+          ],
+          "added": [
+            "{broken:fence}"
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {chase} Come here and catch me! {run}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "giggle",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "act": "chase"
+            },
+            {
+              "say": "Come here and catch me!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{cluck} {run} Wait right there, Peddy! {chase}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "cluck"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "Wait right there, Peddy!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Village",
+      "world": "Village",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": true,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "Village",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{run} {look-around} Over here by the river! {cross:bridge}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "footsteps",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Over here by the river!"
+            },
+            {
+              "wact": "cross",
+              "obj": "bridge"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{cluck} {chase} Stop running with your *magic*! {cross:bridge}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "cluck"
+            },
+            {
+              "act": "chase"
+            },
+            {
+              "say": "Stop running with your *magic*!"
+            },
+            {
+              "wact": "cross",
+              "obj": "bridge"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {turn:Teddy:horse} Gallop faster, slowpoke! {run}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "morph": "horse",
+              "who": "teddy"
+            },
+            {
+              "say": "Gallop faster, slowpoke!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{neigh} {jump} Neigh! Now I can run fast! {chase}",
+          "expression": "normal",
+          "pose": "point",
+          "sfx": "boing",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "neigh"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Neigh! Now I can run fast!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{wow} {step-back} Whoa, you got quick! {turn:Teddy:back}",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "wow"
+            },
+            {
+              "act": "step-back"
+            },
+            {
+              "say": "Whoa, you got quick!"
+            },
+            {
+              "morph": "back",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{uff} {point} Give me back my tools! {run}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "Give me back my tools!"
+            },
+            {
+              "act": "run"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {hide:bush} Too late, I am hiding! {giggle}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "rustle",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "wact": "hide",
+              "obj": "bush"
+            },
+            {
+              "say": "Too late, I am hiding!"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{look:bush} {sniff} I see your sneakers, Peddy! {walk-to}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "footsteps",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "look",
+              "obj": "bush"
+            },
+            {
+              "act": "sniff"
+            },
+            {
+              "say": "I see your sneakers, Peddy!"
+            },
+            {
+              "act": "walk-to"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} {jump} Peekaboo! {turn:Teddy:duck}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Peekaboo!"
+            },
+            {
+              "morph": "duck",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{quack} {flap} Quack! Stop turning me into birds! {angry}",
+          "expression": "angry",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "quack"
+            },
+            {
+              "unknown": "flap",
+              "obj": ""
+            },
+            {
+              "say": "Quack! Stop turning me into birds!"
+            },
+            {
+              "act": "angry"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {run} Catch me if you can! {chase}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "Catch me if you can!"
+            },
+            {
+              "act": "chase"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "forest",
+      "sitting": false,
+      "location": "jungle by the river",
+      "world": "World of Wonders",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "jungle by the river",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{run} {climb:mango tree} Up in the tree I go! {shake:tree}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "rustle",
+          "tone": "excited",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "wact": "climb",
+              "obj": "mango tree"
+            },
+            {
+              "say": "Up in the tree I go!"
+            },
+            {
+              "wact": "shake",
+              "obj": "tree"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{quack} {swim:river} I will go around the water! {splash}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "splash",
+          "tone": "",
+          "segments": [
+            {
+              "act": "quack"
+            },
+            {
+              "wact": "swim",
+              "obj": "river"
+            },
+            {
+              "say": "I will go around the water!"
+            },
+            {
+              "unknown": "splash",
+              "obj": ""
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{pick:mango} {throw:mango} Catch this fruit, quacker! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "whoosh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "pick",
+              "obj": "mango"
+            },
+            {
+              "wact": "throw",
+              "obj": "mango"
+            },
+            {
+              "say": "Catch this fruit, quacker!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {duck} {eat:mango} {wow} Hey, that mango is good! {smile}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "morph": "duck",
+              "who": ""
+            },
+            {
+              "wact": "eat",
+              "obj": "mango"
+            },
+            {
+              "act": "wow"
+            },
+            {
+              "say": "Hey, that mango is good!"
+            },
+            {
+              "act": "smile"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{climb-down} {jump} Time for another trick! {turn:Teddy:monkey}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "climb-down",
+              "obj": ""
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Time for another trick!"
+            },
+            {
+              "morph": "monkey",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ooo} {jump} Ooo ooo! Now I can climb too! {climb:mango tree}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "excited",
+          "segments": [
+            {
+              "unknown": "ooo",
+              "obj": ""
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Ooo ooo! Now I can climb too!"
+            },
+            {
+              "wact": "climb",
+              "obj": "mango tree"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{shock} {step-back} Hey, get down from there! {run}",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "shock"
+            },
+            {
+              "act": "step-back"
+            },
+            {
+              "say": "Hey, get down from there!"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{monkey} {jump} Catch me in the branches! {chase}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "morph": "monkey",
+              "who": ""
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Catch me in the branches!"
+            },
+            {
+              "act": "chase"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{uff} {run} My legs are getting tired! {turn:Teddy:back}",
+          "expression": "surprised",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "My legs are getting tired!"
+            },
+            {
+              "morph": "back",
+              "who": "teddy"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{point} {run} Now you cannot escape! {chase}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "point"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "Now you cannot escape!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "farm",
+      "sitting": false,
+      "location": "farm",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "farm",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{run} {look-around} Back to the farm we go! {run}",
+          "expression": "normal",
+          "pose": "wave",
+          "sfx": "footsteps",
+          "tone": "scared",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Back to the farm we go!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{chase} {run} You cannot hide in the barn! {run}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "chase"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "You cannot hide in the barn!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {turn:Teddy:sheep} Baaa! Slow down, woolly! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "morph": "sheep",
+              "who": "teddy"
+            },
+            {
+              "say": "Baaa! Slow down, woolly!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{baa} {jump} Baaa! Why am I woolly again?! {angry}",
+          "expression": "surprised",
+          "pose": "hips",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "baa"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Baaa! Why am I woolly again?!"
+            },
+            {
+              "act": "angry"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{run} {look-around} Watch out for the mud! {step-back}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Watch out for the mud!"
+            },
+            {
+              "act": "step-back"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{baa} {run} I am coming for you! {chase}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "footsteps",
+          "tone": "",
+          "segments": [
+            {
+              "act": "baa"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "I am coming for you!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {turn:Teddy:back} Okay, okay, you are you! {wave}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "morph": "back",
+              "who": "teddy"
+            },
+            {
+              "say": "Okay, okay, you are you!"
+            },
+            {
+              "act": "wave"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{uff} {run} Too late for sorry! {chase}",
+          "expression": "angry",
+          "pose": "point",
+          "sfx": "",
+          "tone": "shout",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "act": "run"
+            },
+            {
+              "say": "Too late for sorry!"
+            },
+            {
+              "act": "chase"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} {look-around} Look out ahead! {shock}",
+          "expression": "surprised",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Look out ahead!"
+            },
+            {
+              "act": "shock"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{run} {fall} {crash:tractor} Whoaaa! Crash! {dizzy}",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "crash",
+          "tone": "",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "insert": {
+                "kind": "fall",
+                "blocks": [
+                  {
+                    "type": "physics",
+                    "kind": "fall",
+                    "icon": "coin",
+                    "count": 12,
+                    "label": ""
+                  }
+                ],
+                "secs": 3.4,
+                "text": ""
+              }
+            },
+            {
+              "wact": "crash",
+              "obj": "tractor",
+              "custom": true
+            },
+            {
+              "say": "Whoaaa! Crash!"
+            },
+            {
+              "act": "dizzy"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{gasp} {walk-to} Teddy! Are you okay?! {shock}",
+          "expression": "surprised",
+          "pose": "wave",
+          "sfx": "gasp",
+          "tone": "",
+          "segments": [
+            {
+              "act": "gasp"
+            },
+            {
+              "act": "walk-to"
+            },
+            {
+              "say": "Teddy! Are you okay?!"
+            },
+            {
+              "act": "shock"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{dizzy} {shake-head} My head is spinning like a wheel! {uff}",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "dizzy"
+            },
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "My head is spinning like a wheel!"
+            },
+            {
+              "act": "uff"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {point} Look at the tractor and the *fence*! {giggle}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "look",
+              "obj": "tractor"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "Look at the tractor and the *fence*!"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{look-around} {hmm} {laugh} That is a giant mess! {laugh}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "act": "hmm"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "That is a giant mess!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{sit} {laugh} Let us just sit right here! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "sit",
+              "obj": ""
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Let us just sit right here!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {sit} {laugh} {haha} We chased each other in circles! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "wact": "sit",
+              "obj": ""
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "We chased each other in circles!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {clap} A pig, a frog, a cow, a chicken! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "A pig, a frog, a cow, a chicken!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {smile} And a horse, a duck, a monkey, a sheep! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "say": "And a horse, a duck, a monkey, a sheep!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {high-five} Best farm fiasco ever! {yay}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Best farm fiasco ever!"
+            },
+            {
+              "act": "yay"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {high-five} Next time, we fix the *fence* first! {laugh} {fix:fence}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Next time, we fix the *fence* first!"
+            },
+            {
+              "wact": "fix",
+              "obj": "fence",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{fix:fence}"
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sigh} {point} {look-around} Still, look at that bent *fence*! {hmm}",
+          "expression": "suspicious",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "look",
+              "obj": "bent"
+            },
+            {
+              "act": "sigh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Still, look at that bent *fence*!"
+            },
+            {
+              "act": "hmm"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {turn:Teddy:pig} Want another quick *magic* spin? {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "morph": "pig",
+              "who": "teddy"
+            },
+            {
+              "say": "Want another quick *magic* spin?"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{oink} {laugh} Oink! No more magic today! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oink"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Oink! No more magic today!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {turn:Teddy:back} {hug} Deal, my funny friend! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "morph": "back",
+              "who": "teddy"
+            },
+            {
+              "act": "hug"
+            },
+            {
+              "say": "Deal, my funny friend!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{stand-up} {look-around} The tractor has a tiny scratch! {hmm}",
+          "expression": "surprised",
+          "pose": "think",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "stand-up",
+              "obj": ""
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "The tractor has a tiny scratch!"
+            },
+            {
+              "act": "hmm"
+            },
+            {
+              "act": "gasp"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {point} And the *fence* looks like a noodle! {giggle}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "And the *fence* looks like a noodle!"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {shake-head} How did we end up like this? {laugh}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "How did we end up like this?"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {jump} Because I cast a spell! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Because I cast a spell!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {point} And I tried to tackle you! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "And I tried to tackle you!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {clap} That crash was so loud! {laugh} {crash}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "That crash was so loud!"
+            },
+            {
+              "wact": "crash",
+              "obj": "",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{crash}"
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {smile} My hat is still in the hay! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "say": "My hat is still in the hay!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {high-five} What a crazy afternoon! {yay}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "What a crazy afternoon!"
+            },
+            {
+              "act": "yay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "village",
+      "sitting": false,
+      "location": "Village",
+      "world": "Village",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": true,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "Village",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{run} {look-around} Remember when we crossed the bridge? {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "footsteps",
+          "tone": "",
+          "segments": [
+            {
+              "act": "run"
+            },
+            {
+              "act": "look-around"
+            },
+            {
+              "say": "Remember when we crossed the bridge?"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{chase} {laugh} You turned me into a horse! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "chase"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "You turned me into a horse!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {jump} You ran like the wind! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "You ran like the wind!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {shake-head} Then you turned me right back! {laugh}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "Then you turned me right back!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {hide:bush} I thought that bush would hide me! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "rustle",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "wact": "hide",
+              "obj": "bush"
+            },
+            {
+              "say": "I thought that bush would hide me!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {point} Your shoes were sticking right out! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "Your shoes were sticking right out!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{oops} {laugh} Then I made you a duck! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "oops"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Then I made you a duck!"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {quack} {laugh} Quack! I was so mad! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "quack"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Quack! I was so mad!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "forest",
+      "sitting": false,
+      "location": "jungle by the river",
+      "world": "World of Wonders",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "jungle by the river",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{climb:mango tree} {laugh} Up in the mango tree I went! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "rustle",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "climb",
+              "obj": "mango tree"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Up in the mango tree I went!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{swim:river} {laugh} And I splashed across the river! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "splash",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "swim",
+              "obj": "river"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "And I splashed across the river!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{pick:mango} {laugh} I threw a mango right at you! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "whoosh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "pick",
+              "obj": "mango"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "I threw a mango right at you!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {eat:mango} {laugh} And I ate it mid-chase! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "eat",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "wact": "eat",
+              "obj": "mango"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "And I ate it mid-chase!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{jump} {laugh} Then you became a monkey! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "jump"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Then you became a monkey!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{monkey} {laugh} Ooo ooo! Climbing trees like a pro! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "morph": "monkey",
+              "who": ""
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Ooo ooo! Climbing trees like a pro!"
+            },
+            {
+              "act": "giggle"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{uff} {laugh} You chased me through the leaves! {laugh}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "",
+          "tone": "",
+          "segments": [
+            {
+              "act": "uff"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "You chased me through the leaves!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {smile} Best workout of the year! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "say": "Best workout of the year!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "place": "farm",
+      "sitting": false,
+      "location": "farm",
+      "world": "",
+      "blueprint": "",
+      "calm": false,
+      "world_exact": false,
+      "time_skip": "",
+      "clock": "",
+      "holding": {},
+      "background": "farm",
+      "characters": [
+        "8f31b59119cb",
+        "6d7bf361b7fd"
+      ],
+      "lines": [
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{sit} {laugh} Look at all the farm animals watching! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "sit",
+              "obj": ""
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Look at all the farm animals watching!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {point} Even the cows are staring at us! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "Even the cows are staring at us!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {clap} They think we are a comedy show! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "They think we are a comedy show!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {shake-head} Maybe we are! {laugh}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "Maybe we are!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {high-five} A wizard and a crash-test Teddy! {yay} {crash}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "A wizard and a crash-test Teddy!"
+            },
+            {
+              "act": "yay"
+            },
+            {
+              "wact": "crash",
+              "obj": "",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{crash}"
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {high-five} That is a great team name! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "That is a great team name!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sit} {laugh} My knee hurts a little bit! {uff}",
+          "expression": "sad",
+          "pose": "shrug",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "sit",
+              "obj": ""
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "My knee hurts a little bit!"
+            },
+            {
+              "act": "uff"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {turn:Teddy:frog} Want a frog hop to feel better? {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "magic",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "morph": "frog",
+              "who": "teddy"
+            },
+            {
+              "say": "Want a frog hop to feel better?"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{ribbit} {jump} Ribbit! No hopping right now! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "ribbit"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "Ribbit! No hopping right now!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {turn:Teddy:back} {hug} Back to normal in a flash! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "morph": "back",
+              "who": "teddy"
+            },
+            {
+              "act": "hug"
+            },
+            {
+              "say": "Back to normal in a flash!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {smile} Good thing your *magic* wears off! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "say": "Good thing your *magic* wears off!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {clap} Mostly when I remember the spell! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "Mostly when I remember the spell!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {point} Hey, you remembered every single one! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "point"
+            },
+            {
+              "say": "Hey, you remembered every single one!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {high-five} Only because you kept chasing me! {yay}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Only because you kept chasing me!"
+            },
+            {
+              "act": "yay"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{look-around} {laugh} The tractor is leaning sideways! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "look-around"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "The tractor is leaning sideways!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {giggle} It looks like it is taking a nap! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "It looks like it is taking a nap!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {shake-head} And the *fence* is completely crooked! {laugh}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "And the *fence* is completely crooked!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {clap} We did not fix a single post! {laugh} {fix:fence}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "We did not fix a single post!"
+            },
+            {
+              "wact": "fix",
+              "obj": "fence",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{fix:fence}"
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {smile} Instead we broke even more stuff! {laugh} {break:fence}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "say": "Instead we broke even more stuff!"
+            },
+            {
+              "wact": "break",
+              "obj": "fence",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{break:fence}"
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{giggle} {jump} By accident, of course! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "boing",
+          "tone": "",
+          "segments": [
+            {
+              "act": "giggle"
+            },
+            {
+              "act": "jump"
+            },
+            {
+              "say": "By accident, of course!"
+            },
+            {
+              "act": "laugh"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {high-five} Total accident, one hundred percent! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Total accident, one hundred percent!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {clap} Let us keep laughing before anyone comes! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "Let us keep laughing before anyone comes!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{sit} {laugh} Hahaha! Look at that bent gate! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "sit",
+              "obj": ""
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "say": "Hahaha! Look at that bent gate!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {giggle} Hahaha! Look at your muddy boots! {laugh}",
+          "expression": "happy",
+          "pose": "point",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "wact": "look",
+              "obj": "muddy"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "giggle"
+            },
+            {
+              "say": "Hahaha! Look at your muddy boots!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{laugh} {shake-head} Hahaha! I crashed into a tractor! {laugh} {crash}",
+          "expression": "happy",
+          "pose": "shrug",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "shake-head"
+            },
+            {
+              "say": "Hahaha! I crashed into a tractor!"
+            },
+            {
+              "wact": "crash",
+              "obj": "",
+              "custom": true
+            }
+          ],
+          "added": [
+            "{crash}"
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {clap} Hahaha! And I turned you into four animals! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "clap"
+            },
+            {
+              "say": "Hahaha! And I turned you into four animals!"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {smile} Hahaha! My hat is still in the dirt! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "smile"
+            },
+            {
+              "say": "Hahaha! My hat is still in the dirt!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {high-five} Hahaha! Best farm disaster ever! {yay}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "applause",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Hahaha! Best farm disaster ever!"
+            },
+            {
+              "act": "yay"
+            }
+          ]
+        },
+        {
+          "speaker": "6d7bf361b7fd",
+          "text": "{nod} {laugh} {high-five} Hahaha! We should do it again tomorrow! {laugh}",
+          "expression": "happy",
+          "pose": "idle",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "nod"
+            },
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "high-five"
+            },
+            {
+              "say": "Hahaha! We should do it again tomorrow!"
+            }
+          ]
+        },
+        {
+          "speaker": "8f31b59119cb",
+          "text": "{laugh} {hug} Hahaha! Deal, see you at the *fence*! {laugh}",
+          "expression": "happy",
+          "pose": "wave",
+          "sfx": "laugh",
+          "tone": "",
+          "segments": [
+            {
+              "act": "laugh"
+            },
+            {
+              "act": "hug"
+            },
+            {
+              "say": "Hahaha! Deal, see you at the *fence*!"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

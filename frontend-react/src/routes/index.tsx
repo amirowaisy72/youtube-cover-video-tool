@@ -28,29 +28,39 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const tools = [
-  { to: "/cover", n: "01", title: "Cover Video Generator", desc: "Paste a link, drop a cover, get a finished video inside your green-screen frame.", img: coverImg, cta: "Make a cover video" },
-  { to: "/voice", n: "02", title: "Text to Voice", desc: "Turn up to 10,000 characters into natural English or Urdu voiceovers.", img: scene2, cta: "Create a voice" },
-  { to: "/auto-video", n: "03", title: "Auto Video from Title", desc: "Type a title, pick a length — we build every scene for you.", img: scene3, cta: "Build a video" },
-  { to: "/thumbnail", n: "04", title: "Thumbnail Maker", desc: "Upload a background, pick a template, type a headline — get a 1280×720 thumbnail.", img: toolThumbnail, cta: "Make a thumbnail" },
-  { to: "/shorts", n: "05", title: "Shorts Maker", desc: "Cut your long video into a vertical 9:16 Short — blurred background, 1080x1920.", img: scene1, cta: "Make a Short" },
-  { to: "/downloader", n: "06", title: "Video / MP3 Downloader", desc: "Paste a YouTube link and get the video as MP4 or just the audio as MP3.", img: toolDownloader, cta: "Download a video" },
-  { to: "/titles", n: "07", title: "Title + Tags Generator", desc: "Type a topic — get 10 clickable titles, a ready description, and tags.", img: toolTitles, cta: "Generate titles" },
-  { to: "/trimmer", n: "08", title: "Video Trimmer", desc: "Paste a YouTube link, pick start and end — download only that section, nothing else.", img: toolTrimmer, cta: "Trim a video" },
-  { to: "/subtitles", n: "09", title: "Subtitle Generator", desc: "Turn any video or audio into accurate subtitles — free, on your computer.", img: toolSubtitles, cta: "Make subtitles" },
-  { to: "/keywords", n: "10", title: "Keyword Research", desc: "Find what people actually search for on YouTube — real autocomplete suggestions for any seed keyword.", img: toolKeywords, cta: "Research keywords" },
-  { to: "/inspector", n: "11", title: "Competitor Inspector", desc: "Paste any video link — see every detail: title, tags, views, likes, comments and more.", img: toolInspector, cta: "Inspect a video" },
-  { to: "/seo", n: "12", title: "SEO Score Checker", desc: "Score your title, description and tags before you publish — and fix what is weak.", img: toolSeo, cta: "Check my SEO" },
-  { to: "/audio", n: "13", title: "Audio Extractor", desc: "Turn any video — or a YouTube link — into a clean MP3.", img: toolAudio, cta: "Extract audio" },
-  { to: "/music", n: "14", title: "Royalty-Free Music", desc: "Free music and sound effects for your YouTube videos — preview, then download.", img: toolMusic, cta: "Find music" },
-  { to: "/script", n: "15", title: "Script Generator", desc: "Type a topic — get a full ready-to-record script, hooks and description.", img: toolScript, cta: "Write a script" },
-  { to: "/stock", n: "16", title: "Stock Video & B-Roll", desc: "Free stock footage for your YouTube videos — preview, then download.", img: toolStock, cta: "Find B-roll" },
-  { to: "/channel", n: "17", title: "Channel Setup Wizard", desc: "Set up a new YouTube channel — SEO names, description, tags, banner and logo.", img: toolChannel, cta: "Set up a channel" },
-  { to: "/channel-inspect", n: "18", title: "Channel Inspector", desc: "Audit an existing channel — see what is missing, get fixes, and apply them to the channel.", img: toolChannel, cta: "Inspect a channel" },
-  { to: "/animator", n: "21", title: "Story Animator", desc: "Type a title and minutes — get a finished cartoon video starring your own characters.", img: scene3, cta: "Make a cartoon" },
-  { to: "/characters", n: "20", title: "Character Studio", desc: "Design your own cartoon characters, name them and give each a voice — they star in your animated stories.", img: scene1, cta: "Design a character" },
-  { to: "/voice-clone", n: "19", title: "Voice Cloner", desc: "Give a 15–20 sec voice sample — clone it, name it, and voice any script in that voice.", img: scene2, cta: "Clone a voice" },
+// The video makers come first (user, 2026-11-19): Cover Video, Auto Video (stock
+// footage), Story Animator, Visual Explainer — then everything else.
+const toolList = [
+  { to: "/cover", title: "Cover Video Generator", desc: "Paste a link, drop a cover, get a finished video inside your green-screen frame.", img: coverImg, cta: "Make a cover video" },
+  { to: "/auto-video", title: "Auto Video from Title", desc: "Type a title, pick a length — a stock-footage video with voice, music and graphics, scene by scene.", img: scene3, cta: "Build a video" },
+  { to: "/animator", title: "Story Animator", desc: "Type a title and minutes — get a finished cartoon video starring your own characters.", img: scene1, cta: "Make a cartoon" },
+  { to: "/visual", title: "Visual Explainer", desc: "Explainer videos made only of animated drawings — things that move to show the idea, with a sound for every motion. No stock footage.", img: toolStock, cta: "Make an explainer" },
+  { to: "/my-videos", title: "My Videos", desc: "Every video you made with any tool — watch, download, or delete old ones to free space on your computer.", img: toolStock, cta: "Open my videos" },
+  { to: "/research", title: "Topic Research Lab", desc: "What to make next: keywords with views and low competition, trending now, small-channel wins, niches — and your Channel Doctor.", img: toolKeywords, cta: "Research a topic" },
+  { to: "/new-channel", title: "New Channel Wizard", desc: "Start a new channel step by step — niche, name, description, every setting and your launch plan.", img: toolChannel, cta: "Start a channel" },
+  { to: "/voice", title: "Text to Voice", desc: "Turn up to 10,000 characters into natural English or Urdu voiceovers.", img: scene2, cta: "Create a voice" },
+  { to: "/thumbnail", title: "Thumbnail Maker", desc: "Upload a background, pick a template, type a headline — get a 1280×720 thumbnail.", img: toolThumbnail, cta: "Make a thumbnail" },
+  { to: "/shorts", title: "Shorts Maker", desc: "Cut your long video into a vertical 9:16 Short — blurred background, 1080x1920.", img: scene1, cta: "Make a Short" },
+  { to: "/downloader", title: "Video / MP3 Downloader", desc: "Paste a YouTube link and get the video as MP4 or just the audio as MP3.", img: toolDownloader, cta: "Download a video" },
+  { to: "/titles", title: "Title + Tags Generator", desc: "Type a topic — get 10 clickable titles, a ready description, and tags.", img: toolTitles, cta: "Generate titles" },
+  { to: "/trimmer", title: "Video Trimmer", desc: "Paste a YouTube link, pick start and end — download only that section, nothing else.", img: toolTrimmer, cta: "Trim a video" },
+  { to: "/subtitles", title: "Subtitle Generator", desc: "Turn any video or audio into accurate subtitles — free, on your computer.", img: toolSubtitles, cta: "Make subtitles" },
+  { to: "/keywords", title: "Keyword Research", desc: "Find what people actually search for on YouTube — real autocomplete suggestions for any seed keyword.", img: toolKeywords, cta: "Research keywords" },
+  { to: "/inspector", title: "Competitor Inspector", desc: "Paste any video link — see every detail: title, tags, views, likes, comments and more.", img: toolInspector, cta: "Inspect a video" },
+  { to: "/seo", title: "SEO Score Checker", desc: "Score your title, description and tags before you publish — and fix what is weak.", img: toolSeo, cta: "Check my SEO" },
+  { to: "/audio", title: "Audio Extractor", desc: "Turn any video — or a YouTube link — into a clean MP3.", img: toolAudio, cta: "Extract audio" },
+  { to: "/music", title: "Royalty-Free Music", desc: "Free music and sound effects for your YouTube videos — preview, then download.", img: toolMusic, cta: "Find music" },
+  { to: "/script", title: "Script Generator", desc: "Type a topic — get a full ready-to-record script, hooks and description.", img: toolScript, cta: "Write a script" },
+  { to: "/stock", title: "Stock Video & B-Roll", desc: "Free stock footage for your YouTube videos — preview, then download.", img: toolStock, cta: "Find B-roll" },
+  { to: "/channel", title: "Channel Setup Wizard", desc: "Set up a new YouTube channel — SEO names, description, tags, banner and logo.", img: toolChannel, cta: "Set up a channel" },
+  { to: "/channel-inspect", title: "Channel Inspector", desc: "Audit an existing channel — see what is missing, get fixes, and apply them to the channel.", img: toolChannel, cta: "Inspect a channel" },
+  { to: "/characters", title: "Character Studio", desc: "Design your own cartoon characters, name them and give each a voice — they star in your animated stories.", img: scene1, cta: "Design a character" },
+  { to: "/voice-clone", title: "Voice Cloner", desc: "Give a 15–20 sec voice sample — clone it, name it, and voice any script in that voice.", img: scene2, cta: "Clone a voice" },
 ] as const;
+
+// Numbered by position, so the order above is the order on the page.
+const tools = toolList.map((t, i) => ({ ...t, n: String(i + 1).padStart(2, "0") }));
+
 
 function Home() {
   // Locked until the installed setup (with an active license) is
@@ -62,7 +72,7 @@ function Home() {
   return (
     <div>
       <section className="mb-12 text-center">
-        <span className="chip mb-5">✦ 21 tools · zero learning curve</span>
+        <span className="chip mb-5">✦ {tools.length} tools · zero learning curve</span>
         <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-tight md:text-6xl">
           Make YouTube magic in <span className="text-gradient">a few clicks</span>
         </h1>
@@ -80,12 +90,12 @@ function Home() {
               <h2 className="text-xl font-bold">🔒 Tools are locked</h2>
               {installed ? (
                 <>
-                  <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all 18 tools.</p>
+                  <p className="mt-2 text-muted-foreground">Setup is installed. Activate your license to unlock all {tools.length} tools.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Click <b>Activate</b> at the top right and enter your license key.</p>
                 </>
               ) : (
                 <>
-                  <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all 18 tools.</p>
+                  <p className="mt-2 text-muted-foreground">Install YT Guru Setup on your computer to unlock all {tools.length} tools.</p>
                   <a className="btn btn-primary mt-4" href={SETUP_DOWNLOAD_URL}>⬇ Install Setup</a>
                 </>
               )}

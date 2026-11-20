@@ -43,6 +43,7 @@ break the copyright-safe promise of this tool.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import math
 import re
@@ -399,7 +400,7 @@ def _caption_text(scene: dict) -> str:
     sentence = first[0] if first else ""
     if len(sentence) > 110:
         sentence = sentence[:110].rsplit(" ", 1)[0] + "…"
-    return sentence
+    return _tidy_caption(sentence)
 
 
 def _srt_time(seconds: float) -> str:
@@ -679,6 +680,15 @@ _TRANSITION_TYPES = ["fade", "wipeleft", "wiperight", "slideleft",
                      "fadewhite", "dissolve", "pixelize"]
 
 
+def _tidy_caption(t: str) -> str:
+    """Caption spacing as people write it (user, 2026-11-20): Whisper splits "100,000" into
+    "100 ,000" and "3%" into "3 %" — the pieces are joined back."""
+    t = re.sub(r"\s+([,.%!?:;)])", r"\1", t)
+    t = re.sub(r"(\d)[,.]\s+(\d{3})\b", lambda m: m.group(0).replace(" ", ""), t)
+    t = re.sub(r"([$€£(])\s+", r"\1", t)
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
 def _words_to_srt(words: list[dict]) -> str:
     """Word-level timestamps -> SRT cues, YouTube-caption style:
     short phrases (up to 5 words, ~2 seconds each) that change
@@ -705,7 +715,7 @@ def _words_to_srt(words: list[dict]) -> str:
     for i, (start, end, text) in enumerate(cues, 1):
         lines.append(str(i))
         lines.append(f"{_srt_time(start)} --> {_srt_time(end)}")
-        lines.append(text)
+        lines.append(_tidy_caption(text))
         lines.append("")
     return "\n".join(lines)
 
@@ -1234,6 +1244,63 @@ def _get_whisper_model():
         return _WHISPER_MODEL
 
 
+def _align_to_script(words: list[dict], narration: str) -> list[dict]:
+    """The script's own words with the voice's timing (user, 2026-11-20): the speech recogniser
+    mishears names ("take to interactive") and splits numbers ("100" + ",000"); the captions now show
+    exactly what was written, each word at the moment it is spoken."""
+    import difflib
+    script = narration.split()
+    if not script or not words:
+        return words
+
+    def norm(w):
+        return re.sub(r"[^a-z0-9]+", "", w.lower())
+    a = [norm(w) for w in script]
+    b = [norm(w["word"]) for w in words]
+    times: list[tuple[float, float] | None] = [None] * len(script)
+    for blk in difflib.SequenceMatcher(None, a, b, autojunk=False).get_matching_blocks():
+        for k in range(blk.size):
+            w = words[blk.b + k]
+            times[blk.a + k] = (w["start"], w["end"])
+    known = [i for i, t in enumerate(times) if t]
+    if len(known) < max(2, len(script) // 4):  # too different: keep what was heard
+        return words
+    end = words[-1]["end"]
+    out = []
+    for i, w in enumerate(script):
+        if times[i] is None:  # between the nearest known words, spread evenly
+            prev = max((k for k in known if k < i), default=None)
+            nxt = min((k for k in known if k > i), default=None)
+            t0 = times[prev][1] if prev is not None else words[0]["start"]
+            t1 = times[nxt][0] if nxt is not None else end
+            lo = prev if prev is not None else -1
+            hi = nxt if nxt is not None else len(script)
+            step = (t1 - t0) / max(1, hi - lo - 1)
+            st = t0 + step * (i - lo - 1)
+            times[i] = (st, st + step)
+        out.append({"start": float(times[i][0]), "end": float(max(times[i][1], times[i][0] + 0.05)), "word": w})
+    return out
+
+
+def _scene_narration(work_dir: Path, index: int) -> str:
+    try:
+        return (work_dir / f"scene-{index:02d}.narration.txt").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _remember_narrations(work_dir: Path, scenes: list[dict]) -> None:
+    """Each scene's written words beside its voice, so its captions can use them."""
+    for i, sc in enumerate(scenes):
+        try:
+            p = work_dir / f"scene-{i:02d}.narration.txt"
+            t = str(sc.get("narration") or "")
+            if t and (not p.exists() or p.read_text(encoding="utf-8") != t):
+                p.write_text(t, encoding="utf-8")
+        except OSError:
+            pass
+
+
 def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Path | None:
     """Transcribe ONE scene's voiceover with word timestamps and
     write a per-scene SRT (times relative to the scene start,
@@ -1244,7 +1311,24 @@ def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Pat
     instead."""
     srt_cached = work_dir / f"scene-{index:02d}.srt"
     try:
-        if srt_cached.exists() and srt_cached.stat().st_mtime >= voice_path.stat().st_mtime:
+        narration = _scene_narration(work_dir, index)
+        words_file = work_dir / f"scene-{index:02d}.words.json"
+        if (srt_cached.exists() and srt_cached.stat().st_mtime >= voice_path.stat().st_mtime
+                and narration and words_file.exists() and words_file.stat().st_mtime >= voice_path.stat().st_mtime):
+            words = json.loads(words_file.read_text(encoding="utf-8"))
+            fresh = _words_to_srt(_align_to_script(words, narration))
+            if srt_cached.read_text(encoding="utf-8") != fresh:  # the script changed its spelling: same timing
+                st = srt_cached.stat()
+                srt_cached.write_text(fresh, encoding="utf-8")
+                os.utime(srt_cached, (st.st_atime, st.st_mtime))
+            return srt_cached
+        if srt_cached.exists() and srt_cached.stat().st_mtime >= voice_path.stat().st_mtime and not narration:
+            old = srt_cached.read_text(encoding="utf-8")
+            fixed = "\n".join(ln if ("-->" in ln or ln.strip().isdigit()) else _tidy_caption(ln) for ln in old.split("\n"))
+            if fixed != old:  # an older caption file: its spacing fixed, its time kept (the cache stays valid)
+                st = srt_cached.stat()
+                srt_cached.write_text(fixed, encoding="utf-8")
+                os.utime(srt_cached, (st.st_atime, st.st_mtime))
             return srt_cached  # already transcribed (rich-footage timing used it)
     except OSError:
         pass
@@ -1260,7 +1344,8 @@ def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Pat
         if audio is None:
             return None
         segments_iter, _info = model.transcribe(
-            audio, language="en", beam_size=5, word_timestamps=True)
+            audio, language="en", beam_size=5, word_timestamps=True,
+            initial_prompt=(_scene_narration(work_dir, index)[:600] or None))
         words: list[dict] = []
         for seg in segments_iter:
             for w in (seg.words or []):
@@ -1271,6 +1356,13 @@ def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Pat
                         "word": text})
         if not words:
             return None
+        narration = _scene_narration(work_dir, index)
+        try:
+            (work_dir / f"scene-{index:02d}.words.json").write_text(json.dumps(words), encoding="utf-8")
+        except OSError:
+            pass
+        if narration:
+            words = _align_to_script(words, narration)
         srt_path = work_dir / f"scene-{index:02d}.srt"
         srt_path.write_text(_words_to_srt(words), encoding="utf-8")
         return srt_path
@@ -2293,6 +2385,23 @@ def _job_scene_done(work_dir: Path, result: dict) -> None:
         pass
 
 
+def _log_errors(fn):
+    """Print the full error in the console (the job only shows one line), then fail as before."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(*a, **k):
+        try:
+            return fn(*a, **k)
+        except Exception:
+            import traceback
+            print("---- Auto Video error (please send this to support) ----")
+            traceback.print_exc()
+            raise
+    return run
+
+
+@_log_errors
 def plan_footage(title: str, minutes: int, script: str | None,
                  visuals: str, work_dir: Path,
                  pexels_key: str | None = None,
@@ -2328,10 +2437,40 @@ def plan_footage(title: str, minutes: int, script: str | None,
                                      is_short=is_short)
     if not scenes:
         raise RuntimeError("Could not build a scene script.")
-    if progress_cb:
-        progress_cb(0, len(scenes), "Reading every scene to plan its footage…")
+    try:
+        import tools_graphics as _tgv
+        _visual = _tgv.style()["theme"] == "visual"
+    except Exception:  # noqa: BLE001
+        _visual = False
     import autovideo_smart
-    autovideo_smart.attach_scene_plans(title, scenes)
+    try:
+        _av_design = _tgv.style().get("av_design", "auto")
+    except Exception:  # noqa: BLE001
+        _av_design = "auto"
+    if not _visual and _av_design == "script":
+        # AUTO VIDEO SCRIPT MODE (user, 2026-11-20): no footage is searched yet — the user's AI plans every scene
+        # (Script mode box on the next screen) and exactly that footage is downloaded then.
+        import tools_script
+        w_, h_ = (540, 960) if is_short else (960, 540)
+        ordered = []
+        for i, s_ in enumerate(scenes):
+            still = work_dir / f"scene-{i:02d}-wait.png"
+            tools_script.placeholder(still, i + 1, w_, h_, "waiting for your footage plan")
+            sc_ = {"index": i, "narration": s_["narration"], "visual": s_["visual"], "caption": _caption_text(s_),
+                   "kind": "image", "visual_source": "Script mode — paste your AI's footage plan (Script mode box)",
+                   "visual_file": still.name, "visual_url": "", "duration_sec": 0,
+                   "keywords": autovideo.core_words(s_["narration"])[:8], "plan": {"queries": [], "avoid": []}, "shots": []}
+            ordered.append(sc_)
+            _job_scene_done(work_dir, sc_)
+        script_text = "\n\n".join(s["narration"] for s in scenes)
+        return {"scenes": ordered, "script": script_text, "script_source": source, "script_words": len(script_text.split())}
+    if _visual:  # Visual Explainer: no footage planning at all (it only cost time and Gemini quota)
+        for s_ in scenes:
+            s_.setdefault("plan", {})
+    else:
+        if progress_cb:
+            progress_cb(0, len(scenes), "Reading every scene to plan its footage…")
+        autovideo_smart.attach_scene_plans(title, scenes)
     script_text = "\n\n".join(s["narration"] for s in scenes)
     # (user, 2026-11-18) while footage is collected, the page shows HIS real
     # scenes (never example lines): they go into the job right away.
@@ -2340,6 +2479,37 @@ def plan_footage(title: str, minutes: int, script: str | None,
     used_urls: set = set()
     lock = threading.Lock()
     results: dict[int, dict] = {}
+    try:  # graphics intensity, chosen on the Setup step (user, 2026-11-19)
+        import tools_graphics as _tg
+        gfx_amount = _tg.style()["graphics"] if _tg.available() else "none"
+        theme = _tg.style()["theme"]
+    except Exception:  # noqa: BLE001
+        gfx_amount, theme = "none", "classic"
+    if theme == "visual":
+        # VISUAL EXPLAINER (user, 2026-11-19): pure motion graphics — no stock footage is searched or
+        # downloaded at all; every scene gets an animation plan and a storyboard picture instead.
+        import tools_graphics as _tg2
+        if not _tg2.available():
+            raise RuntimeError("Motion graphics are not installed yet — open the Dashboard and press Install on the Motion graphics row.")
+        import tools_visual
+        ordered = []
+        for i, s_ in enumerate(scenes):
+            ordered.append({"index": i, "narration": s_["narration"], "visual": s_["visual"], "caption": _caption_text(s_),
+                            "kind": "image", "visual_source": "Visual explainer", "visual_file": "", "visual_url": "",
+                            "duration_sec": 0, "keywords": autovideo.core_words(s_["narration"])[:8],
+                            "plan": {**(s_.get("plan") or {}), "presenter": False}, "shots": []})
+        info = tools_visual.add_to_footage(title, ordered, work_dir, is_short, progress_cb)
+        for sc in ordered:
+            _job_scene_done(work_dir, sc)
+        return {"scenes": ordered, "script": script_text, "script_source": source,
+                "script_words": len(script_text.split()), "visual_basic": info.get("basic", 0)}
+
+    if gfx_amount != "none":  # (user, 2026-11-19) graphic scenes first, so they download no extra clips
+        try:
+            import tools_graphics as _tg3
+            _tg3.plan_graphics(title, scenes, amount=gfx_amount)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _collect(index: int, scene: dict) -> dict:
         visual_path, kind, visual_source = _scene_visual(
@@ -2348,7 +2518,7 @@ def plan_footage(title: str, minutes: int, script: str | None,
             vertical=is_short)
         try:  # rich footage: a clip for each new thing the scene talks about
             shots = autovideo_smart.collect_shots(title, scene, index, work_dir, visuals, pexels_key, pixabay_key,
-                                                  is_short, used_urls, lock) if kind == "clip" else []
+                                                  is_short, used_urls, lock) if kind == "clip" and gfx_amount != "all" and not scene.get("graphic") else []
         except Exception:  # noqa: BLE001
             shots = []
         return {
@@ -2369,6 +2539,8 @@ def plan_footage(title: str, minutes: int, script: str | None,
                          + autovideo.core_words(scene["narration"]))[:8],
             "plan": scene.get("plan") or {},
             "shots": shots,
+            **({"graphic": scene["graphic"]} if scene.get("graphic") else {}),
+            **({"tags": scene["tags"]} if scene.get("tags") else {}),
         }
 
     workers = max(2, min(4, os.cpu_count() or 4))
@@ -2387,6 +2559,15 @@ def plan_footage(title: str, minutes: int, script: str | None,
     ordered = [results[i] for i in sorted(results)]
     if not ordered:
         raise RuntimeError("Footage collection produced no scenes.")
+    try:  # motion graphics (Manim + Pymunk) for the scenes they explain best (2026-11-19)
+        import tools_graphics
+        if gfx_amount != "none" and tools_graphics.add_to_footage(title, ordered, work_dir, is_short, progress_cb, amount=gfx_amount):
+            for sc in ordered:
+                if sc.get("graphic"):
+                    sc.setdefault("plan", {})["presenter"] = False
+                    _job_scene_done(work_dir, sc)
+    except Exception:  # noqa: BLE001 — footage only, as before
+        pass
     return {
         "scenes": ordered,
         "script": script_text,
@@ -2429,9 +2610,32 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     workers = max(2, min(4, os.cpu_count() or 4))
     results: dict[int, dict] = {}
     fallback_note = ""
+
+    def _voice_keep(i, narration, *rest):
+        """(user, 2026-11-20) an audio step that was stopped half-way (the app was closed) keeps the
+        scenes it had already voiced: a retry voices only the missing ones. The notes are removed when
+        the step finishes, so a later re-voice always makes new voices."""
+        import hashlib
+        note = work_dir / f"scene-{i:02d}.voice-done.json"
+        key = hashlib.sha1(json.dumps([narration, voice, tts_provider or ""]).encode("utf-8")).hexdigest()
+        try:
+            d = json.loads(note.read_text(encoding="utf-8"))
+            p = work_dir / d["file"]
+            if d.get("key") == key and p.exists() and float(d.get("duration") or 0) > 0:
+                return p, d.get("engine") or "kept", float(d["duration"]), False, ""
+        except Exception:  # noqa: BLE001 — no note: voice it
+            pass
+        res = _voice_scene_with_fallback(i, narration, *rest)
+        if res[0] is not None and res[2] > 0 and Path(res[0]).parent.resolve() == work_dir.resolve():
+            try:
+                note.write_text(json.dumps({"key": key, "file": Path(res[0]).name, "engine": res[1], "duration": res[2]}),
+                                encoding="utf-8")
+            except OSError:
+                pass
+        return res
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(_voice_scene_with_fallback, i,
+            pool.submit(_voice_keep, i,
                         s["narration"], voice, work_dir,
                         tts_provider, tts_key, i == 0, i == len(scenes) - 1): i
             for i, s in enumerate(scenes)
@@ -2454,6 +2658,8 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     ordered = [results[i] for i in sorted(results)]
     if not ordered or any(r["voice_path"] is None for r in ordered):
         raise RuntimeError("Voiceover failed for a scene.")
+    for note in work_dir.glob("scene-*.voice-done.json"):  # the step finished: no voice is kept for later
+        note.unlink(missing_ok=True)
     voice_files = [r["voice_path"] for r in ordered]
     durations = [r["duration"] for r in ordered]
     total_voice = sum(durations)
@@ -2534,6 +2740,38 @@ def _to_vertical(final_path: Path, work_dir: Path) -> Path:
     return final_path
 
 
+def _prerender_graphics(work_dir: Path, scenes: list[dict], durations: list[float], voice_files: list[Path],
+                        vertical: bool, progress_cb=None) -> None:
+    """Visual Explainer speed (user, 2026-11-19): the scene animations are drawn a few at a
+    time BEFORE the scenes are joined (each one is reused by the render loop below)."""
+    todo = [i for i, sc in enumerate(scenes) if sc.get("graphic") and (sc["graphic"] or {}).get("theme") == "visual"
+            and sc.get("visual_file") == sc.get("graphic_file")]
+    if len(todo) < 2:
+        return
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+    import tools_graphics
+    srts = {}
+    for i in todo:  # word timings first (one at a time — speech recognition is heavy)
+        try:
+            srts[i] = _transcribe_scene_voice(voice_files[i], work_dir, i)
+        except Exception:  # noqa: BLE001
+            srts[i] = None
+    done = [0]
+
+    def one(i):
+        last = i >= len(scenes) - 1
+        try:
+            tools_graphics.clip_for_scene(scenes[i], i, work_dir, durations[i] + (0 if last else _TRANSITION_SEC), srts.get(i), vertical)
+        except Exception as exc:  # noqa: BLE001 — the render loop tries again
+            print("animation failed for scene", i + 1, exc)
+        done[0] += 1
+        if progress_cb:
+            progress_cb(done[0], len(todo), f"Animating scene {done[0]} of {len(todo)}…")
+    with ThreadPoolExecutor(max_workers=max(1, min(3, (os.cpu_count() or 2) // 2))) as pool:
+        list(pool.map(one, todo))
+
+
 def render_video(work_dir: Path, scenes: list[dict],
                  durations: list[float], voice_files: list[Path],
                  music_path: Path | None, music_volume: float,
@@ -2555,6 +2793,9 @@ def render_video(work_dir: Path, scenes: list[dict],
     vertical = video_type == "short"
     segments: list[Path] = []
     kinds = {"clip": 0, "image": 0, "ai": 0, "card": 0}
+    voice_files = list(voice_files)
+    _remember_narrations(work_dir, scenes)
+    _prerender_graphics(work_dir, scenes, durations, voice_files, vertical, progress_cb)
     for i, scene in enumerate(scenes):
         visual_path = work_dir / scene["visual_file"]
         if not visual_path.exists():
@@ -2562,7 +2803,23 @@ def render_video(work_dir: Path, scenes: list[dict],
                 f"Scene {i + 1} footage missing: {scene['visual_file']}")
         voice_path = voice_files[i]
         caption = scene.get("caption") or _caption_text(scene)
-        if scene.get("shots") and scene.get("kind") == "clip" and not scene.get("studio"):
+        gfx_kind = None
+        if scene.get("graphic") and scene.get("visual_file") == scene.get("graphic_file"):
+            # a motion graphic: animated now, every element when its words are spoken
+            try:
+                import tools_graphics
+                srt = _transcribe_scene_voice(voice_path, work_dir, i)
+                last = i >= len(scenes) - 1
+                g = tools_graphics.clip_for_scene(scene, i, work_dir, durations[i] + (0 if last else _TRANSITION_SEC), srt, vertical)
+                if g is not None and g.exists():
+                    visual_path, gfx_kind = g, "clip"
+                    sfx = g.with_suffix(".sfx.json")
+                    if sfx.exists():  # Visual Explainer: every motion's sound effect under this scene's voice
+                        import tools_visual
+                        tools_visual.mix_into_voice(voice_path, json.loads(sfx.read_text(encoding="utf-8")), durations[i], seed=i)
+            except Exception:  # noqa: BLE001 — the still picture, as in the review
+                pass
+        if scene.get("shots") and scene.get("kind") == "clip" and not scene.get("studio") and not gfx_kind:
             # rich footage: the extra shots cut in, with smooth effects, when their words are spoken
             try:
                 import autovideo_smart
@@ -2574,14 +2831,25 @@ def render_video(work_dir: Path, scenes: list[dict],
                     visual_path = multi
             except Exception:  # noqa: BLE001 — the scene's one clip, as before
                 pass
+        if scene.get("tags") and not gfx_kind and scene.get("kind") == "clip" and not scene.get("studio"):
+            # Documentary Explainer: the spoken number appears as a tag on the footage
+            try:
+                import tools_docu
+                srt = _transcribe_scene_voice(voice_path, work_dir, i) if subtitles else None
+                last = i >= len(scenes) - 1
+                tagged = tools_docu.apply_tags(scene, visual_path, durations[i] + (0 if last else _TRANSITION_SEC), srt, work_dir, i, vertical)
+                if tagged is not None:
+                    visual_path = tagged
+            except Exception:  # noqa: BLE001 — the footage without the tag
+                pass
         dest = encode_scene_segment(
-            i, visual_path, scene["kind"], caption, durations[i],
+            i, visual_path, gfx_kind or scene["kind"], caption, durations[i],
             work_dir, voice_path, subtitles=subtitles,
             total_scenes=len(scenes), vertical=vertical)
         if dest is None:
             raise RuntimeError(f"Scene {i + 1} segment failed to encode.")
         segments.append(dest)
-        kinds[scene["kind"]] = kinds.get(scene["kind"], 0) + 1
+        kinds[gfx_kind or scene["kind"]] = kinds.get(gfx_kind or scene["kind"], 0) + 1
         if progress_cb:
             progress_cb(i + 1, len(scenes),
                         f"Rendering scene {i + 1} of {len(scenes)}…")

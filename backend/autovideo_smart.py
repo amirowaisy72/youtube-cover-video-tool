@@ -37,10 +37,99 @@ _FIN_WORDS = {"money", "salary", "paycheck", "budget", "savings", "save", "inves
               "health", "family", "time", "freedom", "goal", "goals", "mindset", "success", "secret", "mistake", "mistakes"}
 
 
-def _plan_prompt(title: str, part: list[tuple[int, str]]) -> str:
-    lines = "\n".join(f"{n}. {text[:600]}" for n, text in part)
+def _beats(text: str) -> int:
+    """How many footage changes a scene gets: one about every 9 spoken words (~3.5 s),
+    so a wrong clip never stays on screen long (user, 2026-11-19)."""
+    return max(0, min(4, round(len(text.split()) / 11) - 1))  # at most 4 cuts: a faster footage step (user, 2026-11-19)
+
+
+def _brief_prompt(title: str, script: str) -> str:
     return (
-        f'You plan the visuals of a YouTube video titled "{title}". For EACH numbered scene below, '
+        f'A YouTube video is titled "{title}". Its script starts:\n{script[:2500]}\n\n'
+        "Before footage is chosen, explain the topic so stock footage stays RELEVANT. Reply ONLY JSON: "
+        '{"about":"one sentence: what the subject is (e.g. GTA 6 is a video game by Rockstar Games)",'
+        '"important":["10-20 important words/names of THIS topic exactly as they appear in the script"],'
+        '"world":["8 short (2-4 words) stock VIDEO searches that always fit this topic, e.g. for a video game: '
+        'gamer holding controller, gaming pc rgb, neon city night, sports car night drive"],'
+        '"avoid":["words for footage that would look wrong in this video"]}')
+
+
+def ai_scene_items(data) -> list[dict]:
+    """The per-scene answers of an AI reply, whatever shape it came in: a list of objects,
+    an object keyed by scene number, or a bare list. Anything that is not an object is
+    dropped, so an odd AI answer can never stop the video (user, 2026-11-19)."""
+    if isinstance(data, list):
+        rows = data
+    elif isinstance(data, dict):
+        rows = data.get("scenes")
+        if rows is None:
+            rows = [v for k, v in data.items() if str(k).isdigit()]
+            for k, v in data.items():
+                if str(k).isdigit() and isinstance(v, dict):
+                    v.setdefault("n", int(k))
+        elif isinstance(rows, dict):
+            fixed = []
+            for k, v in rows.items():
+                if isinstance(v, dict):
+                    v = dict(v)
+                    if str(k).isdigit():
+                        v.setdefault("n", int(k))
+                    fixed.append(v)
+            rows = fixed
+    else:
+        rows = []
+    out = []
+    for k, v in enumerate(rows if isinstance(rows, list) else []):
+        if isinstance(v, dict):
+            v.setdefault("n", k + 1)
+            out.append(v)
+    return out
+
+
+def _as_list(v) -> list:
+    if isinstance(v, list):
+        return v
+    if isinstance(v, str) and v.strip():
+        return [x.strip() for x in v.split(",") if x.strip()]
+    return []
+
+
+def topic_brief(title: str, scenes: list[dict]) -> dict:
+    """One look at the whole video: what it is about, its important words, safe searches."""
+    script = "\n".join(s["narration"] for s in scenes)
+    out = {"about": "", "important": [], "world": [], "avoid": []}
+    try:
+        import tools_animator as ta
+        data = ta._json_in(ta._ask_ai(_brief_prompt(title, script), timeout=90, attempts=2))
+    except Exception:  # noqa: BLE001
+        data = None
+    if isinstance(data, dict):
+        out["about"] = str(data.get("about") or "")[:200]
+        for k, n in (("important", 20), ("world", 8), ("avoid", 10)):
+            out[k] = [str(x).strip()[:40] for x in _as_list(data.get(k)) if str(x).strip()][:n]
+    if not out["world"]:
+        tw = autovideo.core_words(title)[:3]
+        out["world"] = [" ".join(tw[:2])] if tw else []
+    return out
+
+
+def _plan_prompt(title: str, part: list[tuple[int, str]], brief: dict | None = None) -> str:
+    lines = "\n".join(f"{n}. [{_beats(text)} shots] {text[:900]}" for n, text in part)
+    b = brief or {}
+    ctx = ""
+    try:
+        import tools_graphics
+        if tools_graphics.style()["theme"] == "docu":
+            ctx += ("STYLE: a calm research documentary — queries for cinematic, wide, aerial or slow shots of real places, "
+                    "ships, ports, trucks, factories, fields, warehouses, cities and markets; no people talking to camera, no "
+                    "cartoons, no flashy stock clichés.\n")
+    except Exception:  # noqa: BLE001
+        pass
+    if b.get("about") or b.get("important"):
+        ctx = (f"TOPIC: {b.get('about', '')} Important words of this topic: {', '.join(b.get('important') or [])}. "
+               f"Footage that always fits: {', '.join(b.get('world') or [])}.\n")
+    return (
+        f'You plan the visuals of a YouTube video titled "{title}". ' + ctx + 'For EACH numbered scene below, '
         'reply with ONLY JSON: {"scenes":[{"n":1,"queries":["...","...","..."],"avoid":["..."],'
         '"key":"...","list":[],"presenter":false,"shots":[{"words":"...","query":"..."}]}]}\n'
         "queries: 3 different short (2-4 words) Pexels/Pixabay stock VIDEO searches that SHOW what the scene "
@@ -51,9 +140,12 @@ def _plan_prompt(title: str, part: list[tuple[int, str]]) -> str:
         "list: if the scene names 3 or more things one after another, those items exactly as written; else [].\n"
         "presenter: true if this scene is stronger said to camera by a presenter (the hook, a direct question to the "
         "viewer, a strong opinion, the 'here is the fix' moment, the call to subscribe); false if footage shows it better.\n"
-        "shots: 0-3 moments INSIDE the scene where the picture should change to new footage because the narration "
-        "moves to a new concrete thing (each item of a list, a new example, a new place) - words: the exact words from "
-        "the scene where it changes, query: a 2-4 word stock video search for it. Not for the first sentence.\n"
+        "shots: the footage CHANGES inside the scene - give EXACTLY the number written as [N shots] before the scene. "
+        "Each change starts where an IMPORTANT word is spoken (a name, thing, place, number, action of THIS topic), spread "
+        "evenly through the scene (never two within 6 words, none in the first 5 words). words: 1-4 words copied EXACTLY "
+        "from the scene, in the order they appear; query: a 2-4 word stock VIDEO search that SHOWS that word IN THIS "
+        "VIDEO'S TOPIC (for a video game: 'PC' -> 'gaming pc rgb', 'release' -> 'calendar date circled', 'Vice City' -> "
+        "'miami skyline night'); never a literal meaning that does not fit the topic.\n"
         "Scenes:\n" + lines)
 
 
@@ -109,6 +201,25 @@ def _rules_plan(title: str, text: str, index: int, count: int) -> dict:
                  bool(re.search(r"\b(here'?s (the|how|what)|let me|you need to|try this|subscribe|my advice|the truth)\b", low)))
     items = list_items(text)
     shots = [{"words": it, "query": it} for it in items[:3] if len(it) > 2]
+    if len(shots) < _beats(text):  # a change about every 9 words, on the strongest word of each part
+        toks = text.split()
+        tw = {w.lower() for w in re.findall(r"[A-Za-z']+", title)}
+        have = {sh["words"].lower() for sh in shots}
+        for a in range(9, len(toks) - 4, 9):
+            part = toks[a:a + 9]
+            best, sc = "", 0.0
+            for w in part:
+                lw = re.sub(r"[^a-z0-9'-]", "", w.lower())
+                if len(lw) < 3 or lw in _STOP:
+                    continue
+                v = len(lw) * 0.2 + (2 if lw in tw else 0) + (1 if w[:1].isupper() else 0) + (1.5 if any(c.isdigit() for c in lw) else 0)
+                if v > sc:
+                    best, sc = re.sub(r"[^A-Za-z0-9'-]", "", w), v
+            if best and best.lower() not in have:
+                core = [c for c in autovideo.core_words(" ".join(part)) if c.lower() != best.lower()][:1]
+                shots.append({"words": best, "query": " ".join([best.lower()] + core)})
+                have.add(best.lower())
+        shots.sort(key=lambda sh: text.lower().find(sh["words"].lower()))
     return {"queries": queries[:3], "avoid": [], "key": key_words(text, title), "list": items,
             "presenter": presenter, "shots": shots, "by": "rules"}
 
@@ -122,43 +233,57 @@ def attach_scene_plans(title: str, scenes: list[dict]) -> None:
         import tools_animator as ta
     except Exception:  # noqa: BLE001
         return
+    brief = topic_brief(title, scenes)
+    for sc in scenes:
+        sc["topic"] = brief
     for start in range(0, n, _PLAN_CHUNK):
         part = [(i + 1, scenes[i]["narration"]) for i in range(start, min(n, start + _PLAN_CHUNK))]
         try:
-            data = ta._json_in(ta._ask_ai(_plan_prompt(title, part), timeout=90, attempts=2))
+            data = ta._json_in(ta._ask_ai(_plan_prompt(title, part, brief), timeout=120, attempts=2))
         except Exception:  # noqa: BLE001 — the rules plan stays
             continue
-        for item in (data.get("scenes") or []) if isinstance(data, dict) else []:
+        for item in ai_scene_items(data):
             try:
                 i = int(item.get("n")) - 1
             except (TypeError, ValueError):
                 continue
             if not 0 <= i < n:
                 continue
-            low = scenes[i]["narration"].lower()
-            plan = scenes[i]["plan"]
-            queries = [str(q).strip()[:40] for q in item.get("queries") or [] if str(q).strip()][:3]
-            if queries:
-                plan["queries"] = queries
-            plan["avoid"] = [str(a).strip().lower()[:20] for a in item.get("avoid") or [] if str(a).strip()][:8]
-            key = str(item.get("key") or "").strip()
-            if key and key.lower() in low:
-                plan["key"] = key
-            items = [str(x).strip() for x in item.get("list") or [] if str(x).strip() and str(x).strip().lower() in low]
-            if len(items) >= 3:
-                plan["list"] = items[:6]
-            if isinstance(item.get("presenter"), bool):
-                plan["presenter"] = item["presenter"]
-            shots = []
-            for sh in item.get("shots") or []:
-                if not isinstance(sh, dict):
-                    continue
-                w, q = str(sh.get("words") or "").strip(), str(sh.get("query") or "").strip()
-                if w and q and w.lower() in low and low.find(w.lower()) > 20:
-                    shots.append({"words": w[:80], "query": q[:40]})
-            if shots:
-                plan["shots"] = shots[:3]
-            plan["by"] = "ai"
+            try:
+                _apply_plan(scenes[i], item, brief)
+            except Exception:  # noqa: BLE001 — this scene keeps its rules plan
+                continue
+
+
+def _apply_plan(scene: dict, item: dict, brief: dict) -> None:
+    """Copy one AI scene answer into the scene's plan (only valid values)."""
+    low = scene["narration"].lower()
+    plan = scene["plan"]
+    queries = [str(q).strip()[:40] for q in _as_list(item.get("queries")) if str(q).strip()][:3]
+    if queries:
+        plan["queries"] = queries
+    plan["avoid"] = ([str(a).strip().lower()[:20] for a in _as_list(item.get("avoid")) if str(a).strip()][:8]
+                     + [str(a).lower() for a in brief.get("avoid") or []][:6])
+    key = str(item.get("key") or "").strip()
+    if key and key.lower() in low:
+        plan["key"] = key
+    items = [str(x).strip() for x in _as_list(item.get("list")) if str(x).strip() and str(x).strip().lower() in low]
+    if len(items) >= 3:
+        plan["list"] = items[:6]
+    if isinstance(item.get("presenter"), bool):
+        plan["presenter"] = item["presenter"]
+    shots, last = [], 15
+    for sh in (item.get("shots") if isinstance(item.get("shots"), list) else []):
+        if not isinstance(sh, dict):
+            continue
+        w, q = str(sh.get("words") or "").strip(), str(sh.get("query") or "").strip()
+        p = low.find(w.lower(), last) if w else -1
+        if q and p >= last:  # in order, and not crowded together
+            shots.append({"words": w[:80], "query": q[:40], "at": p})
+            last = p + 25
+    if shots:
+        plan["shots"] = shots[:4]
+    plan["by"] = "ai"
 
 
 def pick_studio_scenes(scenes: list[dict]) -> list[int]:
@@ -177,10 +302,12 @@ def pick_studio_scenes(scenes: list[dict]) -> list[int]:
         if len(chosen) >= 2 and chosen[-1] == i - 1 and chosen[-2] == i - 2:
             continue  # three studio scenes in a row: let footage breathe
         chosen.append(i)
+    graphic = {i for i, s in enumerate(scenes) if s.get("graphic") and s.get("visual_file") == s.get("graphic_file")}
+    chosen = [i for i in chosen if i not in graphic]  # a motion graphic scene stays a graphic
     for i in [0, n - 1] + list(range(2, n, 3)):  # too few: the opening, the end, then a steady spread
         if len(chosen) >= lo:
             break
-        if i not in chosen:
+        if i not in chosen and i not in graphic:
             chosen.append(i)
     if n > 2 and len(chosen) >= n:
         chosen = chosen[: n - 1]
@@ -353,6 +480,9 @@ def plan_auto_popups(scenes: list[dict], work_dir: Path, amount: str = "normal",
         if only_scene is not None and i != only_scene:
             offset += dur
             continue
+        if sc.get("graphic") and sc.get("visual_file") == sc.get("graphic_file"):
+            offset += dur  # a motion graphic shows its own words and numbers
+            continue
         cues = av2._parse_srt_cues(work_dir / f"scene-{i:02d}.srt")
         clock = _Clock(text, dur, cues=cues or None, runs=(runs_by_scene or {}).get(i))
         plan = sc.get("plan") or {}
@@ -442,29 +572,43 @@ SAFE_TRANSITIONS = ["fade", "smoothleft", "circleopen", "slideleft", "dissolve",
 
 def collect_shots(title: str, scene: dict, index: int, work_dir: Path, visuals: str, pexels_key, pixabay_key,
                   vertical: bool, used: set, lock) -> list[dict]:
-    """Download one clip for each planned shot (videos only)."""
+    """Download one clip for each planned shot (videos only), a few at once. A shot whose
+    own search finds nothing new uses the video's always-fitting topic searches instead."""
     if visuals == "images":
         return []
-    out = []
-    for k, sh in enumerate((scene.get("plan") or {}).get("shots") or []):
-        fake = {"plan": {"queries": [sh["query"]], "avoid": (scene.get("plan") or {}).get("avoid") or []}}
-        cands = smart_candidates(title, fake, "videos", pexels_key, pixabay_key, vertical)["videos"]
-        for item in cands[:6]:
-            with lock:
-                if item["url"] in used:
-                    continue
-                used.add(item["url"])
-            dest = work_dir / f"scene-{index:02d}-shot{k + 1}.mp4"
+    from concurrent.futures import ThreadPoolExecutor
+    plan = scene.get("plan") or {}
+    world = list((scene.get("topic") or {}).get("world") or [])
+    avoid = plan.get("avoid") or []
+
+    def one(k: int, sh: dict) -> dict | None:
+        tries = [sh["query"]] + [w for w in random.sample(world, len(world)) if w != sh["query"]][:2]
+        for q in tries:
+            fake = {"plan": {"queries": [q], "avoid": avoid}}
             try:
-                if autovideo._download(item["url"], dest, total_timeout=60) and autovideo._ffprobe_duration(dest):
-                    remember_footage(item["url"])
-                    out.append({"file": dest.name, "words": sh["words"], "query": sh["query"]})
-                    break
+                cands = smart_candidates(title, fake, "videos", pexels_key, pixabay_key, vertical)["videos"]
             except Exception:  # noqa: BLE001
-                pass
-            with lock:
-                used.discard(item["url"])
-    return out
+                cands = []
+            for item in cands[:6]:
+                with lock:
+                    if item["url"] in used:
+                        continue
+                    used.add(item["url"])
+                dest = work_dir / f"scene-{index:02d}-shot{k + 1}.mp4"
+                try:
+                    if autovideo._download(item["url"], dest, total_timeout=60) and autovideo._ffprobe_duration(dest):
+                        remember_footage(item["url"])
+                        return {"file": dest.name, "words": sh["words"], "query": q, **({"at": sh["at"]} if "at" in sh else {})}
+                except Exception:  # noqa: BLE001
+                    pass
+                with lock:
+                    used.discard(item["url"])
+        return None
+
+    shots = list(plan.get("shots") or [])
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        got = list(pool.map(lambda kv: one(*kv), enumerate(shots)))
+    return [g for g in got if g]
 
 
 def compose_shots(work_dir: Path, index: int, main_clip: Path, scene: dict, duration: float,
@@ -490,12 +634,14 @@ def compose_shots(work_dir: Path, index: int, main_clip: Path, scene: dict, dura
             runs = None
     clock = _Clock(text, duration, cues=cues, runs=runs)
     cuts: list[tuple[float, Path]] = [(0.0, main_clip)]
-    for sh in shots:
-        p = low.find(sh["words"].lower())
+    last = 0
+    for sh in sorted(shots, key=lambda x: x.get("at", low.find(x["words"].lower()))):
+        p = sh["at"] if isinstance(sh.get("at"), int) and low[sh["at"]:].startswith(sh["words"].lower()) else low.find(sh["words"].lower(), last)
         if p < 0:
             continue
+        last = p + 1
         t = clock.at_word(clock.word_index(p, text)) - 0.15
-        if t - cuts[-1][0] >= 0.9 and duration - t >= 1.0:  # list items can cut quickly
+        if t - cuts[-1][0] >= 1.4 and duration - t >= 1.2:  # a new picture on each important word, never a flash
             cuts.append((t, work_dir / sh["file"]))
     if len(cuts) < 2:
         return None

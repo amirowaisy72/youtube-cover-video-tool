@@ -1,0 +1,27 @@
+1
+00:00:00,000 --> 00:00:01,100
+Keep in mind that stock
+
+2
+00:00:01,100 --> 00:00:02,700
+prices often jump before release
+
+3
+00:00:02,700 --> 00:00:04,320
+day and swing wildly right
+
+4
+00:00:04,320 --> 00:00:05,120
+after launch.
+
+5
+00:00:06,140 --> 00:00:07,720
+Smart investors buy steadily over
+
+6
+00:00:07,720 --> 00:00:09,140
+time instead of chasing hype
+
+7
+00:00:09,140 --> 00:00:10,100
+on a single morning.

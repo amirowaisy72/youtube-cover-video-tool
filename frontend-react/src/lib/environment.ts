@@ -31,7 +31,8 @@ export type EnvLayout = {
   props: { type: PropType; x: number; x2?: number }[]; // x = fraction of width
   world?: string; // a world you made in the Environment Designer (3D)
   need?: { verb: string; word: string; on?: string }[];
-  quiet?: boolean; // night / sneaking / hiding: no strangers about // what the script uses here ({climb:tree}…) — 3D builds it
+  quiet?: boolean; // night / sneaking / hiding: no strangers about
+  signs?: string[]; // texts the story shows on screens: the city's billboards light up with them // what the script uses here ({climb:tree}…) — 3D builds it
   location?: string; // the scene's own words ("river bank in the jungle")
   name?: string; // the place name the director gave
   world_exact?: boolean; // the saved world was named exactly / chosen by you (else a blueprint may win)

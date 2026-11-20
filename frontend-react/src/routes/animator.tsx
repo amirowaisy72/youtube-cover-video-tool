@@ -18,8 +18,11 @@ import {
 } from "@/lib/api";
 import { ENV_KINDS, type EnvKind } from "@/lib/environment";
 import { BLUEPRINTS, blueprintFor } from "@/lib/world/blueprints";
-import { getGeminiKey, setGeminiKey } from "@/lib/gemini";
-import { FREESOUND_KEY_STORAGE, getTtsKey, PIXABAY_KEY_STORAGE } from "@/lib/keys";
+import { getKey, installDashboardButton, voiceKeys } from "@/lib/config";
+import { KeysNeeded } from "@/components/KeysNeeded";
+import { AiStatusBox } from "@/components/AiStatusBox";
+import { type JobRow, MyVideos, useJobList } from "@/components/MyVideos";
+import { MyVideosLink } from "@/components/VideoLibrary";
 import {
   type CharacterConfig,
   characterSvg,
@@ -27,6 +30,45 @@ import {
   normalizeCharacter,
   POSES,
 } from "@/lib/stickman";
+
+installDashboardButton();
+
+type VoiceEngine = { where: string; reason: string; retry_in: number; last_retry: string; colab_set: boolean;
+  avg_colab: number; avg_cpu: number; age: number | null; gpu?: number; link?: number };
+
+/** Where the voices are made right now — Google GPU (Colab) or this computer — and why (user, 2026-11-19). */
+function VoiceEngineBox({ v }: { v?: VoiceEngine }) {
+  const [, tick] = useState(0);
+  useEffect(() => { const t = window.setInterval(() => tick((n) => n + 1), 1000); return () => window.clearInterval(t); }, []);
+  if (!v) return null;
+  const onColab = v.where === "colab";
+  const onCpu = v.where === "cpu";
+  return (
+    <div className={`rounded-xl border p-3 text-sm ${onColab ? "border-emerald-500/40 bg-emerald-500/5" : "border-amber-500/40 bg-amber-500/5"}`}>
+      {!v.where && <p className="text-muted-foreground">Preparing the voices…</p>}
+      {onColab && (
+        <p className="text-emerald-300">⚡ Running on <b>Google GPU (Colab)</b>{v.avg_colab ? ` · about ${v.avg_colab}s per voice` : ""}
+          {v.gpu ? <span className="text-muted-foreground"> (Google's work {v.gpu}s + internet link {v.link}s)</span> : null}</p>
+      )}
+      {onCpu && (
+        <>
+          <p className="text-amber-300">🖥 Running on <b>this computer (CPU)</b>{v.avg_cpu ? ` · about ${v.avg_cpu}s per voice` : ""} — slower</p>
+          <p className="mt-1 text-muted-foreground">Why not Google: {v.reason || "—"}</p>
+          {v.colab_set && (
+            <p className="mt-1 text-muted-foreground">{v.retry_in > 0 ? `Trying Google again in ${v.retry_in}s` : "Trying Google again with the next voice"}</p>
+          )}
+        </>
+      )}
+      {v.last_retry && v.colab_set && <p className="mt-1 text-xs text-muted-foreground">Last Google try: {v.last_retry}</p>}
+      {v.avg_colab > 0 && v.avg_cpu > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">Google ≈ {v.avg_colab}s · this computer ≈ {v.avg_cpu}s per voice</p>
+      )}
+      {!v.colab_set && (
+        <Link to="/dashboard" className="btn btn-secondary btn-sm mt-2">🐢 Running too slow? Connect Google GPU to make this process faster →</Link>
+      )}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/animator")({
   component: Animator,
@@ -59,16 +101,9 @@ const ACTION_LIST = ["read", "turn-page", "sniff", "laugh", "giggle", "cry", "ga
   "walk-to", "step-back", "pace", "run", "chase", "fight", "kick", "push", "hug", "high-five", "climb", "jump-rope",
   "light-fire", "throw", "hide", "swim"];
 
-/** The user's own Unreal Speech / ElevenLabs / Google keys (saved in Auto Video), for character voices. */
+/** The user's own voice keys (Dashboard), for character voices. */
 function ttsKeys(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const p of ["unreal", "elevenlabs", "google"]) {
-    const k = getTtsKey(p);
-    if (k) out[p] = k;
-  }
-  const g = getGeminiKey();
-  if (g) out.gemini = g;
-  return out;
+  return voiceKeys();
 }
 
 const DEFAULT_SFX = ["laugh", "giggle", "gasp", "boing", "slap", "punch", "crash", "ding", "whoosh", "pop",
@@ -123,6 +158,8 @@ RULES:
 - The user's own 3D worlds (write the world's EXACT name as the place to use one, e.g. "# Scene: ${worlds[0]!.name}"): ${worlds.map((w) => `${w.name} (${w.summary})`).join("; ")}. Whenever a scene happens in a place like one of these, use that world's exact name.` : ""}${fit.length ? `
 - THIS STORY FITS the world "${fit[0]!.name}": set most scenes at "# Scene: ${fit[0]!.name}". What is REALLY there, and what the characters can do with each thing: ${fit[0]!.uses || fit[0]!.summary}. Build the story AROUND these things and use them often (that makes the video alive). Do NOT talk about things that are not there — or bring them in with {show:thing}.` : ""}
 - When a line talks about an animal or thing that should APPEAR in the scene, add {show:<thing>} right there, e.g. "Look, a {show:cat} cat!" or "{show:pizza} Pizza is here!" — it walks / pops into the scene.
+- Motion-graphic panels (a small animated graphic over the film for ~3 seconds) — use about ONE per minute, at a funny or important moment, never two in a row: {meter:<Name>'s patience:90>2} (a level falling/rising), {map:beach>airport>jungle} (a route), {countdown:3}, {chat:Mom:Where are you?} (a phone message), {stars:3} (wanted level), {money:Rs 80000>5000} (money going up/down), {counter:Views:0>1000000}, {pile:coin} (things piling up), {topple:books} (a stack falls over), {scatter:money} (things fly apart), {compare:Spending=9, Saving=2}, {steps:Plan>Steal>Run}, {stamp:BUSTED}, {chapter:Part 2 — The Heist} (a chapter card between big parts).
+- Clothes: {wear:vice} (loud shirt + sunglasses), {wear:jacket}, {wear:suit}, {wear:police}, {wear:normal}. A TV / computer / phone screen with text: {screen:BREAKING NEWS}.
 - Mark only the 2-3 MOST important words of the WHOLE script with *stars* (the key object of the story, e.g. *magic wand*, *samosa*) — they pop up on screen the moment they are said. Pop-ups must be rare to feel special.
 - <expression> must be one of: ${EXPRESSIONS.join(", ")}
 - <pose> must be one of: ${POSES.join(", ")}
@@ -180,7 +217,7 @@ function Animator() {
   // 2D or 3D film (user, 2026-11-16: a full 3D tool, without touching the 2D one)
   const [mode, setModeState] = useState<"2d" | "3d">(() => (load("ytguru-animator-mode") === "3d" ? "3d" : "2d"));
   const setMode = (m: "2d" | "3d") => { setModeState(m); store("ytguru-animator-mode", m); };
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(() => { try { const t = localStorage.getItem("ytguru-title-in-anim"); if (t) { localStorage.removeItem("ytguru-title-in-anim"); return t; } } catch { /* private mode */ } return ""; });
   const [minutes, setMinutes] = useState(1);
   const [format, setFormat] = useState<"long" | "reel">("long");
   const [language, setLanguage] = useState<"en" | "ur">("en");
@@ -190,26 +227,42 @@ function Animator() {
   const [review, setReviewState] = useState(() => load("ytguru-animator-review") !== "0");
   const setReview = (v: boolean) => { setReviewState(v); store("ytguru-animator-review", v ? "1" : "0"); };
   const [savedWorlds, setSavedWorlds] = useState<string[]>([]);
-  const [ownScript, setOwnScript] = useState(false);
-  const [script, setScript] = useState("");
+  const [ownScript, setOwnScriptState] = useState(() => load("ytguru-animator-own") === "1");
+  const setOwnScript = (v: boolean) => { setOwnScriptState(v); store("ytguru-animator-own", v ? "1" : null); };
+  const [script, setScriptState] = useState(() => load("ytguru-animator-script"));
+  const setScript = (v: string) => { setScriptState(v); store("ytguru-animator-script", v || null); };
   // your own rough idea — goes into the copied prompt AND the app's own writer (user, 2026-11-18)
   const [idea, setIdeaState] = useState(() => load("ytguru-animator-idea"));
   const setIdea = (v: string) => { setIdeaState(v); store("ytguru-animator-idea", v || null); };
   const [backgrounds, setBackgrounds] = useState<"drawn" | "pixabay">("drawn");
   const [music, setMusic] = useState("auto");
   const [sfxOn, setSfxOn] = useState(true);
-  const [freesoundKey, setFreesoundKey] = useState(() => load(FREESOUND_KEY_STORAGE));
-  const [geminiKey, setGeminiKeyState] = useState(() => getGeminiKey());
   const [acting, setActing] = useState(() => load("ytguru-animator-acting") !== "0");
   const [musicTracks, setMusicTracks] = useState<{ file: string; name: string; artist: string }[]>([]);
   const [sfxNames, setSfxNames] = useState<string[]>(DEFAULT_SFX);
   const [copied, setCopied] = useState(false);
-  const [pixabayKey, setPixabayKey] = useState(() => load(PIXABAY_KEY_STORAGE));
   const [jobId, setJobId] = useState(() => load(JOB_KEY));
   const [job, setJob] = useState<AnimatorJob | null>(null);
   const [story, setStory] = useState<AnimatorScene[] | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // My videos + the queue (2026-11-19)
+  const [jobs, reloadJobs] = useJobList(true);
+  const [autoRender, setAutoRenderState] = useState(() => load("ytguru-auto-render") === "1");
+  const setAutoRender = (v: boolean) => { setAutoRenderState(v); store("ytguru-auto-render", v ? "1" : null); };
+  const [confirmNew, setConfirmNew] = useState(false);
+  const openJob = (j: JobRow) => {
+    store(JOB_KEY, j.id); setJobId(j.id); setJob(null); setStory(null); setErr(""); setConfirmNew(false);
+  };
+  const jobMode = ((job as (AnimatorJob & { mode?: string }) | null)?.mode === "3d" ? "3d" : (job as (AnimatorJob & { mode?: string }) | null)?.mode === "2d" ? "2d" : mode) as "2d" | "3d";
+  // films finished videos one after another (the tab must stay open)
+  useEffect(() => {
+    if (!autoRender) return;
+    if (job && job.status === "ready") return; // filming this one now
+    const next = [...jobs].reverse().find((j) => j.status === "ready" && j.id !== jobId);
+    if (next && (!job || !["script_ready"].includes(job.status))) openJob(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRender, jobs, job?.status]);
 
   useEffect(() => {
     animatorOptions()
@@ -254,16 +307,15 @@ function Animator() {
   const start = async () => {
     if (busy || !title.trim() || picked.length === 0) return;
     setBusy(true); setErr(""); setStory(null); setJob(null);
-    store(PIXABAY_KEY_STORAGE, pixabayKey.trim() || null);
-    if (freesoundKey.trim()) store(FREESOUND_KEY_STORAGE, freesoundKey.trim());
     try {
       const { job_id } = await animatorStart({
         title: title.trim(), minutes, format, language, character_ids: picked,
-        review, subtitles, custom_script: ownScript ? script : "", pixabay_key: pixabayKey.trim(), backgrounds: mode === "3d" ? "drawn" : backgrounds,
-        music, sfx: sfxOn, freesound_key: freesoundKey.trim(), tts_keys: ttsKeys(), ...({ acting, idea: ownScript ? "" : idea.trim(), gemini_key: geminiKey.trim() } as Record<string, unknown>),
+        review, subtitles, custom_script: ownScript ? script : "", pixabay_key: getKey("pixabay"), backgrounds: mode === "3d" ? "drawn" : backgrounds,
+        music, sfx: sfxOn, freesound_key: getKey("freesound"), tts_keys: ttsKeys(), ...({ acting, idea: ownScript ? "" : idea.trim(), gemini_key: getKey("gemini"), mode } as Record<string, unknown>),
       });
       store(JOB_KEY, job_id);
       setJobId(job_id);
+      reloadJobs();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not start.");
     } finally {
@@ -276,7 +328,7 @@ function Animator() {
     setBusy(true); setErr("");
     try {
       await animatorSaveScript(jobId, story);
-      await animatorContinue(jobId, pixabayKey.trim(), freesoundKey.trim(), ttsKeys());
+      await animatorContinue(jobId, getKey("pixabay"), getKey("freesound"), ttsKeys());
       setStory(null);
       setJob((j) => (j ? { ...j, status: "voicing", message: "Starting voices…" } : j));
     } catch (e) {
@@ -290,7 +342,7 @@ function Animator() {
     if (!jobId) return;
     setErr("");
     try {
-      await animatorContinue(jobId, pixabayKey.trim(), freesoundKey.trim(), ttsKeys());
+      await animatorContinue(jobId, getKey("pixabay"), getKey("freesound"), ttsKeys());
       setJob((j) => (j ? { ...j, status: "voicing", message: "Retrying…" } : j));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Retry failed.");
@@ -305,7 +357,7 @@ function Animator() {
     setSuggesting(true); setErr("");
     try {
       const r = await fetch("/api/animator/titles", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ character_ids: picked, count: 6, language, gemini_key: geminiKey, avoid: seenTitles }) });
+        body: JSON.stringify({ character_ids: picked, count: 6, language, gemini_key: getKey("gemini"), avoid: seenTitles }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail ?? "Could not get titles.");
       setTitleIdeas(j.titles ?? []);
@@ -326,7 +378,7 @@ function Animator() {
     window.setTimeout(() => setCopied(false), 2500);
   };
 
-  const reset = () => { store(JOB_KEY, null); setJobId(""); setJob(null); setStory(null); setErr(""); };
+  const reset = () => { store(JOB_KEY, null); setJobId(""); setJob(null); setStory(null); setErr(""); setConfirmNew(false); reloadJobs(); };
 
   const editLine = (si: number, li: number, patch: Partial<AnimatorScene["lines"][number]>) =>
     setStory((s) => s && s.map((sc, i) => i !== si ? sc : {
@@ -343,6 +395,8 @@ function Animator() {
   return (
     <div>
       <PageHeader icon="🎬" title="Story Animator" sub="Type a title and minutes — get a finished cartoon video with your own characters." />
+      <div className="mb-3 flex justify-end"><MyVideosLink tool="animator" /></div>
+      <MyVideos jobs={jobs} current={jobId} onOpen={openJob} onRefresh={reloadJobs} autoRender={autoRender} setAutoRender={setAutoRender} />
 
       <div className="mb-4 flex justify-end">
         <div className="mr-auto flex rounded-xl border border-border p-1">
@@ -458,8 +512,12 @@ function Animator() {
           {ownScript && (
             <div>
               <textarea className="field min-h-56 font-mono text-sm" value={script} onChange={(e) => setScript(e.target.value)} placeholder={SCRIPT_EXAMPLE} />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Link to="/planner" className="btn btn-secondary btn-sm" onClick={() => store("ytguru-planner-script", script || null)}>🧭 Check this script in the Script Planner</Link>
+                <span className="text-xs text-muted-foreground">Shows exactly what the app cannot show yet — and gets it made for you.</span>
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                One line per sentence: <b>Name: words {"{action}"} more words [expression, pose, tone, sound effect]</b>. Tones: shout, whisper, excited, calm. Put *stars* round a word to make it pop up. {"{show:cat}"} brings a cat (or anything) into the scene. 3D world: {"{climb:mango tree}"} {"{pick:mango}"} {"{swim:river}"} {"{enter:hut}"} — the character really does it. Magic: {"{turn:Teddy:frog}"} turns Teddy into a frog (until {"{turn:Teddy:back}"}), {"{become:cat}"} turns the speaker. New scene: <b># Scene: place (sitting, books)</b>. Time card: <b># Time skip: Two hours later…</b>
+                One line per sentence: <b>Name: words {"{action}"} more words [expression, pose, tone, sound effect]</b>. Tones: shout, whisper, excited, calm. Put *stars* round a word to make it pop up. {"{show:cat}"} brings a cat (or anything) into the scene. 3D world: {"{climb:mango tree}"} {"{pick:mango}"} {"{swim:river}"} {"{enter:hut}"} — the character really does it. Motion graphics: {"{meter:Patience:90>2}"} {"{map:beach>airport}"} {"{countdown:3}"} {"{chat:Mom:Where are you?}"} {"{stars:3}"} {"{money:Rs 80000>5000}"} {"{pile:coin}"} {"{topple:books}"} {"{stamp:BUSTED}"} {"{chapter:Part 2}"}. Magic: {"{turn:Teddy:frog}"} turns Teddy into a frog (until {"{turn:Teddy:back}"}), {"{become:cat}"} turns the speaker. New scene: <b># Scene: place (sitting, books)</b>. Time card: <b># Time skip: Two hours later…</b>
                 Actions: {ACTION_LIST.map((x) => `{${x}}`).join(" ")}.
                 Places: ANY place — jungle, cave, beach, inside a bus, a castle… (drawn: {ENV_KINDS.map((k) => k.id).join(", ")}).
                 Expressions: {EXPRESSIONS.join(", ")}. Poses: {POSES.join(", ")}.
@@ -481,10 +539,6 @@ function Animator() {
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={sfxOn} onChange={(e) => setSfxOn(e.target.checked)} /> Laughs, boings, whooshes, footsteps…
               </label>
-              {sfxOn && (
-                <input className="field mt-2" value={freesoundKey} onChange={(e) => setFreesoundKey(e.target.value)}
-                  placeholder="Freesound key (free, freesound.org/apiv2/apply) — for real laughs, slaps…" />
-              )}
             </div>
           </div>
 
@@ -496,11 +550,9 @@ function Animator() {
             <p className="mb-2 text-xs text-muted-foreground">
               Uses the Voice Cloner engine on your computer for EVERY voice (Edge / Unreal too), in the mood of each line.
               Slower than plain voices (like cloning), but voiced lines are kept, so re-renders are instant.
-              Needs the Voice Cloner set up once. Optional: a free Gemini key (aistudio.google.com/apikey) lets you pick
-              “🎭 Gemini” voices in Character Studio (about 3 lines a minute on the free key).
+              Needs the Voice Cloner set up once. A Gemini key also lets you pick “🎭 Gemini” voices in Character Studio.
+              Faster: connect ⚡ Colab GPU voices in the Dashboard.
             </p>
-            <input className="field" type="password" value={geminiKey} placeholder="Gemini API key (AIza…)"
-              onChange={(e) => { setGeminiKeyState(e.target.value); setGeminiKey(e.target.value); }} />
           </div>
 
           <div>
@@ -509,14 +561,14 @@ function Animator() {
               <button className={`btn btn-sm ${backgrounds === "drawn" ? "btn-primary" : "btn-ghost"}`} onClick={() => setBackgrounds("drawn")}>🎨 Drawn places (same style as characters)</button>
               {mode === "2d" && <button className={`btn btn-sm ${backgrounds === "pixabay" ? "btn-primary" : "btn-ghost"}`} onClick={() => setBackgrounds("pixabay")}>🖼 Pixabay pictures</button>}
             </div>
-            {backgrounds === "pixabay" && mode === "2d" && (
-              <input className="field mt-2" value={pixabayKey} onChange={(e) => setPixabayKey(e.target.value)} placeholder="Free Pixabay key from pixabay.com/api/docs" />
-            )}
           </div>
+
+          <KeysNeeded ids={mode === "2d" && backgrounds === "pixabay" ? ["freesound", "gemini", "pixabay"] : ["freesound", "gemini"]} />
+          <AiStatusBox />
 
           <button className="btn btn-primary w-full py-4 text-lg" disabled={busy || !title.trim() || picked.length === 0 || (ownScript && !script.trim())}
             onClick={() => void start()}>
-            {busy ? "Starting…" : "🎬 Make my video"}
+            {busy ? "Starting…" : jobs.some((j) => ["queued", "writing", "voicing", "backgrounds"].includes(j.status)) ? "➕ Add to the queue (starts after the current video)" : "🎬 Make my video"}
           </button>
           {err && <p className="text-sm text-destructive">{err}</p>}
         </div>
@@ -526,7 +578,15 @@ function Animator() {
         <div className="glass space-y-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-lg font-semibold">{job.title}</h3>
-            <button className="btn btn-ghost btn-sm" onClick={reset}>＋ New video</button>
+            {!confirmNew ? (
+              <button className="btn btn-ghost btn-sm" onClick={() => (job.status === "done" ? reset() : setConfirmNew(true))}>＋ New video</button>
+            ) : (
+              <span className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm">
+                {working || job.status === "waiting" ? "This video keeps being made — open it again from 📂 My videos." : job.status === "ready" ? "This video is not filmed yet — it stays in 📂 My videos." : "This video stays in 📂 My videos."}
+                <button className="btn btn-primary btn-sm" onClick={reset}>Yes, new video</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirmNew(false)}>Cancel</button>
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {STEPS.map((s, i) => (
@@ -537,6 +597,8 @@ function Animator() {
           </div>
           {working && <div className="bar"><div style={{ width: `${Math.max(3, job.progress ?? 0)}%` }} /></div>}
           <p className="text-sm text-muted-foreground">{job.message}</p>
+          {(job.status === "writing" || job.status === "directing" || job.status === "planning") && <AiStatusBox compact />}
+          {job.status === "voicing" && <VoiceEngineBox v={(job as AnimatorJob & { voice_engine?: VoiceEngine }).voice_engine} />}
           {((job as AnimatorJob & { skipped_tags?: string[] }).skipped_tags ?? []).length > 0 && (
             <p className="text-sm text-amber-600">
               ⚠ The app doesn't know these tags, so they are left out of the video:{" "}
@@ -545,9 +607,14 @@ function Animator() {
           )}
           {err && <p className="text-sm text-destructive">{err}</p>}
           {job.status === "error" && <button className="btn btn-amber" onClick={() => void retry()}>↻ Try again</button>}
+          {job.status === "waiting" && (
+            <button className="btn btn-ghost btn-sm" onClick={() => void fetch(`/api/animator/jobs/${jobId}/unqueue`, { method: "POST" }).then(reloadJobs)}>Remove from the queue</button>
+          )}
 
           {job.status === "ready" && (
-            <StoryPreview jobId={jobId} mode={mode} onDone={(url) => setJob((j) => (j ? { ...j, status: "done", video_url: url, message: "Your video is ready!" } : j))} />
+            <StoryPreview key={jobId} jobId={jobId} mode={jobMode} autoRender={autoRender}
+              onRebuild={() => setJob((j) => (j ? { ...j, status: "voicing", progress: 15, message: "Fixing the marked parts… (only the changed lines get new voices)" } : j))}
+              onDone={(url) => { setJob((j) => (j ? { ...j, status: "done", video_url: url, message: "Your video is ready!" } : j)); reloadJobs(); }} />
           )}
 
           {job.status === "done" && job.video_url && (
