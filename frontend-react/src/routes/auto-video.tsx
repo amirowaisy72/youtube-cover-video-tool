@@ -614,6 +614,11 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
   // things before the next step. "done" is the finished video
   // (still editable).
   const [studioBusy, setStudioBusy] = useState(false);
+  // (user, 2026-11-21) per-scene studio: the presenter lives here so the
+  // preview can grey out its studio button until one is chosen, and the
+  // preview's request (one scene index) reaches the presenter to film.
+  const [presenter, setPresenter] = useState("");
+  const [studioAsk, setStudioAsk] = useState<number | null>(null);
   const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "realistic" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
   // The stepper must show the step the backend is ACTUALLY on
@@ -1614,8 +1619,8 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
               ))}
             </div>
           </div>
-          <StudioPresenter jobId={job.id} sceneCount={(job.scenes || []).length} onBusy={setStudioBusy} />
-          <VideoPreview jobId={job.id} />
+          <StudioPresenter jobId={job.id} presenter={presenter} onPresenterChange={setPresenter} filmRequest={studioAsk} onFilmRequestDone={() => setStudioAsk(null)} onBusy={setStudioBusy} />
+          <VideoPreview jobId={job.id} onStudioScene={setStudioAsk} canStudio={presenter !== ""} />
           <div className="flex gap-3">
             <button className="btn btn-ghost" onClick={() => setPhase("audio")} disabled={studioBusy}>← Back to audio</button>
             <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => void startRender()} disabled={studioBusy}>🎬 Render video →</button>

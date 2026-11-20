@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { characterList } from "@/lib/api";
 import { encodeH264, type Timeline } from "@/lib/player";
 import type { CharacterConfig } from "@/lib/stickman";
@@ -10,6 +10,8 @@ import type { CharacterConfig } from "@/lib/stickman";
  * scene's voiceover, with presenter gestures. This browser films those
  * scenes and sends them to the app; the render then uses them like any
  * other footage (captions, pop-ups, music).
+ * (user, 2026-11-21) no auto-pick: the user picks the scene in the preview
+ * ("Want to replace this scene with studio?") — this films just that one.
  */
 type Char = { id: string; name: string; config: unknown };
 
@@ -23,14 +25,16 @@ function webglOk(): boolean {
   } catch { return false; }
 }
 
-export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; sceneCount: number; onBusy?: (busy: boolean) => void }) {
+export function StudioPresenter({ jobId, presenter, onPresenterChange, filmRequest, onFilmRequestDone, onBusy }: {
+  jobId: string; presenter: string; onPresenterChange: (id: string) => void;
+  filmRequest: number | null; onFilmRequestDone: () => void; onBusy?: (busy: boolean) => void;
+}) {
   const [chars, setChars] = useState<Char[]>([]);
-  const [who, setWho] = useState("");
-  const [scenes, setScenes] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState<number[]>([]);
+  const handledRef = useRef<number | null>(null);
 
   useEffect(() => {
     characterList()
@@ -38,42 +42,24 @@ export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; 
       .catch(() => setError("Could not load your characters."));
   }, []);
 
-  // the app decides which scenes the presenter says to camera (user, 2026-11-18: no fixed formula)
-  // (user, 2026-11-21) never fail silently here: a failed pick used to
-  // leave the Film button disabled forever with a silent "…". Now a bad
-  // response, an empty pick, or a server-reported error shows the reason
-  // under the button — either the button works or the user sees why not.
+  // (user, 2026-11-21) the preview asks for one scene at a time — film
+  // just that scene. A request that arrives twice (a re-render while the
+  // parent still holds it) must film only once, so handledRef remembers
+  // the scene already started.
   useEffect(() => {
-    if (!who) return;
-    setError("");
-    fetch(`/api/animator/studio/${jobId}/pick`)
-      .then(async (r) => {
-        const d = (await r.json().catch(() => ({}))) as { scenes?: number[]; error?: string };
-        if (!r.ok) throw new Error(d.error || `Server error (${r.status}) while picking studio scenes.`);
-        return d;
-      })
-      .then((d) => {
-        const picked = d.scenes ?? [];
-        if (d.error) {
-          // the server fell back to scene 1 and told us why — enable the
-          // button and show the reason instead of a silent "…".
-          setError(d.error);
-          setScenes(picked);
-        } else if (picked.length === 0 && sceneCount > 0) {
-          setError("The server sent no studio scenes for this video, so there is nothing to film yet.");
-          setScenes([]);
-        } else {
-          setScenes(picked);
-        }
-      })
-      .catch((e) => {
-        setError(e instanceof Error ? e.message : "Could not reach the server to pick studio scenes.");
-        setScenes([0]);
-      });
-  }, [who, jobId, sceneCount]);
+    if (filmRequest == null) { handledRef.current = null; return; }
+    if (handledRef.current === filmRequest || busy) return;
+    handledRef.current = filmRequest;
+    if (!presenter) {
+      setError("Choose a presenter first (Teddy or Peddy) — then press the button on the scene again.");
+      onFilmRequestDone();
+      return;
+    }
+    void film([filmRequest]).finally(() => onFilmRequestDone());
+  }, [filmRequest, presenter, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const film = async () => {
-    const ch = chars.find((c) => c.id === who);
+  const film = async (list: number[]) => {
+    const ch = chars.find((c) => c.id === presenter);
     if (!ch) return;
     if (!webglOk()) {
       setError("Chrome's 3D is switched off right now — this happens after a 3D crash (it is not this page). Close ALL Chrome windows, open Chrome again, come back to this video (it is saved) and press Film again.");
@@ -86,16 +72,16 @@ export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; 
     try {
       const { StoryPlayer3D } = await import("@/lib/three3d/player3d");
       const configs = new Map<string, CharacterConfig>([[ch.id, ch.config as CharacterConfig]]);
-      for (const [k, i] of scenes.entries()) {
-        setStatus(`Studio scene ${k + 1} of ${scenes.length}: setting up…`);
+      for (const [k, i] of list.entries()) {
+        setStatus(`Studio scene ${k + 1} of ${list.length}: setting up…`);
         const r = await fetch(`/api/animator/studio/${jobId}/timeline?scene=${i}&character=${encodeURIComponent(ch.id)}&variant=${k}`);
         if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { detail?: string }).detail || "Could not plan the studio scene.");
         const tl = (await r.json()) as Timeline;
         const player = new StoryPlayer3D(tl, configs, () => "");
         let blob: Blob;
         try {
-          await player.prepare((m) => setStatus(`Studio scene ${k + 1} of ${scenes.length}: ${m}`));
-          blob = await encodeH264(player, (d, t) => setStatus(`Studio scene ${k + 1} of ${scenes.length}: filming… ${Math.round((d / Math.max(1, t)) * 100)}%`));
+          await player.prepare((m) => setStatus(`Studio scene ${k + 1} of ${list.length}: ${m}`));
+          blob = await encodeH264(player, (d, t) => setStatus(`Studio scene ${k + 1} of ${list.length}: filming… ${Math.round((d / Math.max(1, t)) * 100)}%`));
         } finally {
           player.dispose(); // one 3D context at a time (the browser allows only a few)
         }
@@ -107,7 +93,7 @@ export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; 
         made.push(i);
         setDone([...made]);
       }
-      setStatus(`✓ ${made.length} studio scene${made.length === 1 ? "" : "s"} ready — they will be in the video.`);
+      setStatus(`✓ ${made.length} studio scene${made.length === 1 ? "" : "s"} ready — they will be in the video. Rebuild the preview to see ${made.length === 1 ? "it" : "them"} there.`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Studio filming failed.";
       setError(/webgl/i.test(msg)
@@ -124,7 +110,7 @@ export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; 
     <div className="glass p-6">
       <h3 className="text-xl font-bold">🎙 Studio presenter <span className="text-sm font-normal text-muted-foreground">(optional)</span></h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        Your character presents some scenes from a TV studio — lip-synced to the voiceover, with gestures — and the other scenes show stock footage.
+        Your character presents the scenes you choose from a TV studio — lip-synced to the voiceover, with gestures — and the other scenes show stock footage.
         Make or change characters on the Characters page.
       </p>
       {chars.length === 0 && !error && <p className="mt-3 text-sm text-muted-foreground">No characters yet — make one on the Characters page first.</p>}
@@ -132,23 +118,20 @@ export function StudioPresenter({ jobId, sceneCount, onBusy }: { jobId: string; 
         <>
           <p className="mt-4 mb-1 text-sm font-semibold">Presenter</p>
           <div className="flex flex-wrap gap-2">
-            <button className={`btn btn-sm ${who === "" ? "btn-primary" : "btn-ghost"}`} onClick={() => setWho("")} disabled={busy}>No presenter</button>
+            <button className={`btn btn-sm ${presenter === "" ? "btn-primary" : "btn-ghost"}`} onClick={() => onPresenterChange("")} disabled={busy}>No presenter</button>
             {chars.map((c) => (
-              <button key={c.id} className={`btn btn-sm ${who === c.id ? "btn-primary" : "btn-ghost"}`} onClick={() => setWho(c.id)} disabled={busy}>{c.name}</button>
+              <button key={c.id} className={`btn btn-sm ${presenter === c.id ? "btn-primary" : "btn-ghost"}`} onClick={() => onPresenterChange(c.id)} disabled={busy}>{c.name}</button>
             ))}
           </div>
         </>
       )}
-      {who && (
-        <>
-          <p className="mt-3 text-xs text-muted-foreground">
-            The app picked the scenes your presenter says to camera — the hook, questions to the viewer, strong points, the ending — and keeps the rest as footage:{" "}
-            <b>{scenes.length ? scenes.map((i) => `scene ${i + 1}`).join(", ") : "…"}</b> of {sceneCount}. Filming runs in this tab (keep it open).
-          </p>
-          <button className="btn btn-amber mt-3 w-full py-3" onClick={() => void film()} disabled={busy || scenes.length === 0}>
-            {busy ? "Filming the studio scenes…" : done.length ? "🎬 Film the studio scenes again" : "🎬 Film the studio scenes"}
-          </button>
-        </>
+      {presenter && done.length > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Studio scenes ready: <b>{done.map((i) => `scene ${i + 1}`).join(", ")}</b> — they will be in the video.
+        </p>
+      )}
+      {presenter && done.length === 0 && !busy && (
+        <p className="mt-3 text-xs text-muted-foreground">Pause the preview on any scene and press “Want to replace this scene with studio?” — that scene is filmed here and takes the studio look. Filming runs in this tab (keep it open).</p>
       )}
       {status && <p className="mt-3 text-sm text-emerald-400">{status}</p>}
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}

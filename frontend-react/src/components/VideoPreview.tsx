@@ -1,7 +1,8 @@
 /** Whole-video preview before the render (user, 2026-11-20): every scene drawn quickly with its real voice,
     sounds and captions, played as one video. Pause anywhere → "Want to fix this part?" → write what you want
     (Urdu or English) → copy the prompt for any AI → paste its answer → the part is marked → "Fix all the
-    modified parts" redraws only those scenes. */
+    modified parts" redraws only those scenes. Pause anywhere → "Want to replace this scene with studio?"
+    (user, 2026-11-21) films just this scene with the chosen presenter and puts the studio clip in its place. */
 import { useEffect, useRef, useState } from "react";
 import { getKey } from "@/lib/config";
 
@@ -20,7 +21,7 @@ async function j<T>(r: Response): Promise<T> {
   return d as T;
 }
 
-export function VideoPreview({ jobId }: { jobId: string }) {
+export function VideoPreview({ jobId, onStudioScene, canStudio }: { jobId: string; onStudioScene?: (index: number) => void; canStudio?: boolean }) {
   const [st, setSt] = useState<PvStatus | null>(null);
   const [err, setErr] = useState("");
   const [cur, setCur] = useState(0);
@@ -94,8 +95,15 @@ export function VideoPreview({ jobId }: { jobId: string }) {
               onEnded={() => { if (cur + 1 < scenes.length) go(cur + 1, 0, true); else setPaused(true); }} />
             {cue && <div className="pointer-events-none absolute inset-x-0 bottom-14 text-center"><span className="rounded bg-black/70 px-2 py-1 text-sm font-semibold text-white">{cue.text}</span></div>}
             {paused && (
-              <button className="absolute right-3 top-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-black shadow-lg hover:bg-amber-300"
-                onClick={() => setFix({ index: cur, t: time })}>❓ Want to fix this part?</button>
+              <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
+                <button className="rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-black shadow-lg hover:bg-amber-300"
+                  onClick={() => setFix({ index: cur, t: time })}>❓ Want to fix this part?</button>
+                {onStudioScene && (
+                  <button className="rounded-full bg-violet-500 px-4 py-2 text-sm font-bold text-white shadow-lg hover:bg-violet-400 disabled:opacity-50"
+                    disabled={!canStudio} title={canStudio ? undefined : "Choose a presenter above first"}
+                    onClick={() => onStudioScene(cur)}>🎬 Want to replace this scene with studio?</button>
+                )}
+              </div>
             )}
           </div>
           <div className="text-xs text-muted-foreground">Scene {cur + 1} of {scenes.length} · {fmt(before(cur) + time)} / {fmt(total)}</div>
