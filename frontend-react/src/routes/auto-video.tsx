@@ -1210,7 +1210,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
     setPhase("build");
     try {
       try { await saveGfxLevel(localStorage.getItem(gfxKey(docu)) || (docu ? "many" : "medium"), docu, visual); } catch { /* keep going */ }
-      const data = await autovideoPlan(title.trim(), dur, voice.startsWith("clone:") ? "en-US-AriaNeural" : voice, pexelsKey, pixabayKey, customScript, ttsProvider, getKey(ttsProvider as KeyId), videoType, shortSecs);
+      const data = await autovideoPlan(title.trim(), dur, voice.startsWith("clone:") ? "en-US-AriaNeural" : voice, pexelsKey, pixabayKey, customScript, ttsProvider, getKey(ttsProvider as KeyId), videoType, shortSecs, visual ? "visual" : "");
       setJobId(data.job_id);
       // Background job: the step keeps running if the user
       // leaves this page, and the top bar shows its progress.

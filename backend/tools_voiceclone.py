@@ -53,6 +53,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from video import no_window_kwargs  # noqa: E402
 
+import licensing  # noqa: E402
+
+# Client version sent with license calls. The server only uses it
+# informationally (MIN_CLIENT_VERSION is not enforced) — keep in
+# sync with main.py CLIENT_VERSION; the release workflow bumps
+# both. A local copy is needed because main.py imports this
+# module (importing main back would be circular).
+_CLIENT_VERSION = "1.0.4"
+
+
+def _license_error_to_http(exc: licensing.LicenseError) -> HTTPException:
+    """Map a license error to the HTTP status the server reported
+    (401 bad key, 402 no credits / not activated, 403 device limit)."""
+    msg = str(exc)
+    code = 402
+    for prefix, status in (("401:", 401), ("402:", 402), ("403:", 403)):
+        if msg.startswith(prefix):
+            code = status
+            msg = msg[len(prefix):].strip()
+            break
+    return HTTPException(code, msg or "License check failed.")
+
 router = APIRouter(prefix="/api/voiceclone")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -114,8 +136,20 @@ def _now() -> str:
 
 
 def _engine_installed() -> bool:
+    """True when the voice engine really imports — not just present
+    on disk. In the frozen .exe (1.0.5+) the engine is bundled, so
+    this is True there; on an older .exe, or a machine where the
+    pip install never ran, it is False. A bare find_spec is not
+    enough: the package can exist while torch (its core) is
+    missing, and /install must not report installed then."""
     importlib.invalidate_caches()
-    return importlib.util.find_spec("chatterbox") is not None
+    try:
+        import chatterbox.mtl_tts  # noqa: F401
+        import torch  # noqa: F401
+        import perth  # noqa: F401
+    except Exception:  # noqa: BLE001
+        return False
+    return True
 
 
 def _device() -> str:
@@ -562,9 +596,11 @@ class GenerateRequest(BaseModel):
 
 
 def _run_generate(
-    job_id: str, voice_id: str, text: str, language: str, exaggeration: float
+    job_id: str, voice_id: str, text: str, language: str, exaggeration: float,
+    job_token: str | None = None,
 ) -> None:
     job = _read_job(job_id)
+    voice_name = (_read_voice(voice_id) or {}).get("name", voice_id)
     wav_out = OUT_DIR / f"{job_id}.wav"
     mp3_out = OUT_DIR / f"{job_id}.mp3"
     try:
@@ -703,8 +739,24 @@ def _run_generate(
             download_url=f"/api/voiceclone/download/{job_id}",
             finished_at=_now(),
         )
+        # License accounting (1.0.5): completed voiceover is
+        # reported, usage is pinged either way — in free mode the
+        # credit calls are no-ops and only the usage ping fires.
+        if job_token:
+            licensing.report(job_token, "completed", tool="voiceclone",
+                             title=voice_name, topic=text[:80],
+                             minutes=round(len(audio) / sample_rate / 60, 2),
+                             chars=len(text))
+        licensing.report_usage(tool="voiceclone", title=voice_name,
+                               topic=text[:80], status="completed",
+                               minutes=round(len(audio) / sample_rate / 60, 2),
+                               chars=len(text))
     except Exception as exc:  # noqa: BLE001
         job.update(status="error", message=f"Voiceover failed: {str(exc)[-800:]}")
+        if job_token:
+            licensing.refund(job_token)
+        licensing.report_usage(tool="voiceclone", status="failed",
+                               chars=len(text))
     finally:
         wav_out.unlink(missing_ok=True)
     _write_job(job)
@@ -724,6 +776,14 @@ def generate(payload: GenerateRequest) -> dict:
     if not text:
         raise HTTPException(400, "Script is empty.")
     job_id = uuid.uuid4().hex[:12]
+    # Credit check (1.0.5): reserve 1 credit BEFORE any work.
+    # Raises 402 when the job must not start (no key / no credits
+    # once charging is on). In free mode this returns a local free
+    # token and the tool stays free exactly as today.
+    try:
+        token = licensing.consume("voiceclone", job_id, _CLIENT_VERSION)
+    except licensing.LicenseError as exc:
+        raise _license_error_to_http(exc) from exc
     job = {
         "id": job_id,
         "status": "queued",
@@ -738,7 +798,7 @@ def generate(payload: GenerateRequest) -> dict:
     _write_job(job)
     threading.Thread(
         target=_run_generate,
-        args=(job_id, payload.voice_id, text, payload.language, payload.exaggeration),
+        args=(job_id, payload.voice_id, text, payload.language, payload.exaggeration, token),
         daemon=True,
     ).start()
     return {"job_id": job_id, "status": "queued"}

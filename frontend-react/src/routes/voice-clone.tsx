@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
+import { ModelDownloads } from "@/components/ModelDownloads";
 import {
     type CloneVoice,
     type VoiceCloneJob,
@@ -240,6 +241,7 @@ function VoiceClone() {
                     {!engine.model_loaded && !engine.model_cached && <span className="chip">First voiceover downloads the model (~3 GB)</span>}
                 </div>
             )}
+            <ModelDownloads only={["chatterbox-model"]} />
 
             <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
                 {/* Step 1 — clone a voice */}

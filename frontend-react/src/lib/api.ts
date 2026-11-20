@@ -571,11 +571,11 @@ export const autovideoCreate = (title: string, minutes: number, voice: string, s
 // Setup (Step 1) -> Footage (Step 2) -> Audio (Step 3) -> Render (Step 4).
 // The decisions happen BEFORE any rendering, so a scene's footage or the
 // music can be changed instantly until the final render.
-export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "", ttsProvider = "edge", ttsKey = "", videoType = "long", shortSeconds = 60) =>
+export const autovideoPlan = (title: string, minutes: number, voice: string, pexelsKey = "", pixabayKey = "", script = "", ttsProvider = "edge", ttsKey = "", videoType = "long", shortSeconds = 60, theme = "") =>
   api<{ job_id: string; status: string; phase: string }>("/api/autovideo/plan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null, tts_provider: ttsProvider, tts_key: ttsKey || null, video_type: videoType, short_seconds: shortSeconds }),
+    body: JSON.stringify({ title, minutes, visuals: "both", voice, pexels_key: pexelsKey || null, pixabay_key: pixabayKey || null, script: script.trim() || null, tts_provider: ttsProvider, tts_key: ttsKey || null, video_type: videoType, short_seconds: shortSeconds, theme }),
   });
 
 export const autovideoPrepareAudio = (jobId: string, freesoundKey = "", music = true, ttsProvider = "", ttsVoice = "", ttsKey = "") =>

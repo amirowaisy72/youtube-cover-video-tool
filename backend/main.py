@@ -74,6 +74,7 @@ import tools_characters  # noqa: E402
 import tools_animator  # noqa: E402
 import tools_worlds  # noqa: E402
 import tools_assets  # noqa: E402
+import tools_downloads  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -298,7 +299,11 @@ def _consume_or_402(action: str, job_ref: str) -> str:
 def _close_job_token(token: str | None, job: dict, tool: str) -> None:
     """Report a finished job or refund a failed one (best-effort:
     a failed report/refund is queued and retried on next startup).
-    The customer is never charged for a video that was not made."""
+    The customer is never charged for a video that was not made.
+    Usage is pinged in both cases (completed AND failed) so the
+    admin panel sees demand even for failed attempts — and the
+    ping fires in free mode too, where report()/refund() are
+    no-ops."""
     if not token:
         return
     title = job.get("original_title") or job.get("title") or ""
@@ -311,8 +316,16 @@ def _close_job_token(token: str | None, job: dict, tool: str) -> None:
             topic=title,
             minutes=job.get("final_minutes"),
         )
+        licensing.report_usage(
+            tool=tool, title=title, topic=title, status="completed",
+            minutes=job.get("final_minutes"),
+        )
     else:
         licensing.refund(token)
+        licensing.report_usage(
+            tool=tool, title=title, topic=title, status="failed",
+            minutes=job.get("final_minutes"),
+        )
 
 
 def _yt_dlp_download_opts(outtmpl: str, hook, attempt: int = 1) -> dict:
@@ -405,6 +418,7 @@ app.include_router(tools_characters.router)
 app.include_router(tools_animator.router)
 app.include_router(tools_worlds.router)
 app.include_router(tools_assets.router)
+app.include_router(tools_downloads.router)
 
 
 @app.get("/favicon.ico")
@@ -1205,6 +1219,11 @@ def _run_auto(
     except Exception:
         if job_token:
             licensing.refund(job_token)
+            licensing.report_usage(
+                tool="cover_video",
+                title=read_job(job_id).get("original_title") or "",
+                status="failed",
+            )
         raise
     if job_token:
         _close_job_token(job_token, read_job(job_id), "cover_video")
@@ -2480,13 +2499,16 @@ def tts_generate(payload: TtsRequest) -> dict:
         )
     except ImportError as exc:
         licensing.refund(token)
+        licensing.report_usage(tool="tts", status="failed", chars=len(text))
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         licensing.refund(token)
+        licensing.report_usage(tool="tts", status="failed", chars=len(text))
         raise HTTPException(
             500, f"Voice generation failed: {str(exc)[-1000:]}"
         ) from exc
     licensing.report(token, "completed", tool="tts", chars=len(text))
+    licensing.report_usage(tool="tts", status="completed", chars=len(text))
     return {
         "tts_id": final_path.stem,
         "voice": payload.voice,
@@ -2949,6 +2971,12 @@ class AutoVideoPlanRequest(BaseModel):
     script: str | None = None
     pexels_key: str | None = None
     pixabay_key: str | None = None
+    # Theme (1.0.5): "visual" when the job came from the Visual
+    # Explainer page (same pipeline, different tool for usage).
+    # Stored in the job dict so the render worker can ping usage
+    # with tool="visual" instead of "autovideo". Optional, so
+    # older clients keep working — they just report as autovideo.
+    theme: str = ""
 
 
 def _run_autovideo_plan(
@@ -3075,6 +3103,7 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
             "short_seconds": payload.short_seconds,
             "voice": payload.voice,
             "tts_provider": payload.tts_provider,
+            "theme": payload.theme or "",
             "job_token": token,
         }
     )
@@ -3530,6 +3559,17 @@ def _run_autovideo_render(
                 topic=title,
                 minutes=job.get("final_minutes"),
             )
+        # Usage (1.0.5): Visual Explainer jobs run through this
+        # same pipeline — the usage ping carries tool="visual" for
+        # them (job theme, set at plan time) so the admin panel
+        # tells the two tools apart. Fires in free mode too.
+        licensing.report_usage(
+            tool="visual" if job.get("theme") == "visual" else "autovideo",
+            title=title,
+            topic=title,
+            status="completed",
+            minutes=job.get("final_minutes"),
+        )
     except Exception as exc:  # noqa: BLE001
         job = _av_read(job_id)
         job.update(
@@ -3538,6 +3578,12 @@ def _run_autovideo_render(
         _av_write(job)
         if job_token:
             licensing.refund(job_token)
+        licensing.report_usage(
+            tool="visual" if job.get("theme") == "visual" else "autovideo",
+            title=title,
+            topic=title,
+            status="failed",
+        )
 
 
 @app.post("/api/autovideo/{job_id}/render")

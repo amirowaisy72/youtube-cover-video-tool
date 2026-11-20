@@ -63,6 +63,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from video import no_window_kwargs  # noqa: E402
 
+import licensing  # noqa: E402
+
+# Client version sent with license calls. The server only uses it
+# informationally (MIN_CLIENT_VERSION is not enforced) — keep in
+# sync with main.py CLIENT_VERSION; the release workflow bumps
+# both. A local copy is needed because main.py imports this
+# module (importing main back would be circular).
+_CLIENT_VERSION = "1.0.4"
+
 router = APIRouter(prefix="/api/animator")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -4452,6 +4461,48 @@ def _step_render(job: dict) -> None:
         raise RuntimeError(f"Video encoding failed: {tail}")
 
 
+# -------------------------------------------------------------- license gate (1.0.5)
+# Server-controlled gate, same pattern as cover_video/tts/
+# autovideo in main.py: consume BEFORE any work (story AI,
+# voicing, backgrounds, render). In free mode consume() returns
+# a local free token and report()/refund() are no-ops, so the
+# tool stays free exactly as today. When Master flips charging
+# ON in the admin dashboard, consume() enforces key + credits —
+# on already-installed tools, no reinstall, because the flag is
+# read from the server (cached a few minutes per process).
+def _license_error_to_http(exc: licensing.LicenseError) -> HTTPException:
+    """Map a license error to the HTTP status the server reported
+    (401 bad key, 402 no credits / not activated, 403 device limit)."""
+    msg = str(exc)
+    code = 402
+    for prefix, status in (("401:", 401), ("402:", 402), ("403:", 403)):
+        if msg.startswith(prefix):
+            code = status
+            msg = msg[len(prefix):].strip()
+            break
+    return HTTPException(code, msg or "License check failed.")
+
+
+def _close_animator_job(job_id: str, failed: bool = False) -> None:
+    """License accounting for a finished Animator job (best-effort):
+    report the credit completed (or refund it) and always ping
+    usage. A missing job_token (jobs made before 1.0.5) just skips
+    the credit calls; the usage ping still fires, in free mode too."""
+    job = _read_job(job_id)
+    token = job.get("job_token")
+    title = job.get("title") or ""
+    minutes = job.get("minutes")
+    if token:
+        if failed:
+            licensing.refund(token)
+        else:
+            licensing.report(token, "completed", tool="animator",
+                             title=title, topic=title, minutes=minutes)
+    licensing.report_usage(tool="animator", title=title, topic=title,
+                           status="failed" if failed else "completed",
+                           minutes=minutes)
+
+
 # -------------------------------------------------------------- runner
 def _run(job_id: str, step: str) -> None:
     job = _read_json(ANIM_DIR / job_id / "job.json", None)
@@ -4475,8 +4526,10 @@ def _run(job_id: str, step: str) -> None:
             _step_render(job)
             _update(job, status="done", progress=100, message="Your video is ready!",
                     finished_at=_now(), video_url=f"/api/animator/jobs/{job_id}/video")
+            _close_animator_job(job_id)
     except Exception as exc:  # noqa: BLE001
         _update(job, status="error", message=f"Failed: {str(exc)[-800:]}")
+        _close_animator_job(job_id, failed=True)
     finally:
         _queue_next()
 
@@ -4570,6 +4623,15 @@ def start(payload: StartRequest) -> dict:
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
     job_id = uuid.uuid4().hex[:12]
+    # Credit check (1.0.5): reserve 1 credit BEFORE any work —
+    # story AI, voicing, backgrounds, render. Raises 402 when the
+    # job must not start (no key / no credits once charging is
+    # on). In free mode this returns a local free token and the
+    # tool stays free exactly as today.
+    try:
+        token = licensing.consume("animator", job_id, _CLIENT_VERSION)
+    except licensing.LicenseError as exc:
+        raise _license_error_to_http(exc) from exc
     (ANIM_DIR / job_id).mkdir(parents=True, exist_ok=True)
     job = {"id": job_id, "status": "queued", "progress": 0, "message": "Starting…",
            "title": payload.title.strip(), "minutes": payload.minutes, "format": payload.format,
@@ -4581,7 +4643,7 @@ def start(payload: StartRequest) -> dict:
            "freesound_key": payload.freesound_key.strip(),
            "tts_keys": {k: str(v).strip()[:200] for k, v in payload.tts_keys.items()
                         if k in ("google", "unreal", "elevenlabs") and v},
-           "mode": payload.mode, "created_at": _now()}
+           "mode": payload.mode, "created_at": _now(), "job_token": token}
     _write_json(ANIM_DIR / job_id / "job.json", job)
     queued = _queue_or_start(job, "start")
     if not queued:
@@ -4591,7 +4653,8 @@ def start(payload: StartRequest) -> dict:
 
 def _public(job: dict) -> dict:
     return {k: v for k, v in job.items()
-            if k not in ("pixabay_key", "freesound_key", "custom_script", "music_file", "tts_keys")}
+            if k not in ("pixabay_key", "freesound_key", "custom_script", "music_file", "tts_keys",
+                         "job_token")}
 
 
 @router.get("/jobs")

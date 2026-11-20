@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
+import { ModelDownloads } from "@/components/ModelDownloads";
 
 export const Route = createFileRoute("/subtitles")({
   component: Subtitles,
@@ -301,6 +302,7 @@ function Subtitles() {
           <p className="text-sm text-muted-foreground">
             Free, private, on your computer. First run downloads the tiny speech model (~75 MB, one time only).
           </p>
+          <ModelDownloads only={["whisper-tiny"]} />
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 

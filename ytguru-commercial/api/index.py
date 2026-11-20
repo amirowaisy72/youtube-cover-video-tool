@@ -79,6 +79,17 @@ DEFAULT_SETTINGS = {
     "credits_per_cover_video": 1,
     "credits_per_tts": 1,
     "credits_per_autovideo": 1,
+    # New tools (1.0.5): same consume/report gate as the first
+    # three — 1 credit each when charging is on, free otherwise.
+    "credits_per_animator": 1,
+    "credits_per_visual": 1,
+    "credits_per_voiceclone": 1,
+    # Free mode (user, 2026-11-21): charging OFF by default. The
+    # desktop tool reads this via GET /v1/charging (cached a few
+    # minutes); Master flips it in the admin dashboard and every
+    # already-installed tool starts/stops asking for credits with
+    # no reinstall. Stored as a setting so it survives restarts.
+    "charging_enabled": False,
     "trial_credits": 3,
     "price_per_credit_pkr": 50,
     "packs": [
@@ -126,6 +137,15 @@ def _init_db() -> None:
                 chars INTEGER, credits INTEGER NOT NULL,
                 status TEXT NOT NULL, created_at REAL NOT NULL,
                 finished_at REAL);
+            CREATE TABLE IF NOT EXISTS usage (
+                id TEXT PRIMARY KEY, customer_id TEXT,
+                device_fp TEXT NOT NULL DEFAULT '',
+                tool TEXT NOT NULL, title TEXT DEFAULT '',
+                topic TEXT DEFAULT '', status TEXT NOT NULL,
+                minutes REAL, chars INTEGER,
+                credits INTEGER NOT NULL DEFAULT 0,
+                client_version TEXT DEFAULT '',
+                created_at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS admin_sessions (
                 token TEXT PRIMARY KEY, created_at REAL NOT NULL);
             """
@@ -215,7 +235,7 @@ class ActivateRequest(BaseModel):
 
 class ConsumeRequest(BaseModel):
     license_key: str
-    action: str  # cover_video | tts | autovideo
+    action: str  # cover_video | tts | autovideo | animator | visual | voiceclone
     job_ref: str  # client-generated job id (12 hex chars)
     client_version: str = "0.0.0"
 
@@ -232,6 +252,32 @@ class ReportRequest(BaseModel):
 
 class RefundRequest(BaseModel):
     job_token: str
+
+
+class UsageRequest(BaseModel):
+    """Best-effort usage ping (client licensing.report_usage).
+
+    Separate from credits: it fires in free mode too, so Master
+    can see demand while everything is free. license_key is
+    optional — free-mode machines have no key, so the row is
+    attributed to the device fingerprint instead (customer_id
+    stays NULL). The endpoint never 401s: a bad/missing key still
+    records the row anonymously, because a usage ping must never
+    break a customer's job.
+    """
+    license_key: str = ""
+    device: dict = Field(default_factory=dict)
+    tool: str = ""
+    title: str = ""
+    topic: str = ""
+    status: str = "completed"  # completed | failed
+    minutes: float | None = None
+    chars: int | None = None
+    client_version: str = ""
+
+
+class ChargingUpdate(BaseModel):
+    charging_enabled: bool
 
 
 class AdminLogin(BaseModel):
@@ -307,6 +353,9 @@ def activate(payload: ActivateRequest) -> dict:
             "cover_video": settings["credits_per_cover_video"],
             "tts": settings["credits_per_tts"],
             "autovideo": settings["credits_per_autovideo"],
+            "animator": settings["credits_per_animator"],
+            "visual": settings["credits_per_visual"],
+            "voiceclone": settings["credits_per_voiceclone"],
         },
         "trial_credits": settings["trial_credits"],
         "price_per_credit_pkr": settings["price_per_credit_pkr"],
@@ -325,8 +374,55 @@ def me(license_key: str = Header(..., alias="X-License-Key")) -> dict:
             "cover_video": settings["credits_per_cover_video"],
             "tts": settings["credits_per_tts"],
             "autovideo": settings["credits_per_autovideo"],
+            "animator": settings["credits_per_animator"],
+            "visual": settings["credits_per_visual"],
+            "voiceclone": settings["credits_per_voiceclone"],
         },
     }
+
+
+@app.get("/v1/charging")
+def charging() -> dict:
+    """Free-mode flag, read by the desktop tool (cached a few
+    minutes per process). Public — no key: a machine with no
+    license must still learn that everything is free. Default
+    off; Master flips it in the admin dashboard."""
+    settings = _get_settings()
+    return {"charging_enabled": bool(settings.get("charging_enabled", False))}
+
+
+@app.post("/v1/usage")
+def usage(payload: UsageRequest) -> dict:
+    """Record one finished job for the per-user usage view.
+
+    Best-effort analytics, never a gate: no auth, no 401 — a
+    missing/invalid key just leaves customer_id NULL and the row
+    is grouped by device fingerprint on the dashboard."""
+    customer_id = None
+    if payload.license_key:
+        try:
+            customer_id = _lookup_key(payload.license_key)["customer_id"]
+        except HTTPException:
+            customer_id = None
+    device_fp = ""
+    if payload.device:
+        device_fp = _device_fingerprint(payload.device)
+    with _db() as con:
+        con.execute(
+            "INSERT INTO usage (id, customer_id, device_fp, tool, "
+            "title, topic, status, minutes, chars, credits, "
+            "client_version, created_at) VALUES "
+            "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), customer_id, device_fp,
+             (payload.tool or "")[:64],
+             (payload.title or "")[:200], (payload.topic or "")[:200],
+             payload.status if payload.status in ("completed", "failed")
+             else "completed",
+             payload.minutes, payload.chars, 0,
+             (payload.client_version or "")[:32], time.time()),
+        )
+        con.commit()
+    return {"ok": True}
 
 
 @app.post("/v1/consume")
@@ -343,6 +439,9 @@ def consume(payload: ConsumeRequest) -> dict:
         "cover_video": int(settings["credits_per_cover_video"]),
         "tts": int(settings["credits_per_tts"]),
         "autovideo": int(settings["credits_per_autovideo"]),
+        "animator": int(settings["credits_per_animator"]),
+        "visual": int(settings["credits_per_visual"]),
+        "voiceclone": int(settings["credits_per_voiceclone"]),
     }
     if payload.action not in cost_map:
         raise HTTPException(400, "Unknown action.")
@@ -498,6 +597,91 @@ def admin_overview(authorization: str | None = Header(None)) -> dict:
     }
 
 
+@app.post("/admin/charging")
+def admin_set_charging(payload: ChargingUpdate,
+                       authorization: str | None = Header(None)) -> dict:
+    """Flip free mode on/off. Stored as a setting, so it survives
+    restarts. Every already-installed tool reads the flag on its
+    next license check (cached a few minutes) and starts/stops
+    asking for credits — no reinstall, no new .exe. Turning it ON
+    is what makes the gated tools require a subscription."""
+    _require_admin(authorization)
+    with _db() as con:
+        con.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            ("charging_enabled", json.dumps(bool(payload.charging_enabled))),
+        )
+        con.commit()
+    return {"charging_enabled": bool(payload.charging_enabled)}
+
+
+@app.get("/admin/usage")
+def admin_usage(customer_id: str | None = None,
+                authorization: str | None = Header(None)) -> dict:
+    """Per-user usage view (user, 2026-11-21): how much each
+    customer uses each tool, when they were last active, and what
+    unregistered (free-mode, no-key) devices used. Reads the
+    usage table written by POST /v1/usage — the same rows the
+    client pings in free mode, so demand is visible even while
+    everything is free."""
+    _require_admin(authorization)
+    with _db() as con:
+        customers = {
+            r["id"]: dict(r) for r in con.execute(
+                "SELECT id, name, email FROM customers").fetchall()
+        }
+        if customer_id:
+            rows = con.execute(
+                "SELECT * FROM usage WHERE customer_id = ? "
+                "ORDER BY created_at DESC LIMIT 200",
+                (customer_id,),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                "SELECT * FROM usage ORDER BY created_at DESC LIMIT 500"
+            ).fetchall()
+        by_customer: dict[str, dict] = {}
+        unregistered: dict[str, dict] = {}
+        recent = []
+        for r in rows:
+            d = dict(r)
+            name = customers.get(d["customer_id"] or "", {}).get("name", "")
+            d["customer_name"] = name
+            recent.append(d)
+            if d["customer_id"]:
+                agg = by_customer.setdefault(d["customer_id"], {
+                    "customer_id": d["customer_id"],
+                    "name": name,
+                    "email": customers.get(d["customer_id"] or "", {}).get("email", ""),
+                    "total": 0, "by_tool": {}, "last_active": 0,
+                    "credits_spent": 0,
+                })
+            else:
+                key = (d["device_fp"] or "unknown")[:12]
+                agg = unregistered.setdefault(key, {
+                    "device_fp": key, "total": 0, "by_tool": {},
+                    "last_active": 0,
+                })
+            agg["total"] += 1
+            agg["by_tool"][d["tool"]] = agg["by_tool"].get(d["tool"], 0) + 1
+            agg["last_active"] = max(agg["last_active"], d["created_at"])
+        for agg in by_customer.values():
+            spent = con.execute(
+                "SELECT COALESCE(SUM(-delta),0) s FROM credit_ledger "
+                "WHERE customer_id = ? AND delta < 0",
+                (agg["customer_id"],),
+            ).fetchone()["s"]
+            agg["credits_spent"] = int(spent)
+    return {
+        "by_customer": sorted(by_customer.values(),
+                              key=lambda a: a["last_active"], reverse=True),
+        "unregistered": sorted(unregistered.values(),
+                               key=lambda a: a["last_active"], reverse=True),
+        "recent": recent[:50],
+    }
+
+
 @app.get("/admin/customers")
 def admin_customers(authorization: str | None = Header(None)) -> dict:
     _require_admin(authorization)
@@ -530,6 +714,11 @@ def admin_customer_detail(customer_id: str,
             "SELECT * FROM jobs WHERE customer_id = ? ORDER BY created_at DESC",
             (customer_id,),
         ).fetchall()
+        usage_rows = con.execute(
+            "SELECT * FROM usage WHERE customer_id = ? "
+            "ORDER BY created_at DESC LIMIT 100",
+            (customer_id,),
+        ).fetchall()
         ledger = con.execute(
             "SELECT * FROM credit_ledger WHERE customer_id = ? "
             "ORDER BY created_at DESC",
@@ -543,6 +732,11 @@ def admin_customer_detail(customer_id: str,
     d = dict(cust)
     d["balance"] = _balance(customer_id)
     d["history"] = [dict(r) for r in jobs]
+    d["usage"] = [dict(r) for r in usage_rows]
+    d["usage_by_tool"] = {}
+    for r in usage_rows:
+        d["usage_by_tool"][r["tool"]] = \
+            d["usage_by_tool"].get(r["tool"], 0) + 1
     d["ledger"] = [dict(r) for r in ledger]
     d["keys"] = [dict(r) for r in keys]
     return d

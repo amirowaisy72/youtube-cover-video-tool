@@ -26,6 +26,7 @@ function showTab(name) {
     s.classList.toggle("active", s.id === name));
   if (name === "overview") loadOverview();
   if (name === "customers") loadCustomers();
+  if (name === "usage") loadUsage();
   if (name === "ledger") loadLedger();
   if (name === "credits") loadSettings();
 }
@@ -67,6 +68,35 @@ async function loadOverview() {
   } catch (e) { /* TODO: show error banner */ }
 }
 
+function byToolText(byTool) {
+  return Object.entries(byTool || {})
+    .map(([t, n]) => t + ": " + n).join(", ") || "—";
+}
+
+async function loadUsage() {
+  try {
+    const d = await api("/admin/usage");
+    document.getElementById("usage-customers").innerHTML = (d.by_customer || [])
+      .map((c) => `<tr><td>${escapeHtml(c.name || c.customer_id)}${c.email ? "<br><span class='muted'>" + escapeHtml(c.email) + "</span>" : ""}</td>
+        <td>${c.total}</td><td>${escapeHtml(byToolText(c.by_tool))}</td>
+        <td>${c.credits_spent}</td>
+        <td>${c.last_active ? new Date(c.last_active * 1000).toLocaleString() : "—"}</td></tr>`)
+      .join("") || '<tr><td colspan="5" class="muted">No usage yet.</td></tr>';
+    document.getElementById("usage-devices").innerHTML = (d.unregistered || [])
+      .map((u) => `<tr><td>${escapeHtml(u.device_fp)}</td>
+        <td>${u.total}</td><td>${escapeHtml(byToolText(u.by_tool))}</td>
+        <td>${u.last_active ? new Date(u.last_active * 1000).toLocaleString() : "—"}</td></tr>`)
+      .join("") || '<tr><td colspan="4" class="muted">No unregistered devices yet.</td></tr>';
+    document.getElementById("usage-recent").innerHTML = (d.recent || [])
+      .map((u) => `<tr><td>${new Date(u.created_at * 1000).toLocaleString()}</td>
+        <td>${escapeHtml(u.customer_name || u.device_fp || "—")}</td>
+        <td>${escapeHtml(u.tool)}</td>
+        <td>${escapeHtml(u.topic || u.title || "")}</td>
+        <td>${escapeHtml(u.status)}</td></tr>`)
+      .join("") || '<tr><td colspan="5" class="muted">No usage yet.</td></tr>';
+  } catch (e) { /* TODO: show error banner */ }
+}
+
 async function loadCustomers() {
   try {
     const d = await api("/admin/customers");
@@ -84,7 +114,13 @@ async function openCustomer(id) {
   el.innerHTML =
     "<h3>" + escapeHtml(d.name) + " — balance " + d.balance + "</h3>" +
     "<p class='muted'>Email: " + escapeHtml(d.email || "—") +
-    " · Videos: " + d.history.length + "</p>" +
+    " · Videos: " + d.history.length +
+    " · Usage: " + (d.usage || []).length + " jobs" +
+    (d.usage_by_tool ? " (" + escapeHtml(byToolText(d.usage_by_tool)) + ")" : "") + "</p>" +
+    ((d.usage || []).length ? "<h3>Recent usage</h3><table><thead><tr><th>When</th><th>Tool</th><th>Title / topic</th><th>Status</th></tr></thead><tbody>" +
+      d.usage.slice(0, 20).map((u) => `<tr><td>${new Date(u.created_at * 1000).toLocaleString()}</td>
+        <td>${escapeHtml(u.tool)}</td><td>${escapeHtml(u.topic || u.title || "")}</td>
+        <td>${escapeHtml(u.status)}</td></tr>`).join("") + "</tbody></table>" : "") +
     "<div class='form-box'>" +
     "<h3 style='margin-top:0'>Add / remove credits</h3>" +
     "<label>Credits <input id='cc-delta' type='number' placeholder='+10 to add, -5 to remove'></label>" +
@@ -117,12 +153,34 @@ async function loadSettings() {
     document.getElementById("set-cover").value = s.credits_per_cover_video;
     document.getElementById("set-tts").value = s.credits_per_tts;
     document.getElementById("set-av").value = s.credits_per_autovideo;
+    document.getElementById("set-animator").value = s.credits_per_animator;
+    document.getElementById("set-visual").value = s.credits_per_visual;
+    document.getElementById("set-voiceclone").value = s.credits_per_voiceclone;
     document.getElementById("set-trial").value = s.trial_credits;
     document.getElementById("set-price").value = s.price_per_credit_pkr;
     document.getElementById("set-packs").value = (s.packs || [])
       .map((p) => p.credits + ", " + p.price_pkr).join("\n");
   } catch (e) { /* TODO: show error banner */ }
+  try {
+    const c = await api("/v1/charging");
+    document.getElementById("set-charging").checked = !!c.charging_enabled;
+  } catch (e) { /* TODO: show error banner */ }
 }
+
+document.getElementById("btn-save-charging").addEventListener("click", async () => {
+  const msg = document.getElementById("charging-msg");
+  const on = document.getElementById("set-charging").checked;
+  msg.textContent = "Saving…";
+  try {
+    const r = await api("/admin/charging", {
+      method: "POST",
+      body: JSON.stringify({ charging_enabled: on }),
+    });
+    msg.textContent = r.charging_enabled
+      ? "Charging is ON — tools will ask for a subscription / credits within a few minutes, on already-installed tools too."
+      : "Charging is OFF — everything is free again.";
+  } catch (e) { msg.textContent = "Save failed: " + e.message; }
+});
 
 function parsePacks(text) {
   return text.split("\n").map((l) => l.trim()).filter(Boolean)
@@ -144,6 +202,9 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
         credits_per_cover_video: +document.getElementById("set-cover").value,
         credits_per_tts: +document.getElementById("set-tts").value,
         credits_per_autovideo: +document.getElementById("set-av").value,
+        credits_per_animator: +document.getElementById("set-animator").value,
+        credits_per_visual: +document.getElementById("set-visual").value,
+        credits_per_voiceclone: +document.getElementById("set-voiceclone").value,
         trial_credits: +document.getElementById("set-trial").value,
         price_per_credit_pkr: +document.getElementById("set-price").value,
         packs: parsePacks(document.getElementById("set-packs").value),

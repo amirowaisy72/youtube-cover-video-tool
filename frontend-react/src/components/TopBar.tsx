@@ -5,7 +5,7 @@ import { connectYoutubeFlow, saveYoutubeCredentials, youtubeStatus } from "@/lib
 import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 
 export function TopBar() {
-  const { credits, licensed, installed, licenseKey, licenseError, activate, activeChannelId, setActiveChannelId } = useApp();
+  const { credits, licensed, freeMode, installed, licenseKey, licenseError, activate, activeChannelId, setActiveChannelId } = useApp();
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [err, setErr] = useState("");
@@ -237,11 +237,17 @@ export function TopBar() {
           )}
           {installed && (<div className="relative">
             <button className={`btn btn-sm ${licensed ? "btn-ghost" : "btn-amber"}`} onClick={() => setOpen(!open)}>
-              {licensed ? "✓ Licensed" : "Activate"}
+              {licensed ? (freeMode ? "✓ Free" : "✓ Licensed") : "Activate"}
             </button>
             {open && (
               <div className="glass absolute right-0 mt-3 w-80 p-5 shadow-2xl">
                 {licensed ? (
+                  freeMode ? (
+                    <>
+                      <h4 className="font-semibold">Free mode</h4>
+                      <p className="mt-1 text-sm text-muted-foreground">Everything is free right now — no key needed.</p>
+                    </>
+                  ) : (
                   <>
                     <h4 className="font-semibold">License active</h4>
                     <p className="mt-1 font-mono text-sm text-muted-foreground">{licenseKey}</p>
@@ -251,6 +257,7 @@ export function TopBar() {
                       <a className="underline" href="https://wa.me/923100668952" target="_blank" rel="noreferrer">03100668952</a>
                     </p>
                   </>
+                  )
                 ) : (
                   <>
                     <h4 className="font-semibold">Enter your license key</h4>

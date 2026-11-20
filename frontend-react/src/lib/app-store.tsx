@@ -149,6 +149,8 @@ type Store = {
   /** Credit balance from the license server; null when not activated / unknown. */
   credits: number | null;
   licensed: boolean;
+  /** True while the license server has charging off — everything is free. */
+  freeMode: boolean;
   /** True only when the backend is the frozen .exe (installed setup). */
   installed: boolean;
   /** True once the first /api/license/status read has landed (or failed). */
@@ -183,6 +185,7 @@ const Ctx = createContext<Store | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [credits, setCredits] = useState<number | null>(null);
   const [licensed, setLicensed] = useState(false);
+  const [freeMode, setFreeMode] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [licenseChecked, setLicenseChecked] = useState(false);
   const [activeChannelId, setActiveChannelIdState] = useState<string | null>(() => {
@@ -289,6 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const d = await licenseStatus();
       setLicensed(!!d.activated);
+      setFreeMode(!!d["free_mode"]);
       setInstalled(!!d.installed);
       setCredits(d.activated ? (d.balance ?? null) : null);
       setLicenseError("");
@@ -296,6 +300,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // No backend (public demo) or license server unreachable:
       // not installed, not licensed — the tools stay locked.
       setLicensed(false);
+      setFreeMode(false);
       setInstalled(false);
       setCredits(null);
       setLicenseError(e instanceof Error ? e.message : "License server unreachable.");
@@ -377,7 +382,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider
       value={{
-        credits, licensed, installed, licenseChecked, unlocked: installed && licensed,
+        credits, licensed, freeMode, installed, licenseChecked, unlocked: installed && licensed,
         activeChannelId, setActiveChannelId,
         licenseKey, licenseError, activate, refreshLicense,
         presets, setPresets, activePresetId, setActivePresetId,

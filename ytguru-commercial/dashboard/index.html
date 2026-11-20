@@ -35,6 +35,7 @@
   <nav>
     <button data-tab="overview" class="active">Overview</button>
     <button data-tab="customers">Customers</button>
+    <button data-tab="usage">Usage</button>
     <button data-tab="credits">Credit Settings</button>
     <button data-tab="ledger">Ledger</button>
   </nav>
@@ -89,13 +90,41 @@
     <div id="customer-detail"></div>
   </section>
 
+  <section id="usage">
+    <h2>Usage — who uses which tool, how much (1.0.5)</h2>
+    <p class="muted">Every finished job pings the server — paid or free —
+    so demand is visible even while everything is free. Connects to GET /admin/usage.</p>
+    <h3>Per customer</h3>
+    <table><thead><tr><th>Customer</th><th>Total jobs</th><th>By tool</th><th>Credits spent</th><th>Last active</th></tr></thead>
+    <tbody id="usage-customers"><tr><td colspan="5" class="muted">No data yet.</td></tr></tbody></table>
+    <h3>Unregistered devices (free mode, no license key)</h3>
+    <table><thead><tr><th>Device</th><th>Total jobs</th><th>By tool</th><th>Last active</th></tr></thead>
+    <tbody id="usage-devices"><tr><td colspan="4" class="muted">No data yet.</td></tr></tbody></table>
+    <h3>Recent usage</h3>
+    <table><thead><tr><th>When</th><th>Customer / device</th><th>Tool</th><th>Title / topic</th><th>Status</th></tr></thead>
+    <tbody id="usage-recent"><tr><td colspan="5" class="muted">No data yet.</td></tr></tbody></table>
+  </section>
+
   <section id="credits">
     <h2>Credit settings — the values every customer tool uses</h2>
+    <div class="form-box" style="max-width:640px">
+      <h3 style="margin-top:0">Charging — free mode on / off</h3>
+      <p class="muted">OFF = everything is free, no key, no credits.
+      ON = the tools ask for a subscription / credits — on
+      already-installed tools too, within a few minutes, no new
+      .exe needed. The flag is stored on the server and survives restarts.</p>
+      <label><input id="set-charging" type="checkbox" style="width:auto"> Charging ON (paid mode)</label><br><br>
+      <button class="btn" id="btn-save-charging">Save charging</button>
+      <p class="muted" id="charging-msg"></p>
+    </div>
     <p class="muted">Saving here changes the costs the customer tool fetches
     on its next license check. Nothing is hardcoded in the tool.</p>
     <label>Credits per cover video <input id="set-cover" type="number" min="1" value="1"></label><br><br>
     <label>Credits per Text-to-Voice <input id="set-tts" type="number" min="1" value="1"></label><br><br>
     <label>Credits per auto-video <input id="set-av" type="number" min="1" value="1"></label><br><br>
+    <label>Credits per Story Animator <input id="set-animator" type="number" min="1" value="1"></label><br><br>
+    <label>Credits per Visual Explainer <input id="set-visual" type="number" min="1" value="1"></label><br><br>
+    <label>Credits per Voice Cloner <input id="set-voiceclone" type="number" min="1" value="1"></label><br><br>
     <label>Free trial credits <input id="set-trial" type="number" min="0" value="3"></label><br><br>
     <label>Price per credit (PKR) <input id="set-price" type="number" min="0" value="50"></label><br><br>
     <h3>Packs</h3>
