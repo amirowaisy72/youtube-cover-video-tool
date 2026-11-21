@@ -69,3 +69,65 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\Run-Setup.bat"; WorkingDir:
 [Run]
 ; Offer to open the tool when setup finishes.
 Filename: "{app}\Run-Setup.bat"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// Update-aware setup (user, 2026-11-22): if YT Guru is already
+// installed, the wizard says so — the Ready page offers "Update"
+// instead of "Install" — and the update only replaces the app
+// files. No user data is touched: jobs, covers and license.json
+// are created by the app at runtime (Inno never installed them,
+// so it leaves them alone), and the lazy model downloads live in
+// the Hugging Face cache outside {app}, so an update never
+// re-downloads them. No differential updater here on purpose —
+// the setup is still a full bundle; changed-file-only updates
+// are a bigger job for a later version.
+var
+  ExistingVersion: String;
+
+function GetExistingVersion(): String;
+var
+  Ver: String;
+begin
+  Result := '';
+  // Per-user install (PrivilegesRequired=lowest), so the
+  // uninstall info lives under HKCU, key "<AppId>_is1".
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{3F2A1B4C-7D8E-4A1B-9C2D-5E6F7A8B9C0D}_is1', 'DisplayVersion', Ver) then
+    Result := Ver;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  ExistingVersion := GetExistingVersion();
+  Result := True;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = wpReady then
+  begin
+    if ExistingVersion <> '' then
+      WizardForm.NextButton.Caption := 'Update'
+    else
+      WizardForm.NextButton.Caption := 'Install';
+  end;
+end;
+
+function UpdateReadyMemo(Space, NewLine, MemoUserInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
+begin
+  Result := '';
+  if ExistingVersion <> '' then
+    Result := Result + 'Update: YT Guru ' + ExistingVersion + ' is already installed — this will update it to {#MyAppVersion}. Your jobs, covers and license stay in place.' + NewLine + NewLine;
+  if MemoUserInfo <> '' then
+    Result := Result + MemoUserInfo + NewLine + NewLine;
+  if MemoDirInfo <> '' then
+    Result := Result + MemoDirInfo + NewLine + NewLine;
+  if MemoTypeInfo <> '' then
+    Result := Result + MemoTypeInfo + NewLine + NewLine;
+  if MemoComponentsInfo <> '' then
+    Result := Result + MemoComponentsInfo + NewLine + NewLine;
+  if MemoGroupInfo <> '' then
+    Result := Result + MemoGroupInfo + NewLine + NewLine;
+  if MemoTasksInfo <> '' then
+    Result := Result + MemoTasksInfo;
+end;
+
