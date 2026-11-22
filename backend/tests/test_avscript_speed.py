@@ -219,7 +219,10 @@ class StallTimeoutTest(unittest.TestCase):
     def test_all_scene_visual_downloads_carry_timeout(self):
         src = inspect.getsource(autovideo2._scene_visual)
         lines = [ln for ln in src.splitlines() if "_download(" in ln]
-        self.assertGreaterEqual(len(lines), 4, f"expected 4 download calls, found: {lines}")
+        # 3 download sites (2026-11-22 — Option 2 fix removed the
+        # 4th, the "any image" second pass, so no uncapped or
+        # off-topic image download remains).
+        self.assertGreaterEqual(len(lines), 3, f"expected 3 download calls, found: {lines}")
         for ln in lines:
             self.assertIn("total_timeout=60", ln, f"download without a cap: {ln.strip()}")
 

@@ -293,22 +293,25 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # Prefer a clip for motion, then an image. Candidates are
     # already scored by file-title overlap with the visual
     # description, best first.
-    # CLIP-FIRST FIX (user, 2026-11-09): a 30-minute video came
-    # out with ONLY images and ZERO clips. The on-topic filter
-    # below rejected nearly every Commons video (their file
-    # titles rarely contain the title's core words), so scenes
-    # fell through to images even when clips were available.
-    # Now two passes: on-topic clips first, then ANY clip from
-    # the found list — a moving clip, even loosely related, keeps
-    # viewers watching far better than a static image.
+    # (2026-11-22 — Option 2 fix) the old "CLIP-FIRST FIX" traded
+    # relevance for motion on purpose: when the on-topic filter
+    # rejected nearly every Commons video, scenes fell through to
+    # ANY clip from the found list. That is exactly how a Great
+    # Wall scene ended up showing an unrelated clip. Now there is
+    # NO "any clip" pass at all: only on-topic clips are tried
+    # (small files first), each verified against the scene's
+    # narration before download, and when none fit the scene falls
+    # through to images / AI image / title card.
     # LONG-VIDEO FIX (user, 2026-11-09): short videos looked
     # great but long videos were mostly AI images. Root cause:
     # only the FIRST 5 clips / FIRST 5 images were ever tried,
     # and images had NO "any image" second pass — so once the
     # first few scenes used up the top 5, every later scene
-    # fell straight to AI. Now ALL found candidates are tried
-    # (on-topic first, then any), so a long video uses the
-    # whole pool before ever touching AI.
+    # fell straight to AI. Now ALL found on-topic candidates are
+    # tried, so a long video uses the whole pool before ever
+    # touching AI. (The "then any" pass was removed by the
+    # Option 2 fix, 2026-11-22 — an unrelated clip is worse
+    # than a still image of the right thing.)
     # SPEED FIX (user, 2026-11-09): each footage took ~1 minute
     # even though the clip is only 5-8 seconds — because the
     # download time depends on FILE SIZE, not length, and the app
@@ -318,8 +321,26 @@ def _scene_visual(title: str, scene: dict, visuals: str,
     # Relevance still comes first (on-topic before any), size
     # second — a small on-topic clip beats a big on-topic one.
     _FAST_VIDEO_BYTES = 15 * 1024 * 1024
+
+    # Per-scene visual verification (2026-11-22 — Option 2 fix):
+    # each clip is checked against the scene's narration (AI
+    # yes/no on its title/tags, after the deterministic overlap
+    # gate) BEFORE it is downloaded. At most 4 AI checks per
+    # scene (1 pick + 3 re-picks); past that, or when the AI is
+    # unavailable, the deterministic gates decide alone.
+    _verify_budget = [4]
+
+    def _verify(item: dict) -> bool | None:
+        if _verify_budget[0] <= 0 or not autovideo_smart.ai_verify_enabled():
+            return None
+        _verify_budget[0] -= 1
+        return autovideo_smart.verify_clip_fits(
+            scene.get("narration") or "", item.get("title") or "")
+
     def _try_clips(candidates):
         for item in candidates:
+            if _verify(item) is False:
+                continue  # AI says it does not show the narration: re-pick
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
@@ -356,13 +377,15 @@ def _scene_visual(title: str, scene: dict, visuals: str,
                                     pixabay_key=pixabay_key,
                                     vertical=vertical)
     if visuals in ("videos", "both"):
+        # (2026-11-22 — Option 2 fix) the "any clip" passes are
+        # GONE: a moving clip that shows the wrong thing is worse
+        # than a still image of the right thing. Only on-topic
+        # clips are tried (small files first); when none fit, the
+        # scene falls through to images / AI image / title card.
         on_topic = autovideo_smart.vary([it for it in found["videos"] if _on_topic(it)])
-        any_clip = autovideo_smart.vary(list(found["videos"]))
         for pool in (
             [it for it in on_topic if (it.get("size") or 0) <= _FAST_VIDEO_BYTES],
             on_topic,
-            [it for it in any_clip if (it.get("size") or 0) <= _FAST_VIDEO_BYTES],
-            any_clip,
         ):
             got = _try_clips(pool)
             if got:
@@ -371,13 +394,6 @@ def _scene_visual(title: str, scene: dict, visuals: str,
         for item in found["images"]:
             if not _on_topic(item):
                 continue
-            if not _reserve_url(used_urls, lock, item["url"]):
-                continue
-            dest = work_dir / f"scene-{index:02d}.jpg"
-            if autovideo._download(item["url"], dest, total_timeout=60) and autovideo._valid_image(dest):
-                return dest, "image", item["title"]
-            _release_url(used_urls, lock, item["url"])
-        for item in found["images"]:
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             dest = work_dir / f"scene-{index:02d}.jpg"
@@ -1303,73 +1319,124 @@ def _remember_narrations(work_dir: Path, scenes: list[dict]) -> None:
             pass
 
 
+def _voice_content_hash(voice_path: Path, narration: str) -> dict:
+    """Fingerprint a scene's voice + narration (user, 2026-11-22
+    — Option 2 fix): sha1 of the voice file bytes + sha1 of the
+    narration text. A cached SRT is only reused when BOTH match
+    — the old mtime check silently reused an SRT recorded for a
+    DIFFERENT voice (a re-voiced scene kept the old timings)."""
+    import hashlib
+    voice_sha1 = ""
+    try:
+        h = hashlib.sha1()
+        with open(voice_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        voice_sha1 = h.hexdigest()
+    except OSError:
+        pass
+    return {
+        "voice_sha1": voice_sha1,
+        "narration_sha1": hashlib.sha1((narration or "").encode("utf-8")).hexdigest(),
+    }
+
+
+def _script_srt(narration: str, duration: float) -> str:
+    """Script-derived subtitles (user, 2026-11-22 — Option 2
+    fix): when Whisper cannot transcribe a scene at all, spread
+    the narration's own words evenly over the voice duration
+    instead of leaving the scene with NO subtitles (or a stale
+    first-sentence caption for the whole scene). Same cue shape
+    as the transcribed path: at most 5 words / ~2s per cue,
+    broken at sentence punctuation."""
+    words = (narration or "").split()
+    if not words or duration <= 0:
+        return ""
+    per_word = duration / len(words)
+    timed = [{"start": i * per_word, "end": (i + 1) * per_word, "word": w}
+             for i, w in enumerate(words)]
+    return _words_to_srt(timed)
+
+
 def _transcribe_scene_voice(voice_path: Path, work_dir: Path, index: int) -> Path | None:
     """Transcribe ONE scene's voiceover with word timestamps and
     write a per-scene SRT (times relative to the scene start,
     0.0s — the scene's voice starts at 0.0s inside its segment,
-    so the SRT aligns automatically). Returns the SRT path, or
-    None on ANY failure: a subtitle failure must never break a
-    scene — the segment is then built with its static caption
-    instead."""
+    so the SRT aligns automatically). Returns the SRT path.
+    (2026-11-22 — Option 2 fix) A cached SRT is reused only
+    when the voice file's bytes AND the narration text both
+    still match its fingerprint — a re-voiced or re-worded scene
+    is always re-transcribed, never silently kept on old timings.
+    If Whisper fails twice, the SRT is built from the script
+    itself (words spread over the voice duration) — a scene with
+    spoken narration is never left with no subtitles at all."""
     srt_cached = work_dir / f"scene-{index:02d}.srt"
+    meta_path = work_dir / f"scene-{index:02d}.srt.meta.json"
+    narration = _scene_narration(work_dir, index)
+    words_file = work_dir / f"scene-{index:02d}.words.json"
     try:
-        narration = _scene_narration(work_dir, index)
-        words_file = work_dir / f"scene-{index:02d}.words.json"
-        if (srt_cached.exists() and srt_cached.stat().st_mtime >= voice_path.stat().st_mtime
-                and narration and words_file.exists() and words_file.stat().st_mtime >= voice_path.stat().st_mtime):
-            words = json.loads(words_file.read_text(encoding="utf-8"))
-            fresh = _words_to_srt(_align_to_script(words, narration))
-            if srt_cached.read_text(encoding="utf-8") != fresh:  # the script changed its spelling: same timing
-                st = srt_cached.stat()
-                srt_cached.write_text(fresh, encoding="utf-8")
-                os.utime(srt_cached, (st.st_atime, st.st_mtime))
-            return srt_cached
-        if srt_cached.exists() and srt_cached.stat().st_mtime >= voice_path.stat().st_mtime and not narration:
-            old = srt_cached.read_text(encoding="utf-8")
-            fixed = "\n".join(ln if ("-->" in ln or ln.strip().isdigit()) else _tidy_caption(ln) for ln in old.split("\n"))
-            if fixed != old:  # an older caption file: its spacing fixed, its time kept (the cache stays valid)
-                st = srt_cached.stat()
-                srt_cached.write_text(fixed, encoding="utf-8")
-                os.utime(srt_cached, (st.st_atime, st.st_mtime))
-            return srt_cached  # already transcribed (rich-footage timing used it)
-    except OSError:
+        fingerprint = _voice_content_hash(voice_path, narration)
+        if srt_cached.exists() and meta_path.exists():
+            saved = json.loads(meta_path.read_text(encoding="utf-8"))
+            if (saved.get("voice_sha1") == fingerprint["voice_sha1"]
+                    and saved.get("narration_sha1") == fingerprint["narration_sha1"]
+                    and fingerprint["voice_sha1"]):
+                return srt_cached
+    except (OSError, ValueError):
         pass
-    try:
-        model = _get_whisper_model()
-        # Decode with FFmpeg to a numpy array (video.decode_audio_16k)
-        # instead of passing the file path: faster-whisper's own
-        # av-based decoder is broken with the av version pip
-        # installs (av 19 removed the metadata_errors kwarg
-        # faster-whisper 1.2.1 passes). A numpy array skips that
-        # decoder entirely.
-        audio = video_module.decode_audio_16k(voice_path)
-        if audio is None:
-            return None
-        segments_iter, _info = model.transcribe(
-            audio, language="en", beam_size=5, word_timestamps=True,
-            initial_prompt=(_scene_narration(work_dir, index)[:600] or None))
-        words: list[dict] = []
-        for seg in segments_iter:
-            for w in (seg.words or []):
-                text = (w.word or "").strip()
-                if text:
-                    words.append({
-                        "start": float(w.start), "end": float(w.end),
-                        "word": text})
-        if not words:
-            return None
-        narration = _scene_narration(work_dir, index)
+    words: list[dict] = []
+    last_error: Exception | None = None
+    for _attempt in range(2):  # one retry: a transient Whisper failure must not cost a scene its subtitles
         try:
-            (work_dir / f"scene-{index:02d}.words.json").write_text(json.dumps(words), encoding="utf-8")
+            model = _get_whisper_model()
+            # Decode with FFmpeg to a numpy array (video.decode_audio_16k)
+            # instead of passing the file path: faster-whisper's own
+            # av-based decoder is broken with the av version pip
+            # installs (av 19 removed the metadata_errors kwarg
+            # faster-whisper 1.2.1 passes). A numpy array skips that
+            # decoder entirely.
+            audio = video_module.decode_audio_16k(voice_path)
+            if audio is None:
+                break
+            segments_iter, _info = model.transcribe(
+                audio, language="en", beam_size=5, word_timestamps=True,
+                initial_prompt=(narration[:600] or None))
+            words = []
+            for seg in segments_iter:
+                for w in (seg.words or []):
+                    text = (w.word or "").strip()
+                    if text:
+                        words.append({
+                            "start": float(w.start), "end": float(w.end),
+                            "word": text})
+            if words:
+                break
+        except Exception as exc:  # noqa: BLE001 — retry once, then script fallback below
+            last_error = exc
+    if words:
+        try:
+            words_file.write_text(json.dumps(words), encoding="utf-8")
         except OSError:
             pass
         if narration:
             words = _align_to_script(words, narration)
-        srt_path = work_dir / f"scene-{index:02d}.srt"
-        srt_path.write_text(_words_to_srt(words), encoding="utf-8")
-        return srt_path
-    except Exception:
-        return None
+        srt_text = _words_to_srt(words)
+    else:
+        # No transcription at all (model missing, decode failed,
+        # or an empty result twice): fall back to the script
+        # itself so the scene still shows its words in time.
+        duration = video_module.get_duration(voice_path) or 0
+        srt_text = _script_srt(narration, duration)
+        if not srt_text:
+            print(f"subtitles unavailable for scene {index + 1}: {last_error}")
+            return None
+    try:
+        srt_cached.write_text(srt_text, encoding="utf-8")
+        meta_path.write_text(json.dumps(_voice_content_hash(voice_path, narration)),
+                             encoding="utf-8")
+    except OSError:
+        pass
+    return srt_cached
 
 
 def _burn_caption(image_path: Path, caption: str, dest: Path) -> Path:
@@ -1411,8 +1478,16 @@ def _burn_caption(image_path: Path, caption: str, dest: Path) -> Path:
 # (YouTube style: white text, black outline, bottom centre).
 # The subtitles filter burns the per-scene SRT into the segment
 # during its encode — no extra re-encode pass.
+# PlayResX/PlayResY (user, 2026-11-22 — Visual Explainer reel
+# subtitles were ENORMOUS): libass (the ffmpeg subtitles filter)
+# assumes a 384x288 script canvas when the style sets no
+# PlayRes, and scales FontSize by video_height/288 — so 32px
+# became ~213px per line on a 1080x1920 reel (measured on this
+# VM: one cue covered 552px of the frame). Setting PlayRes to
+# the real frame size makes FontSize a true pixel size.
 _SUBTITLE_STYLE = (
-    "FontName=Arial,FontSize=24,PrimaryColour=&HFFFFFF,"
+    "FontName=Arial,FontSize=24,PlayResX=1280,PlayResY=720,"
+    "PrimaryColour=&HFFFFFF,"
     "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
     "Alignment=2,MarginV=25"
 )
@@ -1423,7 +1498,8 @@ _SUBTITLE_STYLE = (
 # render directly in 1080x1920, so the caption font is sized
 # for that width (32px fits a 5-word cue on one line).
 _SUBTITLE_STYLE_VERTICAL = (
-    "FontName=Arial,FontSize=32,PrimaryColour=&HFFFFFF,"
+    "FontName=Arial,FontSize=32,PlayResX=1080,PlayResY=1920,"
+    "PrimaryColour=&HFFFFFF,"
     "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
     "Alignment=2,MarginV=40"
 )
@@ -1478,11 +1554,6 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
             "format=yuv420p,"
         )
     style = _SUBTITLE_STYLE_VERTICAL if vertical else _SUBTITLE_STYLE
-    if subtitles_srt is not None:
-        vf += (
-            f"subtitles='{subtitles_srt.name}':"
-            f"force_style='{style}',"
-        )
     # Fades: with xfade transitions the join IS the transition,
     # so middle scenes have no fade (first scene fades in, last
     # fades out). When fade_in/out are off, the segment is a hard
@@ -1493,22 +1564,40 @@ def _segment_scene_image(image_path: Path, caption: str, duration: float,
     if fade_out:
         fade_parts.append(
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
-    if fade_parts:
-        vf += ",".join(fade_parts)
-    else:
-        vf = vf.rstrip(",")
-    cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(shown),
-           "-vf", vf, "-r", "30", "-t", str(duration),
-           "-c:v", "libx264", "-preset", "veryfast",
-           "-pix_fmt", "yuv420p", str(dest)]
-    run_kwargs = dict(video_module.no_window_kwargs())
+    fade = ",".join(fade_parts)
+    subtitled_vf = (vf + (f"subtitles='{subtitles_srt.name}':force_style='{style}',"
+                          if subtitles_srt is not None else "") + fade).rstrip(",")
+    plain_vf = (vf + fade).rstrip(",")
+
+    def _run(shown_path, vf_chain, use_cwd: bool) -> bool:
+        cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(shown_path),
+               "-vf", vf_chain, "-r", "30", "-t", str(duration),
+               "-c:v", "libx264", "-preset", "veryfast",
+               "-pix_fmt", "yuv420p", str(dest)]
+        run_kwargs = dict(video_module.no_window_kwargs())
+        if use_cwd:
+            run_kwargs["cwd"] = str(dest.parent)
+        return subprocess.run(cmd, capture_output=True, text=True, **run_kwargs).returncode == 0
+
     if subtitles_srt is not None:
-        run_kwargs["cwd"] = str(dest.parent)
-    ok = subprocess.run(cmd, capture_output=True, text=True, **run_kwargs).returncode == 0
-    if subtitles_srt is None:
+        if _run(shown, subtitled_vf, True):
+            return True
+        # Subtitled encode failed (2026-11-22 — Option 2 fix):
+        # retry with the Pillow-captioned still (no subtitles
+        # filter) so the scene keeps its caption instead of
+        # failing outright — a failed subtitles filter used to
+        # return False and the whole scene fell back to a plain
+        # still with no text at all.
         captioned = dest.with_suffix(".cap.jpg")
-        if captioned.exists():
+        shown = _burn_caption(image_path, caption, captioned)
+        if _run(shown, plain_vf, False):
             captioned.unlink(missing_ok=True)
+            return True
+        return False
+    ok = _run(shown, plain_vf, False)
+    captioned = dest.with_suffix(".cap.jpg")
+    if captioned.exists():
+        captioned.unlink(missing_ok=True)
     return ok
 
 
@@ -1600,6 +1689,33 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
             f"fade=t=out:st={max(duration - 0.5, 0)}:d=0.5")
     fade = ",".join(fade_parts)
     fade_sfx = f",{fade}" if fade else ""
+
+    def _encode_captioned() -> bool:
+        """Static first-sentence caption via drawtext (the
+        fallback when the subtitles filter fails). Returns True
+        when the captioned encode worked."""
+        caption_file = None
+        font = _find_font()
+        if caption and font:
+            import textwrap
+            lines = textwrap.wrap(caption, width=52)[:2]
+            if lines:
+                caption_file = dest.with_suffix(".cap.txt")
+                caption_file.write_text("\n".join(lines), encoding="utf-8")
+                captioned_vf = (
+                    f"{base_vf},"
+                    f"drawtext=fontfile={font}:textfile={caption_file}:"
+                    "fontsize=28:fontcolor=white:box=1:boxcolor=black@0.75:"
+                    "boxborderw=18:x=(w-text_w)/2:y=h-90"
+                    f"{fade_sfx}"
+                )
+                if _encode(captioned_vf):
+                    caption_file.unlink(missing_ok=True)
+                    return True
+        if caption_file is not None:
+            caption_file.unlink(missing_ok=True)
+        return False
+
     style = _SUBTITLE_STYLE_VERTICAL if vertical else _SUBTITLE_STYLE
     if subtitles_srt is not None:
         subtitled_vf = (
@@ -1610,31 +1726,16 @@ def _segment_scene_clip(clip_path: Path, caption: str, duration: float,
         )
         if _encode(subtitled_vf):
             return True
-        # Subtitled encode failed: fall through to the plain
-        # segment below rather than losing the scene.
+        # Subtitled encode failed (2026-11-22 — Option 2 fix):
+        # fall back to the static caption before the plain
+        # segment, so the scene is never left with NO text at
+        # all — a failed subtitles filter used to mean a silent
+        # scene even though a caption was available.
+        if _encode_captioned():
+            return True
         return _encode(f"{base_vf}{fade_sfx}")
-    caption_file = None
-    font = _find_font()
-    if caption and font:
-        import textwrap
-        lines = textwrap.wrap(caption, width=52)[:2]
-        if lines:
-            caption_file = dest.with_suffix(".cap.txt")
-            caption_file.write_text("\n".join(lines), encoding="utf-8")
-            captioned_vf = (
-                f"{base_vf},"
-                f"drawtext=fontfile={font}:textfile={caption_file}:"
-                "fontsize=28:fontcolor=white:box=1:boxcolor=black@0.75:"
-                "boxborderw=18:x=(w-text_w)/2:y=h-90"
-                f"{fade_sfx}"
-            )
-            if _encode(captioned_vf):
-                caption_file.unlink(missing_ok=True)
-                return True
-            # Captioned encode failed: fall through to the
-            # plain segment below rather than losing the scene.
-    if caption_file is not None:
-        caption_file.unlink(missing_ok=True)
+    if _encode_captioned():
+        return True
     return _encode(f"{base_vf}{fade_sfx}")
 
 
@@ -1868,7 +1969,20 @@ def rebuild_video_after_scene_change(work_dir: Path, scenes: list[dict],
     for seg in segments:
         if not seg.exists():
             raise RuntimeError(f"Scene segment missing: {seg.name}")
-    voice_durs = [float(s.get("duration_sec") or 0) for s in scenes]
+    # (2026-11-22 — Option 2 fix) the xfade offsets must come
+    # from what is actually on disk, not the recorded durations:
+    # each segment is voice + 0.5s (except the last, voice only),
+    # so the voice duration is the measured segment length minus
+    # the transition overlap. A segment that cannot be measured
+    # keeps its recorded duration.
+    voice_durs = []
+    for i, (seg, sc) in enumerate(zip(segments, scenes)):
+        rec = float(sc.get("duration_sec") or 0)
+        seg_dur = video_module.get_duration(seg)
+        if seg_dur and seg_dur > 0:
+            voice_durs.append(max(0.1, seg_dur - (0 if i >= len(scenes) - 1 else _TRANSITION_SEC)))
+        else:
+            voice_durs.append(rec)
     total_voice = sum(voice_durs)
     if total_voice <= 0:
         raise RuntimeError("No scene durations — cannot re-join.")
@@ -2578,6 +2692,37 @@ def plan_footage(title: str, minutes: int, script: str | None,
     }
 
 
+def _voice_hash(narration: str, voice: str, provider: str) -> str:
+    """One identity for a scene's voice (user, 2026-11-22 —
+    Option 2 fix): sha1 of [narration, voice, provider]. A voice
+    file is only reused when the hash of the CURRENT narration /
+    voice / provider matches the hash stored with it — so an
+    edit to the narration after the Audio step always re-voices
+    instead of silently keeping the old words."""
+    import hashlib
+    return hashlib.sha1(
+        json.dumps([narration or "", voice or "", provider or ""]).encode("utf-8")
+    ).hexdigest()
+
+
+def _remeasure_voice_durations(voice_files: list, recorded: list[float]) -> list[float]:
+    """Render-time duration check (user, 2026-11-22 — Option 2
+    fix): ffprobe-measure every scene voice file and use the
+    MEASURED durations (the xfade offsets in join_and_mux must
+    place scenes where the words are actually spoken). A file
+    that cannot be measured keeps its recorded duration — a
+    measurement failure must never break a render."""
+    measured: list[float] = []
+    for i, path in enumerate(voice_files):
+        rec = float(recorded[i]) if i < len(recorded) else 0.0
+        try:
+            got = video_module.get_duration(path)
+        except Exception:  # noqa: BLE001 — ffprobe failed: keep recorded
+            got = None
+        measured.append(float(got) if got and got > 0 else rec)
+    return measured
+
+
 def prepare_audio(title: str, scenes: list[dict], voice: str,
                   work_dir: Path, freesound_key: str | None = None,
                   music: bool = True,
@@ -2618,7 +2763,16 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
     # Per-scene checkpoint/resume (2026-11-20): scenes already
     # voiced in an earlier (stuck) attempt are reused from
     # existing_voices, never re-voiced. A scene is reused only
-    # when its file still exists under work_dir and duration > 0.
+    # when its file still exists under work_dir AND its stored
+    # voice_hash matches the CURRENT narration/voice/provider
+    # (2026-11-22 — Option 2 fix: an edit to the narration after
+    # the Audio step used to keep the OLD voice while the
+    # subtitles followed the NEW text, so the words drifted
+    # apart. A missing hash means "never verified": re-voice
+    # once, never crash). The duration is re-measured with
+    # ffprobe, never trusted from the record — a recorded
+    # duration from a different (e.g. plain) voice pass is what
+    # made the render's scene placement drift ~6% per video.
     for _idx, _entry in (existing_voices or {}).items():
         try:
             _idx = int(_idx)
@@ -2626,14 +2780,23 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
             continue
         if not isinstance(_entry, dict):
             continue
-        try:
-            _duration = float(_entry.get("duration") or 0)
-        except (TypeError, ValueError):
+        if not (0 <= _idx < len(scenes)):
             continue
         _name = _entry.get("voice_path") or ""
         _candidate = work_dir / Path(str(_name)).name if _name else None
-        if (0 <= _idx < len(scenes) and _candidate is not None
-                and _candidate.exists() and _duration > 0):
+        if _candidate is None or not _candidate.exists():
+            continue
+        _expected = _voice_hash(scenes[_idx].get("narration", ""), voice,
+                                tts_provider or "")
+        if _entry.get("voice_hash") != _expected:
+            continue  # narration / voice / provider changed: re-voice
+        _duration = video_module.get_duration(_candidate)
+        if _duration is None or _duration <= 0:
+            try:
+                _duration = float(_entry.get("duration") or 0)
+            except (TypeError, ValueError):
+                _duration = 0
+        if _duration > 0:
             results[_idx] = {"voice_path": _candidate,
                              "engine": _entry.get("engine") or "kept",
                              "duration": _duration}
@@ -2645,14 +2808,16 @@ def prepare_audio(title: str, scenes: list[dict], voice: str,
         """(user, 2026-11-20) an audio step that was stopped half-way (the app was closed) keeps the
         scenes it had already voiced: a retry voices only the missing ones. The notes are removed when
         the step finishes, so a later re-voice always makes new voices."""
-        import hashlib
         note = work_dir / f"scene-{i:02d}.voice-done.json"
-        key = hashlib.sha1(json.dumps([narration, voice, tts_provider or ""]).encode("utf-8")).hexdigest()
+        key = _voice_hash(narration, voice, tts_provider or "")
         try:
             d = json.loads(note.read_text(encoding="utf-8"))
             p = work_dir / d["file"]
             if d.get("key") == key and p.exists() and float(d.get("duration") or 0) > 0:
-                return p, d.get("engine") or "kept", float(d["duration"]), False, ""
+                _kept = video_module.get_duration(p)
+                if _kept is None or _kept <= 0:
+                    _kept = float(d["duration"])
+                return p, d.get("engine") or "kept", _kept, False, ""
         except Exception:  # noqa: BLE001 — no note: voice it
             pass
         res = _voice_scene_with_fallback(i, narration, *rest)
@@ -2852,6 +3017,18 @@ def render_video(work_dir: Path, scenes: list[dict],
     which magnified the captions to 64px and cut them off at
     both edges, and centre-cropped the footage. _to_vertical is
     no longer called."""
+    # (2026-11-22 — Option 2 fix) re-measure every voice file
+    # with ffprobe and use the MEASURED durations for the xfade
+    # offsets: the recorded durations came from an earlier voice
+    # pass (plain voice, ~5-6% slower than the presenter voice
+    # actually muxed in), so the video scenes were placed at the
+    # wrong times and the subtitles drifted ~21s by the end of a
+    # 9-minute video. A file that cannot be measured keeps its
+    # recorded duration.
+    durations = _remeasure_voice_durations(voice_files, durations)
+    for i, sc in enumerate(scenes):
+        if i < len(durations):
+            sc["duration_sec"] = round(durations[i], 1)
     total_voice = sum(durations)
     vertical = video_type == "short"
     segments: list[Path] = []
@@ -2925,6 +3102,10 @@ def render_video(work_dir: Path, scenes: list[dict],
         "final_duration_sec": final_duration,
         "join": join_method,
         "kinds": kinds,
+        # (2026-11-22 — Option 2 fix) the ffprobe-measured scene
+        # durations: the caller writes them back into the job so
+        # later scene changes / re-joins use the real values.
+        "durations": [round(d, 1) for d in durations],
     }
 
 

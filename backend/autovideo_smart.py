@@ -368,11 +368,21 @@ def smart_candidates(title: str, scene: dict, visuals: str, pexels_key, pixabay_
     def add(kind: str, url, tags: str, query: str, extra: dict) -> None:
         if not url or url in seen:
             return
-        seen.add(url)
         words = set(re.findall(r"[a-z]+", (tags or "").lower()))
         if words & avoid:
             return  # a bird in a money scene: never
         qw = set(re.findall(r"[a-z]+", query.lower())) - _STOP
+        # (2026-11-22 — Option 2 fix) a candidate whose tags share
+        # NO word with the query is never a match — the old score
+        # (2.0 base + overlap) let zero-overlap results in, and
+        # the random page + shuffle then picked them. A query that
+        # is all stop words has no qw: those pass (nothing to
+        # check against). The seen-set is marked only after the
+        # gates, so a candidate rejected under one query can still
+        # be accepted under another.
+        if qw and not (words & qw):
+            return
+        seen.add(url)
         score = 2.0 + len(words & qw) * 1.5
         if vertical and (extra.get("height") or 0) > (extra.get("width") or 0):
             score += 2
@@ -419,6 +429,61 @@ def smart_candidates(title: str, scene: dict, visuals: str, pexels_key, pixabay_
     for kind in ("videos", "images"):
         out[kind] = vary([it for _, it in sorted(scored[kind], key=lambda p: -p[0])])
     return out
+
+
+# ------------------------------------------------------------ visual verification
+_AI_VERIFY_COOLDOWN_SEC = 300.0  # after one AI failure, stop asking for 5 minutes
+_ai_verify_disabled_until = 0.0
+
+
+def ai_verify_enabled() -> bool:
+    """True when the AI verification path may be tried (not in
+    its cooldown after a failure)."""
+    import time as _time
+    return _time.time() >= _ai_verify_disabled_until
+
+
+def verify_clip_fits(narration: str, clip_title: str) -> bool | None:
+    """Per-scene visual verification (user, 2026-11-22 — Option
+    2 fix): ask the app's AI whether a stock clip actually SHOWS
+    what the scene's narration is talking about, from the clip's
+    title/tags alone — BEFORE the clip is downloaded. Returns
+    True (fits), False (does not fit — re-pick) or None (could
+    not check: no AI answer, unparseable answer, or cooldown —
+    the deterministic gates decide, the scene never blocks).
+    One AI failure puts verification on a 5-minute cooldown so
+    a dead AI (e.g. free-limit 402) never slows a whole job."""
+    import time as _time
+    global _ai_verify_disabled_until
+    if _time.time() < _ai_verify_disabled_until:
+        return None
+    narration = (narration or "").strip()
+    clip_title = (clip_title or "").strip()
+    if not narration or not clip_title:
+        return None
+    prompt = (
+        "A YouTube scene is narrated as follows:\n"
+        f"\"{narration[:400]}\"\n"
+        "A stock video clip is titled:\n"
+        f"\"{clip_title[:160]}\"\n"
+        "Does this clip SHOW what the narration is talking about? "
+        "Reply with exactly one word: YES or NO."
+    )
+    try:
+        import tools_animator as ta
+        answer = ta._ask_ai(prompt, timeout=60, attempts=1)
+    except Exception:  # noqa: BLE001 — AI down: cool down, never block the scene
+        _ai_verify_disabled_until = _time.time() + _AI_VERIFY_COOLDOWN_SEC
+        return None
+    first = (answer or "").strip().split()
+    if not first:
+        return None
+    word = first[0].strip(".,!\"'").upper()
+    if word == "YES":
+        return True
+    if word == "NO":
+        return False
+    return None
 
 
 # ------------------------------------------------------------ pop-ups
@@ -572,17 +637,21 @@ SAFE_TRANSITIONS = ["fade", "smoothleft", "circleopen", "slideleft", "dissolve",
 
 def collect_shots(title: str, scene: dict, index: int, work_dir: Path, visuals: str, pexels_key, pixabay_key,
                   vertical: bool, used: set, lock) -> list[dict]:
-    """Download one clip for each planned shot (videos only), a few at once. A shot whose
-    own search finds nothing new uses the video's always-fitting topic searches instead."""
+    """Download one clip for each planned shot (videos only), a few at once.
+    (2026-11-22 — Option 2 fix) a shot is tried ONLY on its own query:
+    the old fallback to random "world" topic searches filled scenes
+    with clips about something else entirely (a shot about the moon
+    could end up showing a random world landmark). A shot that finds
+    nothing on its own query simply has no extra shot — the main
+    clip carries the scene."""
     if visuals == "images":
         return []
     from concurrent.futures import ThreadPoolExecutor
     plan = scene.get("plan") or {}
-    world = list((scene.get("topic") or {}).get("world") or [])
     avoid = plan.get("avoid") or []
 
     def one(k: int, sh: dict) -> dict | None:
-        tries = [sh["query"]] + [w for w in random.sample(world, len(world)) if w != sh["query"]][:2]
+        tries = [sh["query"]]
         for q in tries:
             fake = {"plan": {"queries": [q], "avoid": avoid}}
             try:

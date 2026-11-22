@@ -3202,6 +3202,11 @@ def _run_autovideo_audio(
                         "voice_path": Path(str(_entry["voice_path"])).name,
                         "engine": _entry.get("engine") or "",
                         "duration": _entry.get("duration") or 0,
+                        # (2026-11-22 — Option 2 fix) the voice's
+                        # identity hash; old checkpoints have
+                        # none, which prepare_audio treats as
+                        # "never verified" and re-voices once.
+                        "voice_hash": _entry.get("voice_hash") or "",
                     }
 
         def _on_scene_done(idx: int, voice_path, engine: str,
@@ -3209,15 +3214,25 @@ def _run_autovideo_audio(
             # Checkpoint one freshly voiced scene immediately, so
             # a later retry resumes from here. Re-read the job
             # fresh so concurrent progress writes are not clobbered.
+            # (2026-11-22 — Option 2 fix) the checkpoint also
+            # stores the voice's identity hash ([narration, voice,
+            # provider]) — the next Audio run re-voices the scene
+            # when the narration has changed since.
             try:
                 fresh = _av_read(job_id)
                 voices = fresh.get("scene_voices") or {}
                 if not isinstance(voices, dict):
                     voices = {}
+                _narration = ""
+                try:
+                    _narration = str((fresh.get("scenes") or [])[idx].get("narration") or "")
+                except (IndexError, TypeError, AttributeError):
+                    pass
                 voices[str(idx)] = {
                     "voice_path": Path(voice_path).name,
                     "engine": engine,
                     "duration": float(duration),
+                    "voice_hash": autovideo2._voice_hash(_narration, voice, tts_provider or ""),
                 }
                 fresh["scene_voices"] = voices
                 _av_write(fresh)
@@ -3480,6 +3495,13 @@ def _run_autovideo_render(
         )
         kinds = result["kinds"]
         job = _av_read(job_id)
+        # (2026-11-22 — Option 2 fix) persist the ffprobe-measured
+        # scene durations render_video used, so a later scene
+        # change / re-join works from the real values, not the
+        # recorded ones from an older voice pass.
+        for _i, _d in enumerate(result.get("durations") or []):
+            if _i < len(job.get("scenes") or []):
+                job["scenes"][_i]["duration_sec"] = _d
         final_path = directory / "final.mp4"
         # Realistic step (user, 2026-11-09): the words he picked
         # pop up wherever they are spoken. Applied right after
