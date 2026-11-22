@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 // Note (2026-11-07): this route's chunk hash is content-based;
 // a comment-only edit does not change the built bundle.
 import { useEffect, useRef, useState } from "react";
@@ -401,6 +401,14 @@ function SimpleScenesBar({ job, onScene }: { job: AvJob; onScene: (i: number, sc
 
 export function AutoVideoPage({ docu = false, visual = false }: { docu?: boolean; visual?: boolean }) {
   const { jobs, registerJob, updateJob, removeJob, activeChannelId } = useApp();
+  const navigate = useNavigate();
+  // Job switch (user, 2026-11-22): ?job=<id> in the URL names
+  // the job this page shows. The top bar and My Videos link
+  // here; reading it loosely keeps this shared component
+  // working under /auto-video and /visual alike.
+  const search = useSearch({ strict: false }) as Record<string, unknown>;
+  const jobParam = search["job"];
+  const requestedJobId = typeof jobParam === "string" && jobParam ? jobParam : undefined;
   const ROUTE = visual ? "/visual" : docu ? "/documentary" : "/auto-video";
   useEffect(() => { if (visual) void saveGfxLevel("all", false, true); }, [visual]);
   // Script mode (user, 2026-11-20): Gemini designs the scenes, or the user's own AI writes their code
@@ -621,6 +629,46 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
   const [studioAsk, setStudioAsk] = useState<number | null>(null);
   const [phase, setPhase] = useState<"form" | "build" | "footage" | "audio" | "realistic" | "done">("form");
   const [job, setJob] = useState<AvJob | null>(null);
+  // Auto Mode (user, 2026-11-22): Visual Explainer only. Checked
+  // on step 1 (Setup) for one video: after the scene-code paste
+  // in step 2, the app advances itself — Audio (default voice),
+  // Realistic (default pop-ups) and Render — without waiting for
+  // a button click. The flag sticks to that job (localStorage,
+  // keyed by job id, value = the design the job was built with),
+  // so a refresh resumes the chain and the next video is
+  // unaffected. Turning it off stops the chain at the next step.
+  const [autoMode, setAutoMode] = useState(false);
+  const autoRef = useRef<{ jobId: string; design: "gemini" | "script" } | null>(null);
+  const autoFiredRef = useRef("");
+  const autoBusyRef = useRef(false);
+  const phaseRef = useRef(phase);
+  const studioBusyRef = useRef(false);
+  useEffect(() => {
+    phaseRef.current = phase;
+    // Leaving a phase re-arms its auto step, so going back and
+    // coming forward again still auto-advances.
+    if (autoFiredRef.current && !autoFiredRef.current.endsWith(`:${phase}`)) autoFiredRef.current = "";
+  }, [phase]);
+  useEffect(() => { studioBusyRef.current = studioBusy; }, [studioBusy]);
+  const autoKey = (jobId: string) => `ytguru-auto-mode:${jobId}`;
+  const readAutoFlag = (jobId: string): "gemini" | "script" | null => {
+    try {
+      const v = localStorage.getItem(autoKey(jobId));
+      return v === "script" || v === "gemini" ? v : null;
+    } catch { return null; }
+  };
+  const writeAutoFlag = (jobId: string, d: "gemini" | "script") => {
+    try { localStorage.setItem(autoKey(jobId), d); } catch { /* ignore */ }
+  };
+  const clearAutoFlag = (jobId: string) => {
+    try { localStorage.removeItem(autoKey(jobId)); } catch { /* ignore */ }
+  };
+  const turnAutoOff = () => {
+    const id = autoRef.current?.jobId ?? job?.id;
+    if (id) clearAutoFlag(id);
+    autoRef.current = null;
+    setAutoMode(false);
+  };
   // The stepper must show the step the backend is ACTUALLY on
   // (user, 2026-11-09): during the plan step the backend is
   // collecting footage (Step 2), but the frontend phase is
@@ -1141,9 +1189,15 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
           setPhase("audio");
         } else if (j.status === "done") {
           if (timer.current) clearInterval(timer.current);
+          clearAutoFlag(id);
+          autoRef.current = null;
           setPhase("done");
         } else if (j.status === "error" || j.status === "failed") {
           if (timer.current) clearInterval(timer.current);
+          clearAutoFlag(id);
+          autoRef.current = null;
+          openJobIdRef.current = null;
+          setAutoMode(false);
           setPhase("form");
           setError("Failed: " + (j.error || j.stage || "Unknown error."));
         }
@@ -1158,11 +1212,77 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
   useEffect(() => {
   }, []);
 
+  // The job this page is currently showing (mirrors jobId, but
+  // usable inside callbacks without a stale closure). The ?job=
+  // switch effect compares against it.
+  const openJobIdRef = useRef<string | null>(null);
+
+  // Open one job in this page (user, 2026-11-22: job switch).
+  // The restore used to run only on mount, so clicking another
+  // job in the top bar while already on this page did nothing.
+  // Now the ?job= URL param names the job to open, and this
+  // runs for it — same fetch, same phase mapping, same Auto
+  // Mode flag restore as the old mount restore. Switching never
+  // touches the job's backend work or its Auto Mode flag: the
+  // flag lives in localStorage per job, so switching away and
+  // back resumes the chain from the job's current phase.
+  const openJob = (id: string) => {
+    openJobIdRef.current = id;
+    if (timer.current) { clearInterval(timer.current); timer.current = null; }
+    setError("");
+    setJob(null);
+    setAutoMode(false);
+    autoRef.current = null;
+    jobKey.current = `autovideo:${id}`;
+    setJobId(id);
+    void autovideoJob(id).then((j) => {
+      setJob(j);
+      // A job opened from My Videos may not be in the background
+      // store (fresh browser / cleared storage) — put it there
+      // so the top bar shows it and the global poller keeps it
+      // fresh. A job already there is untouched (dedup by key).
+      if (!jobs.some((s) => s.key === `autovideo:${id}`)) {
+        registerJob({ key: `autovideo:${id}`, tool: "auto-video", title: j.title || "Video", route: ROUTE, jobId: id });
+      }
+      // Auto Mode (user, 2026-11-22): a refresh — or a switch
+      // back — resumes the chain for a job started in Auto Mode.
+      const autoDesign = readAutoFlag(id);
+      if (autoDesign) { autoRef.current = { jobId: id, design: autoDesign }; setAutoMode(true); }
+      // The job carries the title it was built with — restore it,
+      // or the page shows the default title ("10 Mind-Blowing
+      // Facts…") for a video built with a different title.
+      if (j.title) setTitle(j.title);
+      const ph = j.phase || (j.status === "done" ? "done" : "");
+      if (j.status === "done") { clearAutoFlag(id); autoRef.current = null; setPhase("done"); }
+      else if (ph === "planned") setPhase("footage");
+      else if (ph === "audio-ready") setPhase("audio");
+      else if (j.status === "error" || j.status === "failed") {
+        clearAutoFlag(id); autoRef.current = null; setAutoMode(false); setPhase("form");
+        setError("Failed: " + (j.error || j.stage || "Unknown error."));
+        openJobIdRef.current = null;
+        void navigate({ to: ROUTE, search: {} });
+      }
+      else { setPhase("build"); poll(id); }
+    }).catch(() => {
+      // Job gone (server restarted / working files deleted):
+      // stay on the form and drop the bad ?job=, so a later
+      // click is not stuck on it.
+      openJobIdRef.current = null;
+      jobKey.current = null;
+      setJobId(null);
+      void navigate({ to: ROUTE, search: {} });
+    });
+  };
+
   // Restore a job that was started earlier and is still in the
   // background store (user left the page and came back via the
   // top progress bar, or refreshed). The backend job kept
   // running the whole time.
   useEffect(() => {
+    // A ?job= in the URL names the job to open (top-bar / My
+    // Videos click); otherwise the newest running/finished job
+    // of this tool, as before.
+    if (requestedJobId) { openJob(requestedJobId); return; }
     const mine = (j: { tool: string; route?: string }) => j.tool === "auto-video" && (j.route || "/auto-video") === ROUTE;
     // Newest first (user, 2026-11-22: "+ Another Video" — several
     // jobs of one tool may run at once; a refresh returns to the
@@ -1170,25 +1290,22 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
     const active = [...jobs].reverse().find((j) => mine(j) && j.status === "running");
     const finished = [...jobs].reverse().find((j) => mine(j) && j.status === "done");
     const found = active ?? finished;
-    if (!found || jobId) return;
-    jobKey.current = found.key;
-    setJobId(found.jobId);
-    void autovideoJob(found.jobId).then((j) => {
-      setJob(j);
-      // The job carries the title it was built with — restore it,
-      // or the page shows the default title ("10 Mind-Blowing
-      // Facts…") for a video built with a different title.
-      if (j.title) setTitle(j.title);
-      const ph = j.phase || (j.status === "done" ? "done" : "");
-      if (j.status === "done") setPhase("done");
-      else if (ph === "planned") setPhase("footage");
-      else if (ph === "audio-ready") setPhase("audio");
-      else if (j.status === "error" || j.status === "failed") { setPhase("form"); setError("Failed: " + (j.error || j.stage || "Unknown error.")); }
-      else { setPhase("build"); poll(found.jobId); }
-    }).catch(() => { /* Job gone (server restarted): stay on the form. */ });
+    if (!found) return;
+    openJob(found.jobId);
     // Only on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Job switch (user, 2026-11-22): when ?job= names a different
+  // job than the one open, open THAT job — no refresh needed.
+  // Same-page clicks land here; a fresh navigation is handled
+  // by the mount effect above.
+  useEffect(() => {
+    if (!requestedJobId) return;
+    if (requestedJobId === openJobIdRef.current) return;
+    openJob(requestedJobId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedJobId]);
 
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
 
@@ -1220,6 +1337,20 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
       const key = `autovideo:${data.job_id}`;
       jobKey.current = key;
       registerJob({ key, tool: "auto-video", title: title.trim(), route: ROUTE, jobId: data.job_id });
+      // Auto Mode (user, 2026-11-22): Visual Explainer only.
+      // The flag sticks to this job (not the next video); the
+      // pop-ups stay on the default (Normal), so the chain never
+      // inherits a leftover setting from an earlier video.
+      if (visual && autoMode) {
+        autoRef.current = { jobId: data.job_id, design };
+        writeAutoFlag(data.job_id, design);
+        setPopAuto("normal");
+      }
+      // Job switch (user, 2026-11-22): the URL names the open
+      // job, so a fresh video updates it — otherwise the old
+      // ?job= would re-open the previous video.
+      openJobIdRef.current = data.job_id;
+      void navigate({ to: ROUTE, search: { job: data.job_id } });
       poll(data.job_id);
     } catch (e) {
       setPhase("form");
@@ -1262,6 +1393,61 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
     }
   };
 
+  // Auto Mode chain (user, 2026-11-22): from the Audio review
+  // stop, through Realistic (default pop-ups) to the Render, on
+  // its own. Any failure stops the chain on that phase with the
+  // error shown — it never skips ahead with missing audio, and
+  // it never starts a second render while one is already going.
+  const autoToRealisticThenRender = async () => {
+    if (autoBusyRef.current) return;
+    if (!job || !autoRef.current || autoRef.current.jobId !== job.id) return;
+    autoBusyRef.current = true;
+    try {
+      setPhase("realistic");
+      await loadRealistic();
+      // Re-check after the wait: still auto, same job, still on
+      // the Realistic phase, and no studio filming in progress.
+      if (!autoRef.current || autoRef.current.jobId !== job.id) return;
+      if (phaseRef.current !== "realistic" || studioBusyRef.current) return;
+      await startRender();
+    } finally {
+      autoBusyRef.current = false;
+    }
+  };
+
+  // Auto Mode chain, continued (user, 2026-11-22): when a review
+  // stop is reached on an auto job, keep going without a click.
+  // - Footage + Gemini design: nothing to paste, so start the
+  //   audio straight away.
+  // - Audio: through Realistic (default pop-ups) to the Render.
+  // (Script design is driven by ScriptMode's onMainSaved — the
+  // paste finishing — not by this effect.) Each step fires once
+  // per job+phase; a failure anywhere stops the chain because
+  // the next review stop is never reached.
+  useEffect(() => {
+    if (!job || !autoRef.current || autoRef.current.jobId !== job.id) return;
+    if (autoBusyRef.current) return;
+    if (phase === "footage" && autoRef.current.design === "gemini") {
+      if (autoFiredRef.current === `${job.id}:footage`) return;
+      autoFiredRef.current = `${job.id}:footage`;
+      void startAudio();
+    } else if (phase === "audio") {
+      if (autoFiredRef.current === `${job.id}:audio`) return;
+      autoFiredRef.current = `${job.id}:audio`;
+      void autoToRealisticThenRender();
+    } else if (phase === "realistic") {
+      // [Job-switch hook, 2026-11-22]: a switch away mid-chain
+      // and back can land on the Realistic phase after the audio
+      // step already fired — resume the chain to the Render
+      // instead of stalling here. Fires once per job; the
+      // autoBusyRef guard inside stops a second render.
+      if (autoFiredRef.current === `${job.id}:realistic`) return;
+      autoFiredRef.current = `${job.id}:realistic`;
+      void autoToRealisticThenRender();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, job?.id]);
+
   return (
     <div data-tool="auto-video">
       {visual
@@ -1282,13 +1468,22 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
             // it. No confirm: the current video is not closed, only
             // set aside; start the new one from the fresh form.
             if (timer.current) { clearInterval(timer.current); timer.current = null; }
-            jobKey.current = null; setJobId(null); setPhase("form"); setJob(null);
+            jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); setAutoMode(false); autoRef.current = null;
+            openJobIdRef.current = null; void navigate({ to: ROUTE, search: {} });
           }}>+ Another Video</button>
+        )}
+        {visual && job && phase !== "form" && autoMode && (
+          <span className="flex items-center gap-2">
+            <span className="chip">🤖 Auto Mode ON</span>
+            <button className="btn btn-ghost btn-sm" onClick={turnAutoOff}>Turn off</button>
+          </span>
         )}
         {job && phase !== "form" && (
           <button className="btn btn-ghost btn-sm" onClick={() => {
             if (!confirm("Close this video and start a new one?\nIts files stay in 📁 My videos (open or delete it there). A step that is still running on this computer keeps running until it ends.")) return;
-            if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null);
+            if (job) clearAutoFlag(job.id);
+            if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); setAutoMode(false); autoRef.current = null;
+            openJobIdRef.current = null; void navigate({ to: ROUTE, search: {} });
           }}>✕ Close this video</button>
         )}
       </div>
@@ -1436,6 +1631,15 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
             <VoicePicker provider={ttsProvider} voice={voice} onChange={handleVoiceChange} />
           </div>
           {visual && <DesignChoice value={design} onChange={chooseDesign} />}
+          {visual && (
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-primary/50 bg-primary/5 px-4 py-3">
+              <input type="checkbox" className="h-5 w-5 accent-primary" checked={autoMode} onChange={(e) => setAutoMode(e.target.checked)} />
+              <span>
+                <span className="block font-semibold">🤖 Auto Mode — hands-free after the script paste</span>
+                <span className="block text-sm text-muted-foreground">Tick this and the video runs itself after step 2: paste your scene code once, and the app does the voice, the pop-ups and the render on its own — no more button clicks. Applies to this video only. Turn it off any time from the top bar.</span>
+              </span>
+            </label>
+          )}
           {!visual && !docu && <AvDesignChoice value={avDesign} onChange={chooseAvDesign} />}
           {visual ? <MyShapes /> : <GraphicsAmount docu={docu} />}
           {docu && <DocuSources text={sourcesText} setText={setSourcesText} />}
@@ -1528,11 +1732,19 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
           ))}
           {!visual && !docu && <AvScriptMode jobId={job.id} startOpen={avDesign === "script"}
             onChanged={() => { void autovideoJob(job.id).then((j) => setJob(j)).catch(() => undefined); }} />}
-          {visual && <ScriptMode jobId={job.id} startOpen={design === "script"} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...(sc as Partial<AvScene>) } : x)) } : j))} />}
+          {visual && <ScriptMode jobId={job.id} startOpen={design === "script"} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...(sc as Partial<AvScene>) } : x)) } : j))} onMainSaved={(n) => {
+            // Auto Mode (user, 2026-11-22): the paste is done —
+            // at least one scene's code works, so start the voice
+            // on its own (the plain "simple version" confirm is
+            // skipped: missing scenes get the simple animation by
+            // design). Zero working scenes = stop here and show
+            // the problem in ScriptMode instead.
+            if (n > 0 && autoRef.current?.jobId === job.id) void startAudio();
+          }} />}
           {visual && design === "gemini" && <SimpleScenesBar job={job} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...sc } : x)) } : j))} />}
           {visual && <MyShapes jobId={job.id} />}
           <div className="flex gap-3">
-            <button className="btn btn-ghost" onClick={() => { setJob(null); setJobId(null); setPhase("form"); }}>← Back to setup</button>
+            <button className="btn btn-ghost" onClick={() => { setJob(null); setJobId(null); setPhase("form"); setAutoMode(false); autoRef.current = null; openJobIdRef.current = null; void navigate({ to: ROUTE, search: {} }); }}>← Back to setup</button>
             <button className="btn btn-primary flex-1 py-3 text-lg" onClick={() => {
               const n = visual ? (job.scenes || []).filter((sc) => (sc as { graphic?: { basic?: boolean } }).graphic?.basic).length : 0;
               if (n && !window.confirm(`${n} scene(s) still have the plain "simple version". Continue anyway?`)) return;
@@ -2026,7 +2238,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
               {job.download_url && (
                 <a className="btn btn-amber flex-1" href={job.download_url} download={`autovideo-${jobId ?? "video"}.mp4`}>⬇ Download MP4</a>
               )}
-              <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); }}>Make another</button>
+              <button className="btn btn-ghost" onClick={() => { if (jobKey.current) removeJob(jobKey.current); jobKey.current = null; setJobId(null); setPhase("form"); setJob(null); setAutoMode(false); autoRef.current = null; openJobIdRef.current = null; void navigate({ to: ROUTE, search: {} }); }}>Make another</button>
             </div>
             {/* Compress (user, 2026-11-09): shrink the finished
                 video without losing quality (HEVC CRF 22, same

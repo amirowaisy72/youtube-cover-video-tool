@@ -95,6 +95,14 @@ export function VideoLibrary({ initialTool = "" }: { initialTool?: string }) {
               </div>
             </div>
             {(it.final || it.audio) && <button className="btn btn-ghost btn-sm" onClick={() => setWatch(it)}>▶ {it.audio ? "Listen" : "Watch"}</button>}
+            {/* Job switch (user, 2026-11-22): open this video in
+                its tool — see its current step and change things.
+                Only when the working files are there (folder):
+                without job.json the tool cannot open it. The id
+                IS the backend job id (library folder name). */}
+            {it.folder && (it.tool === "visual" || it.tool === "autovideo") && (
+              <Link to={it.tool === "visual" ? "/visual" : "/auto-video"} search={{ job: it.id }} className="btn btn-ghost btn-sm" title="Open this video in its tool — see its current step and change things">↗ Open</Link>
+            )}
             {it.final && <a className="btn btn-ghost btn-sm" href={url(it, it.final)} download>⬇ Download</a>}
             {it.folder && it.final && it.size - it.final_size > 5e6 && (
               <button className="btn btn-ghost btn-sm" disabled={it.busy || busy === it.root + it.id} onClick={() => void remove(it, true)}

@@ -40,9 +40,13 @@ async function j<T>(r: Response): Promise<T> {
   return d as T;
 }
 
-export function ScriptMode({ jobId, onScene, startOpen = false }: {
+export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
   jobId: string; startOpen?: boolean;
   onScene: (i: number, sc: Record<string, unknown>) => void;
+  /** Auto Mode (user, 2026-11-22): called after the main "Save & test"
+      finishes (never for a per-scene fix save), with how many scenes'
+      code works. The parent decides whether to auto-advance. */
+  onMainSaved?: (workingScenes: number) => void;
 }) {
   const [open, setOpen] = useState(startOpen);
   const [st, setSt] = useState<Status | null>(null);
@@ -102,6 +106,10 @@ export function ScriptMode({ jobId, onScene, startOpen = false }: {
       setMsg(notes.join(" "));
       const runnable = d.results.filter((r) => !r.error).map((r) => r.index);
       await testAll(runnable);
+      // Auto Mode (user, 2026-11-22): the parent auto-advances
+      // after the main save — but only from the "Save & test"
+      // button (replace), never from a per-scene fix save.
+      if (replace) onMainSaved?.(runnable.length);
     } catch (e) { setErr(e instanceof Error ? e.message : "Could not save"); setBusy(""); }
   };
 

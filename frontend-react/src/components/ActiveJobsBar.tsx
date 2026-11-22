@@ -26,7 +26,11 @@ export function ActiveJobsBar() {
       <div className="mx-auto max-w-6xl space-y-2 px-6 py-3">
         {jobs.map((job) => (
           <div key={job.key} className="glass flex items-center gap-3 px-4 py-2">
-            <Link to={job.route} className="flex min-w-0 flex-1 items-center gap-3">
+            {/* Job switch (user, 2026-11-22): ?job= names the job
+                to open, so clicking a bar while already on the
+                tool's page swaps the view to THAT job — no
+                refresh. The page reads the param and opens it. */}
+            <Link to={job.route} search={{ job: job.jobId }} className="flex min-w-0 flex-1 items-center gap-3">
               <span className="shrink-0 text-sm font-semibold">{TOOL_LABEL[job.tool] ?? "⚙️ Job"}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{job.title}</span>
               {job.status === "running" ? (
