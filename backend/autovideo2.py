@@ -324,7 +324,9 @@ def _scene_visual(title: str, scene: dict, visuals: str,
                 continue
             suffix = ".webm" if "webm" in (item.get("mime") or "") else ".mp4"
             dest = work_dir / f"scene-{index:02d}{suffix}"
-            if autovideo._download(item["url"], dest):
+            # STALL FIX (user, 2026-11-22): a slow clip used to hang the
+            # whole scene with no time limit — 60 s, like collect_shots.
+            if autovideo._download(item["url"], dest, total_timeout=60):
                 if autovideo._ffprobe_duration(dest):
                     autovideo_smart.remember_footage(item["url"])
                     return dest, "clip", item["title"]
@@ -344,7 +346,7 @@ def _scene_visual(title: str, scene: dict, visuals: str,
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             dest = work_dir / f"scene-{index:02d}.jpg"
-            if autovideo._download(item["url"], dest) and autovideo._valid_image(dest):
+            if autovideo._download(item["url"], dest, total_timeout=60) and autovideo._valid_image(dest):
                 autovideo_smart.remember_footage(item["url"])
                 return dest, "image", item["title"]
             _release_url(used_urls, lock, item["url"])
@@ -372,14 +374,14 @@ def _scene_visual(title: str, scene: dict, visuals: str,
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             dest = work_dir / f"scene-{index:02d}.jpg"
-            if autovideo._download(item["url"], dest) and autovideo._valid_image(dest):
+            if autovideo._download(item["url"], dest, total_timeout=60) and autovideo._valid_image(dest):
                 return dest, "image", item["title"]
             _release_url(used_urls, lock, item["url"])
         for item in found["images"]:
             if not _reserve_url(used_urls, lock, item["url"]):
                 continue
             dest = work_dir / f"scene-{index:02d}.jpg"
-            if autovideo._download(item["url"], dest) and autovideo._valid_image(dest):
+            if autovideo._download(item["url"], dest, total_timeout=60) and autovideo._valid_image(dest):
                 return dest, "image", item["title"]
             _release_url(used_urls, lock, item["url"])
     # AI image for this scene's visual description.

@@ -191,8 +191,15 @@ def _write_scene(job_id: str, i: int, fields: dict) -> None:
 
 
 def run_apply(job_id: str, indexes: list[int], keys: dict, st: dict | None = None) -> None:
-    """Applies the blocks of these scenes one after another (downloads are the slow part)."""
+    """Applies the blocks of these scenes, three at a time (downloads are the slow part).
+
+    SPEED FIX (user, 2026-11-22): scenes ran one after another, ~1 minute
+    each, so 36 scenes took ~35 minutes. Three workers share the same
+    `used` set + `lock` (the dedup in _scene_visual was already built for
+    parallel scenes), and _write_scene serialises the job-file writes.
+    """
     import tools_visual as tv
+    from concurrent.futures import ThreadPoolExecutor
     app = tv._av()
     st = st if st is not None else {}
     used: set = set()
@@ -202,7 +209,8 @@ def run_apply(job_id: str, indexes: list[int], keys: dict, st: dict | None = Non
         if sc.get("visual_url"):
             used.add(sc["visual_url"])
     work_dir = app._av_job_dir(job_id)
-    for k, i in enumerate(indexes):
+
+    def one(k: int, i: int) -> None:
         st["stage"] = f"Getting your footage — scene {i + 1} ({k + 1} of {len(indexes)})…"
         try:
             job = app._av_read(job_id)
@@ -210,7 +218,11 @@ def run_apply(job_id: str, indexes: list[int], keys: dict, st: dict | None = Non
             _write_scene(job_id, i, {**fields, "av_pending": None})
         except Exception as exc:  # noqa: BLE001 — one scene never stops the others
             _write_scene(job_id, i, {"av_error": str(exc)[-300:]})
-        st["done"] = k + 1
+        with lock:
+            st["done"] = st.get("done", 0) + 1
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        list(pool.map(one, range(len(indexes)), indexes))
 
 
 # ------------------------------------------------------------------ endpoints
@@ -281,6 +293,14 @@ def save(req: SaveReq) -> dict:
             except ValueError as exc:
                 problems.append(f"Scene {n}: {exc}")
                 sc["av_error"] = str(exc)
+                continue
+            # RESUME (user, 2026-11-22): re-saving the same plan must not
+            # re-download footage a scene already has — skip it when its
+            # stored plan is unchanged and its clip is already saved.
+            # A "-wait.png" is only a placeholder, never saved footage.
+            if (sc.get("visual_file") and not str(sc["visual_file"]).endswith("-wait.png")
+                    and (sc.get("av_script") or "") == block):
+                sc["av_error"] = ""
                 continue
             sc["av_script"] = block
             sc["av_error"] = ""
