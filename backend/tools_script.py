@@ -236,6 +236,23 @@ recolor(small, GREY)
 '''
 
 
+# General direction rules (user, 2026-11-22): appended to the copied prompt so the AI
+# directs every scene well — camera, timing, new objects, physics, and a story that
+# feels written for this video, not generic.
+GENERAL_DIRECTION_RULES = '''GENERAL DIRECTION RULES (apply to every scene):
+1. Smart camera use: keep the camera on the acting objects, with smooth zoom in/out — zoom in on the
+important object, zoom out when a wide picture is needed.
+2. Visuals and animation must stay well synced with the narration — timing matters most: the visual for
+a word must appear at the exact moment that word is spoken (use when() correctly).
+3. Do not limit yourself to only the given graphical objects — draw and animate new objects yourself
+when needed (using Manim shapes). The end goal: the scene's demand is fulfilled and the scene is easy
+to understand.
+4. Pay close attention to physics — things fall with gravity, bounce when they bounce, slide with
+momentum. Good physics in both the animations and the visuals.
+5. The script must feel written specifically for this video, not generic. Every scene must connect to
+the previous one and keep the viewer hooked in the story.'''
+
+
 def build_prompt(title: str, scenes: list[dict]) -> str:
     lines = []
     for i, sc in enumerate(scenes):
@@ -243,7 +260,7 @@ def build_prompt(title: str, scenes: list[dict]) -> str:
         d = float(sc.get("duration_sec") or 0) or est_duration(nar)
         lines.append(f"SCENE {i + 1} (about {d:.0f} seconds): {nar}")
     return (GUIDE.replace("{library}", _library()) + f'\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n' + "\n\n".join(lines)
-            + "\n\nWrite the code for ALL scenes now.")
+            + "\n\nWrite the code for ALL scenes now.\n\n" + GENERAL_DIRECTION_RULES)
 
 
 def fix_prompt(title: str, scenes: list[dict], index: int, error: str, warnings: list[str]) -> str:

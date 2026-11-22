@@ -132,8 +132,9 @@ export function ScriptMode({ jobId, onScene, startOpen = false }: {
             <li>Paste it into <b className="text-foreground">Claude, ChatGPT or Gemini</b> (a strong AI = a better video).</li>
             <li>Paste the AI's whole answer below and press <b className="text-foreground">Save & test</b>. Every scene gets a quick preview — hover a scene above to watch it.</li>
           </ol>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button className="btn btn-secondary btn-sm" onClick={() => void copy(`/api/visual/script/${jobId}/prompt`, "Prompt")}>📋 Copy the prompt</button>
+            <span className="text-xs text-muted-foreground">Recommended AI: <b className="text-foreground">Claude</b></span>
             {withCode.length > 0 && <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => void testAll(withCode.map((s) => s.index))}>▶ Test all scenes again</button>}
             {withCode.length > 0 && <button className="btn btn-ghost btn-sm" onClick={() => void clearAll()}>🗑 Remove the code</button>}
           </div>
