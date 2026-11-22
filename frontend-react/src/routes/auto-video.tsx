@@ -1164,8 +1164,11 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
   // running the whole time.
   useEffect(() => {
     const mine = (j: { tool: string; route?: string }) => j.tool === "auto-video" && (j.route || "/auto-video") === ROUTE;
-    const active = jobs.find((j) => mine(j) && j.status === "running");
-    const finished = jobs.find((j) => mine(j) && j.status === "done");
+    // Newest first (user, 2026-11-22: "+ Another Video" — several
+    // jobs of one tool may run at once; a refresh returns to the
+    // job worked on most recently, not the oldest one).
+    const active = [...jobs].reverse().find((j) => mine(j) && j.status === "running");
+    const finished = [...jobs].reverse().find((j) => mine(j) && j.status === "done");
     const found = active ?? finished;
     if (!found || jobId) return;
     jobKey.current = found.key;
@@ -1269,6 +1272,19 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
       {/* (user, 2026-11-20) My videos on every video tool, and close the open video at any step */}
       <div className="mx-auto mb-3 flex max-w-2xl flex-wrap justify-end gap-2">
         <MyVideosLink tool={visual ? "visual" : "autovideo"} />
+        {visual && job && phase !== "form" && (
+          <button className="btn btn-ghost btn-sm" onClick={() => {
+            // "+ Another Video" (user, 2026-11-22): start a fresh
+            // video while this one keeps running in the background.
+            // Only this page's poller stops — the job stays in the
+            // background store (its top-bar progress keeps moving
+            // and My videos lists it) and the backend keeps running
+            // it. No confirm: the current video is not closed, only
+            // set aside; start the new one from the fresh form.
+            if (timer.current) { clearInterval(timer.current); timer.current = null; }
+            jobKey.current = null; setJobId(null); setPhase("form"); setJob(null);
+          }}>+ Another Video</button>
+        )}
         {job && phase !== "form" && (
           <button className="btn btn-ghost btn-sm" onClick={() => {
             if (!confirm("Close this video and start a new one?\nIts files stay in 📁 My videos (open or delete it there). A step that is still running on this computer keeps running until it ends.")) return;

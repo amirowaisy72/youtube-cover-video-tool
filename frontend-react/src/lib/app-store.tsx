@@ -228,9 +228,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stage: job.stage ?? "Starting…",
       status: "running",
     };
-    // One active job per tool: starting a new build replaces
-    // the previous one for that tool.
-    setJobs((prev) => [...prev.filter((j) => j.tool !== job.tool), full]);
+    // Several jobs of one tool may run at once (user, 2026-11-22:
+    // "+ Another Video" — start a new video while the current
+    // one keeps running). A new build only replaces its own key,
+    // never the other jobs of the same tool.
+    setJobs((prev) => [...prev.filter((j) => j.key !== job.key), full]);
   }, []);
 
   const updateJob = useCallback((key: string, patch: Partial<Pick<ActiveJob, "progress" | "stage" | "status">>) => {
