@@ -70,6 +70,11 @@ export function setKey(id: KeyId, value: string): void {
 export function useKey(id: KeyId): string {
   const [v, setV] = useState(() => getKey(id));
   useEffect(() => {
+    // Re-read when the id changes (e.g. the voice picker switches
+    // provider from "edge" to "unreal"): the state above only reads
+    // once, at mount, so without this the new provider's saved key
+    // never shows until a key-change/storage event fires.
+    setV(getKey(id));
     const on = () => setV(getKey(id));
     window.addEventListener(EVENT, on);
     window.addEventListener("storage", on);
