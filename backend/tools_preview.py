@@ -21,6 +21,11 @@ router = APIRouter(prefix="/api/visual/preview", tags=["visual-preview"])
 _STATE: dict[str, dict] = {}
 _JOB_LOCK = threading.Lock()
 
+# Scene sound effects under the voice (user, 2026-11-23): was 0.4,
+# too loud. The value is part of the preview cache key below, so a
+# change rebuilds the preview instead of replaying the old loud file.
+_PREVIEW_SFX_VOLUME = 0.2
+
 
 def _app():
     import tools_visual as tv
@@ -97,7 +102,7 @@ def build_scene(job: dict, i: int, work_dir: Path, voice: Path, cues: list[dict]
             if not g.get("beats"):
                 g = tv.basic_plan(sc.get("narration") or "")
             spec = tv.timed(g, sc.get("narration") or "", dur, cues)
-        what = {"s": spec, "c": code_ok}
+        what = {"s": spec, "c": code_ok, "sfx": _PREVIEW_SFX_VOLUME}
     else:  # stock footage: the scene's clip (and its extra shots, cut at their words) or picture
         vf = work_dir / str(sc.get("visual_file") or "")
         shots = [(sh.get("file"), (work_dir / str(sh.get("file"))).stat().st_mtime) for sh in sc.get("shots") or []
@@ -149,7 +154,7 @@ def build_scene(job: dict, i: int, work_dir: Path, voice: Path, cues: list[dict]
     vf = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1,fps=15,format=yuv420p"
     if has_sfx:
         cmd += ["-i", str(sfx_wav), "-filter_complex",
-                f"[0:v]{vf}[v];[2:a]volume=0.2[s];[1:a][s]amix=inputs=2:duration=first:normalize=0[a]", "-map", "[v]", "-map", "[a]"]
+                f"[0:v]{vf}[v];[2:a]volume={_PREVIEW_SFX_VOLUME}[s];[1:a][s]amix=inputs=2:duration=first:normalize=0[a]", "-map", "[v]", "-map", "[a]"]
     else:
         cmd += ["-filter_complex", f"[0:v]{vf}[v]", "-map", "[v]", "-map", "1:a"]
     cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-c:a", "aac", "-b:a", "96k", "-t", f"{dur:.2f}", str(out)]

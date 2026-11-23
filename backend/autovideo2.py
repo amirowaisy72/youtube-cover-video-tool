@@ -485,7 +485,7 @@ _MUSIC_VOLUME = 0.15  # 15% — background music, clearly there but never over t
 # bed level: the voice (100%) still dominates, but the music is
 # unmistakably there. (2026-11-08, user report: SFX audible,
 # music not heard despite "✓ added".)
-_SFX_VOLUME = 0.8  # Was 0.5: the user heard only ONE transition
+_SFX_VOLUME = 0.4  # Was 0.8 (2026-11-23, user: transition whooshes too loud). Was 0.5 before 0.8: the user heard only ONE transition
 # sound in a video with 4 SFX — Freesound preview levels vary
 # wildly, so quiet tracks were inaudible. 0.8 plus loudnorm
 # (below) makes every transition sound clearly audible.
