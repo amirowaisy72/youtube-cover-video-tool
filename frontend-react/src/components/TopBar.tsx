@@ -229,6 +229,9 @@ export function TopBar() {
                 </div>
               )}
           </div>
+          {/* Tutorial video (user, 2026-11-23): at the top of the site,
+              next to Install Setup — opens the YouTube tutorial in a new tab. */}
+          <a className="btn btn-sm btn-ghost" href="https://youtu.be/YSlvCZrOTxw" target="_blank" rel="noreferrer" title="Watch the YT Guru tutorial video">▶ Tutorial</a>
           {!installed && (
             <a className="btn btn-sm btn-primary" href={SETUP_DOWNLOAD_URL} title="Download the Windows setup — installing it unlocks all tools">⬇ Install Setup</a>
           )}
