@@ -1489,7 +1489,7 @@ _SUBTITLE_STYLE = (
     "FontName=Arial,FontSize=24,PlayResX=1280,PlayResY=720,"
     "PrimaryColour=&HFFFFFF,"
     "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
-    "Alignment=2,MarginV=25"
+    "Alignment=2,MarginL=60,MarginR=60,MarginV=25"
 )
 # SHORTS (user, 2026-11-09): subtitles for a 9:16 vertical
 # frame. The old flow burned captions into a 1280x720 segment
@@ -1501,7 +1501,7 @@ _SUBTITLE_STYLE_VERTICAL = (
     "FontName=Arial,FontSize=32,PlayResX=1080,PlayResY=1920,"
     "PrimaryColour=&HFFFFFF,"
     "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
-    "Alignment=2,MarginV=40"
+    "Alignment=2,MarginL=60,MarginR=60,MarginV=40"
 )
 
 

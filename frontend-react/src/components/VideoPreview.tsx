@@ -93,7 +93,7 @@ export function VideoPreview({ jobId, onStudioScene, canStudio }: { jobId: strin
               onPlay={() => { setPaused(false); setFix(null); }}
               onPause={(e) => { if (!e.currentTarget.ended) setPaused(true); }}
               onEnded={() => { if (cur + 1 < scenes.length) go(cur + 1, 0, true); else setPaused(true); }} />
-            {cue && <div className="pointer-events-none absolute inset-x-0 bottom-14 text-center"><span className="rounded bg-black/70 px-2 py-1 text-sm font-semibold text-white">{cue.text}</span></div>}
+            {cue && <div className="pointer-events-none absolute inset-x-6 bottom-14 text-center"><span className="rounded bg-black/70 px-2 py-1 text-sm font-semibold text-white">{cue.text}</span></div>}
             {paused && (
               <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
                 <button className="rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-black shadow-lg hover:bg-amber-300"
