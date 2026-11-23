@@ -999,7 +999,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
   const [musicOpts, setMusicOpts] = useState<AvMusicOptions | null>(null);
   const [musicLoading, setMusicLoading] = useState(false);
   const [musicError, setMusicError] = useState("");
-  const [musicVolume, setMusicVolume] = useState(20);
+  const [musicVolume, setMusicVolume] = useState(15);
   const [musicApplying, setMusicApplying] = useState(false);
   // Which track is being applied (user, 2026-11-09): only THAT
   // track's button may say "Applying…" — the old shared boolean

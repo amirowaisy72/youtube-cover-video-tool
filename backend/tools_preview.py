@@ -84,6 +84,12 @@ def build_scene(job: dict, i: int, work_dir: Path, voice: Path, cues: list[dict]
     code_ok = bool(sc.get("code")) and not ts.check(sc["code"])[0]
     g = sc.get("graphic") or {}
     animated = code_ok or _visual_job(job) or (g.get("theme") == "visual" and sc.get("visual_file") == sc.get("graphic_file"))
+    # A filmed studio scene (user, 2026-11-23): the presenter clip
+    # replaces the animation — even in a Visual Explainer job, where
+    # every scene would otherwise be animated. Only when the clip
+    # file is actually on disk; otherwise fall back to the animation.
+    studio_clip = bool(sc.get("studio")) and (work_dir / str(sc.get("visual_file") or "")).is_file()
+    animated = animated and not studio_clip
     if animated:
         if code_ok:
             spec = ts.spec_for(sc, i, work_dir, dur, cues)
@@ -124,7 +130,9 @@ def build_scene(job: dict, i: int, work_dir: Path, voice: Path, cues: list[dict]
             import tools_graphics
             srt = work_dir / f"scene-{i:02d}.srt"
             src = tools_graphics.clip_for_scene(sc, i, work_dir, dur, srt if srt.exists() else None, vertical) or src
-        elif sc.get("shots") and sc.get("kind") == "clip":
+        elif sc.get("shots") and sc.get("kind") == "clip" and not sc.get("studio"):
+            # (same studio exclusion as the final render: extra shots
+            # must never be cut in over the presenter clip)
             import autovideo_smart
             srt = work_dir / f"scene-{i:02d}.srt"
             multi = autovideo_smart.compose_shots(work_dir, i, src, sc, dur, srt if srt.exists() else None, voice, vertical)
@@ -141,7 +149,7 @@ def build_scene(job: dict, i: int, work_dir: Path, voice: Path, cues: list[dict]
     vf = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1,fps=15,format=yuv420p"
     if has_sfx:
         cmd += ["-i", str(sfx_wav), "-filter_complex",
-                f"[0:v]{vf}[v];[2:a]volume=0.4[s];[1:a][s]amix=inputs=2:duration=first:normalize=0[a]", "-map", "[v]", "-map", "[a]"]
+                f"[0:v]{vf}[v];[2:a]volume=0.2[s];[1:a][s]amix=inputs=2:duration=first:normalize=0[a]", "-map", "[v]", "-map", "[a]"]
     else:
         cmd += ["-filter_complex", f"[0:v]{vf}[v]", "-map", "[v]", "-map", "1:a"]
     cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-c:a", "aac", "-b:a", "96k", "-t", f"{dur:.2f}", str(out)]

@@ -193,7 +193,7 @@ def _probe_audio(p: Path) -> tuple[int, int]:
         return 24000, 1
 
 
-def mix_into_voice(voice: Path, events: list[dict], duration: float, seed: int = 0, volume: float = 0.4) -> bool:
+def mix_into_voice(voice: Path, events: list[dict], duration: float, seed: int = 0, volume: float = 0.2) -> bool:
     """Put the scene's sound effects under its voice (same file, same format/length).
     The clean voice is kept as *.nosfx.* so a re-render mixes again from the original."""
     if not events or not voice.exists():

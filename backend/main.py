@@ -3272,7 +3272,7 @@ def _run_autovideo_audio(
                 "music_status": audio["music_status"],
                 "music_options": audio["music_options"],
                 "music_options_status": audio["music_options_status"],
-                "music_volume": 0.20,
+                "music_volume": 0.15,
                 "transition_sfx": audio["transition_sfx"],
                 "sfx_status": audio["sfx_status"],
                 "final_minutes": round(audio["total_voice"] / 60, 1),
@@ -3421,7 +3421,7 @@ def tts_preview_audio(filename: str) -> FileResponse:
 
 
 class AutoVideoRenderRequest(BaseModel):
-    music_volume: float = Field(0.20, ge=0.0, le=1.0)
+    music_volume: float = Field(0.15, ge=0.0, le=1.0)
     music: bool = True
     transitions: bool = True
     subtitles: bool = True
@@ -4052,7 +4052,7 @@ def _run_autovideo_revoice(
         # Re-render with the new voiceover (no new license credit).
         _run_autovideo_render(
             job_id,
-            float(job.get("music_volume", 0.20)),
+            float(job.get("music_volume", 0.15)),
             bool(job.get("transitions", True)),
             True,
             None,
@@ -4507,7 +4507,7 @@ def autovideo_music_options(
 class AutoVideoRemixMusicRequest(BaseModel):
     preview_url: str = Field(..., min_length=1, max_length=2000)
     name: str = ""
-    volume: float = Field(0.20, ge=0.0, le=1.0)
+    volume: float = Field(0.15, ge=0.0, le=1.0)
 
 
 @app.post("/api/autovideo/{job_id}/remix-music")

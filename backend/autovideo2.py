@@ -478,7 +478,7 @@ _MOOD_MUSIC_QUERY = {
     "epic": "epic cinematic orchestral",
     "calm": "calm relaxing ambient",
 }
-_MUSIC_VOLUME = 0.20  # 20% — background music, clearly there but never over the voice (user, 2026-11-09)
+_MUSIC_VOLUME = 0.15  # 15% — background music, clearly there but never over the voice (user, 2026-11-23; was 20%)
 # under the voice. Was 0.12 (12%): the user reported "Music: ✓
 # added" but could NOT hear it — 12% of a quiet Freesound track
 # is inaudible under the voiceover. 30% is a standard narration
