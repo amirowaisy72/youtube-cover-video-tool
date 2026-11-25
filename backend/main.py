@@ -74,6 +74,7 @@ import tools_audio  # noqa: E402
 import tools_music  # noqa: E402
 import tools_script  # noqa: E402
 import tools_source  # noqa: E402
+import tools_review  # noqa: E402
 import tools_stock  # noqa: E402
 import tools_channel  # noqa: E402
 import tools_voiceclone  # noqa: E402
@@ -419,6 +420,7 @@ app.include_router(tools_audio.router)
 app.include_router(tools_music.router)
 app.include_router(tools_script.router)
 app.include_router(tools_source.router)
+app.include_router(tools_review.router)
 app.include_router(tools_stock.router)
 app.include_router(tools_channel.router)
 app.include_router(tools_voiceclone.router)

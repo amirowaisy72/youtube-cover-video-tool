@@ -317,18 +317,64 @@ def fix_prompt(req: FixPromptReq) -> dict:
                   f"or animation), starting with its marker line.")
         return {"prompt": prompt, "spoken": words}
     if sc.get("code"):
-        current = f"THE CURRENT CODE OF SCENE {n}:\n```python\n# === SCENE {n} ===\n{sc['code']}```\n\n"
+        current = (f"VISUAL IDEA of this scene: {ts.idea_of(sc['code']) or '(none written yet — write one)'}\n\n"
+                   f"THE CURRENT CODE OF SCENE {n}:\n```python\n# === SCENE {n} ===\n{sc['code']}```\n\n")
         task = (f"Change ONLY the part(s) the viewer asked about (around those words); keep everything else in the scene "
-                f"exactly as it is. Answer with the WHOLE corrected code of scene {n} only, starting with its marker line.")
+                f"exactly as it is. Answer with ONE code block holding the WHOLE corrected code of scene {n} only, starting "
+                "with its marker line and its # VISUAL IDEA line. Nothing after the code block.")
     else:
         current = (f"Scene {n} has no code yet (it was made automatically). Write its whole code, and make sure the "
                    f"viewer's requests are done.\n\n")
-        task = f"Answer with the whole code of scene {n} only, starting with its marker line."
+        task = f"Answer with the whole code of scene {n} only, starting with its marker line and its # VISUAL IDEA line."
+    frames = _sheet(req.job_id, job, req.index, req.t)[1] if sc.get("code") else []
+    if frames:
+        task = (f"I attached an image: the contact sheet of this scene as it looks now.\n{ts.frame_list(frames)}\n"
+                "(If no image is attached, ask me to attach it.) Look at the frames, especially the PAUSED one, to understand "
+                "what the viewer means, and check your fix keeps the scene clear:\n" + ts.REVIEW_CHECKS + "\n\n" + task)
     prompt = (ts.GUIDE.replace("{library}", ts._library()) + f'\nVIDEO TITLE: "{job.get("title") or ""}"\n\n'
+              + ts.other_ideas(job["scenes"], req.index) +
               f"SCENE {n} (it lasts {dur:.1f} seconds): {nar}\n\n{current}"
               f"The viewer watched the preview and paused there. What the viewer wants (it may be written in Urdu or "
               f"English — understand it and do it):\n{asks}\n\n{task}")
     return {"prompt": prompt, "spoken": words}
+
+
+def _sheet(job_id: str, job: dict, index: int, t: float) -> tuple[str, list[dict]]:
+    """Contact sheet of the scene's preview clip with the paused moment marked -> (file name or "", frames)."""
+    import tools_script as ts
+    sc = job["scenes"][index]
+    work_dir = _app()._av_job_dir(job_id)
+    video = work_dir / Path(str(sc.get("pv_file") or "x")).name
+    dur = float(sc.get("pv_dur") or sc.get("duration_sec") or 0)
+    if not video.is_file() or dur <= 0:
+        return "", []
+    old = sc.get("pv_sheet")
+    try:
+        made = ts.make_sheet(sc, index, work_dir, video, ts.word_times(sc, index, work_dir, dur, sc.get("pv_cues") or None), dur, t)
+    except Exception as exc:  # noqa: BLE001 — the prompt still works without the picture
+        print(f"scene {index + 1}: contact sheet failed:", exc)
+        return "", []
+    if old and old != made["sheet"]:
+        (work_dir / Path(old).name).unlink(missing_ok=True)
+    _update_scene(job_id, index, {"pv_sheet": made["sheet"]})
+    return made["sheet"], made["frames"]
+
+
+class SheetReq(BaseModel):
+    job_id: str = Field(..., max_length=40)
+    index: int = Field(..., ge=0, le=500)
+    t: float = Field(0, ge=0, le=3600)
+
+
+@router.post("/sheet")
+def sheet(req: SheetReq) -> dict:
+    job = _read(req.job_id)
+    if not 0 <= req.index < len(job["scenes"]):
+        raise HTTPException(404, "Scene not found.")
+    name = _sheet(req.job_id, job, req.index, req.t)[0]
+    if not name:
+        raise HTTPException(400, "This scene has no preview yet — make the preview first.")
+    return {"sheet": name}
 
 
 class FixSaveReq(BaseModel):
@@ -349,7 +395,7 @@ def fix_save(req: FixSaveReq) -> dict:
     if code is None:
         if parts:
             raise HTTPException(400, f"This answer is for scene {', '.join(map(str, parts))} — paste the code of scene {req.index + 1}.")
-        code = req.code.strip().strip("`").removeprefix("python").strip() + "\n"
+        code = ts.single_block(req.code)
     if not _visual_job(job):  # Auto Video: a footage plan (or an animation), downloaded at "Fix all the modified parts"
         import tools_avscript as tas
         try:
@@ -361,9 +407,9 @@ def fix_save(req: FixSaveReq) -> dict:
     err, _ = ts.check(code)
     if err:
         raise HTTPException(400, f"The code has a problem — {err.rstrip('.')}. Ask the AI to fix it (or paste the whole answer again).")
-    sc = _update_scene(req.job_id, req.index, {"code": code, "pv_modified": True,
+    sc = _update_scene(req.job_id, req.index, {"code": code, "pv_modified": True, "visual_idea": ts.idea_of(code),
                                                "graphic": {**(job["scenes"][req.index].get("graphic") or {}), "theme": "visual"}},
-                       drop=("script_test",))
+                       drop=("script_test", "script_review"))
     return {"ok": True, "index": req.index, "modified": True, "has_code": bool(sc.get("code"))}
 
 

@@ -2,9 +2,13 @@
     code back, save it with the video and test every scene. The final video is drawn from that code — the way
     the hand-made sample was made — with the real voice timing and sound effects. */
 import { useEffect, useState } from "react";
+import { SceneFrames } from "@/components/SceneFrames";
+import { getKey } from "@/lib/config";
 
-type Test = { ok: boolean; error: string; warnings: string[]; at: number } | null;
-type SceneState = { index: number; has_code: boolean; test: Test; visual_file?: string; kind?: string; visual_source?: string };
+type Test = { ok: boolean; error: string; warnings: string[]; at: number; sheet?: string } | null;
+type SceneState = { index: number; has_code: boolean; test: Test; idea?: string; visual_file?: string; kind?: string; visual_source?: string };
+type Review = { index: number; verdict: "good" | "fix" | "error"; seen: string; problems: string[]; code: string; code_error?: string; error?: string };
+type Reviews = { running: boolean; done: number; total: number; stage: string; error: string; reviews: Review[] };
 type Status = { code: string; scenes: SceneState[] };
 
 export function getVisualDesign(): "gemini" | "script" {
@@ -56,6 +60,8 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
   const [err, setErr] = useState("");
   const [fix, setFix] = useState<number | null>(null);
   const [fixCode, setFixCode] = useState("");
+  const [rv, setRv] = useState<Reviews | null>(null);
+  const [dismissed, setDismissed] = useState<string[]>([]);
 
   const load = async () => {
     try {
@@ -64,7 +70,28 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
       setCode((c) => c || s.code || "");
     } catch { /* storyboard not ready yet */ }
   };
-  useEffect(() => { if (open) void load(); }, [open, jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadReviews = async () => {
+    try { setRv(await j<Reviews>(await fetch(`/api/visual/script/review/${jobId}`))); } catch { /* no storyboard yet */ }
+  };
+  useEffect(() => { setRv(null); if (open) { void load(); void loadReviews(); } }, [open, jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // while Gemini reviews: follow its progress (it may test scenes too)
+  useEffect(() => {
+    if (!open || !rv?.running) return;
+    const t = setTimeout(() => { void loadReviews(); void load(); }, 3000);
+    return () => clearTimeout(t);
+  }, [open, rv]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reviewAll = async () => {
+    setErr(""); setDismissed([]);
+    try {
+      setRv(await j<Reviews>(await fetch("/api/visual/script/review", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId, gemini_key: getKey("gemini") }) })));
+    } catch (e) { setErr(e instanceof Error ? e.message : "Could not start the review"); }
+  };
+  const stopReview = () => void fetch("/api/visual/script/review/stop", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: jobId }) });
+  const makeSheet = (i: number) => async () =>
+    (await j<{ sheet: string }>(await fetch(`/api/visual/script/sheet/${jobId}/${i}`, { method: "POST" }))).sheet;
 
   const copy = async (url: string, what: string) => {
     setErr("");
@@ -106,6 +133,7 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
       setMsg(notes.join(" "));
       const runnable = d.results.filter((r) => !r.error).map((r) => r.index);
       await testAll(runnable);
+      void loadReviews();
       // Auto Mode (user, 2026-11-22): the parent auto-advances
       // after the main save — but only from the "Save & test"
       // button (replace), never from a per-scene fix save.
@@ -145,7 +173,17 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
             <span className="text-xs text-muted-foreground">Recommended AI: <b className="text-foreground">Claude</b></span>
             {withCode.length > 0 && <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => void testAll(withCode.map((s) => s.index))}>▶ Test all scenes again</button>}
             {withCode.length > 0 && <button className="btn btn-ghost btn-sm" onClick={() => void clearAll()}>🗑 Remove the code</button>}
+            {withCode.length > 0 && !!getKey("gemini") && (rv?.running
+              ? <button className="btn btn-ghost btn-sm" onClick={stopReview}>⏹ Stop the review</button>
+              : <button className="btn btn-secondary btn-sm" disabled={!!busy} onClick={() => void reviewAll()}
+                  title="Gemini looks at every scene's frames and suggests fixes. Nothing changes until you accept.">🤖 Review all scenes</button>)}
           </div>
+          {rv && (rv.running || rv.error || rv.reviews.length > 0) && (
+            <p className={`text-xs ${rv.error ? "text-rose-300" : "text-muted-foreground"}`}>
+              {rv.running ? `🤖 ${rv.stage} (${rv.done} of ${rv.total} done)` : rv.error
+                || `🤖 Reviewed ${rv.reviews.length} scene${rv.reviews.length === 1 ? "" : "s"}: ${rv.reviews.filter((r) => r.verdict === "fix").length} with suggested fixes. Nothing is changed until you accept it.`}
+            </p>
+          )}
           <textarea className="field h-56 w-full font-mono text-xs" value={code} onChange={(e) => setCode(e.target.value)}
             placeholder={"Paste the AI's answer here. It looks like:\n# === SCENE 1 ===\nshop = thing(\"shop\", x=-3)\nwhen(\"A small bakery\")\nenter(shop, \"grow\")\n# === SCENE 2 ===\n…"} />
           <button className="btn btn-primary w-full" disabled={!!busy || !code.trim()} onClick={() => void save(code, true)}>{busy || "💾 Save & test"}</button>
@@ -161,16 +199,43 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
                       : !s.test ? <span className="text-muted-foreground">not tested yet</span>
                       : s.test.ok ? <span className="text-emerald-300">✓ works{s.test.warnings.length ? ` · ${s.test.warnings.length} note${s.test.warnings.length === 1 ? "" : "s"}` : ""}</span>
                       : <span className="text-rose-300">✗ problem</span>}
-                    {s.has_code && s.test && (!s.test.ok || s.test.warnings.length > 0) && (
-                      <button className="btn btn-ghost btn-sm ml-auto" onClick={() => { setFix(fix === s.index ? null : s.index); setFixCode(""); }}>🔧 Fix it</button>
+                    {s.has_code && s.test && (
+                      <button className="btn btn-ghost btn-sm ml-auto" onClick={() => { setFix(fix === s.index ? null : s.index); setFixCode(""); }}>
+                        {!s.test.ok || s.test.warnings.length > 0 ? "🔧 Fix it" : "👁 Review / fix"}</button>
                     )}
                   </div>
+                  {s.has_code && (s.idea
+                    ? <p className="mt-1 text-xs text-sky-300">💡 {s.idea}</p>
+                    : <p className="mt-1 text-xs text-muted-foreground">💡 No visual idea written for this scene.</p>)}
                   {s.test?.error && <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-rose-300">{s.test.error}</p>}
                   {s.test?.warnings?.map((w, k) => <p key={k} className="mt-0.5 text-xs text-amber-300">• {w}</p>)}
+                  {rv?.reviews.filter((r) => r.index === s.index && !dismissed.includes(`${r.index}:${r.code}`)).map((r) => (
+                    <div key="review" className="mt-2 space-y-1 rounded-md border border-violet-500/50 bg-violet-500/10 p-2 text-xs">
+                      <p className="font-semibold">🤖 Gemini: {r.verdict === "good" ? "looks clear ✓" : r.verdict === "fix" ? "suggests a fix" : "could not review this scene"}</p>
+                      {r.seen && <p>It sees: {r.seen}</p>}
+                      {r.error && <p className="text-rose-300">{r.error}</p>}
+                      {r.problems.map((p, k) => <p key={k} className="text-amber-300">• {p}</p>)}
+                      {r.code_error && <p className="text-rose-300">Its new code cannot be used: {r.code_error}</p>}
+                      {r.code && (
+                        <>
+                          <details>
+                            <summary className="cursor-pointer">Show the corrected code</summary>
+                            <pre className="mt-1 max-h-64 overflow-auto whitespace-pre rounded bg-black/40 p-2 font-mono">{r.code}</pre>
+                          </details>
+                          <div className="flex gap-2">
+                            {!r.code_error && <button className="btn btn-primary btn-sm" disabled={!!busy}
+                              onClick={() => void save(`# === SCENE ${s.index + 1} ===\n${r.code}`, false)}>✓ Accept & test</button>}
+                            <button className="btn btn-ghost btn-sm" onClick={() => setDismissed((d) => [...d, `${r.index}:${r.code}`])}>✕ Keep mine</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
                   {fix === s.index && (
                     <div className="mt-2 space-y-2">
-                      <p className="text-xs text-muted-foreground">Copy the fix prompt → paste it into the same AI → paste its corrected scene here.</p>
+                      <p className="text-xs text-muted-foreground">1) Copy the prompt and paste it into the same AI. 2) Add the frames picture to that message (Claude, ChatGPT and Gemini can see it). 3) Paste its answer here.</p>
                       <button className="btn btn-secondary btn-sm" onClick={() => void copy(`/api/visual/script/${jobId}/fix/${s.index}`, "Fix prompt")}>📋 Copy the fix prompt</button>
+                      <SceneFrames key={s.test?.sheet || "none"} jobId={jobId} fileName={s.test?.sheet} getSheet={makeSheet(s.index)} label={`scene-${s.index + 1}-frames`} />
                       <textarea className="field h-32 w-full font-mono text-xs" value={fixCode} onChange={(e) => setFixCode(e.target.value)}
                         placeholder={`# === SCENE ${s.index + 1} ===\n…`} />
                       <button className="btn btn-primary btn-sm" disabled={!!busy || !fixCode.trim()} onClick={() => {

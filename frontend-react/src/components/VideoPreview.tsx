@@ -4,6 +4,7 @@
     modified parts" redraws only those scenes. Pause anywhere → "Want to replace this scene with studio?"
     (user, 2026-11-21) films just this scene with the chosen presenter and puts the studio clip in its place. */
 import { useEffect, useRef, useState } from "react";
+import { SceneFrames } from "@/components/SceneFrames";
 import { getKey } from "@/lib/config";
 
 type Cue = { start: number; end: number; text: string };
@@ -168,7 +169,7 @@ function FixModal({ jobId, scene, t, onClose, onSaved }: { jobId: string; scene:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="w-full max-w-xl space-y-3 rounded-2xl border border-border bg-background p-5 text-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-xl space-y-3 overflow-y-auto rounded-2xl border border-border bg-background p-5 text-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <b className="text-base">🔧 Fix this part — scene {scene.index + 1}, second {t.toFixed(1)}</b>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -180,6 +181,14 @@ function FixModal({ jobId, scene, t, onClose, onSaved }: { jobId: string; scene:
             placeholder="e.g. yahan bank bada ho aur coins zyada giren / show the number bigger and in the centre" />
         </div>
         <button className="btn btn-secondary w-full" disabled={request.trim().length < 2} onClick={() => void copy()}>{copied ? "✓ Prompt copied — paste it into your AI" : "📋 2 · Copy prompt"}</button>
+        {scene.has_code && scene.file && (
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Add this picture to the same message, so the AI sees the scene (the paused moment is marked red):</p>
+            <SceneFrames jobId={jobId} label={`scene-${scene.index + 1}-frames`} getSheet={async () =>
+              (await j<{ sheet: string }>(await fetch("/api/visual/preview/sheet", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ job_id: jobId, index: scene.index, t }) }))).sheet} />
+          </div>
+        )}
         <div>
           <p className="mb-1 font-semibold">3 · Paste the AI's answer</p>
           <textarea className="field h-36 w-full font-mono text-xs" value={answer} onChange={(e) => setAnswer(e.target.value)}

@@ -519,7 +519,10 @@ class Visual(MovingCameraScene):
             n = text_mob({**d, "text": b.get("text") or d.get("text")}).move_to(m)
         else:
             new_name = K.resolve(str(b.get("obj") or "")) or str(b.get("obj") or "")
-            n = make_obj({"obj": b.get("obj") or "", "size": max(m.width if new_name in K.WIDE else m.height, 0.5), "color": b.get("color"), "text": b.get("text")})
+            old_name = str(d.get("obj") or "")
+            same = new_name == (K.resolve(old_name) or old_name)  # the same kind of thing keeps its colour (a red price tag stays red)
+            n = make_obj({"obj": b.get("obj") or "", "size": max(m.width if new_name in K.WIDE else m.height, 0.5),
+                          "color": b.get("color") or (d.get("color") if same else None), "text": b.get("text")})
             if n is None:
                 return 0
             n.move_to(m)
