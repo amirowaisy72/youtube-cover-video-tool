@@ -27,6 +27,7 @@ HERE = Path(__file__).resolve().parent
 import sys  # noqa: E402
 
 sys.path.insert(0, str(HERE))
+import icon_pack  # noqa: E402
 import vis_kit as K  # noqa: E402
 
 SPEC = json.loads(Path(os.environ.get("YTG_SPEC", "spec.json")).read_text(encoding="utf-8"))
@@ -115,6 +116,9 @@ def make_obj(o):
         m = K.recipe_mob(SPEC["shapes"][name], o.get("color"))
     elif isinstance(SPEC.get("icons"), dict) and SPEC["icons"].get(name):
         m = image_mob(SPEC["icons"][name], size)
+    elif icon_pack.key_of(name):  # the app's own icon set (works offline)
+        m = icon_pack.mob(icon_pack.key_of(name))
+        m.scale_to_fit_height(size)
     if m is None or (hasattr(m, "submobjects") and len(m.submobjects) == 0 and not isinstance(m, ImageMobject)):
         return None  # cannot be drawn: left out — never a word box (user, 2026-11-19)
     if name in K.WIDE:

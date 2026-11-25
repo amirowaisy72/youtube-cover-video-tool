@@ -30,7 +30,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+import icon_pack
 import manim_cli
+import vis_transitions
 
 HERE = Path(__file__).resolve().parent
 SCENE = HERE / "vis_scene.py"
@@ -271,6 +273,9 @@ def resolve_objects(spec: dict) -> list[str]:
             spec["shapes"][key_] = shapes[key_]
             _rename(spec, raw, key_)
             continue
+        if icon_pack.key_of(name):  # the app's own icon set: nothing to download
+            _rename(spec, raw, icon_pack.key_of(name))
+            continue
         icon = None
         try:
             import tools_assets
@@ -328,7 +333,7 @@ MOTION = {"move", "scale", "split", "give", "join", "flow", "pile", "count", "to
 def _drawable(name: str, shapes: dict) -> bool:
     """Library thing, My Shape, or a real icon — never a word box."""
     K = _vk()
-    if K.resolve(name) or name.replace(" ", "_") in shapes:
+    if K.resolve(name) or name.replace(" ", "_") in shapes or icon_pack.key_of(name):
         return True
     try:
         import tools_assets
@@ -1182,6 +1187,9 @@ def render(spec: dict, out_path: Path, width: int, height: int, fps: int = 30, s
             _keep_log(output)
             raise RuntimeError("No video: " + manim_cli.error_summary(output, code))
         shutil.move(str(vids[0]), str(out_path))
+        if script and spec.get("transitions"):  # whip / zoom / slide into or out of the scene
+            vis_transitions.apply(out_path, spec["transitions"], width, height, fps, _n(spec.get("duration"), 6.0),
+                                  spec.get("backdrop") or "#1b2433", **_no_window())
         if sfx.exists():
             shutil.move(str(sfx), str(out_path.with_suffix(".sfx.json")))
         return out_path

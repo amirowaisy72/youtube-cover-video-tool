@@ -23,14 +23,14 @@ def _font(bold: bool, size: int):
         return ImageFont.load_default()
 
 
-def frame_times(duration: float, mark: float | None = None) -> list[float]:
+def frame_times(duration: float, mark: float | None = None, tail: float = 0.0) -> list[float]:
     """4-6 moments spread over the scene: near the end of each equal part (when its action has happened),
     the first one early (is something visible at once?). `mark` (a paused moment) is always included."""
     d = max(0.5, float(duration))
     n = max(4, min(6, round(d / 1.8)))
     times = [d * (k + 0.8) / n for k in range(n)]
     times[0] = min(times[0], 1.0)
-    times[-1] = d - 0.15
+    times[-1] = d - 0.15 - tail
     if mark is not None:
         m = max(0.05, min(d - 0.1, float(mark)))
         k = min(range(n), key=lambda i: abs(times[i] - m))
@@ -82,9 +82,9 @@ def _wrap(text: str, font, width: float, limit: int) -> list[str]:
 
 
 def make(video: Path, out: Path, words: list, duration: float, number: int, idea: str = "", narration: str = "",
-         mark: float | None = None) -> list[dict]:
+         mark: float | None = None, tail: float = 0.0) -> list[dict]:
     """Writes the sheet (PNG) -> the frames shown on it: [{"t": seconds, "said": words, "paused": bool}]."""
-    times = frame_times(duration, mark)
+    times = frame_times(duration, mark, tail)
     info = spoken(words, times)
     shots = [_grab(Path(video), t) for t in times]
     first = next((s for s in shots if s is not None), None)

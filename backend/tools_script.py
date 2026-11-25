@@ -59,6 +59,8 @@ def check(code: str) -> tuple[str, list[str]]:
             return f"line {line}: text with '__' is not allowed.", []
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             fn = node.func.id
+            if fn == "transition" and any(not isinstance(a, ast.Constant) for a in [*node.args, *[k.value for k in node.keywords]]):
+                return (f"line {line}: transition() needs plain text, e.g. transition(\"whip\", \"in\")."), []
             if fn == "source" and not all(_source_args(node)):
                 return (f"line {line}: source() needs the page link and the quoted sentence written as plain text: "
                         'source("https://...", "the exact sentence").'), []
@@ -94,6 +96,110 @@ def source_calls(code: str) -> list[tuple[str, str]]:
     out = [_source_args(n) for n in ast.walk(tree)
            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "source"]
     return list(dict.fromkeys(c for c in out if all(c)))
+
+
+def _calls(code: str):
+    """(function name, [positional text values or None], {keyword: text or None}) for every simple call, in order."""
+    try:
+        tree = ast.parse(code or "")
+    except SyntaxError:
+        return []
+    text = lambda v: v.value if isinstance(v, ast.Constant) and isinstance(v.value, str) else None  # noqa: E731
+    nodes = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
+    return [(n.func.id, [text(a) for a in n.args], {k.arg: text(k.value) for k in n.keywords})
+            for n in sorted(nodes, key=lambda n: (n.lineno, n.col_offset))]
+
+
+def transitions_of(code: str) -> dict:
+    """{"in": kind, "out": kind} asked for with transition()."""
+    import vis_transitions
+    out = {}
+    for fn, args, kw in _calls(code):
+        if fn == "transition":
+            kind = vis_transitions.kind_name(args[0] if args else kw.get("kind", "whip"))
+            when = (args[1] if len(args) > 1 else kw.get("when", "in")) or "in"
+            if kind and when in ("in", "out"):
+                out[when] = kind
+    return out
+
+
+def setting_of(code: str) -> str:
+    import vis_sets
+    for fn, args, kw in _calls(code):
+        if fn == "setting":
+            return vis_sets.setting_name(args[0] if args else kw.get("name")) or ""
+    return ""
+
+
+def things_of(code: str) -> list[str]:
+    """The drawn things a scene's code puts on stage (characters, text and settings are not counted)."""
+    import icon_pack
+    import tools_visual as tv
+    K = tv._vk()
+    out = []
+    for fn, args, kw in _calls(code):
+        names = []
+        if fn == "thing":
+            names = [args[0] if args else kw.get("name")]
+        elif fn == "pile":
+            names = [args[0] if args else kw.get("item", "coin")]
+        elif fn == "flow":
+            names = [args[2] if len(args) > 2 else kw.get("item", "coin")]
+        elif fn == "swap":
+            names = [args[1] if len(args) > 1 else kw.get("name")]
+        for n in names:
+            if n:
+                key = K.resolve(n) or icon_pack.key_of(n) or n.strip().lower().replace(" ", "_")
+                if key not in out:
+                    out.append(key)
+    return out
+
+
+MAX_USES = 3  # one thing in at most this many scenes of a video
+
+
+def used_things(scenes: list[dict], skip: int = -1) -> dict[str, list[int]]:
+    """thing -> the scene numbers that use it."""
+    out: dict[str, list[int]] = {}
+    for i, sc in enumerate(scenes):
+        if i != skip:
+            for n in things_of(sc.get("code")):
+                out.setdefault(n, []).append(i + 1)
+    return out
+
+
+def used_summary(scenes: list[dict], skip: int = -1) -> str:
+    used = used_things(scenes, skip)
+    if not used:
+        return ""
+    lines = [f"  {n}: scene{'s' if len(s) > 1 else ''} {', '.join(map(str, s[:6]))}"
+             + ("  <- limit reached, do NOT use it again" if len(s) >= MAX_USES else "")
+             for n, s in sorted(used.items(), key=lambda x: -len(x[1]))[:40]]
+    near = []
+    for k, word in ((skip - 1, "previous"), (skip + 1, "next")):
+        if skip >= 0 and 0 <= k < len(scenes) and things_of(scenes[k].get("code")):
+            near.append(f"The {word} scene shows: {', '.join(things_of(scenes[k]['code']))} — do not repeat these.")
+    return ("THINGS ALREADY USED in the other scenes (for variety):\n" + "\n".join(lines + near) + "\n\n")
+
+
+def variety_warnings(scenes: list[dict], index: int) -> list[str]:
+    """Repetition that makes a video boring: the previous scene's things again, or one thing too often."""
+    cur = things_of(scenes[index].get("code"))
+    out = []
+    if index > 0:
+        same = [n for n in cur if n in things_of(scenes[index - 1].get("code"))]
+        if same and len(same) * 2 >= len(cur):
+            out.append(f"repeats the previous scene's main thing{'s' if len(same) > 1 else ''} ({', '.join(same)}) — "
+                       "show this idea with something else")
+    before = used_things(scenes[:index + 1])
+    for n in cur:
+        if len(before.get(n, [])) > MAX_USES:
+            out.append(f"'{n}' is now in {len(before[n])} scenes ({', '.join(map(str, before[n]))}) — "
+                       f"use one thing in at most {MAX_USES} scenes")
+    here = setting_of(scenes[index].get("code"))
+    if here and index > 1 and all(setting_of(scenes[k].get("code")) == here for k in (index - 1, index - 2)):
+        out.append(f'the third scene in a row in setting("{here}") — change the background')
+    return out
 
 
 _MARK = re.compile(r"^\s*#+\s*=*\s*SCENE\s+(\d+)\b[^\n]*$", re.I | re.M)
@@ -214,6 +320,12 @@ def spec_for(scene: dict, index: int, work_dir: Path, duration: float, cues=None
         import tools_source
         shots = tools_source.capture_many([(u.strip(), q.strip()) for u, q in calls])
         extra["sources"] = [{**d, "url": u, "quote": q} for (u, q), d in zip(calls, shots)]
+    moves = transitions_of(scene.get("code") or "")
+    if moves:
+        import vis_sets
+        extra["transitions"] = moves
+        here = setting_of(scene.get("code") or "")
+        extra["backdrop"] = vis_sets.PALETTE[here][0] if here else "#1b2433"
     return {**extra, "theme": "visual", "code": scene.get("code") or "", "narration": scene.get("narration") or "",
             "duration": round(max(1.0, duration), 2), "words": word_times(scene, index, work_dir, duration, cues),
             "objects": [{"id": f"n{k}", "obj": n} for k, n in enumerate(names)], "beats": []}
@@ -243,15 +355,18 @@ def clip_for_scene(scene: dict, index: int, work_dir: Path, duration: float, cue
 
 # ------------------------------------------------------------------ the prompts
 def _library() -> str:
+    import icon_pack
     import tools_visual as tv
-    names = tv.library_names()
     mine = sorted(tv.my_shapes())
-    return ", ".join(names) + (f"\nThe user's own drawn shapes: {', '.join(mine)}" if mine else "")
+    icons = "".join(f"\n  {cat.replace('_', ' ')}: {', '.join(names)}" for cat, names in icon_pack.by_category().items())
+    return ("\n  drawn in the app's style (take color=): " + ", ".join(tv.library_names())
+            + "\n  MORE THINGS (colourful icons; their colours are fixed):" + icons
+            + (f"\n  the user's own drawn shapes: {', '.join(mine)}" if mine else ""))
 
 
 GUIDE = r'''You are the animation director of a YouTube EXPLAINER video. Write the animation of EVERY scene below as
-Python code for my app (it runs Manim Community Edition with extra tools). Style: flat, colourful drawn objects on a
-dark navy background (#1b2433) with a floor; every idea is SHOWN with motion, numbers COUNT up, every motion has a
+Python code for my app (it runs Manim Community Edition with extra tools). Style: flat, colourful drawn objects and
+characters in front of quiet backgrounds with a floor; every idea is SHOWN with motion, numbers COUNT up, every motion has a
 sound effect. No stock footage, no static slides, no long sentences on screen.
 
 STEP 1 — IDEA FIRST, THEN CODE (required for every scene)
@@ -320,7 +435,38 @@ TOOLS (already available — NO imports):
   Sounds: pop whoosh swoosh swoosh_down riser coin thud tick click ding crack rumble zap. The tools above make
   their own sounds; with play(...) give sound="..." so EVERY motion is heard.
 
-DRAWN OBJECTS (names for thing()): {library}
+CHARACTERS — people who react (use them instead of thing("person") whenever someone feels or does something):
+  p = person(pose="standing", x=-3, h=3.4, who="maya", mood=None, color=None, flip=False)   then enter(p)
+      who: sam, maya, leo, nina, omar, grandpa, boss — keep ONE main character (same who) through the whole video
+      pose: standing, happy, worried, sad, thinking, pointing, celebrating, running, shrug, surprised,
+            holding_money, holding_phone        (pointing points right; flip=True points left)
+      mood (only the face): neutral, happy, joy, worried, sad, thinking, surprised, angry, determined, confused
+  pose(p, "worried")  -> moves smoothly into that pose, with sound.   mood(p, "surprised")  -> only the face.
+  run_to(p, to=4, end="celebrating")  -> runs to x=4 with moving legs, then takes that pose.
+  Change the pose ON THE WORD that causes the feeling:
+      hero = person("happy", x=-3.5, who="maya")
+      enter(hero, "left")
+      when("the bill arrives")
+      pose(hero, "worried")
+
+SETTINGS — where the scene happens: setting("street") as the FIRST line after the idea. plain, street, office, home,
+  shop, bank (a bank hall), night. Without setting() the plain navy stage. Choose what fits the narration; do not put
+  more than 2 scenes in a row in the same setting. A setting is background only: it needs no thing() to repeat it
+  (inside setting("bank") do not add thing("bank")).
+
+TRANSITIONS — transition("whip" | "zoom" | "slide", "in" | "out"), with its sound; the app draws it in the first
+  ("in") or last ("out") 0.3 s of the scene without changing its length. For one connected cut write
+  transition("whip", "out") at the start of the earlier scene's code AND transition("whip", "in") in the next one.
+  Use one on about 1 cut in 3, where the story jumps (new place, new time, new idea) — not on every scene.
+  whip = meanwhile / another side; zoom = going deeper into a detail; slide = the next step.
+
+VARIETY (the test warns about this):
+  - A scene must not show the same main things as the scene before it.
+  - One thing (coin, bank, wallet...) in at most 3 scenes of the whole video. Pick the specific object from the list
+    (receipt, shopping_cart, umbrella, locked...) instead of "coin" and "bank" again.
+  - Vary the layout too: not always "one thing left, one number right".
+
+THINGS (names for thing(), flow(), pile()):{library}
 Other simple nouns also work (drawn as an icon), but prefer these.
 Tips: a crowd is a row of small people — use count=4-6 for a big crowd. split() looks best on wide things (factory,
 box, pie, gold_bar).
@@ -355,15 +501,18 @@ enter(tag, "pop", dur=0.4)
 when("keeps climbing", -0.2)
 move(tag, to=(3.2, 2.5), dur=0.5)
 swap(tag, text="$4")
+transition("whip", "out")
 # === SCENE 2 ===
-# VISUAL IDEA: the same money buys half = 8 loaves on the right, 4 of them fade away: before -> after
+# VISUAL IDEA: the same money buys half = 8 shopping bags on the right, 4 of them fade away: before -> after
+transition("whip", "in")
+setting("plain")
 money = text("$100", x=-4, y=1.2, style="number", size=1.5)
 enter(money, "pop")
-loaves = VGroup(*[thing("bread", x=-0.7 + 1.9 * (i % 4), y=1.9 - 2.1 * (i // 4), h=1.05) for i in range(8)])
+bags = VGroup(*[thing("shopping_bags", x=-0.7 + 1.9 * (i % 4), y=1.9 - 2.1 * (i // 4), h=1.4) for i in range(8)])
 when("ten years")
-play(LaggedStart(*[FadeIn(m, scale=0.5) for m in loaves], lag_ratio=0.08), run_time=1.0, sound="pop")
+play(LaggedStart(*[FadeIn(m, scale=0.5) for m in bags], lag_ratio=0.08), run_time=1.0, sound="pop")
 when("only about half", -0.2)
-play(*[loaves[i].animate.set_opacity(0.1).shift(0.4 * DOWN) for i in (4, 5, 6, 7)], run_time=0.8, sound="swoosh_down")
+play(*[bags[i].animate.set_opacity(0.1).shift(0.4 * DOWN) for i in (4, 5, 6, 7)], run_time=0.8, sound="swoosh_down")
 half = text("half", x=-4, y=-0.5, style="number", size=1.5, color=RED)
 when("half as much", -0.2)
 enter(half)
@@ -425,6 +574,8 @@ def build_prompt(title: str, scenes: list[dict], sources: list[dict] | None = No
                      + "\n".join(_source_line(s) for s in matched[-1]))
     if not usable:
         lines.append("SOURCES: none were saved for this video, so do not use source().")
+    if used_summary(scenes):  # scenes that already have code
+        lines.append(used_summary(scenes).strip())
     return (GUIDE.replace("{library}", _library()) + f'\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n' + "\n\n".join(lines)
             + "\n\nFirst decide the video's visual language (which object and colour stands for each main idea) and keep it "
             "in every scene. Then write the code for ALL scenes now — each starting with its # VISUAL IDEA line.\n\n"
@@ -446,7 +597,8 @@ def other_ideas(scenes: list[dict], index: int) -> str:
              if i != index and idea_of(sc.get("code"))]
     if len(lines) > 12:  # a long video: the scenes around this one
         lines = [x for x in lines if abs(int(x.split()[1].rstrip(":")) - 1 - index) <= 6]
-    return ("VISUAL IDEAS OF THE OTHER SCENES (keep this video's visual language):\n" + "\n".join(lines) + "\n\n") if lines else ""
+    ideas = ("VISUAL IDEAS OF THE OTHER SCENES (keep this video's visual language):\n" + "\n".join(lines) + "\n\n") if lines else ""
+    return ideas + used_summary(scenes, index)
 
 
 def frame_list(frames: list[dict]) -> str:
@@ -522,6 +674,8 @@ def test_scene(job: dict, index: int, work_dir: Path) -> dict:
         rep["error"] = rep.get("error") or str(exc)[-500:]
     ok = not rep.get("error") and out.exists()
     warn = list(rep.get("warnings") or [])
+    if ok:
+        warn.extend(variety_warnings(job["scenes"], index))
     if ok and not idea_of(sc.get("code")):
         warn.append("no '# VISUAL IDEA:' line — ask the AI to write what the viewer should understand in one glance")
     if ok and rep.get("sounds", 0) < max(2, dur / 4):
@@ -553,8 +707,9 @@ def make_sheet(sc: dict, index: int, work_dir: Path, video: Path, words: list, d
     """The contact sheet of a scene preview -> {"sheet": file name, "frames": [...]}."""
     import scene_sheet
     name = f"scene-{index:02d}-sheet-{int(time.time() * 10) % 1000000}.png"
+    tail = 0.3 if "out" in transitions_of(sc.get("code")) else 0.0  # no frame in the middle of a leaving transition
     frames = scene_sheet.make(video, work_dir / name, words, duration, index + 1, idea_of(sc.get("code")),
-                              str(sc.get("narration") or ""), mark)
+                              str(sc.get("narration") or ""), mark, tail)
     return {"sheet": name, "frames": frames}
 
 

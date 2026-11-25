@@ -20,6 +20,9 @@ import manim as _M
 from manim import DOWN, LEFT, RIGHT, UP, FadeIn, Rectangle, UpdateFromAlphaFunc, config, rate_functions
 
 import vis_scene as V
+import vis_people as P
+import vis_sets
+import vis_transitions
 from vis_scene import GROUND_Y, H, W, XMAX, YMAX, YMIN, K, make_obj, num, text_mob
 
 SPEC = V.SPEC
@@ -81,6 +84,7 @@ class ScriptScene(V.Visual):
         self._pos = 0
         self.floor_rect = Rectangle(width=W * 3, height=6, fill_color=K.GROUND, fill_opacity=1, stroke_width=0).move_to([0, GROUND_Y - 3.0, 0])
         self.add(self.floor_rect)
+        self.scenery = []  # the setting's layers: they stay through clear()
         frame = self.camera.frame
         if V.TALL:
             frame.set(width=W)
@@ -335,7 +339,7 @@ class ScriptScene(V.Visual):
 
         def clear(dur=0.5):
             """Everything on stage leaves (swoosh) — a clean stage for the next idea."""
-            ms = [m for m in S.mobjects if m is not S.floor_rect]
+            ms = [m for m in S.mobjects if m is not S.floor_rect and not any(m is s for s in S.scenery)]
             if not ms:
                 return 0
             S.snd("swoosh")
@@ -349,7 +353,138 @@ class ScriptScene(V.Visual):
             return do("camera", None, zoom=zoom, to=to, dur=dur)
 
         def no_floor():
-            S.remove(S.floor_rect)
+            S.remove(S.floor_rect, *S.scenery[3:])
+
+        # -------------------------------------------------------- characters
+        def person(pose="standing", x=0.0, y=None, h=3.2, who="sam", mood=None, color=None, flip=False):
+            """A character (feet on the floor unless y). Not shown until enter()."""
+            name = P.pose_name(pose)
+            if name is None:
+                S.warnings.append(f'person(pose="{pose}"): unknown pose — standing is used')
+                name = "standing"
+            who_ = str(who).strip().lower()
+            if who_ not in P.CAST:
+                S.warnings.append(f'person(who="{who}"): unknown character — sam is used')
+                who_ = "sam"
+            _check_mood(mood)
+            m = P.Person(who_, name, mood, color, flip, min(num(h, 3.2) or 3.2, YMAX - GROUND_Y))
+            m.shift([num(x), GROUND_Y if y is None else num(y), 0])
+            return _reg(m, {"obj": "raw"})
+
+        def _check_mood(mood):
+            if mood is not None and mood not in P.MOODS:
+                S.warnings.append(f'mood "{mood}": unknown (use one of {", ".join(P.MOODS)})')
+
+        def _is_person(m, tool):
+            if isinstance(m, P.Person):
+                return True
+            S.warnings.append(f"{tool}(): the first value must be a person(...)")
+            return False
+
+        def _morph(m, to, mood, flip, dur):
+            frm = m.pose_now
+            flip = m.flip_now if flip is None else bool(flip)
+
+            def step(mob, a):
+                mob.show(P.between(frm, to, a), mood if a >= 0.5 else m.mood_now, flip)
+            used = 0
+            if _shown(m) and S.total - S.t > 0.3:
+                used = play(UpdateFromAlphaFunc(m, step), run_time=dur, rate_func=rate_functions.ease_in_out_sine)
+            m.show(to, mood, flip)
+            m.pose_now, m.mood_now, m.flip_now = to, mood, flip
+            return used
+
+        def pose(m, name, mood=None, flip=None, dur=0.45, sound=True):
+            """The character moves into another pose (with its sound)."""
+            if not _is_person(m, "pose"):
+                return 0
+            new = P.pose_name(name)
+            if new is None:
+                S.warnings.append(f'pose("{name}"): unknown pose')
+                return 0
+            _check_mood(mood)
+            if sound and _shown(m):
+                sfx({"celebrating": "ding", "happy": "pop", "surprised": "pop", "worried": "swoosh_down", "sad": "swoosh_down",
+                     "holding_money": "coin", "thinking": "click"}.get(new, "swoosh"))
+            m.pose_label = new
+            return _morph(m, P.POSES[new], mood, flip, dur)
+
+        def mood(m, name, dur=0.25):
+            """Only the face changes."""
+            if not _is_person(m, "mood"):
+                return 0
+            _check_mood(name)
+            sfx("click")
+            return _morph(m, m.pose_now, name, None, dur)
+
+        def run_to(m, to, dur=1.6, end="standing"):
+            """The character runs to x (or to (x, y) / next to a thing), legs moving, then takes the pose `end`."""
+            if not _is_person(m, "run"):
+                return 0
+            start = m.submobjects[0].get_center().copy()
+            if hasattr(to, "get_center"):
+                tx = to.get_center()[0] + (-1 if to.get_center()[0] > start[0] else 1) * (to.width / 2 + 0.8)
+                goal = np.array([tx, start[1], 0.0])
+            elif isinstance(to, (list, tuple)):
+                goal = np.array([num(to[0]), num(to[1], start[1]), 0.0])
+            else:
+                goal = np.array([num(to), start[1], 0.0])
+            if not _shown(m):
+                S.add(m)
+                S.on.add(m._ytg_id)
+            flip = bool(goal[0] < start[0])
+            length = max(0.4, min(num(dur, 1.6), S.total - S.t - 0.05))
+
+            def step(mob, a):
+                swing = (1 - math.cos(math.pi * a * length / 0.2)) / 2
+                mob.shift(start + (goal - start) * a - mob.submobjects[0].get_center())
+                mob.show(P.between(P.POSES["running"], P._RUN2, swing), None, flip)
+            k = 0.0
+            while k < length - 0.05:
+                sfx("tick", k)
+                k += 0.2
+            used = play(UpdateFromAlphaFunc(m, step), run_time=length, rate_func=rate_functions.ease_in_out_sine)
+            m.pose_now, m.mood_now, m.flip_now = P.POSES["running"], None, flip
+            new = P.pose_name(end) or "standing"
+            m.pose_label = new
+            return used + _morph(m, P.POSES[new], None, False if new != "pointing" else flip, 0.25)
+
+        # -------------------------------------------------------- settings and transitions
+        def setting(name):
+            """A background: plain, street, office, home, shop, bank or night (the camera sees it with depth)."""
+            key = vis_sets.setting_name(name)
+            if key is None:
+                S.warnings.append(f'setting("{name}"): unknown — use one of {", ".join(vis_sets.SETTINGS)}')
+                return
+            S.remove(*S.scenery)
+            back, far, near = vis_sets.build(key, GROUND_Y)
+            marks = vis_sets.floor_details(key, GROUND_Y)
+            S.floor_rect.set_fill(vis_sets.PALETTE[key][1])
+            if V.TALL and S.floor_rect.height < 15:  # a Short: the ground reaches the bottom of the picture
+                S.floor_rect.stretch_to_fit_height(16).move_to([0, GROUND_Y - 8.0, 0])
+            for layer, follow, drift in ((far, 0.45, -0.22), (near, 0.2, -0.4)):
+                state = {"t": 0.0, "off": np.zeros(3)}
+
+                def move_layer(mob, dt, follow=follow, drift=drift, state=state):
+                    state["t"] += dt
+                    off = frame_.get_center() * follow + RIGHT * drift * min(1.0, state["t"] / S.total)
+                    mob.shift(off - state["off"])
+                    state["off"] = off
+                frame_ = S.camera.frame
+                layer.add_updater(move_layer)
+            S.scenery = [back, far, near, marks]
+            on_top = [m for m in S.mobjects if m is not S.floor_rect and not any(m is s for s in S.scenery)]
+            floor = [S.floor_rect] if S.floor_rect in S.mobjects else []
+            S.remove(*on_top, *floor)
+            S.add(back, far, near, *floor, marks, *on_top)
+
+        def transition(kind="whip", when="in"):
+            """How the scene arrives ("in") or leaves ("out"): whip, zoom or slide. The picture is done by the app."""
+            if vis_transitions.kind_name(kind) is None or when not in ("in", "out"):
+                S.warnings.append(f'transition("{kind}", "{when}"): use whip, zoom or slide, and "in" or "out"')
+                return
+            at_time = 0.0 if when == "in" else max(0.0, S.total - vis_transitions.LENGTH - 0.05)
+            S.snd("whoosh" if when == "in" else "swoosh", at_time - S.t)
 
         def color(name):
             return K.col(name, K.CREAM)
@@ -423,7 +558,8 @@ class ScriptScene(V.Visual):
             "enter": enter, "exit": exit, "move": move, "grow": grow, "split": split, "give": give, "flow": flow,
             "count": count, "drop": drop, "topple": topple, "shake": shake, "pulse": pulse, "recolor": recolor,
             "swap": swap, "clone": clone, "pile": pile, "label": label, "badge": badge, "clear": clear, "camera": camera,
-            "no_floor": no_floor, "color": color, "math": math, "random": random.Random(7), "np": np,
+            "no_floor": no_floor, "color": color, "person": person, "pose": pose, "mood": mood, "run_to": run_to,
+            "setting": setting, "transition": transition, "math": math, "random": random.Random(7), "np": np,
             "FLOOR": GROUND_Y, "TOP": YMAX - 0.4, "XMAX": XMAX, "YMIN": YMIN, "W": W, "H": H, "DURATION": S.total,
             "ORANGE": K.ORANGE, "TEAL": K.TEAL, "GOLD": K.GOLD, "CREAM": K.CREAM, "RED": K.RED, "GREEN": K.GREEN,
             "BLUE": K.BLUE, "PURPLE": K.PURPLE, "PINK": K.PINK, "SLATE": K.SLATE, "INK": K.INK, "BG": K.BG, "GREY": K.GREY,
