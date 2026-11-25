@@ -91,8 +91,8 @@ def build(name: str, floor: float) -> tuple[VGroup, VGroup, VGroup]:
             near.add(_stand(0.18, 0.8, "#2b2a30", x, f), _c(0.62, "#2c5a4e", x, f + 1.2), _c(0.45, "#32695a", x + 0.3, f + 1.5))
     elif name == "office":
         far.add(_window(-4.4, 1.5, 3.4, 2.3, "#3c4d6b", "#486a94"), _window(4.4, 1.5, 3.4, 2.3, "#3c4d6b", "#486a94"))
-        far.add(_c(0.5, "#3c4d6b", 0, 2.6), _c(0.4, "#c9d2e0", 0, 2.6, 0.55), _r(0.05, 0.28, "#27324c", 0, 2.73),
-                _r(0.2, 0.05, "#27324c", 0.08, 2.6))
+        far.add(_c(0.34, "#3c4d6b", 6.55, 3.15), _c(0.27, "#c9d2e0", 6.55, 3.15, 0.55), _r(0.04, 0.2, "#27324c", 6.55, 3.24),
+                _r(0.14, 0.04, "#27324c", 6.61, 3.15))  # in the corner: the top middle is for titles
         for x in (-6.1, 6.1):  # filing cabinet / plant
             if x < 0:
                 near.add(_stand(1.0, 1.5, "#3a4660", x, f), *[_r(0.34, 0.07, "#6b7896", x, f + 0.35 + 0.45 * k) for k in range(3)])
@@ -127,7 +127,6 @@ def build(name: str, floor: float) -> tuple[VGroup, VGroup, VGroup]:
         for x in (-6.2, -4.3, 4.3, 6.2):
             far.add(_stand(0.75, 5.25, "#3d4b6c", x, f), _r(1.05, 0.25, "#4a597c", x, 2.72), _r(1.05, 0.25, "#4a597c", x, f + 0.12),
                     *[_stand(0.07, 4.8, "#34415f", x + d, f + 0.3) for d in (-0.18, 0.18)])
-        far.add(_c(0.55, "#b99a55", 0, 3.45, 0.55), _c(0.36, "#27324c", 0, 3.45), _c(0.2, "#b99a55", 0, 3.45, 0.55))
     elif name == "night":
         rnd = random.Random(23)
         for _ in range(55):

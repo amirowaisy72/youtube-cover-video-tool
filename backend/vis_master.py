@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 import re
 
+import vis_master2
+
 # ================================================================== numbers (no Manim needed)
 
 
@@ -134,7 +136,7 @@ def beat_times(found: list, start: float, total: float) -> list[float]:
 
 
 # ================================================================== drawing
-NAMES = ("compound", "inflation", "revenue_split", "big_number_compare", "money_timeline")
+NAMES = ("compound", "inflation", "revenue_split", "big_number_compare", "money_timeline") + vis_master2.NAMES
 _ICON_FOR = (("theat", "ticket"), ("cinema", "ticket"), ("studio", "clapper"), ("tax", "bank_building"),
              ("actor", "theatre"), ("cast", "theatre"), ("star", "sparkle_star"), ("market", "megaphone"), ("ad", "megaphone"),
              ("store", "store_front"), ("shop", "store_front"), ("developer", "desktop"), ("music", "music_note"),
@@ -807,7 +809,8 @@ def make(S, api: dict, narration: str) -> dict:
         return got[-1]["value"]
 
     return {"compound": compound, "inflation": inflation, "revenue_split": revenue_split,
-            "big_number_compare": big_number_compare, "money_timeline": money_timeline}
+            "big_number_compare": big_number_compare, "money_timeline": money_timeline,
+            **vis_master2.make(S, api, narration)}
 
 
 def np_point(x: float, y: float):
@@ -847,3 +850,4 @@ in two scenes in a row; at most 2 times each in a video.
                      when_words={"Opening": "opening weekend", "Week 2": "second week", "Total": "in total"})
 
 '''
+GUIDE = GUIDE.rstrip("\n") + "\n" + vis_master2.GUIDE
