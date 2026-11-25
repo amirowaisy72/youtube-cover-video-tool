@@ -11,3 +11,5 @@ __pycache__/
 .venv/
 backend/settings.json
 .dev-unlock
+source_cache/
+manim-error.log

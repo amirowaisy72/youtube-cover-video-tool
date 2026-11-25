@@ -54,10 +54,14 @@ def check(code: str) -> tuple[str, list[str]]:
             return f"line {line}: '{node.id}' is not allowed in scene code.", []
         if isinstance(node, ast.Attribute) and (node.attr.startswith("_") or node.attr in _BAD_ATTRS):
             return f"line {line}: '.{node.attr}' is not allowed in scene code.", []
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and "__" in node.value:
+        if (isinstance(node, ast.Constant) and isinstance(node.value, str) and "__" in node.value
+                and not re.match(r"https?://\S+$", node.value)):
             return f"line {line}: text with '__' is not allowed.", []
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             fn = node.func.id
+            if fn == "source" and not all(_source_args(node)):
+                return (f"line {line}: source() needs the page link and the quoted sentence written as plain text: "
+                        'source("https://...", "the exact sentence").'), []
             if fn in ("thing", "swap", "pile") and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
                 names.append(node.args[0].value)
             if fn in ("swap",) and len(node.args) > 1 and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
@@ -66,6 +70,30 @@ def check(code: str) -> tuple[str, list[str]]:
                 if kw.arg in ("item", "name") and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
                     names.append(kw.value.value)
     return "", list(dict.fromkeys(n for n in names if n))
+
+
+def _source_nodes(node: ast.Call) -> list:
+    given = dict(zip(("url", "quote"), node.args))
+    given.update({kw.arg: kw.value for kw in node.keywords if kw.arg in ("url", "quote")})
+    return [given.get("url"), given.get("quote")]
+
+
+def _source_args(node: ast.Call) -> tuple[str, str]:
+    """The (url, quote) of a source() call when both are written as plain text, else empty strings.
+    Returned exactly as written: vis_script.py matches these strings."""
+    url, quote = (v.value if isinstance(v, ast.Constant) and isinstance(v.value, str) else "" for v in _source_nodes(node))
+    return (url if url.strip().lower().startswith(("http://", "https://")) else ""), (quote if quote.strip() else "")
+
+
+def source_calls(code: str) -> list[tuple[str, str]]:
+    """Every (url, quote) the scene code shows with source()."""
+    try:
+        tree = ast.parse(code or "")
+    except SyntaxError:
+        return []
+    out = [_source_args(n) for n in ast.walk(tree)
+           if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "source"]
+    return list(dict.fromkeys(c for c in out if all(c)))
 
 
 _MARK = re.compile(r"^\s*#+\s*=*\s*SCENE\s+(\d+)\b[^\n]*$", re.I | re.M)
@@ -123,7 +151,13 @@ def est_duration(narration: str) -> float:
 
 def spec_for(scene: dict, index: int, work_dir: Path, duration: float, cues=None) -> dict:
     _err, names = check(scene.get("code") or "")
-    return {"theme": "visual", "code": scene.get("code") or "", "narration": scene.get("narration") or "",
+    extra = {}
+    calls = source_calls(scene.get("code") or "")
+    if calls:  # the web pages are photographed here, once (cached), before the animation is drawn
+        import tools_source
+        shots = tools_source.capture_many([(u.strip(), q.strip()) for u, q in calls])
+        extra["sources"] = [{**d, "url": u, "quote": q} for (u, q), d in zip(calls, shots)]
+    return {**extra, "theme": "visual", "code": scene.get("code") or "", "narration": scene.get("narration") or "",
             "duration": round(max(1.0, duration), 2), "words": word_times(scene, index, work_dir, duration, cues),
             "objects": [{"id": f"n{k}", "obj": n} for k, n in enumerate(names)], "beats": []}
 
@@ -189,6 +223,18 @@ TOOLS (already available — NO imports):
   split(m, rows=3, cols=5)   give(m, to=person, label="1 share")   drop(m)   topple(m)   shake(m)   pulse(m)
   swap(m, name="trophy") / swap(text_obj, text="$100")   recolor(m, RED)   label(m, "PS5")   badge("VICE CITY")
   camera(zoom=1.3, to=(x, y))   no_floor()
+  source(url, quote, highlight_words=None, until=None, hold=None)   PROOF on screen, like a documentary: the REAL
+      web page floats in, the camera zooms to the sentence, its paragraph lifts toward the viewer and the words are
+      marked exactly when the narrator says them (with sound). It fills the whole screen for about 5-8 seconds and
+      then leaves by itself (or at until="words", or hold=seconds after the last mark). Use it in the scenes with
+      the most important facts and numbers (about 1 scene in 3, at most once per scene):
+        when("words said just before the fact", -1.0)     # call it about 2 seconds BEFORE the fact is spoken
+        source("https://full.page/address", "The exact sentence copied from that page.",
+               highlight_words=["the words", "that prove it"])
+      url and quote must be copied EXACTLY from the SOURCES listed below (plain text in quotes, no variables):
+      never invent or reword them; if a fact has no source below, do not use source() for it. highlight_words =
+      short parts of the quote (default: the whole quote); prefer words the narrator also says. Add other
+      animation after it only if enough time is left.
   play(*any_manim_animations, run_time=1.0, sound="whoosh")   sfx("pop")   add(m)   remove(m)
   Plain Manim is available too: Circle, Square, Rectangle, RoundedRectangle, Line, Arrow, Dot, Polygon, Arc, VGroup,
   Text, FadeIn, FadeOut, Create, Write, Transform, ReplacementTransform, GrowFromCenter, GrowFromEdge, Indicate,
@@ -253,20 +299,58 @@ momentum. Good physics in both the animations and the visuals.
 the previous one and keep the viewer hooked in the story.'''
 
 
-def build_prompt(title: str, scenes: list[dict]) -> str:
+def _keys(text: str) -> tuple[set, set]:
+    t = str(text or "").lower().replace(",", "")
+    return set(re.findall(r"\d+(?:\.\d+)?", t)), set(re.findall(r"[a-z]{5,}", t))
+
+
+def sources_by_scene(scenes: list[dict], sources: list[dict]) -> dict[int, list[dict]]:
+    """Which source belongs to which scene (shared numbers and words); -1 = no clear scene."""
+    texts = [_keys(sc.get("narration")) for sc in scenes]
+    out: dict[int, list[dict]] = {}
+    for s in sources:
+        nums, words = _keys(f"{s.get('fact', '')} {s.get('quote', '')}")
+        scores = [3 * len(nums & n) + len(words & w) for n, w in texts]
+        best = max(range(len(scores)), key=scores.__getitem__) if scores else -1
+        out.setdefault(best if scores and scores[best] >= 3 else -1, []).append(s)
+    return out
+
+
+def _source_line(s: dict) -> str:
+    quote = str(s.get("quote") or "").replace('"', "'").replace("\\", " ")  # fits inside "…" in the code
+    return f'  url: {s["url"]}\n  quote: "{quote}"' + (f'\n  (supports: {s["fact"]})' if s.get("fact") else "")
+
+
+def build_prompt(title: str, scenes: list[dict], sources: list[dict] | None = None) -> str:
+    usable = [s for s in sources or [] if s.get("url") and s.get("quote")]
+    matched = sources_by_scene(scenes, usable)
     lines = []
     for i, sc in enumerate(scenes):
         nar = str(sc.get("narration") or "").strip()
         d = float(sc.get("duration_sec") or 0) or est_duration(nar)
-        lines.append(f"SCENE {i + 1} (about {d:.0f} seconds): {nar}")
+        block = f"SCENE {i + 1} (about {d:.0f} seconds): {nar}"
+        if matched.get(i):
+            block += "\nSOURCES for this scene (for source()):\n" + "\n".join(_source_line(s) for s in matched[i])
+        lines.append(block)
+    if matched.get(-1):
+        lines.append("OTHER SOURCES of this video (use one in the scene whose fact it supports):\n"
+                     + "\n".join(_source_line(s) for s in matched[-1]))
+    if not usable:
+        lines.append("SOURCES: none were saved for this video, so do not use source().")
     return (GUIDE.replace("{library}", _library()) + f'\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n' + "\n\n".join(lines)
             + "\n\nWrite the code for ALL scenes now.\n\n" + GENERAL_DIRECTION_RULES)
 
 
-def fix_prompt(title: str, scenes: list[dict], index: int, error: str, warnings: list[str]) -> str:
+def fix_prompt(title: str, scenes: list[dict], index: int, error: str, warnings: list[str],
+               sources: list[dict] | None = None) -> str:
     sc = scenes[index]
     nar = str(sc.get("narration") or "").strip()
     probs = (f"ERROR: {error}\n" if error else "") + "".join(f"WARNING: {w}\n" for w in warnings or [])
+    usable = [s for s in sources or [] if s.get("url") and s.get("quote")]
+    mine = sources_by_scene(scenes, usable)
+    shown = mine.get(index, []) + mine.get(-1, [])
+    if shown:
+        probs += "SOURCES (for source()):\n" + "\n".join(_source_line(s) for s in shown) + "\n"
     return (GUIDE.replace("{library}", _library()) + f'\nVIDEO TITLE: "{title}"\n\nSCENE {index + 1} '
             f"(about {est_duration(nar):.0f} seconds): {nar}\n\nThis code for scene {index + 1} has a problem:\n"
             f"{probs}\n```python\n# === SCENE {index + 1} ===\n{sc.get('code') or ''}```\n\n"
@@ -365,7 +449,7 @@ def get_script(job_id: str) -> dict:
 @router.get("/{job_id}/prompt")
 def get_prompt(job_id: str) -> dict:
     _app_, job = _job(job_id)
-    return {"prompt": build_prompt(job.get("title") or "", job["scenes"])}
+    return {"prompt": build_prompt(job.get("title") or "", job["scenes"], job.get("sources"))}
 
 
 @router.get("/{job_id}/fix/{index}")
@@ -374,7 +458,8 @@ def get_fix(job_id: str, index: int) -> dict:
     if not 0 <= index < len(job["scenes"]):
         raise HTTPException(404, "Scene not found.")
     t = job["scenes"][index].get("script_test") or {}
-    return {"prompt": fix_prompt(job.get("title") or "", job["scenes"], index, t.get("error") or "", t.get("warnings") or [])}
+    return {"prompt": fix_prompt(job.get("title") or "", job["scenes"], index, t.get("error") or "", t.get("warnings") or [],
+                                 job.get("sources"))}
 
 
 class SaveReq(BaseModel):

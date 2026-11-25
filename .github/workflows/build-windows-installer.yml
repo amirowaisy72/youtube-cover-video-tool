@@ -169,6 +169,8 @@ jobs:
             --collect-all pkuseg `
             --collect-all pykakasi `
             --collect-all manim `
+            --collect-all playwright `
+            --collect-all greenlet `
             --collect-all pymunk `
             --collect-all manimpango `
             --collect-all cairo `

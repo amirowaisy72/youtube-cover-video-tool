@@ -165,7 +165,7 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
                       <button className="btn btn-ghost btn-sm ml-auto" onClick={() => { setFix(fix === s.index ? null : s.index); setFixCode(""); }}>🔧 Fix it</button>
                     )}
                   </div>
-                  {s.test?.error && <p className="mt-1 font-mono text-xs text-rose-300">{s.test.error}</p>}
+                  {s.test?.error && <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-rose-300">{s.test.error}</p>}
                   {s.test?.warnings?.map((w, k) => <p key={k} className="mt-0.5 text-xs text-amber-300">• {w}</p>)}
                   {fix === s.index && (
                     <div className="mt-2 space-y-2">

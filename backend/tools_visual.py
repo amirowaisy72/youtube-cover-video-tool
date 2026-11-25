@@ -30,6 +30,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+import manim_cli
+
 HERE = Path(__file__).resolve().parent
 SCENE = HERE / "vis_scene.py"
 SHAPES_FILE = HERE / "my_shapes.json"
@@ -103,6 +105,16 @@ def synth(kind: str, rnd: random.Random):
             acc += sweep[i] * (x - acc)
             y[i] = acc
         return y * env * (1.7 if kind == "whoosh" else 1.4)
+    if kind == "marker":  # a felt-tip stroke over paper: soft, rubbing noise with a faint squeak
+        dur = 0.26 * v
+        t = t_(dur)
+        n = noise(len(t))
+        hiss = lowpass(n, 0.45) - lowpass(n, 0.08)
+        grain = 0.75 + 0.25 * np.sin(2 * np.pi * 38 * v * t)
+        f = 1500 * v + 500 * (t / dur)
+        squeak = np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.05
+        env = np.clip(t / 0.03, 0, 1) * np.clip((dur - t) / 0.1, 0, 1)
+        return (hiss * grain * 0.75 + squeak) * env
     if kind == "riser":
         t = t_(0.9 * v)
         f = 180 + 520 * (t / t[-1]) ** 2
@@ -1126,6 +1138,14 @@ def timed(spec: dict, narration: str, duration: float, cues=None) -> dict:
 
 
 # ================================================================== render
+def _keep_log(output: str) -> None:
+    """The full output of the last failed scene, for troubleshooting (manim-error.log next to the app)."""
+    try:
+        (HERE.parent / "manim-error.log").write_text(output[-60000:], encoding="utf-8")
+    except OSError:
+        pass
+
+
 def render(spec: dict, out_path: Path, width: int, height: int, fps: int = 30, still: bool = False, timeout: int = 1200,
            script: bool = False, report: dict | None = None) -> Path | None:
     """Draws one plan with Manim. Writes <out>.sfx.json (the sound effects) next to a video.
@@ -1136,29 +1156,31 @@ def render(spec: dict, out_path: Path, width: int, height: int, fps: int = 30, s
     try:
         (work / "spec.json").write_text(json.dumps(spec), encoding="utf-8")
         sfx = work / "sfx.json"
-        cmd = [sys.executable, "-m", "manim", "render", "--resolution", f"{width},{height}", "--frame_rate", str(fps),
-               "--disable_caching", "--media_dir", str(work / "media"), "-o", "out", "-v", "WARNING"]
+        args = ["render", "--resolution", f"{width},{height}", "--frame_rate", str(fps),
+                "--disable_caching", "--media_dir", str(work / "media"), "-o", "out", "-v", "WARNING"]
         if still:
-            cmd += ["-s"]
-        cmd += [str(HERE / "vis_script.py"), "ScriptScene"] if script else [str(SCENE), "Visual"]
-        env = {**os.environ, "YTG_SPEC": str(work / "spec.json"), "YTG_SFX": str(sfx), "YTG_ERR": str(work / "err.json"),
-               "PYTHONIOENCODING": "utf-8"}
-        r = subprocess.run(cmd, cwd=str(work), env=env, capture_output=True, text=True, timeout=timeout, **_no_window())
+            args += ["-s"]
+        args += [str(HERE / "vis_script.py"), "ScriptScene"] if script else [str(SCENE), "Visual"]
+        env = {**os.environ, "YTG_SPEC": str(work / "spec.json"), "YTG_SFX": str(sfx), "YTG_ERR": str(work / "err.json")}
+        code, output = manim_cli.run(args, work, env, timeout, **_no_window())
         if report is not None:
             try:
                 report.update(json.loads((work / "err.json").read_text(encoding="utf-8")))
             except Exception:  # noqa: BLE001
-                report["error"] = report.get("error") or ("The scene could not run: " + (r.stderr or r.stdout or "")[-500:] if r.returncode else "")
+                report["error"] = report.get("error") or (
+                    "The scene could not run: " + manim_cli.error_summary(output, code) if code else "")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         if still:
             pics = sorted((work / "media" / "images").rglob("*.png"))
             if not pics:
-                raise RuntimeError((r.stderr or r.stdout or "no picture")[-400:])
+                _keep_log(output)
+                raise RuntimeError("No picture: " + manim_cli.error_summary(output, code))
             shutil.move(str(pics[-1]), str(out_path))
             return out_path
         vids = [p for p in (work / "media" / "videos").rglob("*.mp4") if "partial" not in str(p)]
         if not vids:
-            raise RuntimeError((r.stderr or r.stdout or "no video")[-400:])
+            _keep_log(output)
+            raise RuntimeError("No video: " + manim_cli.error_summary(output, code))
         shutil.move(str(vids[0]), str(out_path))
         if sfx.exists():
             shutil.move(str(sfx), str(out_path.with_suffix(".sfx.json")))

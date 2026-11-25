@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
 import { StudioPresenter } from "@/components/StudioPresenter";
+import { SourcesPanel } from "@/components/SourcesPanel";
 import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, voiceCloneList, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, setChannelNiche } from "@/lib/keys";
 import { getKey, installDashboardButton, type KeyId, useKey } from "@/lib/config";
@@ -271,6 +272,17 @@ function gfxKey(docu: boolean) {
   return docu ? "ytguru-docu-graphics" : "ytguru-av-graphics";
 }
 
+/** A pasted script -> its spoken words and the SOURCES list under them (the server splits it the same way). */
+function splitSources(script: string): { body: string; sources: string } {
+  const heads = [...script.matchAll(/^[ \t>#*_]*(?:sources?|references?)(?:[ \t]+list)?[ \t*_]*(?::|$)[ \t*_]*/gim)];
+  for (let i = heads.length - 1; i >= 0; i--) {
+    const at = heads[i]?.index ?? 0;
+    const tail = script.slice(at + (heads[i]?.[0].length ?? 0));
+    if (/https?:\/\//i.test(tail)) return { body: script.slice(0, at).trimEnd(), sources: tail };
+  }
+  return { body: script, sources: "" };
+}
+
 function docuSources(): string[] {
   try { return (localStorage.getItem("ytguru-docu-sources") || "").split(/\s+/).filter((u) => /^https?:\/\//.test(u)).slice(0, 8); } catch { return []; }
 }
@@ -531,13 +543,6 @@ export function AutoVideoPage({ docu = false, visual = false }: { docu?: boolean
   const [sourcesText, setSourcesTextRaw] = useState(() => { try { return localStorage.getItem("ytguru-docu-sources") || ""; } catch { return ""; } });
   const setSourcesText = (v: string) => { setSourcesTextRaw(v); try { localStorage.setItem("ytguru-docu-sources", v); } catch { /* full */ } };
   const setCustomScript = (v: string) => {
-    // Documentary: the AI's "SOURCES:" list goes to the Sources box, never into the narration.
-    const m = docu ? v.match(/\n\s*\**\s*sources?\s*\**\s*:\s*\**\s*\n?([\s\S]*)$/i) : null;
-    if (m) {
-      const links = ((m[1] ?? "").match(/https?:\/\/[^\s)\]>"']+/g) || []).slice(0, 8);
-      v = v.slice(0, m.index ?? v.length).trimEnd();
-      if (links.length) setSourcesText(Array.from(new Set([...sourcesText.split(/\s+/).filter(Boolean), ...links])).slice(0, 8).join("\n"));
-    }
     setCustomScriptRaw(v);
     try { localStorage.setItem(scriptKey, v); } catch { /* full */ }
   };
@@ -553,6 +558,11 @@ export function AutoVideoPage({ docu = false, visual = false }: { docu?: boolean
   const channelBit = forChannel ? `${activeChannelTitle ? ` for the YouTube channel "${activeChannelTitle}"` : ""}${niche.trim() ? ` (channel topic: ${niche.trim()})` : ""}` : "";
   const words = videoType === "short" ? Math.round(shortSecs * 2.5) : dur * 150;
   const paras = videoType === "short" ? "4-6" : `${Math.max(4, Math.round(dur * 4))}-${Math.max(6, Math.round(dur * 5))}`;
+  // Every script prompt asks where each fact comes from. The list is saved with the video, shown to you,
+  // used by the Script mode source() tool and added to the YouTube description — never spoken.
+  const sourcesRule = `SOURCES (required): after the script, on its own line, write SOURCES: and then ONE line for every fact or number in the script, in exactly this form:
+- the fact as the script says it | https://full-address-of-the-page | "the EXACT sentence copied word for word from that page that supports it"
+Rules for the sources: use only pages you really opened (search the web); copy the sentence character for character — my app searches the page for it and shows it on screen; prefer official reports, government sites, Wikipedia and well-known news sites without a paywall; if you cannot find a real source for a fact, leave that fact out of the script. NEVER invent a link or a sentence.`;
   const scriptPrompt = `Write the spoken script for a YouTube ${videoType === "short" ? `Short (vertical, about ${shortSecs} seconds)` : `video (about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
 
 LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
@@ -565,7 +575,9 @@ HOW MY VIDEO APP USES YOUR SCRIPT (follow this exactly):
 - Build curiosity: each paragraph should make the viewer want the next one (a small question, a "but here is the catch", a promise of the fix).
 - The LAST paragraph: one clear takeaway the viewer can use today, then a short, natural ask to subscribe.
 
-FORMAT: plain spoken narration only. No title, no headings, no labels like "Narrator:" or "Scene 1", no stage directions, no [brackets], no emojis, no bullet points, no markdown. Only the words that will be spoken.`;
+FORMAT: the script is plain spoken narration only. No title, no headings, no labels like "Narrator:" or "Scene 1", no stage directions, no [brackets], no emojis, no bullet points, no markdown — only the words that will be spoken. The one exception is the SOURCES list at the very end.
+
+${sourcesRule}`;
   // Documentary Explainer (user, 2026-11-19): a calm, researched documentary narration
   // built for paper cards, real maps, news clippings and cinematic footage.
   const docuPrompt = `Write the narration for a calm, serious RESEARCH DOCUMENTARY for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
@@ -581,9 +593,9 @@ HOW MY VIDEO APP BUILDS THE VIDEO (follow this exactly):
 - Every few paragraphs, start a new part with a clear turn ("But the real problem started on land.").
 - The LAST paragraph: the one thing to watch next, then a short, natural ask to subscribe.
 
-After the script, on its own line, write SOURCES: and list the links of the articles/reports you used (I paste them into the app so the video can show them as clippings).
+FORMAT: the script is plain spoken narration only. No title, no headings, no labels like "Narrator:" or "Scene 1", no stage directions, no [brackets], no emojis, no bullet points, no markdown — except the SOURCES list at the very end.
 
-FORMAT: plain spoken narration only. No title, no headings, no labels like "Narrator:" or "Scene 1", no stage directions, no [brackets], no emojis, no bullet points, no markdown — except the SOURCES list at the very end.`;
+${sourcesRule}`;
   // Visual Explainer (user, 2026-11-19): every paragraph becomes an animated scene of drawn objects.
   const visualPrompt = `Write the narration for an animated EXPLAINER video for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
 
@@ -1237,6 +1249,10 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
     setJobId(id);
     void autovideoJob(id).then((j) => {
       setJob(j);
+      // A reopened video keeps its own voice: without this the next Audio /
+      // Re-voice step would silently use the page default (free Edge voice)
+      // instead of the chosen provider and its saved key.
+      if (j.tts_provider && j.voice) { setTtsProvider(j.tts_provider); setVoice(j.voice); }
       // A job opened from My Videos may not be in the background
       // store (fresh browser / cleared storage) — put it there
       // so the top bar shows it and the global poller keeps it
@@ -1329,6 +1345,11 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
     setJob(null);
     setPhase("build");
     try {
+      // Documentary: the links of the script's SOURCES list also go to the Sources box (news clippings).
+      if (docu) {
+        const links = (splitSources(customScript).sources.match(/https?:\/\/[^\s|)\]>"']+/g) || []);
+        if (links.length) setSourcesText(Array.from(new Set([...sourcesText.split(/\s+/).filter(Boolean), ...links])).slice(0, 8).join("\n"));
+      }
       try { await saveGfxLevel(localStorage.getItem(gfxKey(docu)) || (docu ? "many" : "medium"), docu, visual); } catch { /* keep going */ }
       const data = await autovideoPlan(title.trim(), dur, voice.startsWith("clone:") ? "en-US-AriaNeural" : voice, pexelsKey, pixabayKey, customScript, ttsProvider, getKey(ttsProvider as KeyId), videoType, shortSecs, visual ? "visual" : "");
       setJobId(data.job_id);
@@ -1580,7 +1601,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
               placeholder="Paste a script here (e.g. written by Gemini) — the video will be built from your words. Leave empty and the tool writes the script itself."
             />
             {customScript.trim()
-              ? <p className="mt-1 text-xs text-emerald-400">✓ Your script: {customScript.trim().split(/\s+/).length} words — it will be spoken word for word. <button className="underline" onClick={() => setCustomScript("")}>Clear</button></p>
+              ? <p className="mt-1 text-xs text-emerald-400">✓ Your script: {splitSources(customScript).body.trim().split(/\s+/).filter(Boolean).length} words — it will be spoken word for word.{splitSources(customScript).sources ? ` 📚 Sources found (${(splitSources(customScript).sources.match(/https?:\/\//gi) || []).length} links): saved with the video, not spoken.` : ""} <button className="underline" onClick={() => setCustomScript("")}>Clear</button></p>
               : <p className="mt-1 text-xs text-muted-foreground">Empty — the app will write the script itself.</p>}
           </div>
           <div>
@@ -1730,6 +1751,8 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
               </div>
             </div>
           ))}
+          {/* above Script mode: its prompt includes the saved sources */}
+          <SourcesPanel jobId={job.id} />
           {!visual && !docu && <AvScriptMode jobId={job.id} startOpen={avDesign === "script"}
             onChanged={() => { void autovideoJob(job.id).then((j) => setJob(j)).catch(() => undefined); }} />}
           {visual && <ScriptMode jobId={job.id} startOpen={design === "script"} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...(sc as Partial<AvScene>) } : x)) } : j))} onMainSaved={(n) => {
@@ -2055,6 +2078,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
                 </div>
               )}
             </div>
+            <SourcesPanel jobId={job.id} />
             {/* Upload to YouTube (user, 2026-11-09): title,
                 description, tags, privacy and thumbnail, to the
                 selected channel. The trimmed video is uploaded

@@ -289,7 +289,7 @@ def render(spec: dict, out_path: Path, width: int, height: int, fps: int = 30, p
     try:
         (work / "spec.json").write_text(json.dumps(spec), encoding="utf-8")
         name = "out"
-        cmd = [sys.executable, "-m", "manim", "render", "--resolution", f"{width},{height}", "--frame_rate", str(fps),
+        cmd = ["render", "--resolution", f"{width},{height}", "--frame_rate", str(fps),
                "--disable_caching", "--media_dir", str(work / "media"), "-o", name, "-v", "WARNING"]
         if still:
             cmd += ["-s"]
@@ -299,26 +299,27 @@ def render(spec: dict, out_path: Path, width: int, height: int, fps: int = 30, p
             cmd += [str(HERE / "docu_scene.py"), "Docu"]
         else:
             cmd += [str(SCENE), "Graphic"]
-        env = {**os.environ, "YTG_SPEC": str(work / "spec.json"), "PYTHONIOENCODING": "utf-8"}
-        r = subprocess.run(cmd, cwd=str(work), env=env, capture_output=True, text=True, timeout=timeout, **_no_window())
+        env = {**os.environ, "YTG_SPEC": str(work / "spec.json")}
+        import manim_cli
+        code, output = manim_cli.run(cmd, work, env, timeout, **_no_window())
         if still:
             pics = sorted((work / "media" / "images").rglob("*.png"))
             if not pics:
-                raise RuntimeError((r.stderr or r.stdout or "no picture")[-400:])
+                raise RuntimeError("No picture: " + manim_cli.error_summary(output, code))
             out_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(pics[-1]), str(out_path))
             return out_path
         if png_dir is not None:
             frames = sorted((work / "media" / "images").rglob("*.png"))
             if not frames:
-                raise RuntimeError((r.stderr or r.stdout or "no frames")[-400:])
+                raise RuntimeError("No frames: " + manim_cli.error_summary(output, code))
             png_dir.mkdir(parents=True, exist_ok=True)
             for k, f in enumerate(frames):
                 shutil.move(str(f), str(png_dir / f"{k:04d}.png"))
             return png_dir
         vids = [p for p in (work / "media" / "videos").rglob("*.mp4") if "partial" not in str(p)]
         if not vids:
-            raise RuntimeError((r.stderr or r.stdout or "no video")[-400:])
+            raise RuntimeError("No video: " + manim_cli.error_summary(output, code))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(vids[0]), str(out_path))
         return out_path

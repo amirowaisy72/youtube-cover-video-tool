@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import manim as _M
-from manim import DOWN, LEFT, RIGHT, UP, FadeIn, Rectangle, rate_functions
+from manim import DOWN, LEFT, RIGHT, UP, FadeIn, Rectangle, UpdateFromAlphaFunc, config, rate_functions
 
 import vis_scene as V
 from vis_scene import GROUND_Y, H, W, XMAX, YMAX, YMIN, K, make_obj, num, text_mob
@@ -37,17 +37,22 @@ def _manim_names() -> dict:
     out = {}
     fns = {"always_redraw", "interpolate_color", "color_gradient", "rate_functions", "smooth", "linear", "there_and_back",
            "rush_into", "rush_from", "double_smooth", "wiggle", "ManimColor", "interpolate", "rotate_vector"}
+    # Manim versions differ: a name may be missing or raise when it is read — it is skipped, never fatal.
+    color_type = getattr(_M, "ManimColor", None)
+    values = (int, float, str, np.ndarray) + ((color_type,) if isinstance(color_type, type) else ())
+    drawable = (_M.Mobject, _M.Animation)
     for k in dir(_M):
         if k.startswith("_") or k in _BLOCK:
             continue
-        v = getattr(_M, k)
-        if isinstance(v, type):
-            if issubclass(v, (_M.Mobject, _M.Animation)) or k == "ManimColor":
+        try:
+            v = getattr(_M, k)
+            if isinstance(v, type):
+                if issubclass(v, drawable) or k == "ManimColor":
+                    out[k] = v
+            elif isinstance(v, values) or k in fns:
                 out[k] = v
-        elif isinstance(v, (int, float, str, np.ndarray, _M.ManimColor)):
-            out[k] = v
-        elif k in fns:
-            out[k] = v
+        except Exception:  # noqa: BLE001
+            continue
     return out
 
 
@@ -165,7 +170,7 @@ class ScriptScene(V.Visual):
         def sfx(kind="pop", delay=0.0):
             """A sound effect now (or a little later)."""
             if kind in ("pop", "whoosh", "swoosh", "swoosh_down", "riser", "coin", "thud", "tick", "click", "ding", "crack",
-                        "rumble", "zap"):
+                        "rumble", "zap", "marker"):
                 S.snd(kind, num(delay))
             else:
                 S.warnings.append(f'sfx("{kind}"): unknown sound')
@@ -349,6 +354,69 @@ class ScriptScene(V.Visual):
         def color(name):
             return K.col(name, K.CREAM)
 
+        def source(url, quote, highlight_words=None, until=None, hold=None):
+            """The REAL web page as proof: it floats in, the camera zooms to the quoted sentence, the paragraph
+            lifts toward the viewer and its words are marked as the narrator says them. Fills the screen, then
+            leaves: at `until` words, `hold` seconds after the last mark, or 1.4 s after it."""
+            import source_view
+            url, quote = str(url), str(quote)
+            left = S.total - S.t
+            if left < 1.5:
+                S.warnings.append("source(): called too close to the end of the scene — call it earlier")
+                return 0
+            data = next((d for d in SPEC.get("sources") or [] if d.get("url") == url and d.get("quote") == quote), None)
+            if data is None:
+                data = {"ok": False, "url": url, "domain": url.split("//")[-1].split("/")[0].replace("www.", ""),
+                        "reason": "the page was not captured"}
+            if not data.get("ok"):
+                S.warnings.append(f"source({data.get('domain')}): {data.get('reason')} — a quote card is shown instead"
+                                  + (". Check that the sentence is really on that page" if data.get("not_found") else ""))
+            view = source_view.View(data, quote, config.pixel_width, config.pixel_height)
+            if not view.choose(highlight_words):
+                S.warnings.append("source(): highlight_words are not in the quote — the whole quote is marked")
+            t0 = S.t
+            said, found = source_view.sync_times(view.hl_words, S.word_norm, t0)
+            if not found:
+                S.warnings.append("source(): the narrator does not say the marked words here — they are marked at a steady pace")
+            first = next((t for t in said if t is not None), None)
+            intro = 2.4 if first is None else max(1.2, min(2.6, first - t0))
+            intro = min(intro, max(0.8, left * 0.55))
+            marks = [t - t0 for t in source_view.fill_times(said, t0 + intro, S.total - 0.1)]
+            done = marks[-1] + 0.35
+            if until is not None:
+                end = at(until) - t0
+            else:
+                end = done + (max(0.0, num(hold, 1.4)) if hold is not None else 1.4)
+            end = max(end, intro + 0.8)
+            if left - end < (0.6 if until is not None else 1.2):
+                end = left
+            leaves = left - end > 0.05
+            view.times(marks, intro, end, leaves)
+            S.snd("whoosh", 0.02)
+            if data.get("ok"):
+                S.snd("swoosh", intro * 0.28)
+            S.snd("pop", intro * 0.68)
+            prev_t, prev_y = -9.0, -1e9
+            for (_w, _x, y, _ww, h), t in zip(view.hl_words, marks):
+                if t - prev_t > 0.45 or abs(y - prev_y) > h * 0.5:
+                    S.snd("marker", t)
+                    prev_t, prev_y = t, y
+            if leaves:
+                S.snd("swoosh_down", end - source_view.EXIT)
+            frame = S.camera.frame
+            img = _M.ImageMobject(view.frame(0.0))
+            img.set_resampling_algorithm(_M.RESAMPLING_ALGORITHMS["linear"])
+            img.scale_to_fit_height(frame.height).move_to(frame.get_center())
+
+            def draw(mob, alpha):
+                mob.pixel_array = view.frame(alpha * end)
+                mob.orig_alpha_pixel_array = mob.pixel_array[..., 3].copy()
+            S.play(UpdateFromAlphaFunc(img, draw), run_time=end, rate_func=rate_functions.linear)
+            S.t += end
+            if leaves:
+                S.remove(img)
+            return end
+
         return {
             "at": at, "when": when, "wait": wait, "wait_until": wait_until, "now": now, "remaining": remaining,
             "sfx": sfx, "play": play, "add": add, "remove": remove, "thing": thing, "text": text,
@@ -359,6 +427,6 @@ class ScriptScene(V.Visual):
             "FLOOR": GROUND_Y, "TOP": YMAX - 0.4, "XMAX": XMAX, "YMIN": YMIN, "W": W, "H": H, "DURATION": S.total,
             "ORANGE": K.ORANGE, "TEAL": K.TEAL, "GOLD": K.GOLD, "CREAM": K.CREAM, "RED": K.RED, "GREEN": K.GREEN,
             "BLUE": K.BLUE, "PURPLE": K.PURPLE, "PINK": K.PINK, "SLATE": K.SLATE, "INK": K.INK, "BG": K.BG, "GREY": K.GREY,
-            "BROWN": K.BROWN, "SERIF": K.SERIF, "FONT": K.FONT, "rate": rate_functions, "FadeIn": FadeIn,
+            "BROWN": K.BROWN, "source": source, "SERIF": K.SERIF, "FONT": K.FONT, "rate": rate_functions, "FadeIn": FadeIn,
             "UP": UP, "DOWN": DOWN, "LEFT": LEFT, "RIGHT": RIGHT,
         }

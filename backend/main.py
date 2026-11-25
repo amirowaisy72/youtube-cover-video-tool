@@ -48,6 +48,12 @@ from pydantic import BaseModel, Field
 # `python -m uvicorn backend.main:app` from the project root.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# Installed app: "YT-Guru.exe -m manim ..." draws a scene and exits here (an
+# already-installed .exe whose launcher predates this reaches it by importing us).
+import manim_cli  # noqa: E402
+
+manim_cli.run_worker()
+
 import video  # noqa: E402
 import youtube_upload  # noqa: E402
 import metadata as local_metadata  # noqa: E402
@@ -67,6 +73,7 @@ import tools_seo  # noqa: E402
 import tools_audio  # noqa: E402
 import tools_music  # noqa: E402
 import tools_script  # noqa: E402
+import tools_source  # noqa: E402
 import tools_stock  # noqa: E402
 import tools_channel  # noqa: E402
 import tools_voiceclone  # noqa: E402
@@ -411,6 +418,7 @@ app.include_router(tools_seo.router)
 app.include_router(tools_audio.router)
 app.include_router(tools_music.router)
 app.include_router(tools_script.router)
+app.include_router(tools_source.router)
 app.include_router(tools_stock.router)
 app.include_router(tools_channel.router)
 app.include_router(tools_voiceclone.router)
@@ -3087,11 +3095,16 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
             raise HTTPException(400, "Unknown voice for this provider.")
     elif payload.tts_provider == "elevenlabs" and not payload.tts_key:
         raise HTTPException(400, "ElevenLabs needs an API key.")
+    # The AI's SOURCES list is saved with the video — it is never spoken.
+    script, sources = tools_source.split_script(payload.script or "")
+    if sources and not script.strip():
+        raise HTTPException(400, "The script box holds only the sources list — paste the script above it.")
     job_id = uuid.uuid4().hex[:12]
     token = _consume_or_402("autovideo", job_id)
     _av_write(
         {
             "id": job_id,
+            "sources": sources,
             "status": "planning",
             "phase": "planning",
             "stage": "Starting…",
@@ -3115,7 +3128,7 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
             payload.minutes,
             payload.visuals,
             payload.voice,
-            payload.script,
+            script or None,
             payload.pexels_key,
             payload.pixabay_key,
             token,
@@ -3260,6 +3273,9 @@ def _run_autovideo_audio(
             {
                 "status": "audio-ready",
                 "phase": "audio-ready",
+                # the voice really picked for this video: a reopened page restores it
+                "voice": voice,
+                "tts_provider": tts_provider,
                 "stage": "Audio ready — pick the music.",
                 "progress": 100,
                 "voice_duration_sec": audio["total_voice"],
@@ -4668,6 +4684,7 @@ def _run_autovideo_upload(
             )
             _av_write(j)
 
+        description = tools_source.description_with_sources(description, job.get("sources") or [])
         result = youtube_upload.upload_video(
             src,
             title.strip(),

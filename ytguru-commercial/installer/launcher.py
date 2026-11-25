@@ -43,6 +43,17 @@ else:
 # frontend live next to this launcher; make them importable.
 sys.path.insert(0, str(BASE_DIR))
 
+# The app also calls itself as "YT-Guru.exe -m manim ..." to draw a scene: that
+# must run Manim and exit — never start a second server or open a browser tab.
+if getattr(sys, "frozen", False) and len(sys.argv) > 2 and sys.argv[1] == "-m":
+    for _root in (Path(getattr(sys, "_MEIPASS", BASE_DIR)), BASE_DIR):
+        if (_root / "backend" / "manim_cli.py").exists():
+            sys.path.insert(0, str(_root / "backend"))
+            break
+    import manim_cli
+
+    manim_cli.run_worker()  # does not return
+
 LOG_FILE = BASE_DIR / "launcher-error.log"
 URL = "http://127.0.0.1:8000"
 HEALTH_URL = "http://127.0.0.1:8000/api/health"

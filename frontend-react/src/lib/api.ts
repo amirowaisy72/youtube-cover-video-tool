@@ -123,6 +123,8 @@ export type AvScene = {
 
 export type AvTimelineEvent = { t: number; text: string };
 
+export type VideoSource = { url: string; quote: string; fact: string };
+
 export type AvJob = {
   id: string;
   status: string;
@@ -167,6 +169,10 @@ export type AvJob = {
   // (9:16 YouTube Short). short_seconds is the Short length.
   video_type?: string;
   short_seconds?: number;
+  // The voice chosen for this video (restored when it is reopened).
+  voice?: string;
+  // Where the facts come from (shown, saved, added to the description).
+  sources?: VideoSource[];
   // Number pop-ups (user, 2026-11-09): figures the voiceover
   // says pop up big on screen at that moment.
   popups_applied?: boolean;
