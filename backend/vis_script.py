@@ -21,6 +21,7 @@ from manim import DOWN, LEFT, RIGHT, UP, FadeIn, Rectangle, UpdateFromAlphaFunc,
 
 import vis_scene as V
 import vis_people as P
+import vis_master
 import vis_sets
 import vis_transitions
 from vis_scene import GROUND_Y, H, W, XMAX, YMAX, YMIN, K, make_obj, num, text_mob
@@ -111,6 +112,14 @@ class ScriptScene(V.Visual):
         if ERR_OUT:
             Path(ERR_OUT).write_text(json.dumps({"error": err, "warnings": self.warnings[:12], "sounds": len(self.sfx)}),
                                      encoding="utf-8")
+
+    def get_moving_and_static_mobjects(self, animations):
+        """Manim lists every part an object has when an animation starts and draws that list on every frame — a
+        character or a number whose parts are replaced while it animates was drawn twice (old and new). Only the
+        outermost objects are listed here: their parts are read fresh for each frame (and drawn once, faster)."""
+        moving, static = super().get_moving_and_static_mobjects(animations)
+        inner = {id(part) for m in moving for part in m.get_family()[1:]}
+        return [m for m in moving if id(m) not in inner], static
 
     def run(self, *anims, rt=0.7, rf=None):  # the library actions, faster while the code is running late
         return super().run(*anims, rt=max(0.2, rt * self.speed), rf=rf)
@@ -460,7 +469,7 @@ class ScriptScene(V.Visual):
             back, far, near = vis_sets.build(key, GROUND_Y)
             marks = vis_sets.floor_details(key, GROUND_Y)
             S.floor_rect.set_fill(vis_sets.PALETTE[key][1])
-            if V.TALL and S.floor_rect.height < 15:  # a Short: the ground reaches the bottom of the picture
+            if config.pixel_height > config.pixel_width and S.floor_rect.height < 15:  # a Short: the ground reaches the bottom of the picture
                 S.floor_rect.stretch_to_fit_height(16).move_to([0, GROUND_Y - 8.0, 0])
             for layer, follow, drift in ((far, 0.45, -0.22), (near, 0.2, -0.4)):
                 state = {"t": 0.0, "off": np.zeros(3)}
@@ -552,7 +561,7 @@ class ScriptScene(V.Visual):
                 S.remove(img)
             return end
 
-        return {
+        tools = {
             "at": at, "when": when, "wait": wait, "wait_until": wait_until, "now": now, "remaining": remaining,
             "sfx": sfx, "play": play, "add": add, "remove": remove, "thing": thing, "text": text,
             "enter": enter, "exit": exit, "move": move, "grow": grow, "split": split, "give": give, "flow": flow,
@@ -566,3 +575,5 @@ class ScriptScene(V.Visual):
             "BROWN": K.BROWN, "source": source, "SERIF": K.SERIF, "FONT": K.FONT, "rate": rate_functions, "FadeIn": FadeIn,
             "UP": UP, "DOWN": DOWN, "LEFT": LEFT, "RIGHT": RIGHT,
         }
+        tools.update(vis_master.make(S, tools, str(SPEC.get("narration") or "")))  # compound(), revenue_split() ...
+        return tools

@@ -16,6 +16,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+import vis_master
+
 router = APIRouter(prefix="/api/visual/script", tags=["visual-script"])
 WORDS_PER_SEC = 2.6
 _LOCK = threading.Lock()
@@ -155,6 +157,11 @@ def things_of(code: str) -> list[str]:
     return out
 
 
+def masters_of(code: str) -> list[str]:
+    """The master scenes (compound(), revenue_split() ...) a scene's code calls."""
+    return [fn for fn, _a, _k in _calls(code) if fn in vis_master.NAMES]
+
+
 MAX_USES = 3  # one thing in at most this many scenes of a video
 
 
@@ -170,8 +177,10 @@ def used_things(scenes: list[dict], skip: int = -1) -> dict[str, list[int]]:
 
 def used_summary(scenes: list[dict], skip: int = -1) -> str:
     used = used_things(scenes, skip)
+    shown = [f"{n}() in scene {i + 1}" for i, sc in enumerate(scenes) if i != skip for n in masters_of(sc.get("code"))]
+    masters = f"MASTER SCENES already used: {', '.join(shown)}.\n\n" if shown else ""
     if not used:
-        return ""
+        return masters
     lines = [f"  {n}: scene{'s' if len(s) > 1 else ''} {', '.join(map(str, s[:6]))}"
              + ("  <- limit reached, do NOT use it again" if len(s) >= MAX_USES else "")
              for n, s in sorted(used.items(), key=lambda x: -len(x[1]))[:40]]
@@ -179,7 +188,7 @@ def used_summary(scenes: list[dict], skip: int = -1) -> str:
     for k, word in ((skip - 1, "previous"), (skip + 1, "next")):
         if skip >= 0 and 0 <= k < len(scenes) and things_of(scenes[k].get("code")):
             near.append(f"The {word} scene shows: {', '.join(things_of(scenes[k]['code']))} — do not repeat these.")
-    return ("THINGS ALREADY USED in the other scenes (for variety):\n" + "\n".join(lines + near) + "\n\n")
+    return ("THINGS ALREADY USED in the other scenes (for variety):\n" + "\n".join(lines + near) + "\n\n") + masters
 
 
 def variety_warnings(scenes: list[dict], index: int) -> list[str]:
@@ -196,6 +205,15 @@ def variety_warnings(scenes: list[dict], index: int) -> list[str]:
         if len(before.get(n, [])) > MAX_USES:
             out.append(f"'{n}' is now in {len(before[n])} scenes ({', '.join(map(str, before[n]))}) — "
                        f"use one thing in at most {MAX_USES} scenes")
+    mine = masters_of(scenes[index].get("code"))
+    if len(mine) > 1:
+        out.append(f"two master scenes in one scene ({', '.join(mine)}) — each fills the whole screen, use only one")
+    for n in mine[:1]:
+        if index > 0 and n in masters_of(scenes[index - 1].get("code")):
+            out.append(f"{n}() is also the previous scene — do not use the same master scene twice in a row")
+        uses = [i + 1 for i in range(index + 1) if n in masters_of(scenes[i].get("code"))]
+        if len(uses) > 2:
+            out.append(f"{n}() is now in {len(uses)} scenes — use a master scene at most 2 times in a video")
     here = setting_of(scenes[index].get("code"))
     if here and index > 1 and all(setting_of(scenes[k].get("code")) == here for k in (index - 1, index - 2)):
         out.append(f'the third scene in a row in setting("{here}") — change the background')
@@ -517,6 +535,9 @@ half = text("half", x=-4, y=-0.5, style="number", size=1.5, color=RED)
 when("half as much", -0.2)
 enter(half)
 '''
+
+
+GUIDE = GUIDE.replace("CHARACTERS — people who react", vis_master.GUIDE + "CHARACTERS — people who react")
 
 
 # General direction rules (user, 2026-11-22): appended to the copied prompt so the AI
