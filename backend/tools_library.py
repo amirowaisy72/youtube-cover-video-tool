@@ -132,7 +132,9 @@ def list_videos(tool: str = "") -> dict:
             })
     out.sort(key=lambda r: r["modified"], reverse=True)
     try:
-        free = shutil.disk_usage(BASE_DIR).free
+        # the videos' own drive (in the installed app they live in the data folder, behind a link)
+        videos = BASE_DIR / "autovideos"
+        free = shutil.disk_usage(videos if videos.is_dir() else BASE_DIR).free
     except OSError:
         free = 0
     return {"items": out, "total": total, "free": free}

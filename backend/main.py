@@ -39,7 +39,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
@@ -51,6 +51,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Installed app: "YT-Guru.exe -m manim ..." draws a scene and exits here (an
 # already-installed .exe whose launcher predates this reaches it by importing us).
 import manim_cli  # noqa: E402
+import parts  # noqa: E402
+import credit_gate  # noqa: E402
 
 manim_cli.run_worker()
 
@@ -73,6 +75,7 @@ import tools_seo  # noqa: E402
 import tools_audio  # noqa: E402
 import tools_music  # noqa: E402
 import tools_script  # noqa: E402
+import tools_scriptgen  # noqa: E402
 import tools_source  # noqa: E402
 import tools_review  # noqa: E402
 import tools_hooks  # noqa: E402
@@ -131,7 +134,7 @@ AV_DIR.mkdir(exist_ok=True)
 # tool charges 1 credit per video/voiceover through the license
 # server. CLIENT_VERSION is sent with every license call so the
 # server can refuse old builds.
-CLIENT_VERSION = "1.0.7"
+CLIENT_VERSION = "1.0.8"
 
 # Retry any license reports/refunds that failed while offline.
 threading.Thread(target=licensing.flush_outbox, daemon=True).start()
@@ -408,6 +411,27 @@ def yt_dlp_available() -> bool:
 
 
 app = FastAPI(title="Copyright free video generator")
+app.add_middleware(credit_gate.CreditGate, error_of=_license_error_to_http)
+
+
+@app.exception_handler(parts.PartNeeded)
+def _part_needed(_request: Request, exc: parts.PartNeeded) -> JSONResponse:
+    """428: the page asks "This tool needs X. Download now?" — nothing downloads by itself."""
+    return JSONResponse({"detail": str(exc), "part": parts.info(exc.pid)}, status_code=428)
+
+
+
+
+@app.exception_handler(ModuleNotFoundError)
+def _library_missing(request: Request, exc: ModuleNotFoundError) -> JSONResponse:
+    """Safety net: any tool that reaches for a library of an optional part asks for that part."""
+    pid = parts.part_of_module(exc.name or "")
+    if pid and parts.enabled() and not parts.have(pid):
+        return _part_needed(request, parts.PartNeeded(pid))
+    return JSONResponse({"detail": f"A library is missing: {exc.name}"}, status_code=500)
+
+
+app.include_router(parts.make_router())
 
 # New free tools (YT Guru all-in-one, 2026-11-07): each router is
 # self-contained in backend/tools_*.py. Mounted here, BEFORE the
@@ -424,6 +448,7 @@ app.include_router(tools_seo.router)
 app.include_router(tools_audio.router)
 app.include_router(tools_music.router)
 app.include_router(tools_script.router)
+app.include_router(tools_scriptgen.router)
 app.include_router(tools_source.router)
 app.include_router(tools_review.router)
 app.include_router(tools_hooks.router)
@@ -3107,7 +3132,9 @@ def autovideo_plan(payload: AutoVideoPlanRequest) -> dict:
     if sources and not script.strip():
         raise HTTPException(400, "The script box holds only the sources list — paste the script above it.")
     job_id = uuid.uuid4().hex[:12]
-    token = _consume_or_402("autovideo", job_id)
+    if payload.theme == "visual":
+        parts.require("graphics")
+    token = _consume_or_402("visual" if payload.theme == "visual" else "autovideo", job_id)
     _av_write(
         {
             "id": job_id,
@@ -3322,6 +3349,7 @@ def autovideo_prepare_audio(job_id: str, payload: AutoVideoPrepareAudioRequest) 
     restarted from the UI. A re-run within 3 minutes of the
     last start is rejected (the step is still working, not
     stuck); after 3 minutes it is the user's explicit retry."""
+    parts.require("whisper")
     import time as _time
 
     job = _av_read(job_id)
@@ -3645,6 +3673,8 @@ def autovideo_render(job_id: str, payload: AutoVideoRenderRequest) -> dict:
     job = _av_read(job_id)
     if job.get("phase") not in ("audio-ready", "done"):
         raise HTTPException(400, "Run the audio step first.")
+    if job.get("theme") == "visual":
+        parts.require("graphics")
     # A re-render of a finished video costs no credit.
     token = None if job.get("phase") == "done" else job.get("job_token")
     threading.Thread(
@@ -4867,7 +4897,7 @@ def license_status() -> dict:
     the installed setup, and the public demo has no backend at
     all — the frontend locks the tools unless installed+activated.
     """
-    installed = bool(getattr(sys, "frozen", False))
+    installed = bool(getattr(sys, "frozen", False)) or parts.enabled()
     # Dev unlock (owner only, 2026-11-09): a local `.dev-unlock` file
     # at the project root lets run.bat unlock for testing new
     # features without building the .exe each time. The file is

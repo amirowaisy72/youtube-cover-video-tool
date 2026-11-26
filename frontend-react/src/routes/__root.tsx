@@ -14,6 +14,7 @@ import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 import { TopBar } from "@/components/TopBar";
 import { ActiveJobsBar } from "@/components/ActiveJobsBar";
 import { ColabHost } from "@/components/ColabPanel";
+import { PartPrompt } from "@/components/PartPrompt";
 
 function NotFoundComponent() {
   return (
@@ -121,6 +122,7 @@ function RootComponent() {
         <TopBar />
         <ActiveJobsBar />
         <ColabHost />
+        <PartPrompt />
         <main className="mx-auto max-w-6xl px-6 py-10">
           <LockGate>
             <Outlet />

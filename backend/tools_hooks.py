@@ -17,6 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -81,7 +82,7 @@ def build_prompt(job: dict, mode: str) -> str:
     usable = [s for s in job.get("sources") or [] if s.get("url")]
     quoted = [s for s in usable if s.get("quote")]
     lines = [ts.GUIDE.replace("{library}", ts._library()),
-             "=== YOUR TASK NOW: THREE HOOKS FOR THE FIRST SCENE (this replaces the ANSWER FORMAT above) ===",
+             "=== YOUR TASK NOW: THREE HOOKS FOR THE FIRST SCENE (this replaces the ANSWER FORMAT above; no plan table) ===",
              f'VIDEO TITLE: "{job.get("title") or ""}"', f"SCENE 1 narration: {nar}",
              f"CURRENT CODE OF SCENE 1:\n{sc.get('code') or '(none yet)'}",
              "The first seconds decide whether the viewer stays. Make THREE clearly different openings for scene 1:",
@@ -102,7 +103,10 @@ def build_prompt(job: dict, mode: str) -> str:
                      "marker, and use when() with words of the new narration (your new words + that rest).")
     else:
         lines.append("Keep the narration exactly as it is: only the animation changes. when() uses its exact words.")
-    lines.append("ANSWER with ONE code block, nothing else:\n"
+    if not usable:
+        lines.append("SOURCES saved with this video: none — do not add source(), headlines() or any link.")
+    lines.append("Use only the sources saved with this video; never add or invent another.\n"
+                 "ANSWER WITH THE CODE BLOCK ONLY: ONE code block with the three hooks, no text before or after it:\n"
                  + "".join(f"# === HOOK {i + 1}: {k} ===\n" + ("# NEW WORDS: ...\n" if mode == "words" else "")
                            + "# VISUAL IDEA: ...\n<code>\n" for i, k in enumerate(KINDS)))
     return "\n\n".join(lines)
@@ -132,6 +136,8 @@ def get_prompt(job_id: str, mode: str = "visuals") -> dict:
 
 
 def _save(job_id: str, text: str, mode: str) -> dict:
+    import tools_source
+    text, listed = tools_source.split_answer(text)
     found = parse_hooks(text)
     if not found:
         raise HTTPException(400, "No hooks found. Each one starts with a line like  # === HOOK 1: question ===")
@@ -145,8 +151,9 @@ def _save(job_id: str, text: str, mode: str) -> dict:
     with ts._LOCK:
         app, job = _job(job_id)
         job["hooks"], job["hooks_mode"] = found, mode
+        tools_source.merge_found(job, listed)
         app._av_write(job)
-    return _view(job)
+    return {**_view(job), "sources_found": len(listed)}
 
 
 class SaveReq(BaseModel):
@@ -196,6 +203,7 @@ def _hook(job: dict, n: int) -> dict:
 @router.post("/test")
 def test(req: PickReq) -> dict:
     """A quick preview of one hook (the video's own scene 1 stays as it is)."""
+    parts.require("graphics")
     app, job = _job(req.job_id)
     h = _hook(job, req.n)
     work = app._av_job_dir(req.job_id)

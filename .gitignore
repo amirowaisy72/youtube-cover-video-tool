@@ -23,3 +23,8 @@ presenter_people/
 presenter_models/
 presenter_settings.json
 presenter_speed.json
+ytguru-commercial/installer/installer-output/
+
+# the license key and the queued license reports of this PC: never in the repository
+license.json
+license-outbox.jsonl

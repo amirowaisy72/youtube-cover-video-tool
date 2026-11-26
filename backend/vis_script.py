@@ -589,7 +589,7 @@ class ScriptScene(V.Visual):
                 data = {"ok": False, "url": url, "domain": url.split("//")[-1].split("/")[0].replace("www.", ""),
                         "reason": "the page was not captured"}
             if not data.get("ok"):
-                S.warnings.append(f"source({data.get('domain')}): {data.get('reason')} — a quote card is shown instead"
+                S.warnings.append(f"source({data.get('domain')}): {data.get('reason')} — a quote card marked \"reported\" is shown instead"
                                   + (". Check that the sentence is really on that page" if data.get("not_found") else ""))
             view = source_view.View(data, quote, config.pixel_width, config.pixel_height)
             if not view.choose(highlight_words):

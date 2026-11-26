@@ -43,6 +43,7 @@ import uuid
 import wave
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -60,7 +61,7 @@ import licensing  # noqa: E402
 # sync with main.py CLIENT_VERSION; the release workflow bumps
 # both. A local copy is needed because main.py imports this
 # module (importing main back would be circular).
-_CLIENT_VERSION = "1.0.4"
+_CLIENT_VERSION = "1.0.8"
 
 
 def _license_error_to_http(exc: licensing.LicenseError) -> HTTPException:
@@ -299,6 +300,8 @@ def _cache_bytes() -> tuple[int, bool]:
 
 
 def _model_cached() -> bool:
+    if parts.enabled():  # installed app: the model is part of the optional download
+        return parts.have("voice")
     size, partial = _cache_bytes()
     return not partial and size >= MODEL_TOTAL_BYTES * 0.9
 
@@ -342,6 +345,7 @@ def _patch_sampling_progress() -> None:
 def _get_model():
     """Load Chatterbox Multilingual once and keep it in memory.
     The first call downloads the model from Hugging Face."""
+    parts.require("voice")
     global _model
     with _model_lock:
         if _model is None:
@@ -459,6 +463,7 @@ def _run_install() -> None:
 
 @router.post("/install")
 def install_engine() -> dict:
+    parts.require("voice")
     if _engine_installed():
         return {"started": False, "installed": True}
     if getattr(sys, "frozen", False):
@@ -764,6 +769,7 @@ def _run_generate(
 
 @router.post("/generate")
 def generate(payload: GenerateRequest) -> dict:
+    parts.require("voice")
     if not _engine_installed():
         raise HTTPException(400, "Install the voice engine first (button at the top).")
     _check_id(payload.voice_id, "Voice")

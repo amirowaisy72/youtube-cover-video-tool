@@ -1,6 +1,4 @@
 @echo off
-REM YT Guru — Run-Setup.
-REM Double-click this file and the tool opens in your browser.
-REM (The installer puts this file in the folder you chose.)
+REM YT Guru - double-click and the tool opens in your browser.
 cd /d "%~dp0"
-start "" "YT-Guru.exe"
+start "" "%~dp0python\pythonw.exe" "%~dp0launcher.py"

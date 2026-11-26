@@ -3,6 +3,7 @@
     the hand-made sample was made — with the real voice timing and sound effects. */
 import { useEffect, useState } from "react";
 import { SceneFrames } from "@/components/SceneFrames";
+import { askSourceCheck } from "@/components/SourceCheck";
 import { getKey } from "@/lib/config";
 
 type Test = { ok: boolean; error: string; warnings: string[]; at: number; sheet?: string } | null;
@@ -132,7 +133,7 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
     setErr(""); setMsg("");
     setBusy("Saving and checking the code…");
     try {
-      const d = await j<Status & { found: number; missing: number[]; extra: number[]; results: { index: number; error: string }[] }>(
+      const d = await j<Status & { sources_found?: number; found: number; missing: number[]; extra: number[]; results: { index: number; error: string }[] }>(
         await fetch("/api/visual/script/save", { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ job_id: jobId, code: text, replace }) }));
       setSt(d);
@@ -140,7 +141,9 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
       const notes = [`✓ Saved — code for ${d.found} scene${d.found === 1 ? "" : "s"}.`];
       if (d.missing.length) notes.push(`No code yet for scene ${d.missing.join(", ")} (they get the simple animation).`);
       if (d.extra.length) notes.push(`Ignored scene ${d.extra.join(", ")} (this video has fewer scenes).`);
+      if (d.sources_found) notes.push(`${d.sources_found} source${d.sources_found === 1 ? "" : "s"} saved to 📚 Sources — checking them against the real pages now.`);
       setMsg(notes.join(" "));
+      askSourceCheck(jobId, d.sources_found);
       const runnable = d.results.filter((r) => !r.error).map((r) => r.index);
       await testAll(runnable);
       void loadReviews();

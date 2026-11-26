@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import difflib
 import hashlib
+import os
 import ipaddress
 import json
 import re
@@ -23,6 +24,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import parts
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -99,6 +101,68 @@ def split_script(text: str) -> tuple[str, list[dict]]:
             body = re.sub(r"[\s`\-_*]+$", "", text[:m.start()])
             return body, parse_sources(tail.replace("```", ""))
     return text, []
+
+
+# ------------------------------------------------------------------ research rules of the "Copy the prompt" buttons
+WEB_FIRST = "Turn on web search before answering."
+
+
+def research_rules(part_two: str) -> str:
+    """Added to every copied prompt that has Sources, whether or not the Sources box holds anything."""
+    return ("RESEARCH THE SOURCES YOURSELF (every time, even if some sources are already listed here):\n"
+            "Use web search to find 3–6 real, reliable pages (news, official reports, company pages) that support the facts "
+            "and numbers in this script. Never make up a link or a quote.\n\n"
+            "ANSWER IN TWO PARTS, in this order (a plan table, when one is asked for, comes before PART 1):\n"
+            "PART 1 — a line with exactly\n# === SOURCES ===\nthen one source per line:\n"
+            'fact | https://url | "exact sentence copied word for word from the page"\n'
+            f"PART 2 — {part_two}")
+
+
+_BLOCK_HEAD = re.compile(r"^[ \t]*#*[ \t]*={2,}[ \t]*SOURCES[ \t]*={2,}[ \t]*$|^[ \t]*#+[ \t]*SOURCES[ \t]*:?[ \t]*$", re.I)
+_BLOCK_LINE = re.compile(r"https?://|^\s*(?:[-*•]|\d{1,2}[.)])\s|^\s*(?:url|quote|fact|sentence)\s*:|^\s*[\"“]", re.I)
+
+
+def split_answer(text: str) -> tuple[str, list[dict]]:
+    """A pasted AI answer -> (everything except its "# === SOURCES ===" block, the sources in that block)."""
+    kept, block, inside = [], [], False
+    for line in str(text or "").replace("\r\n", "\n").split("\n"):
+        if _BLOCK_HEAD.match(line):
+            inside = True
+            continue
+        if inside:
+            if not line.strip() or _BLOCK_LINE.search(line):
+                block.append(line)
+                continue
+            if re.fullmatch(r"\s*```[\w+-]*\s*", line) and not any(x.strip() for x in block):
+                kept.append(line)  # the fence that opens the list: its partner closes it
+                continue
+            inside = False
+        kept.append(line)
+    return "\n".join(kept), parse_sources("\n".join(block))
+
+
+def merge_found(job: dict, found: list[dict]) -> int:
+    """The AI's sources join the video's list (the same page and sentence only once). -> how many are new."""
+    have = {(s.get("url"), s.get("quote") or "") for s in job.get("sources") or []}
+    new = [s for s in found if (s["url"], s.get("quote") or "") not in have]
+    if new:
+        job["sources"] = (job.get("sources") or []) + new
+    return len(new)
+
+
+def check_list(sources: list[dict], scenes_using: dict | None = None) -> list[dict]:
+    """Opens every page and looks for its sentence -> one result per source, in the same order."""
+    pairs = [(s["url"], s["quote"]) for s in sources if s.get("url") and s.get("quote")]
+    res = dict(zip(pairs, capture_many(pairs)))
+    out = []
+    for s in sources:
+        d = res.get((s.get("url"), s.get("quote")))
+        quoted = bool(s.get("quote"))
+        out.append({"url": s.get("url"), "quoted": quoted, "ok": bool(d and d.get("ok")),
+                    "reason": "" if d and d.get("ok") else (d or {}).get("reason")
+                    or "no quoted sentence to look for (a data or headline page)",
+                    "scenes": (scenes_using or {}).get(s.get("url"), [])})
+    return out
 
 
 def to_text(sources: list[dict]) -> str:
@@ -356,6 +420,19 @@ def add_found(job: dict, found: list[dict]) -> bool:
     return bool(new)
 
 
+def system_browser() -> bool:
+    """Is Microsoft Edge or Google Chrome on this PC?"""
+    roots = [os.environ.get(k) for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+    return any(root and (Path(root) / sub).is_file() for root in roots
+               for sub in (r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"))
+
+
+def need_browser() -> None:
+    """Installed app on a PC without Edge or Chrome: ask for the small browser instead of failing."""
+    if parts.enabled() and not system_browser():
+        parts.require("browser")
+
+
 def _launch(pw):
     errors = []
     for kw in ({}, {"channel": "msedge"}, {"channel": "chrome"}):  # Windows always has Edge: nothing to download
@@ -363,6 +440,8 @@ def _launch(pw):
             return pw.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"], **kw)
         except Exception as exc:  # noqa: BLE001
             errors.append(str(exc).strip().split("\n")[0][:150])
+    if parts.enabled():
+        parts.require("browser")
     raise RuntimeError("no browser could be started (" + errors[-1] + "). Run:  python -m playwright install chromium")
 
 
@@ -569,13 +648,11 @@ def save_sources(job_id: str, req: SourcesReq) -> dict:
 @router.post("/{job_id}/check")
 def check_sources(job_id: str) -> dict:
     """Opens every source page and looks for its quote (the screenshots are kept for the video)."""
+    need_browser()
     _app_, job = _job(job_id)
-    src = job.get("sources") or []
-    pairs = [(s["url"], s["quote"]) for s in src if s.get("url") and s.get("quote")]
-    res = dict(zip(pairs, capture_many(pairs)))
-    out = []
-    for s in src:
-        d = res.get((s.get("url"), s.get("quote")))
-        out.append({"url": s.get("url"), "ok": bool(d and d.get("ok")),
-                    "reason": "" if d and d.get("ok") else (d or {}).get("reason") or "no quoted sentence to look for (a data or headline page)"})
-    return {"results": out}
+    import tools_script as ts
+    using: dict = {}
+    for i, sc in enumerate(job.get("scenes") or []):
+        for url, _quote in ts.source_calls(sc.get("code") or ""):
+            using.setdefault(url.strip(), []).append(i + 1)
+    return {"results": check_list(job.get("sources") or [], using)}

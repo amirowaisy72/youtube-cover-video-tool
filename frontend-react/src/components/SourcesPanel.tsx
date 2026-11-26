@@ -1,9 +1,9 @@
 /** Where the facts of a video come from: the AI's SOURCES list, saved with the video. Shown here, editable,
     checked against the real pages, used by the Script mode source() tool and added to the YouTube description. */
 import { useEffect, useState } from "react";
+import { CheckSummary, type Check } from "@/components/SourceCheck";
 import { api, type VideoSource } from "@/lib/api";
 
-type Check = { url: string; ok: boolean; reason: string };
 type Data = { sources: VideoSource[]; text: string };
 
 export function SourcesPanel({ jobId }: { jobId: string }) {
@@ -57,6 +57,23 @@ export function SourcesPanel({ jobId }: { jobId: string }) {
     setChecks((await api<{ results: Check[] }>(`/api/sources/${jobId}/check`, { method: "POST" })).results);
   });
 
+  // the AI's answer was pasted: show the new list and open every page by itself
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== jobId) return;
+      setEdit(false);
+      void run("Opening every page and looking for its sentence…", async () => {
+        const d = await api<Data>(`/api/sources/${jobId}`);
+        setData(d);
+        setText(d.text);
+        setChecks([]);
+        setChecks((await api<{ results: Check[] }>(`/api/sources/${jobId}/check`, { method: "POST" })).results);
+      });
+    };
+    window.addEventListener("ytguru-sources-check", on);
+    return () => window.removeEventListener("ytguru-sources-check", on);
+  }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!data) return null;
   const n = data.sources.length;
   return (
@@ -65,6 +82,7 @@ export function SourcesPanel({ jobId }: { jobId: string }) {
         📚 Sources <span className="font-normal text-muted-foreground">({n ? `${n} saved — added to the end of the YouTube description` : "none saved"})</span>
       </summary>
       <div className="mt-2 space-y-2">
+        {!edit && <CheckSummary checks={checks} />}
         {!edit && data.sources.map((s, i) => {
           const c = checks[i];
           return (

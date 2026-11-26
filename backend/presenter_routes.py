@@ -19,6 +19,8 @@ from fastapi.responses import FileResponse
 from PIL import Image, ImageDraw, ImageOps
 from pydantic import BaseModel, Field
 
+import licensing
+import parts
 import presenter_face as pf
 import presenter_lipsync as ls
 import presenter_models as models
@@ -146,6 +148,7 @@ def choose_face(folder: Path, meta: dict, index: int) -> dict:
 
 @router.post("/people")
 def add_person(file: UploadFile = File(...), name: str = Form("")) -> dict:
+    parts.require("presenter")
     _need_setup()
     data = file.file.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
@@ -188,6 +191,7 @@ class Choose(BaseModel):
 
 @router.post("/people/{pid}/choose")
 def choose(pid: str, req: Choose) -> dict:
+    parts.require("presenter")
     _need_setup()
     folder, meta = _person(pid)
     if req.index >= len(meta["faces"]):
@@ -295,6 +299,7 @@ def ensure_storyboard(job_id: str, flag) -> dict:
 
 @router.post("/jobs/{job_id}/storyboard")
 def storyboard(job_id: str) -> dict:
+    parts.require("whisper")
     _idle(job_id)
     talk.start(job_id, "storyboard", lambda flag: ensure_storyboard(job_id, flag))
     return talk.public(talk.read(job_id))
@@ -679,17 +684,21 @@ def _test_scenes(job_id: str, wanted: list[int], flag) -> None:
 
 @router.post("/jobs/{job_id}/graphics/save")
 def graphics_save(job_id: str, req: Code) -> dict:
+    parts.require("graphics")
     import tools_script as ts
+    import tools_source
     job = _idle(job_id)
     scenes = job.get("storyboard") or []
+    code_text, found = tools_source.split_answer(req.text)
     if req.scene is not None:
         _scene(job, req.scene)
-        parsed = ts.parse(req.text)
-        code = parsed.get(req.scene + 1) or (next(iter(parsed.values())) if len(parsed) == 1 else "") or ts.single_block(req.text)
+        parsed = ts.parse(code_text)
+        code = parsed.get(req.scene + 1) or (next(iter(parsed.values())) if len(parsed) == 1 else "") or ts.single_block(code_text)
         parsed = {req.scene + 1: code} if code.strip() else {}
     else:
-        parsed = ts.parse(req.text)
+        parsed = ts.parse(code_text)
     saved = []
+    tools_source.merge_found(job, found)
     for number, code in parsed.items():
         i = number - 1
         if 0 <= i < len(scenes) and scenes[i]["bg"].get("type") == "graphic":
@@ -781,8 +790,21 @@ def _speed() -> float:
         return 2.5
 
 
+def _require_parts(job_id: str) -> None:
+    """The optional downloads this video needs before a preview or a render."""
+    job = talk.read(job_id)
+    scenes = job.get("storyboard") or []
+    need = ["presenter"]
+    if not _storyboard_fresh(job):
+        need.append("whisper")
+    if any((s.get("bg") or {}).get("type") == "graphic" for s in scenes):
+        need.append("graphics")
+    parts.require(*need)
+
+
 @router.post("/jobs/{job_id}/preview/{index}")
 def preview(job_id: str, index: int) -> dict:
+    _require_parts(job_id)
     _idle(job_id)
 
     def work(flag):
@@ -803,6 +825,7 @@ def preview(job_id: str, index: int) -> dict:
 
 @router.post("/jobs/{job_id}/preview-all")
 def preview_all(job_id: str) -> dict:
+    _require_parts(job_id)
     _idle(job_id)
 
     def work(flag):
@@ -820,16 +843,43 @@ def preview_all(job_id: str) -> dict:
     return talk.public(talk.read(job_id))
 
 
+def _charge(job: dict) -> str:
+    """Reserve the credit before any work. A video that was already paid for renders again for free."""
+    if job.get("paid"):
+        return ""
+    try:
+        return licensing.consume("presenter", job["id"], "1.0.8")
+    except licensing.LicenseError as exc:
+        code = int(str(exc)[:3]) if str(exc)[:3] in ("401", "403") else 402
+        raise HTTPException(code, re.sub(r"^\d{3}:\s*", "", str(exc)) or "License check failed.") from None
+
+
 @router.post("/jobs/{job_id}/render")
 def render(job_id: str) -> dict:
+    _require_parts(job_id)
     job = _idle(job_id)
     if not _storyboard_fresh(job):
         raise HTTPException(400, "The voiceover changed: make the storyboard again (step 6).")
     wrong = pv.problems(talk._dir(job_id), {**job, **_settings(job)})
     if wrong:
         raise HTTPException(400, " ".join(wrong[:4]))
+    token = _charge(job)
 
     def work(flag):
+        try:
+            make(flag)
+        except BaseException:
+            if token:
+                licensing.refund(token)
+            licensing.report_usage(tool="presenter", title=job.get("title") or "", status="failed")
+            raise
+        minutes = round(talk.read(job_id)["storyboard"][-1]["end"] / 60, 2)
+        if token:
+            licensing.report(token, "completed", tool="presenter", title=job.get("title") or "", minutes=minutes)
+            talk.update(job_id, paid=True)
+        licensing.report_usage(tool="presenter", title=job.get("title") or "", status="completed", minutes=minutes)
+
+    def make(flag):
         current = talk.update(job_id, **_settings(talk.read(job_id)))
         shown = [0.0]
 
@@ -845,7 +895,12 @@ def render(job_id: str) -> dict:
             _speed_file().write_text(json.dumps({"per_second": round(took / long, 3)}), encoding="utf-8")
         talk.update(job_id, rendered={"seconds": round(took), "length": round(long, 1), "at": int(time.time())})
 
-    talk.start(job_id, "render", work)
+    try:
+        talk.start(job_id, "render", work)
+    except BaseException:
+        if token:
+            licensing.refund(token)
+        raise
     return talk.public(talk.read(job_id))
 
 

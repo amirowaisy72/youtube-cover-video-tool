@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import math
 
-import manim as M
-from manim import Annulus, Ellipse, Line, UpdateFromAlphaFunc, VGroup, rate_functions
+try:  # the app only reads GUIDE; the drawing runs where Manim is installed (an optional download)
+    import manim as M
+    from manim import Annulus, Ellipse, Line, UpdateFromAlphaFunc, VGroup, rate_functions
 
-from vis_people import _arc, _chain, _dot, _poly
+    from vis_people import _arc, _chain, _dot, _poly
+except ImportError:
+    M, VGroup = None, object
 
 GOLD, DEEP, RIM, LIGHT = "#f6c445", "#d99a22", "#b97d17", "#ffe08a"
 INK, WHITE, TONGUE = "#2a1d18", "#ffffff", "#e8737a"

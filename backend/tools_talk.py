@@ -31,6 +31,7 @@ import time
 import uuid
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -353,7 +354,11 @@ def _new_job(url: str = "", title: str = "") -> str:
 def rewrite_prompt(job: dict) -> str:
     words = len(job.get("transcript", "").split())
     language = job.get("language") or "the same language as the transcript"
-    return f'''You are writing the narration for MY OWN YouTube video. Below is a transcript of someone else's video.
+    import tools_source
+    research = tools_source.research_rules("a line  # === SCRIPT ===  then ONLY the narration.")
+    return f'''{tools_source.WEB_FIRST}
+
+You are writing the narration for MY OWN YouTube video. Below is a transcript of someone else's video.
 It is only research material: do not copy it.
 
 WRITE A NEW SCRIPT IN MY OWN WORDS:
@@ -364,7 +369,10 @@ WRITE A NEW SCRIPT IN MY OWN WORDS:
 - Do not pretend to be the original speaker, and remove their greetings, sponsor messages and "subscribe" requests.
 - Plain spoken language for a voiceover: short sentences, numbers written as people say them.
 - Length: about {max(80, words)} words. Language code: {language}.
-- ANSWER WITH THE NARRATION ONLY, in short paragraphs. No title, no headings, no scene notes, no lists, no markdown.
+- The narration is plain spoken text in short paragraphs. No title, no headings, no scene notes, no lists, no markdown.
+- Research is for checking the facts and linking their pages: if a page shows a fact is wrong, say it correctly.
+
+{research}
 
 ORIGINAL VIDEO (for your information): {job.get("title", "")}
 
@@ -554,6 +562,7 @@ def jobs() -> dict:
 
 @router.post("/jobs")
 def create(req: LinkReq) -> dict:
+    parts.require("whisper")
     url = check_url(req.url)
     job_id = _new_job(url)
     start(job_id, "transcript", _transcript_step(job_id, url))
@@ -582,6 +591,7 @@ def _receive(file: UploadFile, target: Path) -> None:
 @router.post("/source/file")
 def from_file(file: UploadFile = File(...), job: str = Form(""), url: str = Form("")) -> dict:
     """Step 1 from your own copy of the video or its sound (never kept after the words are written down)."""
+    parts.require("whisper")
     page = check_url(url) if url.strip() else ""
     if job:
         read(job)
@@ -653,6 +663,20 @@ def stop(job_id: str) -> dict:
     return public(read(job_id))
 
 
+@router.post("/jobs/{job_id}/sources/check")
+def check_sources(job_id: str) -> dict:
+    """Opens every source page of this video and looks for its sentence."""
+    import tools_source
+    job = read(job_id)
+    tools_source.need_browser()
+    import tools_script as ts
+    using: dict = {}
+    for i, sc in enumerate(job.get("storyboard") or []):
+        for url, _quote in ts.source_calls((sc.get("bg") or {}).get("code") or ""):
+            using.setdefault(url.strip(), []).append(i + 1)
+    return {"results": tools_source.check_list(job.get("sources") or [], using)}
+
+
 @router.get("/jobs/{job_id}/prompt")
 def prompt(job_id: str) -> dict:
     job = read(job_id)
@@ -671,11 +695,14 @@ def save_script(job_id: str, req: ScriptReq) -> dict:
     job = read(job_id)
     if job_id in _running:
         raise HTTPException(409, "A step is still running. Wait for it, or press Stop.")
-    text = clean_script(req.text)
+    import tools_source
+    answer, found = tools_source.split_answer(req.text)
+    text = clean_script(answer)
     if len(text.split()) < 3:
         raise HTTPException(400, "The script is empty. Paste the narration text.")
-    return public(update(job_id, script=text, script_mode=req.mode,
-                         copied=copied_share(text, job.get("transcript", ""))))
+    tools_source.merge_found(job, found)
+    return {**public(update(job_id, script=text, script_mode=req.mode, sources=job.get("sources") or [],
+                            copied=copied_share(text, job.get("transcript", "")))), "sources_found": len(found)}
 
 
 class VoiceReq(BaseModel):
@@ -719,6 +746,7 @@ def voice_original(job_id: str) -> dict:
 
 @router.post("/jobs/{job_id}/voice-file")
 def voice_file(job_id: str, file: UploadFile = File(...)) -> dict:
+    parts.require("whisper")
     read(job_id)
     if job_id in _running:
         raise HTTPException(409, "A step is still running. Wait for it, or press Stop.")

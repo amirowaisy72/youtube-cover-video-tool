@@ -101,6 +101,31 @@ DEFAULT_SETTINGS = {
     "offline_grace_jobs": 0,  # 0 = strict: no internet, no new jobs
 }
 
+# Tools priced since 1.0.8: (action, default credits). 0 = free even while charging is on.
+EXTRA_ACTIONS = (
+    ("presenter", 1),
+    ("thumbnail", 0),
+    ("shorts", 0),
+    ("downloader", 0),
+    ("trimmer", 0),
+    ("subtitles", 0),
+    ("audio", 0),
+    ("titles", 0),
+    ("script", 0),
+    ("seo", 0),
+    ("keywords", 0),
+    ("inspector", 0),
+    ("research", 0),
+    ("music", 0),
+    ("stock", 0),
+    ("channel_setup", 0),
+    ("channel_inspect", 0),
+    ("characters", 0),
+)
+DEFAULT_SETTINGS.update({f"credits_per_{a}": d for a, d in EXTRA_ACTIONS})
+ACTIONS = ("cover_video", "tts", "autovideo", "animator", "visual", "voiceclone",
+           *(a for a, _d in EXTRA_ACTIONS))
+
 app = FastAPI(title="YT Guru License Server")
 
 
@@ -187,6 +212,11 @@ def _key_hash(license_key: str) -> str:
     return hashlib.sha256(license_key.encode("utf-8")).hexdigest()
 
 
+def _costs(settings: dict) -> dict:
+    """Credits for one job of every tool, as set in the dashboard."""
+    return {a: int(settings[f"credits_per_{a}"]) for a in ACTIONS}
+
+
 # ---------------------------------------------------------------- tokens
 def _sign_job_token(payload: dict) -> str:
     """Single-use, short-lived, HMAC-signed job token.
@@ -235,7 +265,7 @@ class ActivateRequest(BaseModel):
 
 class ConsumeRequest(BaseModel):
     license_key: str
-    action: str  # cover_video | tts | autovideo | animator | visual | voiceclone
+    action: str  # one of ACTIONS
     job_ref: str  # client-generated job id (12 hex chars)
     client_version: str = "0.0.0"
 
@@ -349,14 +379,7 @@ def activate(payload: ActivateRequest) -> dict:
     return {
         "customer_id": row["customer_id"],
         "balance": _balance(row["customer_id"]),
-        "costs": {
-            "cover_video": settings["credits_per_cover_video"],
-            "tts": settings["credits_per_tts"],
-            "autovideo": settings["credits_per_autovideo"],
-            "animator": settings["credits_per_animator"],
-            "visual": settings["credits_per_visual"],
-            "voiceclone": settings["credits_per_voiceclone"],
-        },
+        "costs": _costs(settings),
         "trial_credits": settings["trial_credits"],
         "price_per_credit_pkr": settings["price_per_credit_pkr"],
         "min_client_version": MIN_CLIENT_VERSION,
@@ -370,14 +393,7 @@ def me(license_key: str = Header(..., alias="X-License-Key")) -> dict:
     return {
         "customer_id": row["customer_id"],
         "balance": _balance(row["customer_id"]),
-        "costs": {
-            "cover_video": settings["credits_per_cover_video"],
-            "tts": settings["credits_per_tts"],
-            "autovideo": settings["credits_per_autovideo"],
-            "animator": settings["credits_per_animator"],
-            "visual": settings["credits_per_visual"],
-            "voiceclone": settings["credits_per_voiceclone"],
-        },
+        "costs": _costs(settings),
     }
 
 
@@ -388,7 +404,8 @@ def charging() -> dict:
     license must still learn that everything is free. Default
     off; Master flips it in the admin dashboard."""
     settings = _get_settings()
-    return {"charging_enabled": bool(settings.get("charging_enabled", False))}
+    return {"charging_enabled": bool(settings.get("charging_enabled", False)),
+            "costs": _costs(settings)}
 
 
 @app.post("/v1/usage")
@@ -435,14 +452,7 @@ def consume(payload: ConsumeRequest) -> dict:
     """
     row = _lookup_key(payload.license_key)
     settings = _get_settings()
-    cost_map = {
-        "cover_video": int(settings["credits_per_cover_video"]),
-        "tts": int(settings["credits_per_tts"]),
-        "autovideo": int(settings["credits_per_autovideo"]),
-        "animator": int(settings["credits_per_animator"]),
-        "visual": int(settings["credits_per_visual"]),
-        "voiceclone": int(settings["credits_per_voiceclone"]),
-    }
+    cost_map = _costs(settings)
     if payload.action not in cost_map:
         raise HTTPException(400, "Unknown action.")
     cost = cost_map[payload.action]

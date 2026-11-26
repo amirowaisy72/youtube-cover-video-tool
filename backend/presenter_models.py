@@ -20,6 +20,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import parts
+
 # name -> (address, size in bytes or 0, what it is)
 FILES: dict[str, tuple[str, int, str]] = {
     "face_landmarker.task": ("https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/"
@@ -67,6 +69,8 @@ def default_folder() -> Path:
 
 
 def folder() -> Path:
+    if parts.enabled():  # installed app: the data folder chosen in Setup
+        return parts.model_dir() / "presenter"
     try:
         saved = json.loads(_settings_file().read_text(encoding="utf-8")).get("models")
     except (OSError, ValueError, AttributeError):
@@ -117,9 +121,9 @@ def have(name: str) -> bool:
 
 def status() -> dict:
     missing = [n for n in FILES if not have(n)]
-    libraries = add_libraries()
+    libraries = add_libraries() and parts.have("presenter")
     return {"folder": str(folder()), "ready": not missing and libraries, "libraries": libraries, "missing": missing,
-            "download": dict(_state)}
+            "download": dict(_state), "installed_app": parts.enabled()}
 
 
 def fetch(url: str, target: Path, size: int = 0, progress=None, stop: threading.Event | None = None, tries: int = 40) -> None:
@@ -206,7 +210,8 @@ def setup_all() -> None:
 
 
 def start_setup() -> None:
-    if _state["busy"]:
+    parts.require("presenter")  # installed app: asks first, then downloads on the Downloads page
+    if parts.enabled() or _state["busy"]:
         return
     _stop.clear()
     _state.update(busy=True, error="")

@@ -31,6 +31,7 @@ import threading
 import uuid
 from pathlib import Path
 
+import parts
 import ytdl
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -385,6 +386,7 @@ def _get_model():
     with _MODEL_LOCK:
         if _MODEL is not None:
             return _MODEL
+        parts.require("whisper")
         from faster_whisper import WhisperModel
 
         _MODEL = WhisperModel("tiny", device="cpu", compute_type="int8")
@@ -508,6 +510,7 @@ async def create_subtitles(request: Request, file: UploadFile | None = File(None
     JSON body: {"url": "<youtube link>", "language": "auto"|"en"|...}.
     Returns immediately; poll GET /api/subtitles/{job_id}.
     """
+    parts.require("whisper")
     if not _whisper_available():
         raise HTTPException(
             400,

@@ -24,6 +24,7 @@ import threading
 import time
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/animator/graphics", tags=["graphics"])
@@ -70,6 +71,7 @@ def _run_install() -> None:
 
 @router.post("/install")
 def install() -> dict:
+    parts.require("graphics")
     if available():
         return {"ok": True, "installed": True}
     if not _install["running"]:

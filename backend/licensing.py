@@ -75,6 +75,12 @@ CHARGING_CACHE_TTL_SEC = 300
 _CHARGING_CACHE: dict = {"value": None, "at": 0.0}
 
 
+# The actions the license server has priced since 1.0.5. For any other action the server must
+# publish a price above 0 (GET /v1/charging -> costs) before the app asks for a credit, so a tool
+# can never be blocked by a server that does not know it.
+FIRST_ACTIONS = ("cover_video", "tts", "autovideo", "animator", "visual", "voiceclone")
+
+
 def _fetch_charging_from_server() -> bool:
     """One unauthenticated GET /v1/charging. Single attempt, short
     timeout, no retries — any failure is the caller's problem
@@ -84,6 +90,8 @@ def _fetch_charging_from_server() -> bool:
     req = urllib.request.Request(LICENSE_SERVER_URL + "/v1/charging")
     with urllib.request.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read().decode() or "{}")
+    costs = data.get("costs")
+    _CHARGING_CACHE["costs"] = costs if isinstance(costs, dict) else {}
     return bool(data.get("charging_enabled", False))
 
 
@@ -107,11 +115,21 @@ def charging_enabled(refresh: bool = False) -> bool:
     return value
 
 
+def price_of(action: str) -> int:
+    """Credits the server asks for one such job (0 = it did not publish a price)."""
+    charging_enabled()
+    try:
+        return int((_CHARGING_CACHE.get("costs") or {}).get(action) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _reset_charging_cache() -> None:
     """Forget the cached flag (tests; also lets a caller force a
     fresh ask on the next check)."""
     _CHARGING_CACHE["value"] = None
     _CHARGING_CACHE["at"] = 0.0
+    _CHARGING_CACHE["costs"] = {}
 
 
 def _free_mode_payload() -> dict:
@@ -345,12 +363,14 @@ def consume(action: str, job_ref: str, client_version: str) -> str:
     """
     if not charging_enabled():
         return FREE_MODE_TOKEN
+    if action not in FIRST_ACTIONS and price_of(action) <= 0:
+        return FREE_MODE_TOKEN  # the owner has set no price for this tool
     key = load_key()
     if not key:
         raise LicenseError("No license key. Activate the tool first.")
     data = _http("POST", "/v1/consume", {
         "license_key": key,
-        "action": action,  # cover_video | tts | autovideo
+        "action": action,  # see the cost list in the license server
         "job_ref": job_ref,
         "client_version": client_version,
     })

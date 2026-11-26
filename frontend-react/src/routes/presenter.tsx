@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PresenterSources } from "@/components/SourceCheck";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
 import { ColabEstimate } from "@/components/ColabPanel";
@@ -281,6 +282,7 @@ function Presenter() {
                 )}
               </div>
             )}
+            {job.sources?.length > 0 && <PresenterSources jobId={job.id} sources={job.sources} />}
             {job.sources?.length > 0 && (
               <p className="break-all text-xs text-muted-foreground">Sources: {job.sources.map((s) => s.url).join(" · ")}</p>
             )}

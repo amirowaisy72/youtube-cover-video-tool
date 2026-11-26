@@ -32,7 +32,7 @@ def code_key(code: str) -> str:
     return hashlib.sha1(str(code or "").encode("utf-8")).hexdigest()[:12]
 
 
-def review_prompt(title: str, scenes: list[dict], index: int) -> str:
+def review_prompt(title: str, scenes: list[dict], index: int, sources: list[dict] | None = None) -> str:
     sc = scenes[index]
     test = sc.get("script_test") or {}
     nar = str(sc.get("narration") or "").strip()
@@ -44,6 +44,7 @@ def review_prompt(title: str, scenes: list[dict], index: int) -> str:
             + f"SCENE {index + 1}: {nar}\nVISUAL IDEA: {ts.idea_of(sc.get('code')) or '(none written)'}\n\n"
             + f"The attached image is the contact sheet of this scene as it is drawn now.\n{ts.frame_list(test.get('frames') or [])}\n\n"
             + f"CODE:\n# === SCENE {index + 1} ===\n{sc.get('code') or ''}\n{problems}\n"
+            + ts.saved_sources(scenes, sources, index) + "\n"
             + "First LOOK at the frames alone and say what a viewer understands from them. Then judge them honestly:\n"
             + ts.REVIEW_CHECKS
             + "\nReport only problems you can really see in the frames or that the test reported. If the scene is already "
@@ -156,7 +157,7 @@ def review_scene(app, job_id: str, index: int, key: str, st: dict) -> None:
         if not test.get("sheet"):
             raise RuntimeError("The scene gives no picture to look at: " + (test.get("error") or "test failed"))
         st["stage"] = f"Scene {index + 1}: Gemini is looking at the frames…"
-        text, model = ask_gemini(review_prompt(job.get("title") or "", job["scenes"], index),
+        text, model = ask_gemini(review_prompt(job.get("title") or "", job["scenes"], index, job.get("sources")),
                                  (work_dir / Path(test["sheet"]).name).read_bytes(), key, st)
         result = parse_answer(text, code, index)
         result["model"] = model

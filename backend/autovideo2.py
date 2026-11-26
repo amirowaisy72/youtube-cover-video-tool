@@ -1257,6 +1257,8 @@ def _get_whisper_model():
     with _WHISPER_LOCK:
         if _WHISPER_MODEL is not None:
             return _WHISPER_MODEL
+        import parts
+        parts.require("whisper")
         from faster_whisper import WhisperModel
         _WHISPER_MODEL = WhisperModel("tiny", device="cpu", compute_type="int8")
         return _WHISPER_MODEL

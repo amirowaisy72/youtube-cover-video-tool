@@ -1,6 +1,7 @@
 /** Auto Video Script mode (user, 2026-11-20): any AI plans every scene's footage (search words, the new clip at
     chosen words, or a drawn animation); the app downloads exactly that. */
 import { useEffect, useState } from "react";
+import { askSourceCheck } from "@/components/SourceCheck";
 import { getKey } from "@/lib/config";
 
 type St = { running: boolean; stage: string; done: number; total: number; error: string; code: string;
@@ -73,9 +74,10 @@ export function AvScriptMode({ jobId, startOpen = false, onChanged }: { jobId: s
   const save = async () => {
     setErr(""); setMsg("");
     try {
-      const d = await j<St & { problems: string[]; applying: number; found: number }>(await fetch("/api/avscript/save", {
+      const d = await j<St & { sources_found?: number; problems: string[]; applying: number; found: number }>(await fetch("/api/avscript/save", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ job_id: jobId, code, ...keys }) }));
       setSt(d);
+      askSourceCheck(jobId, d.sources_found);
       setMsg(`✓ Saved — plans for ${d.found} scene${d.found === 1 ? "" : "s"}; getting the footage of ${d.applying} now…`);
       if (d.problems.length) setErr(d.problems.join("  ·  "));
     } catch (e) { setErr(e instanceof Error ? e.message : "Could not save"); }

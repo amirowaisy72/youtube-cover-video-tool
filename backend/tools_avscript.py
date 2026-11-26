@@ -42,7 +42,7 @@ use a drawn animation instead. At most about 1 scene in 4. Write:
 animation:
 <Python code with the animation tools below>
 
-ANSWER FORMAT — ONE code block with every scene, each starting with its marker line, nothing else.
+ANSWER FORMAT of the plan — ONE code block with every scene, each starting with its marker line.
 
 ========== ANIMATION TOOLS (only for animation scenes) ==========
 """
@@ -64,8 +64,12 @@ def build_prompt(title: str, scenes: list[dict]) -> str:
         nar = str(sc.get("narration") or "").strip()
         d = float(sc.get("duration_sec") or 0) or ts.est_duration(nar)
         lines.append(f"SCENE {i + 1} (about {d:.0f} seconds): {nar}")
-    return (GUIDE + _anim_guide() + f'\n\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n' + "\n\n".join(lines)
-            + "\n\nWrite the plan for ALL scenes now (footage for most scenes, animation only where it explains better).")
+    import tools_source
+    return (tools_source.WEB_FIRST + "\n\n" + GUIDE + _anim_guide() + f'\n\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n'
+            + "\n\n".join(lines)
+            + "\n\nWrite the plan for ALL scenes now (footage for most scenes, animation only where it explains better).\n\n"
+            + tools_source.research_rules("the scene plan, in the ANSWER FORMAT above. In animation scenes call "
+                                          'source("https://url", "the exact sentence") where a source fits.'))
 
 
 # ------------------------------------------------------------------ parsing
@@ -274,7 +278,9 @@ def save(req: SaveReq) -> dict:
     """Saves the pasted plan; scenes with a usable block get their footage now (in the background)."""
     import tools_script as ts
     app, job = _job(req.job_id)
-    parts = ts.parse(req.code)
+    import tools_source
+    code_text, found = tools_source.split_answer(req.code)
+    parts = ts.parse(code_text)
     if not parts:
         raise HTTPException(400, "No scene plan found. Every scene must start with a line like  # === SCENE 1 ===")
     st = _STATE.get(req.job_id)
@@ -283,6 +289,7 @@ def save(req: SaveReq) -> dict:
     problems, todo = [], []
     with _LOCK:
         job = app._av_read(req.job_id)
+        tools_source.merge_found(job, found)
         for n, block in sorted(parts.items()):
             i = n - 1
             if not 0 <= i < len(job["scenes"]):

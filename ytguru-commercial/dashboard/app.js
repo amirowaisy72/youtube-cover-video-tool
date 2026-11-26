@@ -147,6 +147,9 @@ async function openCustomer(id) {
   });
 }
 
+// Tools priced since 1.0.8 (input id "set-<action>", setting "credits_per_<action>").
+const EXTRA_ACTIONS = ["presenter", "thumbnail", "shorts", "downloader", "trimmer", "subtitles", "audio", "titles", "script", "seo", "keywords", "inspector", "research", "music", "stock", "channel_setup", "channel_inspect", "characters"];
+
 async function loadSettings() {
   try {
     const s = await api("/admin/settings");
@@ -156,6 +159,9 @@ async function loadSettings() {
     document.getElementById("set-animator").value = s.credits_per_animator;
     document.getElementById("set-visual").value = s.credits_per_visual;
     document.getElementById("set-voiceclone").value = s.credits_per_voiceclone;
+    EXTRA_ACTIONS.forEach((a) => {
+      document.getElementById("set-" + a).value = s["credits_per_" + a];
+    });
     document.getElementById("set-trial").value = s.trial_credits;
     document.getElementById("set-price").value = s.price_per_credit_pkr;
     document.getElementById("set-packs").value = (s.packs || [])
@@ -205,6 +211,8 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
         credits_per_animator: +document.getElementById("set-animator").value,
         credits_per_visual: +document.getElementById("set-visual").value,
         credits_per_voiceclone: +document.getElementById("set-voiceclone").value,
+        ...Object.fromEntries(EXTRA_ACTIONS.map((a) =>
+          ["credits_per_" + a, +document.getElementById("set-" + a).value])),
         trial_credits: +document.getElementById("set-trial").value,
         price_per_credit_pkr: +document.getElementById("set-price").value,
         packs: parsePacks(document.getElementById("set-packs").value),

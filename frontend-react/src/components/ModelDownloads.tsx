@@ -41,6 +41,8 @@ export function ModelDownloads({ only }: { only?: string[] }) {
 
   const refresh = async () => {
     try {
+      // the installed app has its own Downloads page and asks before every download
+      if ((await fetch("/api/parts").then((r) => r.json())).enabled) { setItems([]); return; }
       const d = await fetch("/api/downloads/status").then((r) => r.json());
       const all = (d.downloads ?? []) as Download[];
       setItems(only ? all.filter((x) => only.includes(x.id)) : all);

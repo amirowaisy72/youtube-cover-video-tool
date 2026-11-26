@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { connectYoutubeFlow, youtubeStatus } from "@/lib/api";
 import { useApp } from "@/lib/app-store";
 import { getKey } from "@/lib/config";
+import { PresenterSources } from "@/components/SourceCheck";
 
 /** Talking Presenter, steps 4–9: photo, lip-sync, backgrounds, layout, extras, render. */
 
@@ -16,7 +17,7 @@ export type Scene = {
 export type Job = {
   id: string; url: string; title: string; channel?: string; duration?: number; language?: string;
   status: "idle" | "working" | "failed" | "stopped"; step_working?: string; progress?: number; stage?: string; error?: string; notice?: string;
-  transcript: string; segments?: { start: number; end: number; text: string }[]; sources: { url: string; fact: string }[];
+  transcript: string; segments?: { start: number; end: number; text: string }[]; sources: { url: string; fact: string; quote?: string }[];
   script: string; script_mode: string; copied?: number;
   voice: { provider: string; voice: string } | null; voice_ready: boolean; voice_outdated: boolean;
   voice_duration?: number; voice_version?: number; voice_warnings?: string[];
@@ -99,7 +100,7 @@ function PerScene({ children, note }: { children: React.ReactNode; note: string 
 }
 
 // ------------------------------------------------------------------ 4. photo
-type Setup = { folder: string; ready: boolean; libraries: boolean; missing: string[];
+type Setup = { installed_app?: boolean; folder: string; ready: boolean; libraries: boolean; missing: string[];
   download: { busy: boolean; file: string; done: number; total: number; error: string } };
 type Face = { index: number; box: number[]; warnings: string[]; usable: boolean };
 type Person = { id: string; name: string; faces: Face[]; chosen: number; warnings: string[]; version?: number };
@@ -147,7 +148,8 @@ export function PhotoStep({ t }: { t: Tools }) {
     <>
       <h2 className="font-display text-lg font-bold">4. Choose the presenter photo</h2>
       <p className="rounded-lg border border-border p-2 text-sm">{RULE}</p>
-      {setup && !setup.ready && (
+      {setup && !setup.ready && setup.installed_app && <InstalledSetup onReady={() => void call<Setup>("setup").then(setSetup)} />}
+      {setup && !setup.ready && !setup.installed_app && (
         <div className="space-y-2 rounded-xl border border-primary/50 bg-primary/5 p-3">
           <p className="text-sm">The presenter needs a one-time setup: three small model files{setup.libraries ? "" : " and the MediaPipe and OpenCV libraries (about 300 MB)"}. They are kept in <code>{setup.folder}</code>.</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -415,6 +417,20 @@ const WHOLE: [string, string, string][] = [
   ["color", "Plain colour", "A calm single colour."],
 ];
 
+/** The installed app: the presenter's libraries and models are one optional download. */
+function InstalledSetup({ onReady }: { onReady: () => void }) {
+  useEffect(() => {
+    const timer = window.setInterval(onReady, 4000);
+    return () => window.clearInterval(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="space-y-2 rounded-xl border border-primary/50 bg-primary/5 p-3">
+      <p className="text-sm">The presenter needs one optional download (lip-sync and cut-out). You can also get or remove it in Dashboard → Downloads.</p>
+      <button className="btn btn-primary btn-sm" onClick={() => void fetch("/api/presenter/setup", { method: "POST" })}>Set up the presenter</button>
+    </div>
+  );
+}
+
 function GraphicsBox({ t, count }: { t: Tools; count: number }) {
   const [code, setCode] = useState("");
   const off = t.busy || t.working;
@@ -424,7 +440,7 @@ function GraphicsBox({ t, count }: { t: Tools; count: number }) {
   return (
     <div className="space-y-2 rounded-xl border border-primary/50 p-3">
       <p className="text-sm font-semibold">Graphics: {count} scene{count > 1 ? "s" : ""}, {works} working</p>
-      <p className="text-xs text-muted-foreground">1. Copy the prompt (it holds the whole script). 2. Give it to any AI. 3. Paste the whole answer once: the app splits it at “# === SCENE N ===” and tests every scene.</p>
+      <p className="text-xs text-muted-foreground">1. Copy the prompt (it holds the whole script). 2. Give it to any AI. 3. Paste the whole answer once: the app saves its sources, checks them against the real pages and tests every scene.</p>
       <button className="btn btn-primary btn-sm" disabled={off} onClick={() => void t.act(async () => {
         const d = await call<{ prompt: string }>(`jobs/${t.job.id}/graphics/prompt`);
         await navigator.clipboard.writeText(d.prompt);
@@ -434,6 +450,7 @@ function GraphicsBox({ t, count }: { t: Tools; count: number }) {
         onClick={() => void t.act(async () => { const j = await call<Job>(`jobs/${t.job.id}/graphics/save`, "POST", { text: code }); setCode(""); return j; })}>
         💾 Save & test all
       </button>
+      <PresenterSources jobId={t.job.id} sources={t.job.sources ?? []} />
       {broken.length > 0 && <p className="text-xs text-red-300">Scene {broken.join(", ")} has an error: open “Change one scene” and press “Fix this part”.</p>}
     </div>
   );

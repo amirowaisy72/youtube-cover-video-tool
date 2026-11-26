@@ -1,6 +1,7 @@
 /** Hook builder: three openings for the first scene (big question, shocking number, proof on screen), each with
     a preview; you pick one. New visuals only, or new opening words too (then only scene 1's voice is remade). */
 import { useEffect, useState } from "react";
+import { askSourceCheck } from "@/components/SourceCheck";
 import { sceneFileUrl } from "@/components/SceneFrames";
 import { api } from "@/lib/api";
 import { getKey, voiceKeys } from "@/lib/config";
@@ -52,8 +53,9 @@ export function HookBuilder({ jobId, onApplied }: { jobId: string; onApplied: ()
     setMsg("✓ Hook prompt copied — paste it into your AI, then paste its answer below.");
   });
   const save = () => run("Saving…", async () => {
-    const d = await api<Data>("/api/visual/hooks/save", post({ job_id: jobId, code, mode }));
+    const d = await api<Data & { sources_found?: number }>("/api/visual/hooks/save", post({ job_id: jobId, code, mode }));
     setData(d); setCode("");
+    askSourceCheck(jobId, d.sources_found);
     await testAll(d);
   });
   const gemini = () => run("Gemini is writing three hooks…", async () => {

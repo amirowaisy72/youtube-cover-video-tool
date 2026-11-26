@@ -165,6 +165,22 @@ class UsageServerTest(unittest.TestCase):
         s2 = self.client.get("/admin/settings", headers=self.auth).json()
         self.assertEqual(s2["credits_per_animator"], 2)
 
+    def test_prices_of_the_tools_added_in_108(self):
+        costs = self.client.get("/v1/charging").json()["costs"]
+        self.assertEqual(costs["presenter"], 1)  # the new video maker is charged
+        self.assertEqual(costs["thumbnail"], 0)  # smaller tools stay free until a price is set
+        key = self.client.post("/admin/customers", json={"name": "P"}, headers=self.auth).json()["license_key"]
+
+        def consume(action):
+            return self.client.post("/v1/consume", json={"license_key": key, "action": action, "job_ref": action})
+        self.assertEqual(consume("presenter").json()["balance_after"], 2)
+        r = self.client.put("/admin/settings", json={"settings": {"credits_per_thumbnail": 2}}, headers=self.auth)
+        self.assertEqual(r.json()["credits_per_thumbnail"], 2)
+        self.assertEqual(self.client.get("/v1/charging").json()["costs"]["thumbnail"], 2)
+        self.assertEqual(consume("thumbnail").json()["balance_after"], 0)
+        self.assertEqual(consume("presenter").status_code, 402)
+        self.client.put("/admin/settings", json={"settings": {"credits_per_thumbnail": 0}}, headers=self.auth)
+
 
 if __name__ == "__main__":
     unittest.main()

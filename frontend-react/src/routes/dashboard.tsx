@@ -250,6 +250,14 @@ function Dashboard() {
         </Link>
       </div>
 
+      <Link to="/downloads" className="glass mb-6 flex flex-wrap items-center justify-between gap-2 p-4 hover:bg-white/5">
+        <span>
+          <span className="font-semibold">⬇ Downloads</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">The optional parts (speech recogniser, motion graphics, lip-sync, cloned voice…): what is installed, its size, download or remove.</span>
+        </span>
+        <span className="btn btn-secondary btn-sm">Open →</span>
+      </Link>
+
       {GROUPS.map((g) => (
         <section key={g.id} className="mb-8">
           <h2 className="font-display text-lg font-bold">{g.title}</h2>

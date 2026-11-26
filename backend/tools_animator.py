@@ -70,7 +70,7 @@ import licensing  # noqa: E402
 # sync with main.py CLIENT_VERSION; the release workflow bumps
 # both. A local copy is needed because main.py imports this
 # module (importing main back would be circular).
-_CLIENT_VERSION = "1.0.4"
+_CLIENT_VERSION = "1.0.8"
 
 router = APIRouter(prefix="/api/animator")
 

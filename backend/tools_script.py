@@ -13,6 +13,7 @@ import threading
 import time
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -476,6 +477,17 @@ STEP 2 — MAKE IT READABLE (required)
     growth, gain, good result = GREEN; banks and companies = BLUE; the viewer / a person = TEAL; past or unimportant =
     GREY. The same idea uses the same object and colour in every scene.
 
+STEP 3 — PLAN THE WHOLE VIDEO BEFORE ANY CODE (required)
+First output a plan table with one row for EVERY scene:
+  scene | main thing (or master scene) | setting
+Then check the table against these VARIETY rules (the test warns about them), change every row that breaks one,
+and only then write the code — following your corrected table:
+  - A scene must not show the same main things as the scene before it.
+  - One thing (coin, bank, wallet...) in at most 3 scenes of the whole video. Pick the specific object from the list
+    (receipt, shopping_cart, umbrella, locked...) instead of "coin" and "bank" again.
+  - Vary the layout too: not always "one thing left, one number right".
+  - A master scene at most 2 times in the video and never in two scenes in a row.
+
 THE STAGE (16:9): x from -7 (left) to 7 (right); y from FLOOR = -2.4 (the floor line) up to TOP = 3.6.
 Below the floor is the caption area: never put anything below FLOOR. Things that stand on the floor are placed
 there automatically (thing(...) without y). Keep big things 2.5-4 units tall; keep the stage full, centred and tidy;
@@ -511,8 +523,9 @@ TOOLS (already available — NO imports):
         when("words said just before the fact", -1.0)     # call it about 2 seconds BEFORE the fact is spoken
         source("https://full.page/address", "The exact sentence copied from that page.",
                highlight_words=["the words", "that prove it"])
-      url and quote must be copied EXACTLY from the SOURCES listed below (plain text in quotes, no variables):
-      never invent or reword them; if a fact has no source below, do not use source() for it. highlight_words =
+      url and quote must be copied EXACTLY from the SOURCES listed below
+      (plain text in quotes, no variables):
+      never invent or reword them; a fact without a source gets no source(). highlight_words =
       short parts of the quote (default: the whole quote); prefer words the narrator also says. Add other
       animation after it only if enough time is left.
   play(*any_manim_animations, run_time=1.0, sound="whoosh")   sfx("pop")   add(m)   remove(m)
@@ -548,12 +561,6 @@ TRANSITIONS — transition("whip" | "zoom" | "slide", "in" | "out"), with its so
   Use one on about 1 cut in 3, where the story jumps (new place, new time, new idea) — not on every scene.
   whip = meanwhile / another side; zoom = going deeper into a detail; slide = the next step.
 
-VARIETY (the test warns about this):
-  - A scene must not show the same main things as the scene before it.
-  - One thing (coin, bank, wallet...) in at most 3 scenes of the whole video. Pick the specific object from the list
-    (receipt, shopping_cart, umbrella, locked...) instead of "coin" and "bank" again.
-  - Vary the layout too: not always "one thing left, one number right".
-
 THINGS (names for thing(), flow(), pile()):{library}
 Other simple nouns also work (drawn as an icon), but prefer these.
 Tips: a crowd is a row of small people — use count=4-6 for a big crowd. split() looks best on wide things (factory,
@@ -563,7 +570,7 @@ RULES: no import, no files, no names starting with "_", no class. Text on screen
 "$10 billion". Show what the narrator says at the moment he says it (names as badges/labels: "PS5", "Take-Two").
 Do not show copyrighted logos or characters.
 
-ANSWER FORMAT — one code block, every scene starting with its marker line, then its VISUAL IDEA line, nothing else:
+ANSWER FORMAT of the scene code — one code block, every scene starting with its marker line, then its VISUAL IDEA line:
 # === SCENE 1 ===
 # VISUAL IDEA: ...
 <code>
@@ -665,13 +672,17 @@ def build_prompt(title: str, scenes: list[dict], sources: list[dict] | None = No
         lines.append("OTHER SOURCES of this video (use one in the scene whose fact it supports):\n"
                      + "\n".join(_source_line(s) for s in matched[-1]))
     if not usable:
-        lines.append("SOURCES: none were saved for this video, so do not use source().")
-    if used_summary(scenes):  # scenes that already have code
-        lines.append(used_summary(scenes).strip())
-    return (GUIDE.replace("{library}", _library()) + f'\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n' + "\n\n".join(lines)
+        lines.append("SOURCES saved with this video so far: none — find them yourself (research rules below).")
+    import tools_source
+    guide = GUIDE.replace("EXACTLY from the SOURCES listed below",
+                          "EXACTLY from your SOURCES list (part 1 of your answer) or the sources listed below")
+    return (tools_source.WEB_FIRST + "\n\n" + guide.replace("{library}", _library())
+            + f'\nVIDEO TITLE: "{title}"\n\nTHE SCENES:\n' + "\n\n".join(lines)
             + "\n\nFirst decide the video's visual language (which object and colour stands for each main idea) and keep it "
             "in every scene. Then write the code for ALL scenes now — each starting with its # VISUAL IDEA line.\n\n"
-            + GENERAL_DIRECTION_RULES)
+            + GENERAL_DIRECTION_RULES + "\n\n"
+            + tools_source.research_rules("the scene code, in the ANSWER FORMAT above, with source() calls in the scenes "
+                                          "where a source fits."))
 
 
 REVIEW_CHECKS = """  1. One glance: with the sound off, does a viewer understand the VISUAL IDEA from the pictures? Is it a real change
@@ -699,6 +710,18 @@ def frame_list(frames: list[dict]) -> str:
                      for k, f in enumerate(frames))
 
 
+def saved_sources(scenes: list[dict], sources: list[dict] | None, index: int) -> str:
+    """For the prompts about ONE scene: only what is already saved with the video (this scene's first)."""
+    usable = [s for s in sources or [] if s.get("url")]
+    if not usable:
+        return ("SOURCES saved with this video: none — do not add source(), headlines() or any link.\n")
+    mine = sources_by_scene(scenes, usable).get(index, [])
+    ordered = (mine + [s for s in usable if s not in mine])[:12]
+    return ("SOURCES saved with this video (use only these; never add or invent another):\n"
+            + "\n".join(_source_line(s) if s.get("quote") else f"  url: {s['url']}\n  (no quoted sentence: not for source())"
+                        for s in ordered) + "\n")
+
+
 def fix_prompt(title: str, scenes: list[dict], index: int, error: str, warnings: list[str],
                sources: list[dict] | None = None) -> str:
     sc = scenes[index]
@@ -706,13 +729,10 @@ def fix_prompt(title: str, scenes: list[dict], index: int, error: str, warnings:
     code = sc.get("code") or ""
     frames = (sc.get("script_test") or {}).get("frames") or []
     probs = (f"ERROR: {error}\n" if error else "") + "".join(f"WARNING: {w}\n" for w in warnings or [])
-    usable = [s for s in sources or [] if s.get("url") and s.get("quote")]
-    mine = sources_by_scene(scenes, usable)
-    shown = mine.get(index, []) + mine.get(-1, [])
-    if shown:
-        probs += "SOURCES (for source()):\n" + "\n".join(_source_line(s) for s in shown) + "\n"
+    probs += saved_sources(scenes, sources, index)
     idea = idea_of(code)
     look = ""
+    probs += "(Only this one scene: no plan table is needed — STEP 3's rules still hold.)\n"
     if frames:
         look = (f"\nSELF-CHECK — I attached an image: the contact sheet of this scene ({len(frames)} frames from a low-resolution "
                 f"test; timings are estimates until the voice is made).\n{frame_list(frames)}\n"
@@ -722,9 +742,9 @@ def fix_prompt(title: str, scenes: list[dict], index: int, error: str, warnings:
             + f"SCENE {index + 1} (about {est_duration(nar):.0f} seconds): {nar}\n"
             + f"VISUAL IDEA of this scene: {idea or '(none written yet — write one first)'}\n\n"
             + f"The current code of scene {index + 1}:\n```python\n# === SCENE {index + 1} ===\n{code}```\n\n{probs}{look}\n"
-            + "ANSWER: first a short REVIEW (max 6 lines: what is wrong, or that it is already clear), then ONE code block with "
-            f"the whole corrected code of scene {index + 1} only, starting with its marker line and its # VISUAL IDEA line "
-            "(improve the idea itself if the picture cannot show it). Nothing after the code block.")
+            + "ANSWER WITH THE CODE BLOCK ONLY (this replaces the ANSWER FORMAT above): ONE code block with the whole "
+            f"corrected code of scene {index + 1} only, starting with its marker line and its # VISUAL IDEA line (improve the "
+            "idea itself if the picture cannot show it). No text before or after the code block.")
 
 
 # ------------------------------------------------------------------ storyboard / test
@@ -875,15 +895,18 @@ class SaveReq(BaseModel):
 def save_script(req: SaveReq) -> dict:
     """Saves the pasted code with the video: each scene's code is checked (not run yet)."""
     app, job = _job(req.job_id)
-    parts = parse(req.code)
-    if not parts:
+    import tools_source
+    code_text, found = tools_source.split_answer(req.code)
+    parsed = parse(code_text)
+    if not parsed:
         raise HTTPException(400, "No scene code found. The answer must contain lines like  # === SCENE 1 ===  before each scene's code.")
+    tools_source.merge_found(job, found)
     scenes = job["scenes"]
-    extra = sorted(n for n in parts if not 1 <= n <= len(scenes))
+    extra = sorted(n for n in parsed if not 1 <= n <= len(scenes))
     results = []
     with _LOCK:
         for i, sc in enumerate(scenes):
-            code = parts.get(i + 1)
+            code = parsed.get(i + 1)
             if code is None:
                 if req.replace:
                     for k in ("code", "script_test", "script_review", "visual_idea"):
@@ -901,12 +924,12 @@ def save_script(req: SaveReq) -> dict:
                 sc["script_test"] = {"ok": False, "error": err, "warnings": [], "at": time.time()}
             results.append({"index": i, "error": err, "objects": names})
         if req.replace:
-            job["script_code"] = req.code
+            job["script_code"] = code_text
         else:  # a fixed scene: the saved full text gets that scene's new code
             job["script_code"] = "\n".join(f"# === SCENE {i + 1} ===\n{sc['code']}" for i, sc in enumerate(scenes) if sc.get("code"))
         app._av_write(job)
     missing = [i + 1 for i, sc in enumerate(scenes) if not sc.get("code")]
-    return {**_status(job), "found": len(parts), "missing": missing, "extra": extra, "results": results}
+    return {**_status(job), "found": len(parsed), "sources_found": len(found), "missing": missing, "extra": extra, "results": results}
 
 
 class TestReq(BaseModel):
@@ -916,6 +939,7 @@ class TestReq(BaseModel):
 
 @router.post("/test")
 def test(req: TestReq) -> dict:
+    parts.require("graphics")
     app, job = _job(req.job_id)
     if not 0 <= req.index < len(job["scenes"]):
         raise HTTPException(404, "Scene not found.")

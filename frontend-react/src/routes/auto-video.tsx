@@ -357,8 +357,11 @@ export function AutoVideoPage({ docu = false, visual = false }: { docu?: boolean
   // used by the Script mode source() tool and added to the YouTube description — never spoken.
   const sourcesRule = `SOURCES (required): after the script, on its own line, write SOURCES: and then ONE line for every fact or number in the script, in exactly this form:
 - the fact as the script says it | https://full-address-of-the-page | "the EXACT sentence copied word for word from that page that supports it"
+Use web search to find 3–6 real, reliable pages (news, official reports, company pages) that support the facts and numbers in the script. Never make up a link or a quote.
 Rules for the sources: use only pages you really opened (search the web); copy the sentence character for character — my app searches the page for it and shows it on screen; prefer official reports, government sites, Wikipedia and well-known news sites without a paywall; if you cannot find a real source for a fact, leave that fact out of the script. NEVER invent a link or a sentence.`;
-  const scriptPrompt = `Write the spoken script for a YouTube ${videoType === "short" ? `Short (vertical, about ${shortSecs} seconds)` : `video (about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
+  const scriptPrompt = `Turn on web search before answering.
+
+Write the spoken script for a YouTube ${videoType === "short" ? `Short (vertical, about ${shortSecs} seconds)` : `video (about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
 
 LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
 
@@ -375,7 +378,9 @@ FORMAT: the script is plain spoken narration only. No title, no headings, no lab
 ${sourcesRule}`;
   // Documentary Explainer (user, 2026-11-19): a calm, researched documentary narration
   // built for paper cards, real maps, news clippings and cinematic footage.
-  const docuPrompt = `Write the narration for a calm, serious RESEARCH DOCUMENTARY for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
+  const docuPrompt = `Turn on web search before answering.
+
+Write the narration for a calm, serious RESEARCH DOCUMENTARY for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
 
 LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
 
@@ -392,7 +397,9 @@ FORMAT: the script is plain spoken narration only. No title, no headings, no lab
 
 ${sourcesRule}`;
   // Visual Explainer (user, 2026-11-19): every paragraph becomes an animated scene of drawn objects.
-  const visualPrompt = `Write the narration for an animated EXPLAINER video for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
+  const visualPrompt = `Turn on web search before answering.
+
+Write the narration for an animated EXPLAINER video for YouTube ${videoType === "short" ? `(a vertical Short, about ${shortSecs} seconds)` : `(about ${dur} minute${dur === 1 ? "" : "s"})`} titled "${title.trim() || "my video"}"${channelBit}.
 
 LENGTH: about ${words} words in ${paras} paragraphs, with ONE blank line between paragraphs.
 

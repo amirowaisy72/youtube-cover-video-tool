@@ -14,6 +14,7 @@ import threading
 import time
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -236,6 +237,7 @@ class BuildReq(BaseModel):
 
 @router.post("/build")
 def build(req: BuildReq) -> dict:
+    parts.require("graphics", "whisper")
     job = _read(req.job_id)
     _voice_ready(job, _app()._av_job_dir(req.job_id))
     st = _STATE.get(req.job_id)
@@ -313,19 +315,21 @@ def fix_prompt(req: FixPromptReq) -> dict:
                   f"SCENE {n} (it lasts {dur:.1f} seconds): {nar}\n\nWHAT SCENE {n} SHOWS NOW:\n```\n{cur}```\n\n"
                   f"The viewer watched the preview and paused there. What the viewer wants (it may be written in Urdu or "
                   f"English — understand it and do it):\n{asks}\n\nChange ONLY what the viewer asked about (around those "
-                  f"words); keep the rest of the scene's plan. Answer with the whole plan of scene {n} only (footage lines, "
-                  f"or animation), starting with its marker line.")
+                  f"words); keep the rest of the scene's plan.\n\n" + ts.saved_sources(job["scenes"], job.get("sources"), req.index)
+                  + f"\nANSWER WITH THE CODE BLOCK ONLY: one code block with the whole plan of scene {n} (footage lines, or "
+                  "animation), starting with its marker line. No text before or after it.")
         return {"prompt": prompt, "spoken": words}
     if sc.get("code"):
         current = (f"VISUAL IDEA of this scene: {ts.idea_of(sc['code']) or '(none written yet — write one)'}\n\n"
                    f"THE CURRENT CODE OF SCENE {n}:\n```python\n# === SCENE {n} ===\n{sc['code']}```\n\n")
         task = (f"Change ONLY the part(s) the viewer asked about (around those words); keep everything else in the scene "
-                f"exactly as it is. Answer with ONE code block holding the WHOLE corrected code of scene {n} only, starting "
-                "with its marker line and its # VISUAL IDEA line. Nothing after the code block.")
+                f"exactly as it is. ANSWER WITH THE CODE BLOCK ONLY: one code block holding the WHOLE corrected code of "
+                f"scene {n}, starting with its marker line and its # VISUAL IDEA line. No text before or after it.")
     else:
         current = (f"Scene {n} has no code yet (it was made automatically). Write its whole code, and make sure the "
                    f"viewer's requests are done.\n\n")
-        task = f"Answer with the whole code of scene {n} only, starting with its marker line and its # VISUAL IDEA line."
+        task = (f"ANSWER WITH THE CODE BLOCK ONLY: one code block with the whole code of scene {n}, starting with its marker "
+                "line and its # VISUAL IDEA line. No text before or after it.")
     frames = _sheet(req.job_id, job, req.index, req.t)[1] if sc.get("code") else []
     if frames:
         task = (f"I attached an image: the contact sheet of this scene as it looks now.\n{ts.frame_list(frames)}\n"
@@ -335,7 +339,8 @@ def fix_prompt(req: FixPromptReq) -> dict:
               + ts.other_ideas(job["scenes"], req.index) +
               f"SCENE {n} (it lasts {dur:.1f} seconds): {nar}\n\n{current}"
               f"The viewer watched the preview and paused there. What the viewer wants (it may be written in Urdu or "
-              f"English — understand it and do it):\n{asks}\n\n{task}")
+              f"English — understand it and do it):\n{asks}\n\n"
+              + ts.saved_sources(job["scenes"], job.get("sources"), req.index) + f"\n{task}")
     return {"prompt": prompt, "spoken": words}
 
 

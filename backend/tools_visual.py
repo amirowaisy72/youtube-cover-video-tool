@@ -27,6 +27,7 @@ import time
 import wave
 from pathlib import Path
 
+import parts
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -1306,6 +1307,7 @@ class RedoReq(BaseModel):
 @router.post("/redo")
 def redo(req: RedoReq) -> dict:
     """A new idea for one scene (optionally what the user wants to see), with a new storyboard picture."""
+    parts.require("graphics")
     app = _av()
     if app is None:
         raise HTTPException(503, "The app is not ready.")

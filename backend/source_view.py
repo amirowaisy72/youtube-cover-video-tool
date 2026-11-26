@@ -143,6 +143,12 @@ def _quote_card(data: dict, quote: str, width: int):
         d.text((r[1], r[2]), r[0], font=font, fill=(28, 30, 36))
     foot = (data.get("domain") or "")[:70]
     d.text((pad, height - int(92 * s)), foot, font=_font("Poppins-Medium.ttf", 36 * s), fill=(95, 105, 125))
+    # not seen on the page by this app: the viewer is told it is a report, not a screenshot
+    tag, tag_font = "REPORTED", _font("Poppins-Bold.ttf", 34 * s)
+    wide = tag_font.getlength(tag)
+    box = [width - pad - wide - int(44 * s), height - int(108 * s), width - pad, height - int(46 * s)]
+    d.rounded_rectangle(box, radius=int(14 * s), fill=(27, 36, 51))
+    d.text(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), tag, font=tag_font, fill=(242, 169, 59), anchor="mm")
     return card, rects
 
 
