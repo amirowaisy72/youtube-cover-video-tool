@@ -13,6 +13,7 @@ import { AppProvider, useApp } from "@/lib/app-store";
 import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
 import { TopBar } from "@/components/TopBar";
 import { ActiveJobsBar } from "@/components/ActiveJobsBar";
+import { ColabHost } from "@/components/ColabPanel";
 
 function NotFoundComponent() {
   return (
@@ -119,6 +120,7 @@ function RootComponent() {
       <AppProvider>
         <TopBar />
         <ActiveJobsBar />
+        <ColabHost />
         <main className="mx-auto max-w-6xl px-6 py-10">
           <LockGate>
             <Outlet />

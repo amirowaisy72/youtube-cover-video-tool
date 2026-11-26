@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/lib/app-store";
 import { connectYoutubeFlow, saveYoutubeCredentials, youtubeStatus } from "@/lib/api";
 import { SETUP_DOWNLOAD_URL } from "@/lib/setup";
+import { ColabButton } from "@/components/ColabPanel";
 
 export function TopBar() {
   const { credits, licensed, freeMode, installed, licenseKey, licenseError, activate, activeChannelId, setActiveChannelId } = useApp();
@@ -124,6 +125,7 @@ export function TopBar() {
             here are gone. Every tool, including Presets, is reached
             from Home, and each page has a ← Home button. */}
         <div className="ml-auto flex items-center gap-3">
+          <ColabButton />
           <div className="relative">
             {ytConnected === true ? (
               <>

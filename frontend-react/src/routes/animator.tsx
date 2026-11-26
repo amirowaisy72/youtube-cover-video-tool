@@ -1,3 +1,4 @@
+import { ColabEstimate, openColab } from "@/components/ColabPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AssetLibrary } from "@/components/AssetLibrary";
@@ -551,8 +552,9 @@ function Animator() {
               Uses the Voice Cloner engine on your computer for EVERY voice (Edge / Unreal too), in the mood of each line.
               Slower than plain voices (like cloning), but voiced lines are kept, so re-renders are instant.
               Needs the Voice Cloner set up once. A Gemini key also lets you pick “🎭 Gemini” voices in Character Studio.
-              Faster: connect ⚡ Colab GPU voices in the Dashboard.
+              <button type="button" className="underline" onClick={openColab}>Faster: ⚡ connect Google Colab</button>.
             </p>
+            {acting && <ColabEstimate chars={script.length || undefined} />}
           </div>
 
           <div>

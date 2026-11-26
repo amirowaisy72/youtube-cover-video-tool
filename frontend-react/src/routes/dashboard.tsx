@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/TopBar";
+import { ColabLight, openColab, useColab } from "@/components/ColabPanel";
 import { ttsQuota, validateStockKey, youtubeStatus } from "@/lib/api";
 import { useApp } from "@/lib/app-store";
 import { getKey, installDashboardButton, KEY_INFO, type KeyId, type KeyInfo, maskKey, setKey, useKey } from "@/lib/config";
@@ -113,80 +114,24 @@ function KeyRow({ info }: { info: KeyInfo }) {
   );
 }
 
-type Colab = { set: boolean; url: string; ok: boolean; gpu: boolean; error: string };
 type Engine = { installed: boolean; installing: boolean; device: string | null; model_cached: boolean };
 
 function ColabRow() {
-  const [st, setSt] = useState<Colab | null>(null);
-  const [line, setLine] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  const load = async () => {
-    try {
-      const r = await fetch("/api/animator/config/colab");
-      setSt((await r.json()) as Colab);
-    } catch {
-      setSt(null);
-    }
-  };
-  useEffect(() => { void load(); }, []);
-
-  const save = async () => {
-    setBusy(true); setErr("");
-    try {
-      const r = await fetch("/api/animator/config/colab", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: line.trim() }),
-      });
-      const data = (await r.json()) as Colab & { detail?: string };
-      if (!r.ok) throw new Error(data.detail || "Could not save");
-      setSt(data); setLine("");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not save");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const remove = async () => {
-    setBusy(true);
-    try {
-      const r = await fetch("/api/animator/config/colab", { method: "DELETE" });
-      setSt((await r.json()) as Colab);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const pill = !st ? <StatusPill ok={false} text="…" />
-    : !st.set ? <StatusPill ok={false} text="○ Not set (this computer only)" />
-    : st.ok ? <StatusPill ok text={st.gpu ? "✓ Connected · GPU" : "✓ Connected"} />
-    : <StatusPill ok={false} warn text="✗ Not answering" />;
-
+  const st = useColab();
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2"><span className="font-semibold">⚡ Colab GPU voices</span>{pill}</div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Makes the acting / cloned voices on Google Colab's free GPU — the same voice engine and settings, 5–10× faster.
-            Run the <b>YTGuru_Colab_Voices</b> notebook on colab.research.google.com, then paste the line it prints here.
-            If Colab stops, this computer simply carries on.
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Used by: Story Animator, Auto Video (acting & cloned voices)</p>
-          {st?.set && <p className="mt-1 text-xs text-muted-foreground break-all">{st.url}</p>}
-          {st?.set && !st.ok && st.error && <p className="mt-1 text-xs text-amber-300">{st.error}</p>}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">⚡ Google Colab (free GPU)</span>
+            {st && <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold"><ColabLight st={st} /></span>}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">Makes your cloned and acting voices on Google's graphics chip, much faster than this computer. One notebook, with a picture guide.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Used by: Story Animator, Auto Video, Visual Explainer (cloned & acting voices)</p>
+          {st?.error && <p className="mt-1 text-xs text-amber-300">{st.error}</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {st?.set && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void load()}>Test</button>}
-          {st?.set && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void remove()}>Remove</button>}
-        </div>
+        <button className="btn btn-primary btn-sm" onClick={openColab}>⚡ Connect Google Colab</button>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <input className="field min-w-0 flex-1" value={line} placeholder="https://….trycloudflare.com  code   (the whole line from Colab)"
-          onChange={(e) => setLine(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && line.trim()) void save(); }} />
-        <button className="btn btn-primary btn-sm" disabled={busy || !line.trim()} onClick={() => void save()}>{busy ? "Checking…" : st?.set ? "Replace" : "Save"}</button>
-      </div>
-      {err && <p className="mt-2 text-xs text-amber-300">{err}</p>}
     </div>
   );
 }

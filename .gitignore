@@ -15,3 +15,7 @@ source_cache/
 data_cache/
 text_cache/
 manim-error.log
+colab_voice.txt
+colab_voice.log
+colab_settings.json
+presenter/

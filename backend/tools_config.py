@@ -34,18 +34,9 @@ def _colab_file():
 
 
 def _colab_health(url: str, token: str) -> dict:
-    req = urllib.request.Request(url.rstrip("/") + "/health",
-                                 headers={"X-Token": token, "User-Agent": "YTGuru"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            data = json.loads(r.read().decode())
-        return {"ok": True, "gpu": bool(data.get("gpu")), "error": ""}
-    except urllib.error.HTTPError as exc:
-        why = "wrong code (copy the WHOLE line again)" if exc.code == 403 else f"error {exc.code}"
-        return {"ok": False, "gpu": False, "error": why}
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "gpu": False,
-                "error": f"not reachable — is the Colab tab still running? ({str(exc)[:80]})"}
+    import colab_link
+    got = colab_link.health(url, token)
+    return {"ok": got["ok"], "gpu": got["gpu"], "error": got["error"]}
 
 
 @router.get("/colab")
@@ -63,21 +54,15 @@ class ColabLine(BaseModel):
 
 @router.post("/colab")
 def colab_save(body: ColabLine) -> dict:
-    parts = body.line.strip().split()
-    if len(parts) < 2 or not parts[0].startswith("https://"):
-        raise HTTPException(400, "Paste the whole line the Colab notebook printed: the https://… link, a space, then the code.")
-    url, token = parts[0].rstrip("/"), parts[1]
-    _colab_file().write_text(f"{url} {token}\n", encoding="utf-8")
-    ta = _ta()
-    ta._COLAB_STATE["dead_until"] = 0.0  # use it right away
-    ta._COLAB_STATE["sent"].clear()
-    ta._COLAB_STATE.pop("no_best", None)
-    return {"set": True, "url": url, **_colab_health(url, token)}
+    import colab_link
+    st = colab_link.connect(colab_link.Line(line=body.line))
+    return {"set": True, "url": st["url"], "ok": st["state"] == "connected", "gpu": st["gpu"], "error": st["error"]}
 
 
 @router.delete("/colab")
 def colab_remove() -> dict:
-    _colab_file().unlink(missing_ok=True)
+    import colab_link
+    colab_link.disconnect()
     return {"set": False, "url": "", "ok": False, "gpu": False, "error": ""}
 
 

@@ -76,6 +76,8 @@ import tools_script  # noqa: E402
 import tools_source  # noqa: E402
 import tools_review  # noqa: E402
 import tools_hooks  # noqa: E402
+import colab_link  # noqa: E402
+import tools_talk  # noqa: E402
 import tools_stock  # noqa: E402
 import tools_channel  # noqa: E402
 import tools_voiceclone  # noqa: E402
@@ -423,6 +425,8 @@ app.include_router(tools_script.router)
 app.include_router(tools_source.router)
 app.include_router(tools_review.router)
 app.include_router(tools_hooks.router)
+app.include_router(colab_link.router)
+app.include_router(tools_talk.router)
 app.include_router(tools_stock.router)
 app.include_router(tools_channel.router)
 app.include_router(tools_voiceclone.router)

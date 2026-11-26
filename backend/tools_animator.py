@@ -2007,7 +2007,6 @@ def _colab_reason(exc: Exception) -> str:
     if "500" in t:
         return "the voice server on Colab had an error"
     return t[:120]
-    _VOICE_PROBLEMS.append(f"Colab voice: {str(exc)[:150]} (this computer made the line)")
 
 
 def _colab_post(remote: tuple[str, str], path: str, body: dict, timeout: int = 90) -> dict:
@@ -2087,8 +2086,9 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
     words = max(1, len(re.findall(r"[A-Za-z']+", text)))
     expected = 0.25 + words * 0.36  # seconds, normal talking pace
     exag = min(0.85, float((prosody or {}).get("exaggeration", 0.45)))
-    remote = _colab_target()
+    import colab_link
     why = ""
+    remote = colab_link.target()  # waits here when Colab stopped in the middle of a job
     if remote is None:
         import time as _t0
         if not (BASE_DIR / "colab_voice.txt").exists():
@@ -2098,14 +2098,16 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
         else:
             why = "the Colab line in the Dashboard is not complete"
     cap0 = int(25 * (expected * 2.0 + 1.5)) + 40
-    if remote:
-        # newer Colab notebook: the whole line (all takes) in one call
+    # newer Colab notebook: the whole line (all takes) in one call
+    rounds, whole_line = 0, True
+    while remote and whole_line:
         import time as _tb
         for attempt_b in range(3):
             try:
                 t0 = _tb.time()
                 res = _colab_best(remote, _speakable(text), ref, exag, expected, cap0)
                 if res is None:
+                    whole_line = False  # an older notebook: one call per take, below
                     break
                 sig, sr, gpu, takes = res
                 if sr != SAMPLE_RATE:
@@ -2113,11 +2115,12 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
                     sig = np.interp(idx, np.arange(len(sig)), sig).astype(np.float32)
                 total = _tb.time() - t0
                 _colab_log(f"ok {total:.1f}s (gpu {gpu:.1f}s, {takes} take(s), link {max(0.0, total - gpu):.1f}s) {len(text)} chars")
-                if _ENGINE["where"] == "cpu" or attempt_b:
+                if _ENGINE["where"] == "cpu" or attempt_b or rounds:
                     _ENGINE["last_retry"] = _tb.strftime("%H:%M:%S") + " ✓ Google answered again"
                 _engine_note("colab", total, "")
                 _ENGINE["gpu"] = gpu
                 _ENGINE["link"] = max(0.0, total - gpu)
+                colab_link.note_success()
                 peak = float(np.max(np.abs(sig))) if len(sig) else 1.0
                 sig = sig if len(sig) else np.zeros(SAMPLE_RATE // 4, dtype=np.float32)
                 return array("h", (sig / (peak or 1.0) * 0.9 * 32767).astype(np.int16).tobytes())
@@ -2128,7 +2131,9 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
                 else:
                     _colab_failed(exc)
                     why = _ENGINE["reason"]
-                    remote = None
+                    # pause until Colab is back; after two returns this computer makes the line
+                    remote = colab_link.after_failure(colab_link.explain(exc)) if rounds < 2 else None
+                    rounds += 1
     model = None if remote else vc._get_model()
     if model is not None:
         _speed_up(model)
@@ -2141,7 +2146,8 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
         # the sentence (a runaway take could be 40 s of mumbling).
         cap = int(25 * (expected * 2.0 + 1.5)) + 40
         got = None
-        if remote:
+        rounds = 0
+        while remote and got is None:
             # The SAME Chatterbox model on Google Colab's free GPU (user,
             # 2026-11-19): same settings, same takes, same cleaning below.
             # A hiccup of the free link is retried (Colab is ~4x faster than this
@@ -2152,18 +2158,21 @@ def _clone_clean(vc, text: str, ref: Path, prosody: dict | None) -> array:
                     t0 = _t.time()
                     got = _colab_take(remote, _speakable(text), ref, settings, cap)
                     _colab_log(f"ok {(_t.time() - t0):.1f}s {len(text)} chars")
-                    if _ENGINE["where"] == "cpu" or attempt_c:
+                    if _ENGINE["where"] == "cpu" or attempt_c or rounds:
                         _ENGINE["last_retry"] = _t.strftime("%H:%M:%S") + " ✓ Google answered again"
                     _engine_note("colab", _t.time() - t0, "")
+                    colab_link.note_success()
                     break
                 except Exception as exc:  # noqa: BLE001
                     _colab_log(f"try {attempt_c + 1} failed: {str(exc)[:200]}")
                     if attempt_c < 2:
                         _t.sleep(3 + attempt_c * 5)
                     else:
-                        _colab_failed(exc)  # this computer makes the line; Colab is tried again soon
+                        _colab_failed(exc)
                         why = _ENGINE["reason"]
-                        remote = None
+                        # wait for Colab when wanted, else this computer makes the line
+                        remote = colab_link.after_failure(colab_link.explain(exc)) if rounds < 2 else None
+                        rounds += 1
         if got is None:
             if model is None:
                 model = vc._get_model()
