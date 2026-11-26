@@ -34,6 +34,7 @@ import time
 import uuid
 from pathlib import Path
 
+import ytdl
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -209,8 +210,7 @@ def _download_source(job_id: str, url: str, target: Path) -> dict | None:
                 "quiet": True,
                 "no_warnings": True,
             }
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True) or {}
+            info = ytdl.run(url, opts, note=lambda text: _set(job_id, "downloading", 0, stage=text)) or {}
             if target.exists():
                 return info
             _set(job_id, "failed", 0,
@@ -219,12 +219,13 @@ def _download_source(job_id: str, url: str, target: Path) -> dict | None:
         except ImportError:
             break
         except Exception as exc:  # noqa: BLE001
-            if attempt < 3:
+            problem = ytdl.explain(exc)
+            if attempt < 3 and problem.retry:
                 _set(job_id, "downloading", 0,
                      stage="Download hit a problem — retrying…")
                 time.sleep(5 * attempt)
                 continue
-            _set(job_id, "failed", 0, error=str(exc)[-2000:])
+            _set(job_id, "failed", 0, error=str(problem))
             return None
     # Python module missing: fall back to the yt-dlp binary.
     if not shutil.which("yt-dlp"):
@@ -244,7 +245,7 @@ def _download_source(job_id: str, url: str, target: Path) -> dict | None:
                           **video.no_window_kwargs())
     if proc.returncode != 0 or not target.exists():
         _set(job_id, "failed", 0,
-             error=(proc.stderr or proc.stdout or "yt-dlp failed.")[-2000:])
+             error=str(ytdl.explain(proc.stderr or proc.stdout or "yt-dlp failed.")))
         return None
     return info
 

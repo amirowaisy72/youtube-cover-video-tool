@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-yt-dlp
+yt-dlp[default]
 python-multipart
 Pillow
 google-api-python-client
@@ -8,4 +8,6 @@ google-auth-oauthlib
 edge-tts
 gtts
 faster-whisper
+mediapipe
+opencv-contrib-python
 playwright

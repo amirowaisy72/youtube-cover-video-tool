@@ -77,7 +77,9 @@ import tools_source  # noqa: E402
 import tools_review  # noqa: E402
 import tools_hooks  # noqa: E402
 import colab_link  # noqa: E402
+import ytdl  # noqa: E402
 import tools_talk  # noqa: E402
+import presenter_routes  # noqa: E402
 import tools_stock  # noqa: E402
 import tools_channel  # noqa: E402
 import tools_voiceclone  # noqa: E402
@@ -427,6 +429,7 @@ app.include_router(tools_review.router)
 app.include_router(tools_hooks.router)
 app.include_router(colab_link.router)
 app.include_router(tools_talk.router)
+app.include_router(presenter_routes.router)
 app.include_router(tools_stock.router)
 app.include_router(tools_channel.router)
 app.include_router(tools_voiceclone.router)
@@ -668,10 +671,7 @@ def fetch_original_info(url: str) -> dict:
     the download: on any error it returns empty fields, and the caller
     just shows nothing instead of blocking the video."""
     try:
-        import yt_dlp
-
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
-            info = ydl.extract_info(url, download=False) or {}
+        info = ytdl.info(url)
         return {
             "original_title": info.get("title") or "",
             "original_description": info.get("description") or "",
@@ -783,21 +783,23 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
     _dl_done = False
     _dl_error = None
     _dl_missing = False
+
+    def _note(text: str) -> None:
+        job["note"] = text
+        write_job(job)
+
     for _attempt in range(1, 6):
         try:
-            import yt_dlp
-
             opts = _yt_dlp_download_opts(str(target), hook, _attempt)
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
+            ytdl.run(url, opts, note=_note)
             _dl_done = True
             break
         except ImportError:
             _dl_missing = True
             break
-        except Exception as exc:  # noqa: BLE001
+        except ytdl.DownloadProblem as exc:
             _dl_error = exc
-            if _attempt < 5:
+            if _attempt < 5 and exc.retry:
                 _time.sleep(10 * _attempt)
                 continue
             break
@@ -836,7 +838,7 @@ def _run_download(job_id: str, url: str, target: Path) -> None:
                 _time.sleep(5 * _attempt)
                 continue
             job["status"] = "failed"
-            job["error"] = (proc.stderr or proc.stdout or "yt-dlp failed.")[-2000:]
+            job["error"] = str(ytdl.explain(proc.stderr or proc.stdout or "yt-dlp failed."))
             write_job(job)
             return
         if not _cli_ok:
@@ -956,8 +958,6 @@ def _run_auto_impl(
     _dl_error = None
     for _attempt in range(1, 6):
         try:
-            import yt_dlp
-
             def hook(d: dict) -> None:
                 total = d.get("total_bytes") or d.get("total_bytes_estimate")
                 downloaded = d.get("downloaded_bytes", 0) or 0
@@ -965,13 +965,12 @@ def _run_auto_impl(
                 _set("downloading", round(pct * 0.25, 1))
 
             opts = _yt_dlp_download_opts(str(source), hook, _attempt)
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
+            ytdl.run(url, opts, note=lambda text: _set("downloading", 0, {"note": text}))
             _dl_error = None
             break
         except Exception as exc:  # noqa: BLE001
-            _dl_error = exc
-            if _attempt < 5:
+            _dl_error = ytdl.explain(exc)
+            if _attempt < 5 and _dl_error.retry:
                 _set("downloading (connection retry…)", 0, {"status": "downloading"})
                 _time.sleep(10 * _attempt)
                 continue

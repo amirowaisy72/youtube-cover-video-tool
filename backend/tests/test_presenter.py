@@ -62,6 +62,7 @@ class FlowTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         patches = [mock.patch.object(ta, "BASE_DIR", Path(self.tmp.name)),
+                   mock.patch.object(t, "audio_dir", lambda: Path(self.tmp.name)),
                    mock.patch.object(t, "download_audio", self.fake_download),
                    mock.patch.object(t, "transcribe", lambda a, f, p: ([{"start": 0.0, "end": 3.0, "text": "Original words here."}], "en"))]
         for p in patches:
@@ -70,7 +71,7 @@ class FlowTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.spoken: list[str] = []
 
-    def fake_download(self, url, folder, flag, progress):
+    def fake_download(self, url, folder, flag, progress, note=None):
         f = folder / "source.m4a"
         f.write_bytes(b"x")
         return f, {"title": 'A "great" video', "channel": "Someone", "duration": 65.0, "page": url}

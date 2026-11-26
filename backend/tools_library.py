@@ -23,11 +23,12 @@ ROOTS = {
     "jobs": ("cover", "Cover Video / other tools"),
     "groups": ("cover", "Cover Video (group)"),
     "tts": ("voice", "Text to Voice"),
+    "presenter": ("presenter", "Talking Presenter"),
 }
 VIDEO_EXT = (".mp4", ".webm", ".mov", ".mkv")
 AUDIO_EXT = (".mp3", ".wav", ".m4a")
 BUSY = {"running", "rendering", "audio", "planning", "voicing", "queued", "writing", "backgrounds", "uploading",
-        "processing", "downloading", "collecting", "starting"}
+        "processing", "downloading", "collecting", "starting", "working"}
 _ID = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 
 
@@ -164,6 +165,12 @@ def delete(root: str, item: str, keep_final: bool = False) -> dict:
     if p.is_dir() and _busy(job, p):
         raise HTTPException(409, "This video is still being made — wait until it finishes (if it got stuck because the app was closed, try again in 10 minutes).")
     before = _size(p)
+    if root == "presenter" and p.is_dir():  # its saved original audio lives on another drive
+        try:
+            import tools_talk
+            tools_talk.remove_audio(item)
+        except Exception as exc:  # noqa: BLE001
+            print("presenter audio not removed:", exc)
     if keep_final:
         if not p.is_dir():
             raise HTTPException(400, "Nothing to clean here.")

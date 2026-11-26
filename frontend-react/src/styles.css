@@ -134,3 +134,6 @@
 @utility animate-kenburns { animation: kenburns 9s ease-in-out infinite; }
 @utility animate-floaty { animation: floaty 4s ease-in-out infinite; }
 @utility animate-pulseglow { animation: pulseglow 1.4s ease-in-out infinite; }
+
+/* Error messages may have several lines (e.g. what to do for each browser). */
+.text-destructive { white-space: pre-line; overflow-wrap: anywhere; }

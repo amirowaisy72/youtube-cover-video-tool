@@ -116,7 +116,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/70 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-xl btn-primary p-0 text-lg">▶</span>
           <span className="font-display text-xl font-bold">YT <span className="text-gradient">Guru</span></span>
@@ -124,7 +124,7 @@ export function TopBar() {
         {/* Top nav removed entirely (user, 2026-11-07): the names up
             here are gone. Every tool, including Presets, is reached
             from Home, and each page has a ← Home button. */}
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <ColabButton />
           <div className="relative">
             {ytConnected === true ? (

@@ -15,6 +15,7 @@ import json
 import subprocess
 from urllib.parse import urlparse
 
+import ytdl
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -152,27 +153,25 @@ def _summarize(info: dict) -> dict:
     }
 
 
+_last_problem: list[str] = []  # why the last video could not be read, in plain words
+
+
 def _extract_info(url: str) -> dict | None:
     """Raw yt-dlp info dict, or None on any failure. No download.
 
     Same two-step pattern as main.py fetch_original_info: the
     Python API first, the yt-dlp CLI (-J) as fallback."""
     try:
-        import yt_dlp
-
-        with yt_dlp.YoutubeDL({
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "skip_download": True,
-            "socket_timeout": 15,
-        }) as ydl:
-            info = ydl.extract_info(url, download=False) or {}
+        info = ytdl.info(url, {"socket_timeout": 15})
         # A playlist link still resolves to its first video.
         if info.get("_type") == "playlist":
             entries = info.get("entries") or []
             info = entries[0] if entries else {}
         return info or None
+    except ytdl.DownloadProblem as exc:
+        _last_problem[:] = [str(exc)]
+        if not exc.retry:
+            return None
     except Exception:
         pass
     try:
@@ -225,6 +224,7 @@ def inspect_video(payload: InspectorRequest) -> dict:
     if not info:
         raise HTTPException(
             404,
+            _last_problem[0] if _last_problem else
             "Could not read that video — it may be private, deleted, "
             "age-restricted, or the link may be wrong. Check the link and try again.",
         )
@@ -236,16 +236,7 @@ def _flat_entries(target: str) -> list[dict]:
     channel's /videos page, or [] on any failure. Same two-step
     pattern as _extract_info: Python API first, CLI fallback."""
     try:
-        import yt_dlp
-
-        with yt_dlp.YoutubeDL({
-            "quiet": True,
-            "no_warnings": True,
-            "extract_flat": True,
-            "skip_download": True,
-            "socket_timeout": 20,
-        }) as ydl:
-            info = ydl.extract_info(target, download=False) or {}
+        info = ytdl.info(target, {"extract_flat": True, "noplaylist": False, "socket_timeout": 20})
         entries = info.get("entries") or []
         return [e for e in entries if isinstance(e, dict) and e.get("id")]
     except Exception:

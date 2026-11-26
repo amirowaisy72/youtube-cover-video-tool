@@ -35,7 +35,7 @@ const toolList = [
   { to: "/auto-video", title: "Auto Video from Title", desc: "Type a title, pick a length — a stock-footage video with voice, music and graphics, scene by scene.", img: scene3, cta: "Build a video" },
   { to: "/animator", title: "Story Animator", desc: "Type a title and minutes — get a finished cartoon video starring your own characters.", img: scene1, cta: "Make a cartoon" },
   { to: "/visual", title: "Visual Explainer", desc: "Explainer videos made only of animated drawings — things that move to show the idea, with a sound for every motion. No stock footage.", img: toolStock, cta: "Make an explainer" },
-  { to: "/presenter", title: "Talking Presenter", desc: "Paste a video link, rewrite it in your own words and voice it. Next parts: a person from your photo presents it. (Parts 1–3 of 9 steps.)", img: scene2, cta: "Start a presenter video" },
+  { to: "/presenter", title: "Talking Presenter", desc: "Paste a video link, rewrite it in your own words, voice it, and let a person from your photo present it over graphics, footage or images.", img: scene2, cta: "Start a presenter video" },
   { to: "/my-videos", title: "My Videos", desc: "Every video you made with any tool — watch, download, or delete old ones to free space on your computer.", img: toolStock, cta: "Open my videos" },
   { to: "/research", title: "Topic Research Lab", desc: "What to make next: keywords with views and low competition, trending now, small-channel wins, niches — and your Channel Doctor.", img: toolKeywords, cta: "Research a topic" },
   { to: "/new-channel", title: "New Channel Wizard", desc: "Start a new channel step by step — niche, name, description, every setting and your launch plan.", img: toolChannel, cta: "Start a channel" },

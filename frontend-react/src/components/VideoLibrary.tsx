@@ -8,7 +8,7 @@ type Item = { root: string; id: string; tool: string; tool_label: string; title:
 type Lib = { items: Item[]; total: number; free: number };
 
 const TOOLS: [string, string][] = [["", "All"], ["visual", "Visual Explainer"], ["autovideo", "Auto Video"],
-  ["animator", "Story Animator"], ["cover", "Cover Video / others"], ["voice", "Voices"]];
+  ["animator", "Story Animator"], ["presenter", "Talking Presenter"], ["cover", "Cover Video / others"], ["voice", "Voices"]];
 
 export function fmtSize(b: number) {
   if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`;
@@ -100,6 +100,9 @@ export function VideoLibrary({ initialTool = "" }: { initialTool?: string }) {
                 Only when the working files are there (folder):
                 without job.json the tool cannot open it. The id
                 IS the backend job id (library folder name). */}
+            {it.folder && it.tool === "presenter" && (
+              <a href={`/presenter?job=${it.id}`} className="btn btn-ghost btn-sm" title="Open this video in the Talking Presenter">↗ Open</a>
+            )}
             {it.folder && (it.tool === "visual" || it.tool === "autovideo") && (
               <Link to={it.tool === "visual" ? "/visual" : "/auto-video"} search={{ job: it.id }} className="btn btn-ghost btn-sm" title="Open this video in its tool — see its current step and change things">↗ Open</Link>
             )}

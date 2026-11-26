@@ -22,6 +22,7 @@ import threading
 import uuid
 from pathlib import Path
 
+import ytdl
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -145,11 +146,15 @@ def _run_trim(job_id: str, url: str, start: float, end: float, target: Path) -> 
             _write_job(job)
 
     # 1) Video info first: title for the UI + duration to validate the range.
+    def note(text: str) -> None:
+        current = _read_job(job_id)
+        current["note"] = text
+        _write_job(current)
+
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
-            info = ydl.extract_info(url, download=False) or {}
-    except Exception as exc:  # noqa: BLE001 - surface yt-dlp's message
-        job.update({"status": "failed", "error": str(exc)[-2000:] or "Could not read this video."})
+        info = ytdl.info(url, note=note)
+    except Exception as exc:  # noqa: BLE001
+        job.update({"status": "failed", "error": str(ytdl.explain(exc))})
         _write_job(job)
         return
     title = str(info.get("title") or "YouTube video")
@@ -189,11 +194,10 @@ def _run_trim(job_id: str, url: str, start: float, end: float, target: Path) -> 
         "noplaylist": True,
     }
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
-    except Exception as exc:  # noqa: BLE001 - surface yt-dlp's message
+        ytdl.run(url, opts, note=note)
+    except Exception as exc:  # noqa: BLE001
         job = _read_job(job_id)
-        job.update({"status": "failed", "error": str(exc)[-2000:] or "Section download failed."})
+        job.update({"status": "failed", "error": str(ytdl.explain(exc))})
         _write_job(job)
         return
 
@@ -281,15 +285,10 @@ def get_trimmer_info(payload: TrimmerInfoRequest) -> dict:
     except ImportError:
         raise HTTPException(400, "yt-dlp is not installed.") from None
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True}) as ydl:
-            info = ydl.extract_info(url, download=False) or {}
-    except Exception as exc:  # noqa: BLE001 - surface yt-dlp's message
+        info = ytdl.info(url)
+    except Exception as exc:  # noqa: BLE001
         raise HTTPException(
-            404,
-            "Could not read that video — it may be private, deleted, "
-            "age-restricted, or the link may be wrong. "
-            "You can still trim by typing the times manually.",
-        ) from exc
+            404, f"{ytdl.explain(exc)}\nYou can still trim by typing the times manually.") from exc
     duration = info.get("duration")
     return {
         "title": str(info.get("title") or "YouTube video"),

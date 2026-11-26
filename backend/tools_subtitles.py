@@ -31,6 +31,7 @@ import threading
 import uuid
 from pathlib import Path
 
+import ytdl
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
@@ -474,16 +475,17 @@ def _run_url(job_id: str, url: str, language: str | None) -> None:
             "socket_timeout": 60,
             "retries": 3,
         }
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
+        ytdl.run(url, opts, note=lambda text: _set(job_id, stage=text))
         audio_files = sorted(directory.glob("audio.*"))
         audio_files = [p for p in audio_files if p.suffix.lower() != ".part"]
         if not audio_files:
             raise RuntimeError("Audio download finished but no file was created.")
         _run_transcribe(job_id, audio_files[0], language)
+    except ytdl.DownloadProblem as exc:
+        _set(job_id, status="failed", progress=0, stage="Failed.", error=str(exc))
     except Exception as exc:  # noqa: BLE001
         _set(job_id, status="failed", progress=0,
-             stage="Failed.", error=str(exc)[-2000:])
+             stage="Failed.", error=ytdl.clean(exc)[-2000:])
 
 
 def _clean_language(raw: str | None) -> str | None:

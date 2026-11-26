@@ -26,6 +26,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
+import ytdl
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -133,14 +134,19 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
     # Best-effort title/duration first (never blocks the download).
     title = ""
     duration = None
+    def note(text: str) -> None:
+        job["note"] = text
+        _write_job(job)
+
     try:
-        import yt_dlp
-        with yt_dlp.YoutubeDL(
-            {"quiet": True, "no_warnings": True, "socket_timeout": 30}
-        ) as ydl:
-            info = ydl.extract_info(url, download=False) or {}
+        info = ytdl.info(url, {"socket_timeout": 30}, note=note)
         title = info.get("title") or ""
         duration = info.get("duration")
+    except ytdl.DownloadProblem as exc:
+        if not exc.retry:  # sign-in, private, removed…: downloading would fail the same way
+            job.update({"status": "failed", "error": str(exc)})
+            _write_job(job)
+            return
     except Exception:
         pass
     if not title:
@@ -215,16 +221,14 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
     error: Exception | None = None
     for attempt in range(1, 4):
         try:
-            import yt_dlp
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
+            ytdl.run(url, opts, note=note)
             done = True
             break
         except ImportError:
             break
-        except Exception as exc:  # noqa: BLE001
+        except ytdl.DownloadProblem as exc:
             error = exc
-            if attempt < 3:
+            if attempt < 3 and exc.retry:
                 time.sleep(5 * attempt)
                 continue
             break
@@ -265,7 +269,7 @@ def _run_download(job_id: str, url: str, fmt: str) -> None:
     else:
         job.update({
             "status": "failed",
-            "error": str(error)[-2000:] if error else "yt-dlp finished but no file was created.",
+            "error": str(ytdl.explain(error)) if error else "yt-dlp finished but no file was created.",
         })
     _write_job(job)
 

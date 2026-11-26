@@ -22,6 +22,7 @@ import threading
 import uuid
 from pathlib import Path
 
+import ytdl
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -145,10 +146,9 @@ def _run_youtube(job_id: str, url: str) -> None:
         "socket_timeout": 60,
     }
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
+        ytdl.run(url, opts, note=lambda text: _write_job({**_read_job(job_id), "note": text}))
     except Exception as exc:  # noqa: BLE001
-        _fail(job_id, "Download failed: " + str(exc)[-1000:])
+        _fail(job_id, str(ytdl.explain(exc)))
         return
     raws = [p for p in directory.glob("source.*")
             if p.suffix.lower() in {".m4a", ".webm", ".opus", ".mp3", ".ogg",

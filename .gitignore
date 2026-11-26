@@ -19,3 +19,7 @@ colab_voice.txt
 colab_voice.log
 colab_settings.json
 presenter/
+presenter_people/
+presenter_models/
+presenter_settings.json
+presenter_speed.json

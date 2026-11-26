@@ -11,5 +11,8 @@
 | World map and places (`world_map()`) | `data/world_countries.json`, `data/world_places.json` | Natural Earth | Public domain. Some borders it shows are disputed. |
 | Chart data (`data_chart()`) | downloaded into `data_cache/` | FRED (St. Louis Fed); World Bank | World Bank: CC BY 4.0 (the on-screen "Source:" line credits it). Some FRED series belong to other owners who restrict re-use; the scene test warns for the ones it detects. |
 | Headlines and web pages (`headlines()`, `source()`) | photographed into `source_cache/` | the linked sites | Belong to their publishers; shown as short quotations with the site named. |
+| Talking Presenter: face points | `face_landmarker.task`, downloaded | MediaPipe (Google) | Apache-2.0 |
+| Talking Presenter: face finder | `yunet.onnx`, downloaded | OpenCV Zoo | MIT |
+| Talking Presenter: cut-out | `rvm.onnx`, downloaded | Robust Video Matting | GPL-3.0: used on this computer, not shipped with the app; it does not restrict the videos |
 
 Rebuild the icon file with `python scripts/make_icon_pack.py <icons.json from the package>`.

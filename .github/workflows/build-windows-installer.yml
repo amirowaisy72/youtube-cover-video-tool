@@ -118,6 +118,7 @@ jobs:
             --collect-all pydantic `
             --collect-all uvicorn `
             --collect-all yt_dlp `
+            --collect-all yt_dlp_ejs `
             --collect-all PIL `
             --collect-all edge_tts `
             --collect-all gtts `
@@ -133,6 +134,8 @@ jobs:
             --collect-all urllib3 `
             --collect-all requests `
             --collect-all faster_whisper `
+            --collect-all mediapipe `
+            --collect-all cv2 `
             --collect-all ctranslate2 `
             --collect-all av `
             --collect-all tokenizers `
