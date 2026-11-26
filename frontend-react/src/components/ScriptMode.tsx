@@ -70,6 +70,15 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
       setCode((c) => c || s.code || "");
     } catch { /* storyboard not ready yet */ }
   };
+  // the Hook builder changed scene 1's code: take the saved code, so a later "Save & test" keeps the hook
+  useEffect(() => {
+    const on = () => {
+      void fetch(`/api/visual/script/${jobId}`).then((r) => j<Status>(r)).then((s) => { setSt(s); setCode(s.code || ""); }).catch(() => undefined);
+    };
+    window.addEventListener("ytguru-code-changed", on);
+    return () => window.removeEventListener("ytguru-code-changed", on);
+  }, [jobId]);
+
   const loadReviews = async () => {
     try { setRv(await j<Reviews>(await fetch(`/api/visual/script/review/${jobId}`))); } catch { /* no storyboard yet */ }
   };
@@ -116,6 +125,7 @@ export function ScriptMode({ jobId, onScene, startOpen = false, onMainSaved }: {
       }
     }
     setBusy("");
+    window.dispatchEvent(new Event("ytguru-sources-changed"));
   };
 
   const save = async (text: string, replace: boolean) => {

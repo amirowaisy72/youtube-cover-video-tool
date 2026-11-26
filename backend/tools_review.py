@@ -165,6 +165,12 @@ def review_scene(app, job_id: str, index: int, key: str, st: dict) -> None:
     except Exception as exc:  # noqa: BLE001 — this scene failed, the others go on
         result = {"verdict": "error", "error": str(exc)[:300], "problems": [], "seen": "", "code": "", "code_error": ""}
     _store(app, job_id, index, code, {"script_review": {**result, "for": code_key(code), "at": time.time()}})
+    if sc.get("auto_sources"):  # pages used by a scene that was tested for this review
+        import tools_source
+        with ts._LOCK:
+            fresh = app._av_read(job_id)
+            if tools_source.add_found(fresh, sc["auto_sources"]):
+                app._av_write(fresh)
 
 
 def _worker(app, job_id: str, indexes: list[int], key: str) -> None:

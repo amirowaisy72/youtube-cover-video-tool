@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/TopBar";
 import { useApp } from "@/lib/app-store";
 import { StudioPresenter } from "@/components/StudioPresenter";
 import { SourcesPanel } from "@/components/SourcesPanel";
+import { HookBuilder } from "@/components/HookBuilder";
 import { ApiError, api, autovideoCompress, autovideoJob, autovideoMusicOptions, autovideoNumberPopups, autovideoPlan, autovideoPrepareAudio, autovideoRealisticWords, autovideoRemixMusic, autovideoRemixVolume, autovideoRender, autovideoRevoice, autovideoSaveRealisticWords, autovideoSceneAlternatives, autovideoSceneFileUrl, autovideoSceneUpload, autovideoSceneVisual, autovideoTrim, autovideoUpload, ttsPreview, ttsProviderVoices, ttsProviders, ttsQuota, type AvJob, type AvMusicOptions, type AvScene, type AvSceneAlternatives, type AvUploadResult, type RealisticWord, type TtsProvider, type TtsVoice, type TtsVoiceOption, voiceCloneList, youtubeStatus } from "@/lib/api";
 import { getChannelNiche, setChannelNiche } from "@/lib/keys";
 import { getKey, installDashboardButton, type KeyId, useKey } from "@/lib/config";
@@ -1765,6 +1766,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
             if (n > 0 && autoRef.current?.jobId === job.id) void startAudio();
           }} />}
           {visual && design === "gemini" && <SimpleScenesBar job={job} onScene={(i, sc) => setJob((j) => (j ? { ...j, scenes: (j.scenes || []).map((x, k) => (k === i ? { ...x, ...sc } : x)) } : j))} />}
+          {visual && <HookBuilder jobId={job.id} onApplied={() => { void autovideoJob(job.id).then((j) => setJob(j)).catch(() => undefined); }} />}
           {visual && <MyShapes jobId={job.id} />}
           <div className="flex gap-3">
             <button className="btn btn-ghost" onClick={() => { setJob(null); setJobId(null); setPhase("form"); setAutoMode(false); autoRef.current = null; openJobIdRef.current = null; void navigate({ to: ROUTE, search: {} }); }}>← Back to setup</button>
@@ -1783,6 +1785,7 @@ FORMAT: plain spoken narration only. No title, no headings, no labels, no stage 
           here before the render. */}
       {phase === "audio" && job && (
         <div className="mx-auto max-w-2xl space-y-4">
+          {visual && <HookBuilder jobId={job.id} onApplied={() => { void autovideoJob(job.id).then((j) => setJob(j)).catch(() => undefined); }} />}
           <div className="glass p-6">
             <h3 className="text-xl font-bold">{job.title || title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">

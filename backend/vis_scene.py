@@ -45,6 +45,12 @@ except Exception:  # noqa: BLE001
     pass
 
 config.background_color = K.BG
+# Pango's finished texts are kept between renders (drawing a new one takes about 0.1 s on Windows)
+try:
+    (HERE.parent / "text_cache").mkdir(exist_ok=True)
+    config.text_dir = str(HERE.parent / "text_cache")
+except OSError:
+    pass
 W, H = config.frame_width, config.frame_height
 TALL = H > W
 if TALL:  # a Short: the same 16:9 stage, full width, in the middle of the tall picture

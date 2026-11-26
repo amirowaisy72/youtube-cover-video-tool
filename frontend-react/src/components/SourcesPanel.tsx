@@ -14,6 +14,18 @@ export function SourcesPanel({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
 
+  // a scene test may add pages (data charts, headlines) to the list
+  const [stamp, setStamp] = useState(0);
+  useEffect(() => {
+    const on = () => setStamp((n) => n + 1);
+    window.addEventListener("ytguru-sources-changed", on);
+    return () => window.removeEventListener("ytguru-sources-changed", on);
+  }, []);
+  useEffect(() => {
+    if (edit) return;
+    api<Data>(`/api/sources/${jobId}`).then((d) => { setData(d); setText(d.text); }).catch(() => undefined);
+  }, [stamp]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     setData(null);
     setChecks([]);

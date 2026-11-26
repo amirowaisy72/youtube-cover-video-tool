@@ -12,4 +12,6 @@ __pycache__/
 backend/settings.json
 .dev-unlock
 source_cache/
+data_cache/
+text_cache/
 manim-error.log

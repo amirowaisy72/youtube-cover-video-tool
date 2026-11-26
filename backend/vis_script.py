@@ -21,6 +21,9 @@ from manim import DOWN, LEFT, RIGHT, UP, FadeIn, Rectangle, UpdateFromAlphaFunc,
 
 import vis_scene as V
 import vis_people as P
+import vis_data
+import vis_map
+import vis_mascot
 import vis_master
 import vis_sets
 import vis_transitions
@@ -83,7 +86,9 @@ class ScriptScene(V.Visual):
         self.speed = 1.0
         self._n = 0
         self._pos = 0
-        self.floor_rect = Rectangle(width=W * 3, height=6, fill_color=K.GROUND, fill_opacity=1, stroke_width=0).move_to([0, GROUND_Y - 3.0, 0])
+        deep = 16 if config.pixel_height > config.pixel_width else 6  # in a Short the ground reaches the bottom of the picture
+        self.floor_rect = Rectangle(width=W * 3, height=deep, fill_color=K.GROUND, fill_opacity=1,
+                                    stroke_width=0).move_to([0, GROUND_Y - deep / 2, 0])
         self.add(self.floor_rect)
         self.scenery = []  # the setting's layers: they stay through clear()
         frame = self.camera.frame
@@ -469,8 +474,6 @@ class ScriptScene(V.Visual):
             back, far, near = vis_sets.build(key, GROUND_Y)
             marks = vis_sets.floor_details(key, GROUND_Y)
             S.floor_rect.set_fill(vis_sets.PALETTE[key][1])
-            if config.pixel_height > config.pixel_width and S.floor_rect.height < 15:  # a Short: the ground reaches the bottom of the picture
-                S.floor_rect.stretch_to_fit_height(16).move_to([0, GROUND_Y - 8.0, 0])
             for layer, follow, drift in ((far, 0.45, -0.22), (near, 0.2, -0.4)):
                 state = {"t": 0.0, "off": np.zeros(3)}
 
@@ -497,6 +500,79 @@ class ScriptScene(V.Visual):
 
         def color(name):
             return K.col(name, K.CREAM)
+
+        def headlines(pages, when_words=None, until=None, hold=None):
+            """2-4 real headlines of the source pages slam onto the screen one after another, then leave."""
+            import headline_view
+            items = []
+            for entry in list(pages)[:4]:
+                url, own = (str(entry[0]), str(entry[1])) if isinstance(entry, (list, tuple)) else (str(entry), "")
+                d = next((h for h in SPEC.get("headlines") or [] if h.get("url") == url), None) or {}
+                domain = d.get("domain") or url.split("//")[-1].split("/")[0].replace("www.", "")
+                item = {"domain": domain, "site": d.get("site"), "date": d.get("date")}
+                if d.get("ok"):
+                    item.update(image=d.get("image"), headline=d.get("headline"))
+                elif d.get("headline"):
+                    item.update(headline=d["headline"])
+                    S.warnings.append(f"headlines({domain}): {d.get('reason')} — its title is shown as text")
+                elif own.strip():
+                    item.update(headline=own.strip()[:200], summary=True, date="")
+                    S.warnings.append(f"headlines({domain}): {d.get('reason') or 'not captured'} — your own text is shown, "
+                                      'marked "summary". Check the page really says this')
+                else:
+                    S.warnings.append(f"headlines({domain}): {d.get('reason') or 'not captured'} — left out")
+                    continue
+                items.append(item)
+            left = S.total - S.t
+            if not items or left < 1.2:
+                S.warnings.append("headlines(): nothing to show" if not items else
+                                  "headlines(): called too close to the end of the scene")
+                return 0
+            n, t0 = len(items), S.t
+            words_ = [when_words] if isinstance(when_words, str) else list(when_words or [])
+            gap = min(1.7, max(0.5, (left - 1.2) / n))
+            times, prev = [], 0.0
+            for i in range(n):
+                t = None
+                if i < len(words_) and words_[i]:
+                    before = len(S.warnings)
+                    spoken = at(words_[i])
+                    if not any("not found" in w for w in S.warnings[before:]):
+                        t = spoken - t0
+                if t is None or (i == 0 and t > 2.5):
+                    t = 0.35 if i == 0 else prev + gap
+                t = max(t, prev + 0.4 if i else 0.3)
+                t = min(t, left - 0.5 - 0.3 * (n - 1 - i))
+                times.append(t)
+                prev = t
+            if until is not None:
+                end = at(until) - t0
+            else:
+                end = times[-1] + (max(0.3, num(hold, 1.8)) if hold is not None else 1.8)
+            end = max(end, times[-1] + 0.5)
+            if left - end < (0.6 if until is not None else 2.5):  # stay to the end rather than leave an empty stage
+                end = left
+            leaves = left - end > 0.05
+            view = headline_view.Montage(items, config.pixel_width, config.pixel_height)
+            view.timeline(times, end, leaves)
+            for t in times:
+                S.snd("whoosh", max(0.0, t - 0.22))
+                S.snd("thud", t)
+            if leaves:
+                S.snd("swoosh_down", end - headline_view.EXIT)
+            frame = S.camera.frame
+            img = _M.ImageMobject(view.frame(0.0))
+            img.set_resampling_algorithm(_M.RESAMPLING_ALGORITHMS["linear"])
+            img.scale_to_fit_height(frame.height).move_to(frame.get_center())
+
+            def draw(mob, alpha):
+                mob.pixel_array = view.frame(alpha * end)
+                mob.orig_alpha_pixel_array = mob.pixel_array[..., 3].copy()
+            S.play(UpdateFromAlphaFunc(img, draw), run_time=end, rate_func=rate_functions.linear)
+            S.t += end
+            if leaves:
+                S.remove(img)
+            return end
 
         def source(url, quote, highlight_words=None, until=None, hold=None):
             """The REAL web page as proof: it floats in, the camera zooms to the quoted sentence, the paragraph
@@ -572,8 +648,11 @@ class ScriptScene(V.Visual):
             "FLOOR": GROUND_Y, "TOP": YMAX - 0.4, "XMAX": XMAX, "YMIN": YMIN, "W": W, "H": H, "DURATION": S.total,
             "ORANGE": K.ORANGE, "TEAL": K.TEAL, "GOLD": K.GOLD, "CREAM": K.CREAM, "RED": K.RED, "GREEN": K.GREEN,
             "BLUE": K.BLUE, "PURPLE": K.PURPLE, "PINK": K.PINK, "SLATE": K.SLATE, "INK": K.INK, "BG": K.BG, "GREY": K.GREY,
-            "BROWN": K.BROWN, "source": source, "SERIF": K.SERIF, "FONT": K.FONT, "rate": rate_functions, "FadeIn": FadeIn,
+            "BROWN": K.BROWN, "source": source, "headlines": headlines, "SERIF": K.SERIF, "FONT": K.FONT, "rate": rate_functions, "FadeIn": FadeIn,
             "UP": UP, "DOWN": DOWN, "LEFT": LEFT, "RIGHT": RIGHT,
         }
         tools.update(vis_master.make(S, tools, str(SPEC.get("narration") or "")))  # compound(), revenue_split() ...
+        tools.update(vis_data.make(S, tools, str(SPEC.get("narration") or ""), SPEC.get("data")))  # data_chart()
+        tools.update(vis_map.make(S, tools))  # world_map(), fly_to(), pin() ...
+        tools.update(vis_mascot.make(S, tools))  # mascot(), react(), point_at(), flip_coin()
         return tools

@@ -16,6 +16,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+import vis_data
+import vis_map
+import vis_mascot
 import vis_master
 
 router = APIRouter(prefix="/api/visual/script", tags=["visual-script"])
@@ -63,6 +66,11 @@ def check(code: str) -> tuple[str, list[str]]:
             fn = node.func.id
             if fn == "transition" and any(not isinstance(a, ast.Constant) for a in [*node.args, *[k.value for k in node.keywords]]):
                 return (f"line {line}: transition() needs plain text, e.g. transition(\"whip\", \"in\")."), []
+            if fn == "data_chart" and not _data_args(node):
+                return (f"line {line}: data_chart() needs the series as plain text: data_chart(\"fred:CPIAUCSL\")."), []
+            if fn == "headlines" and not _headline_args(node):
+                return (f"line {line}: headlines() needs a list of page links written as plain text: "
+                        "headlines([\"https://...\", \"https://...\"])."), []
             if fn == "source" and not all(_source_args(node)):
                 return (f"line {line}: source() needs the page link and the quoted sentence written as plain text: "
                         'source("https://...", "the exact sentence").'), []
@@ -87,6 +95,53 @@ def _source_args(node: ast.Call) -> tuple[str, str]:
     Returned exactly as written: vis_script.py matches these strings."""
     url, quote = (v.value if isinstance(v, ast.Constant) and isinstance(v.value, str) else "" for v in _source_nodes(node))
     return (url if url.strip().lower().startswith(("http://", "https://")) else ""), (quote if quote.strip() else "")
+
+
+def _plain(node) -> str | None:
+    return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+
+def _data_args(node: ast.Call) -> tuple[str, str] | None:
+    """The (series, country) of a data_chart() call written as plain text."""
+    kw = {k.arg: k.value for k in node.keywords}
+    series = _plain(node.args[0] if node.args else kw.get("series"))
+    country_node = node.args[1] if len(node.args) > 1 else kw.get("country")
+    country = "" if country_node is None else _plain(country_node)
+    return (series, country) if series and country is not None else None
+
+
+def _headline_args(node: ast.Call) -> list[tuple[str, str]] | None:
+    """The [(url, own text or "")] of a headlines() call written as plain text."""
+    kw = {k.arg: k.value for k in node.keywords}
+    first = node.args[0] if node.args else kw.get("pages")
+    if not isinstance(first, (ast.List, ast.Tuple)) or not first.elts:
+        return None
+    out = []
+    for el in first.elts:
+        if isinstance(el, (ast.Tuple, ast.List)) and len(el.elts) == 2:
+            url, text = _plain(el.elts[0]), _plain(el.elts[1])
+        else:
+            url, text = _plain(el), ""
+        if not url or text is None or not url.strip().lower().startswith(("http://", "https://")):
+            return None
+        out.append((url, text))
+    return out
+
+
+def _named_calls(code: str, name: str) -> list:
+    try:
+        tree = ast.parse(code or "")
+    except SyntaxError:
+        return []
+    return [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == name]
+
+
+def data_calls(code: str) -> list[tuple[str, str]]:
+    return list(dict.fromkeys(a for a in map(_data_args, _named_calls(code, "data_chart")) if a))
+
+
+def headline_calls(code: str) -> list[tuple[str, str]]:
+    return list(dict.fromkeys(p for a in map(_headline_args, _named_calls(code, "headlines")) if a for p in a))
 
 
 def source_calls(code: str) -> list[tuple[str, str]]:
@@ -159,7 +214,7 @@ def things_of(code: str) -> list[str]:
 
 def masters_of(code: str) -> list[str]:
     """The master scenes (compound(), revenue_split() ...) a scene's code calls."""
-    return [fn for fn, _a, _k in _calls(code) if fn in vis_master.NAMES]
+    return [fn for fn, _a, _k in _calls(code) if fn in vis_master.NAMES or fn == "data_chart"]
 
 
 MAX_USES = 3  # one thing in at most this many scenes of a video
@@ -338,6 +393,21 @@ def spec_for(scene: dict, index: int, work_dir: Path, duration: float, cues=None
         import tools_source
         shots = tools_source.capture_many([(u.strip(), q.strip()) for u, q in calls])
         extra["sources"] = [{**d, "url": u, "quote": q} for (u, q), d in zip(calls, shots)]
+    wanted = data_calls(scene.get("code") or "")
+    if wanted:  # real figures, downloaded here (cached) — the scene code never contains them
+        import tools_data
+        extra["data"] = []
+        for series, country in wanted:
+            got = tools_data.fetch(series, country)
+            code_id = series.split(":", 1)[-1].split("/")[-1].strip().upper()
+            extra["data"].append({**{k: v for k, v in got.items() if k != "at"}, "series": series,
+                                  "country_asked": country, "code": code_id})
+    pages = headline_calls(scene.get("code") or "")
+    if pages:
+        import tools_source
+        shots = tools_source.headlines([u.strip() for u, _t in pages])
+        extra["headlines"] = [{**{k: v for k, v in d.items() if k not in ("at", "blur", "quote")}, "url": u, "own": t}
+                              for (u, t), d in zip(pages, shots)]
     moves = transitions_of(scene.get("code") or "")
     if moves:
         import vis_sets
@@ -537,7 +607,8 @@ enter(half)
 '''
 
 
-GUIDE = GUIDE.replace("CHARACTERS — people who react", vis_master.GUIDE + "CHARACTERS — people who react")
+GUIDE = GUIDE.replace("CHARACTERS — people who react", vis_master.GUIDE + vis_data.GUIDE + vis_map.GUIDE + vis_mascot.GUIDE
+                      + "CHARACTERS — people who react")
 
 
 # General direction rules (user, 2026-11-22): appended to the copied prompt so the AI
@@ -712,6 +783,7 @@ def test_scene(job: dict, index: int, work_dir: Path) -> dict:
                 (work_dir / old).with_suffix(".sfx.json").unlink(missing_ok=True)
             except OSError:
                 pass
+    sc["auto_sources"] = auto_sources(spec)
     old_sheet = (sc.get("script_test") or {}).get("sheet")
     sc["script_test"] = {"ok": ok, "error": rep.get("error") or "", "warnings": warn[:10], "at": time.time()}
     if old_sheet:
@@ -722,6 +794,15 @@ def test_scene(job: dict, index: int, work_dir: Path) -> dict:
         except Exception as exc:  # noqa: BLE001 — the test itself still counts
             print(f"scene {index + 1}: contact sheet failed:", exc)
     return sc["script_test"]
+
+
+def auto_sources(spec: dict) -> list[dict]:
+    """The pages a scene's data_chart() and headlines() really used, for the video's Sources list."""
+    out = [{"url": d["url"], "fact": f"Data: {d.get('title')} ({d.get('source')})"} for d in spec.get("data") or []
+           if d.get("ok")]
+    out += [{"url": h["url"], "fact": f"Headline: {h.get('headline')}"} for h in spec.get("headlines") or []
+            if h.get("headline")]
+    return out
 
 
 def make_sheet(sc: dict, index: int, work_dir: Path, video: Path, words: list, duration: float, mark: float | None = None) -> dict:
@@ -846,6 +927,8 @@ def test(req: TestReq) -> dict:
         fresh = app._av_read(req.job_id)
         fresh["scenes"][req.index].update({k: job["scenes"][req.index].get(k) for k in
                                            ("script_test", "kind", "visual_file", "graphic_file", "visual_source")})
+        import tools_source
+        tools_source.add_found(fresh, job["scenes"][req.index].get("auto_sources"))
         app._av_write(fresh)
     return {"result": res, "scene": fresh["scenes"][req.index]}
 

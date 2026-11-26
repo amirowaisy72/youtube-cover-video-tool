@@ -13,6 +13,7 @@ import math
 import re
 
 import vis_master2
+import vis_text
 
 # ================================================================== numbers (no Manim needed)
 
@@ -244,8 +245,11 @@ class Stage:
         """size = height of a capital letter in stage units (about)."""
         key = (s, round(size, 3), color, serif, round(max_width, 2))
         if key not in self._texts:
-            t = self.M.Text(s, font=self.K.SERIF if serif else self.K.FONT, font_size=int(100 * size * self.k),
-                            color=color or self.K.CREAM, weight="NORMAL" if serif else "BOLD")
+            font, weight = self.K.SERIF if serif else self.K.FONT, "NORMAL" if serif else "BOLD"
+            points, shade = int(100 * size * self.k), color or self.K.CREAM
+            t = vis_text.number(s, font, weight, points, shade) if vis_text.can(s) else None  # numbers: put together quickly
+            if t is None:
+                t = self.M.Text(s, font=font, font_size=points, color=shade, weight=weight)
             if t.width > max_width:
                 t.scale_to_fit_width(max_width)
             self._texts[key] = t

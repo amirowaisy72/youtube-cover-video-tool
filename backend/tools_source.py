@@ -274,6 +274,88 @@ _READ_JS = r"""() => {
 }"""
 
 
+HEADLINE = "(headline)"  # asked for instead of a quote: photograph the page's own headline
+
+_HEADLINE_JS = r"""() => {
+  const seen = (e) => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+    return r.width > 60 && r.height > 10 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.1; };
+  const norm = (t) => (t || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const meta = document.querySelector('meta[property="og:title"]');
+  const og = meta ? (meta.content || '').trim() : '';
+  const titles = [norm(og), norm(document.title)];
+  // the headline is the heading that the page's own title also names (a site's banner is often an h1 too)
+  const score = (h) => {
+    const t = norm(h.innerText);
+    return (t.length >= 12 && titles.some((x) => x && (x.includes(t) || t.includes(x))) ? 100 : 0)
+      + (h.tagName === 'H1' ? 30 : h.tagName === 'H2' ? 8 : 0)
+      + (h.closest('article,main,[role=main],#article,#content') ? 15 : 0)
+      - (h.closest('header,nav,footer,aside,[role=banner],[role=navigation]') && !h.closest('article') ? 40 : 0)
+      + Math.min(20, parseFloat(getComputedStyle(h).fontSize) / 3);
+  };
+  const list = [...document.querySelectorAll('h1,h2,h3')].filter((h) => {
+    const t = (h.innerText || '').trim(); return seen(h) && t.length >= 4 && t.length <= 260; });
+  list.sort((a, b) => score(b) - score(a));
+  if (!list.length || score(list[0]) < 40)
+    return { text: og || (document.title || '').split(/ [|–—-] /)[0].trim(), rect: null };
+  const h = list[0];
+  h.scrollIntoView({ block: 'center' });
+  const range = document.createRange(); range.selectNodeContents(h);
+  const rs = [...range.getClientRects()].filter((r) => r.width > 2 && r.height > 8);
+  const box = rs.length ? rs.reduce((a, r) => ({ l: Math.min(a.l, r.left), t: Math.min(a.t, r.top),
+    r: Math.max(a.r, r.right), b: Math.max(a.b, r.bottom) }), { l: 1e9, t: 1e9, r: -1e9, b: -1e9 }) : null;
+  return { text: h.innerText.trim().replace(/\s+/g, ' '),
+    rect: box ? [box.l + scrollX, box.t + scrollY, box.r - box.l, box.b - box.t] : null };
+}"""
+
+
+def _shoot_headline(page, url: str) -> dict:
+    page.evaluate(_CLEAN_JS)
+    info = page.evaluate(_READ_JS)
+    base = {"site": (info.get("site") or "").strip()[:60], "title": (info.get("title") or "").strip()[:200],
+            "date": str(info.get("date") or "")[:40]}
+    if len(info["words"]) < 30 or re.search(r"(?i)just a moment|access denied|captcha|are you a robot|attention required",
+                                            base["title"]):
+        return {**base, "ok": False, "reason": "the page shows no readable text (blocked, paywall or robot check)"}
+    found = page.evaluate(_HEADLINE_JS)
+    page.wait_for_timeout(500)
+    page.evaluate(_CLEAN_JS)
+    found = page.evaluate(_HEADLINE_JS)
+    text = str(found.get("text") or "").strip()[:260]
+    if not text:
+        return {**base, "ok": False, "reason": "no headline was found on the page"}
+    rect = found.get("rect")
+    if not rect or rect[2] < 80 or rect[3] > 420:
+        return {**base, "ok": False, "headline": text, "reason": "the headline could not be photographed"}
+    _meta, image = _paths(url, HEADLINE)
+    image.parent.mkdir(parents=True, exist_ok=True)
+    # only what is on screen is photographed (a very long page as a whole would take too long)
+    sx, sy = page.evaluate("() => [window.scrollX, window.scrollY]")
+    x, y = max(0, rect[0] - sx - 12), max(0, rect[1] - sy - 10)
+    if x > 1200 or y + rect[3] > 900:
+        return {**base, "ok": False, "headline": text, "reason": "the headline could not be photographed"}
+    page.screenshot(path=str(image), animations="disabled", timeout=45000,
+                    clip={"x": x, "y": y, "width": min(1280 - x, rect[2] + 24), "height": min(900 - y, rect[3] + 20)})
+    return {**base, "ok": True, "headline": text, "image": str(image), "blur": str(image)}
+
+
+def headlines(urls: list[str]) -> list[dict]:
+    """The headline of every page (photograph + text), from the cache or the web. Never raises."""
+    return capture_many([(u, HEADLINE) for u in urls])
+
+
+def add_found(job: dict, found: list[dict]) -> bool:
+    """Pages used by data_chart() / headlines() join the video's Sources list (each page once)."""
+    have = {s.get("url") for s in job.get("sources") or []}
+    new = []
+    for s in found or []:
+        if s.get("url") and s["url"] not in have:
+            have.add(s["url"])
+            new.append({"url": s["url"], "quote": "", "fact": re.sub(r'["“”«»|]', "'", str(s.get("fact") or ""))[:200]})
+    if new:
+        job["sources"] = (job.get("sources") or []) + new
+    return bool(new)
+
+
 def _launch(pw):
     errors = []
     for kw in ({}, {"channel": "msedge"}, {"channel": "chrome"}):  # Windows always has Edge: nothing to download
@@ -353,7 +435,7 @@ def _capture_page(browser, url: str, quotes: list[str]) -> None:
         page.wait_for_timeout(700)
         for quote in quotes:
             try:
-                _save(url, quote, _shoot(page, url, quote))
+                _save(url, quote, _shoot_headline(page, url) if quote == HEADLINE else _shoot(page, url, quote))
             except Exception as exc:  # noqa: BLE001
                 _save(url, quote, {"ok": False, "reason": str(exc).split("\n")[0][:200]})
     finally:
@@ -495,5 +577,5 @@ def check_sources(job_id: str) -> dict:
     for s in src:
         d = res.get((s.get("url"), s.get("quote")))
         out.append({"url": s.get("url"), "ok": bool(d and d.get("ok")),
-                    "reason": "" if d and d.get("ok") else (d or {}).get("reason") or "no quoted sentence to look for"})
+                    "reason": "" if d and d.get("ok") else (d or {}).get("reason") or "no quoted sentence to look for (a data or headline page)"})
     return {"results": out}
