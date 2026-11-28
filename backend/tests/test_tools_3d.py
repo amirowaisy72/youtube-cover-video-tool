@@ -129,6 +129,97 @@ class ShotsTest(unittest.TestCase):
             any("globe" in w and "in total" in w for w in warnings),
             warnings)
 
+    def test_chips_cleaned_empty_dropped_corner_defaulted(self):
+        clean, errors = shots.validate_shotlist([{
+            "template": "globe", "duration": 6, "narration": "One.",
+            "visualizes": "One.",
+            "chips": [{"text": "   "},
+                      {"text": "99%", "sub": "of intercontinental data"}],
+        }])
+        self.assertEqual(errors, [])
+        chips = clean[0]["chips"]
+        self.assertEqual(len(chips), 1)  # empty-text chip dropped
+        self.assertEqual(chips[0]["text"], "99%")
+        self.assertEqual(chips[0]["sub"], "of intercontinental data")
+        self.assertEqual(chips[0]["corner"], "top-right")  # defaulted
+        self.assertEqual(chips[0]["t0"], 0.0)
+        self.assertEqual(chips[0]["t1"], 6.0)  # defaults to duration
+
+    def test_chips_corner_coerced_and_times_numeric(self):
+        clean, errors = shots.validate_shotlist([{
+            "template": "globe", "duration": 6, "narration": "One.",
+            "visualizes": "One.",
+            "chips": [{"text": "5x", "corner": "middle",
+                       "t0": "2", "t1": 4},
+                      {"text": "3", "corner": "top-left", "t0": 1}],
+        }])
+        self.assertEqual(errors, [])
+        chips = clean[0]["chips"]
+        self.assertEqual(chips[0]["corner"], "top-right")  # invalid coerced
+        self.assertEqual(chips[0]["t0"], 2.0)
+        self.assertIsInstance(chips[0]["t0"], float)
+        self.assertEqual(chips[0]["t1"], 4.0)
+        self.assertEqual(chips[1]["corner"], "top-left")  # valid kept
+
+    def test_camera_path_preserved_with_coerced_values(self):
+        clean, errors = shots.validate_shotlist([{
+            "template": "globe", "duration": 6, "narration": "One.",
+            "visualizes": "One.",
+            "cameraPath": [{"at": 0, "pos": [0, 0, 10], "lookAt": [0, 0, 0]},
+                           {"at": 1.5, "pos": [1, 2, 3],
+                            "lookAt": [4, 5, 6]}],
+        }])
+        self.assertEqual(errors, [])  # cameraPath never errors
+        path = clean[0]["cameraPath"]
+        self.assertEqual(len(path), 2)
+        self.assertEqual(path[0], {"at": 0.0, "pos": [0.0, 0.0, 10.0],
+                                   "lookAt": [0.0, 0.0, 0.0]})
+        self.assertEqual(path[1]["at"], 1.0)  # clamped to 0..1
+        self.assertEqual(path[1]["pos"], [1.0, 2.0, 3.0])
+        self.assertIsInstance(path[1]["lookAt"][0], float)
+
+    def test_camera_path_malformed_keyframes_dropped(self):
+        clean, errors = shots.validate_shotlist([{
+            "template": "globe", "duration": 6, "narration": "One.",
+            "visualizes": "One.",
+            "cameraPath": ["junk",
+                           {"at": 0.5, "pos": [1, 2]},  # pos not 3-vector
+                           {"at": 0.5, "pos": [1, 2, 3]},  # no lookAt
+                           {"at": 0.5, "pos": [1, "x", 3],
+                            "lookAt": [0, 0, 0]},  # non-numeric pos
+                           {"at": 0.25, "pos": [1, 2, 3],
+                            "lookAt": [0, 0, 0]}],
+        }])
+        self.assertEqual(errors, [])
+        path = clean[0]["cameraPath"]
+        self.assertEqual(len(path), 1)
+        self.assertEqual(path[0]["at"], 0.25)
+
+    def test_cutaway_spec_has_compare_param(self):
+        spec = shots.TEMPLATES["cutaway"]["params"]
+        self.assertIn("compare", spec)
+        self.assertEqual(spec["compare"][0], "str")
+        self.assertEqual(spec["compare"][1], "")
+        example = shots.TEMPLATES["cutaway"]["example"]
+        self.assertEqual(example["params"]["compare"], "hair")
+        self.assertEqual(example["params"]["model"], "cable")
+        self.assertIn("Optical fibres", example["params"]["parts"])
+
+    def test_macro_and_process_specs_have_travel_params(self):
+        macro = shots.TEMPLATES["macro_flyover"]["params"]
+        self.assertIn("travelLabel", macro)
+        self.assertEqual(macro["travelLabel"][0], "str")
+        self.assertIn("follow", macro)
+        self.assertEqual(macro["follow"][0], "num")
+        self.assertEqual(macro["follow"][1], 1)
+        example = shots.TEMPLATES["macro_flyover"]["example"]
+        self.assertEqual(example["params"]["travelLabel"], "To: London")
+        self.assertEqual(example["params"]["follow"], 1)
+        process = shots.TEMPLATES["process_flow"]["params"]
+        self.assertIn("travelLabel", process)
+        self.assertEqual(process["travelLabel"][0], "str")
+        self.assertEqual(process["travelLabel"][1], "")
+
     def test_globe_routes_nested_passthrough_floats(self):
         clean, errors = shots.validate_shotlist([{
             "template": "globe", "duration": 6, "narration": "One.",
@@ -202,6 +293,27 @@ class PromptsTest(unittest.TestCase):
         for name in ("growth_chart_3d", "stack_growth", "process_flow",
                      "timeline", "comparison_split", "object_orbit"):
             self.assertIn(name, text)
+
+    def test_shot_prompt_mentions_chips_camerapath_and_grammar(self):
+        text = prompts.shot_prompt("T", "Narr.", "Src")
+        self.assertIn("chips", text)
+        self.assertIn("cameraPath", text)
+        self.assertIn("camera does", text.lower())  # planning grammar
+        self.assertIn("SHOWN", text)
+        self.assertIn("continuous journey", text)
+
+    def test_shot_prompt_chip_rules_normal_way(self):
+        text = prompts.shot_prompt("T", "Narr.", "Src")
+        self.assertIn("CHIP RULES", text)
+        self.assertIn("NORMAL way to put a stat on screen", text)
+        self.assertIn("explicitly asks for a title/stat card", text)
+
+    def test_fix_prompt_mentions_chips_and_camerapath(self):
+        project = {"title": "T", "narration": "N", "sources": "S",
+                   "shots": GOOD}
+        text = prompts.fix_shot_prompt(project, 0)
+        self.assertIn("chips", text)
+        self.assertIn("cameraPath", text)
 
     def test_fix_prompt_requires_visualizes(self):
         project = {"title": "T", "narration": "N", "sources": "S",

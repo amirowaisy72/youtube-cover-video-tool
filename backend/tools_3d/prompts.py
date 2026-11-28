@@ -29,6 +29,11 @@ VARIETY_RULES = """VISUALIZATION-FIRST RULES (must follow):
 
 VISUALIZATION_RULES = VARIETY_RULES
 
+CHIP_RULES = """CHIP RULES (must follow):
+- Facts and numbers that belong to a moment INSIDE a scene go in the shot's "chips" list: a small overlay in a top corner of the screen ({"text": "99%", "sub": "of intercontinental data", "corner": "top-right", "t0": 2, "t1": 5}) shown WHILE the scene plays — the scene keeps moving underneath.
+- Chips are the NORMAL way to put a stat on screen: prefer a chip on a scene shot over stopping the video for a card.
+- A data_card full-screen moment is used ONLY when the user explicitly asks for a title/stat card — never as the default way to show a number."""
+
 ACCURACY_RULES = """ACCURACY RULES (must follow):
 - Use ONLY numbers, names and facts that appear in the narration or the sources below. Never invent data, statistics, dates or places.
 - If a number is not in the narration/sources, do not put it on screen.
@@ -88,6 +93,10 @@ SOURCES (research these with web search before planning, and stay faithful to th
 
 Split the narration into shots. For EVERY shot, FIRST fill in "visualizes" — the exact narration sentence(s) this shot depicts — BEFORE choosing the template or params, then choose the template and params that actually show what those sentences say. "visualizes" is a REQUIRED field on every shot.
 
+PLAN IN THIS GRAMMAR — for each narration sentence decide: (a) what object or process is SHOWN, (b) what the camera does, (c) which label or chip appears. Every shot should be plannable in those three parts.
+
+JOURNEY SHOTS: when consecutive narration lines describe one continuous journey (e.g. globe -> coast -> underwater), prefer ONE shot with a "cameraPath" flying between scales over several disconnected scenes.
+
 Each shot is one JSON object with:
 {{"id": "shot-1", "template": "<template name>", "duration": <seconds, number > 0>,
   "narration": "<the exact narration words spoken during this shot>",
@@ -95,15 +104,21 @@ Each shot is one JSON object with:
   "say": "<optional trigger: the word/phrase in the narration at which the key visual moment happens>",
   "params": {{...}}, "labels": [{{"text": "...", "anchor": "top|bottom|left|right|center", "t0": 0, "t1": 0}}],
   "cards": [{{"value": "...", "unit": "...", "sub": "...", "t0": 0, "t1": 0}}],
+  "chips": [{{"text": "<the big value / short fact>", "sub": "<optional small line>", "corner": "top-right|top-left", "t0": 0, "t1": 0}}],
   "camera": {{"distance": "wide|medium|close", "angle": "...", "move": "..."}},
+  "cameraPath": [{{"at": <0..1 fraction of the shot>, "pos": [<x>, <y>, <z>], "lookAt": [<x>, <y>, <z>]}}],
   "transition_in": "cut|fade|zoom"}}
 
-Timing: use the "say" field for timing words — e.g. when the narrator says "doubled", the data card appears. Set label/card t0/t1 in seconds inside the shot.
+"chips" are small stat overlays shown in a top corner WHILE the scene plays underneath (see CHIP RULES below). "cameraPath" is optional: a list of keyframes for a multi-keyframe fly-through ("journey") shot — "at" is the fraction of the shot (0..1) at which the camera reaches "pos" while looking at "lookAt".
+
+Timing: use the "say" field for timing words — e.g. when the narrator says "doubled", the data card appears. Set label/card/chip t0/t1 in seconds inside the shot.
 
 TEMPLATES (use only these):
 {_template_catalogue()}
 
 {VARIETY_RULES}
+
+{CHIP_RULES}
 
 {ACCURACY_RULES}
 
@@ -131,7 +146,7 @@ STYLE: {style_summary()}
 THE SHOT TO FIX (shot number {shot_index + 1}):
 {json.dumps(shot, indent=2)}
 
-The fixed shot MUST include "visualizes": "<the exact narration sentence(s) this shot depicts>" — this is a REQUIRED field. Fill in "visualizes" FIRST, before choosing the template or params, and choose a template that actually shows what those sentences say. Remember: data_card is a last resort (at most one per video) — show numbers inside a scene instead whenever a scene template can show them.
+The fixed shot MUST include "visualizes": "<the exact narration sentence(s) this shot depicts>" — this is a REQUIRED field. Fill in "visualizes" FIRST, before choosing the template or params, and choose a template that actually shows what those sentences say. Remember: data_card is a last resort (at most one per video) — show numbers inside a scene instead whenever a scene template can show them. Put a stat that belongs to a moment inside the scene in "chips" (a small top-corner overlay shown while the scene plays), and use "cameraPath" (optional keyframes {{"at": 0..1, "pos": [x, y, z], "lookAt": [x, y, z]}}) when the shot is a fly-through journey between scales.
 
 TEMPLATES (use only these):
 {_template_catalogue()}

@@ -5,7 +5,9 @@ A shot list is a plain JSON list of shots. Each shot::
     {id, template, duration, narration, visualizes, params{}, say?,
      labels[{text, anchor, t0, t1}],
      cards[{value, unit, sub, t0, t1}],
-     camera{}, transition_in: cut|fade|zoom}
+     chips[{text, sub, corner: top-right|top-left, t0, t1}],
+     camera{}, cameraPath[{at, pos[x, y, z], lookAt[x, y, z]}],
+     transition_in: cut|fade|zoom}
 
 ``validate_shotlist`` never raises on bad user/AI input: it returns
 ``(clean_shots, errors)`` where clean shots have defaults filled in
@@ -18,6 +20,7 @@ import copy
 
 TRANSITIONS = ("cut", "fade", "zoom")
 ANCHORS = ("top", "bottom", "left", "right", "center")
+CHIP_CORNERS = ("top-right", "top-left")
 
 # Per-template parameter specs: name -> (type, default, help).
 # Types: "str", "num", "bool", "list".
@@ -40,7 +43,9 @@ TEMPLATES: dict[str, dict] = {
                     "visualizes": "Trade routes circle the whole planet.",
                     "params": {"lat": 25, "lon": 55, "zoom": 1.8,
                                "routes": [{"from": {"lat": 31.5, "lon": 74.3, "label": "Lahore"},
-                                           "to": {"lat": 51.5, "lon": -0.1, "label": "London"}}]}},
+                                           "to": {"lat": 51.5, "lon": -0.1, "label": "London"}}]},
+                    "chips": [{"text": "99%", "sub": "of intercontinental data",
+                               "corner": "top-right", "t0": 2}]},
     },
     "map_zoom": {
         "label": "Map zoom",
@@ -75,22 +80,27 @@ TEMPLATES: dict[str, dict] = {
             "model": ("str", "cable", "Model to open: cable|phone|ship|chip|server"),
             "parts": ("str", "", "Part names, comma separated (labels)"),
             "explode": ("num", 1.0, "Explode amount 0..1"),
+            "compare": ("str", "", "Comparison object next to the model, e.g. 'hair' for a human hair beside a cable"),
         },
         "example": {"template": "cutaway", "duration": 6,
-                    "narration": "Inside the cable, glass fibres carry the light.",
-                    "visualizes": "Inside the cable, glass fibres carry the light.",
-                    "params": {"model": "cable", "parts": "Jacket, Armour, Glass fibres", "explode": 1}},
+                    "narration": "Layer by layer, the cable is built to protect the glass fibres inside.",
+                    "visualizes": "Layer by layer, the cable is built to protect the glass fibres inside.",
+                    "params": {"model": "cable",
+                               "parts": "Jacket, Copper tube, Steel wires, Gel, Optical fibres",
+                               "explode": 1, "compare": "hair"}},
     },
     "macro_flyover": {
         "label": "Macro flyover",
         "params": {
             "boardColor": ("str", "#0b3d2e", "Circuit board colour"),
             "speed": ("num", 1.0, "Flight / packet speed multiplier"),
+            "travelLabel": ("str", "", "Text carried on the travelling packet"),
+            "follow": ("num", 1, "Camera follows the packet 0/1"),
         },
         "example": {"template": "macro_flyover", "duration": 6,
                     "narration": "Across the board, a packet of light races on.",
                     "visualizes": "Across the board, a packet of light races on.",
-                    "params": {"speed": 1.0}},
+                    "params": {"speed": 1.0, "travelLabel": "To: London", "follow": 1}},
     },
     "underwater": {
         "label": "Underwater scene",
@@ -164,6 +174,7 @@ TEMPLATES: dict[str, dict] = {
         "label": "Process flow",
         "params": {
             "steps": ("str", "", "comma-separated step names, 3-5 steps, a glowing pulse travels through them"),
+            "travelLabel": ("str", "", "Text carried by the travelling object/pulse"),
         },
         "example": {"template": "process_flow", "duration": 6,
                     "narration": "First you deposit, then interest is added, then that interest starts earning interest too.",
@@ -278,6 +289,8 @@ def apply_defaults(shot: dict, index: int = 0) -> dict:
     out["transition_in"] = out.get("transition_in") or ("cut" if index == 0 else "fade")
     out["labels"] = _clean_labels(out.get("labels"))
     out["cards"] = _clean_cards(out.get("cards"), out["duration"])
+    out["chips"] = _clean_chips(out.get("chips"), out["duration"])
+    out["cameraPath"] = _clean_camera_path(out.get("cameraPath"))
     if out.get("say"):
         out["say"] = str(out["say"])
     return out
@@ -310,6 +323,53 @@ def _clean_cards(raw, duration: float) -> list:
             "t1": _num(item.get("t1"), duration or 0.0),
         })
     return cards
+
+
+def _clean_chips(raw, duration: float) -> list:
+    """Small stat overlays shown WHILE a scene plays (top corner)."""
+    chips = []
+    for item in raw or []:
+        if not isinstance(item, dict) or not str(item.get("text") or "").strip():
+            continue
+        chips.append({
+            "text": str(item["text"]).strip(),
+            "sub": str(item.get("sub") or ""),
+            "corner": item.get("corner") if item.get("corner") in CHIP_CORNERS
+                      else "top-right",
+            "t0": _num(item.get("t0"), 0.0),
+            "t1": _num(item.get("t1"), duration or 0.0),
+        })
+    return chips
+
+
+def _vec3(value):
+    """Coerce to a 3-float list, or None when malformed."""
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        return None
+    try:
+        return [float(v) for v in value]
+    except (TypeError, ValueError):
+        return None
+
+
+def _clean_camera_path(raw) -> list:
+    """Multi-keyframe camera path for fly-through ("journey") shots.
+
+    Optional and forgiving: malformed keyframes are silently dropped,
+    ``at`` is coerced to a float clamped to 0..1 and ``pos``/``lookAt``
+    to 3-float lists. Never a validation error.
+    """
+    path = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        pos = _vec3(item.get("pos"))
+        look_at = _vec3(item.get("lookAt"))
+        if pos is None or look_at is None:
+            continue
+        at = min(1.0, max(0.0, _num(item.get("at"), 0.0)))
+        path.append({"at": at, "pos": pos, "lookAt": look_at})
+    return path
 
 
 def validate_shotlist(data) -> tuple[list, list]:
