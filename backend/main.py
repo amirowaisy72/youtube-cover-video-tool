@@ -463,6 +463,8 @@ app.include_router(tools_animator.router)
 app.include_router(tools_worlds.router)
 app.include_router(tools_assets.router)
 app.include_router(tools_downloads.router)
+import tools_3d  # noqa: E402
+app.include_router(tools_3d.router)
 
 
 @app.get("/favicon.ico")

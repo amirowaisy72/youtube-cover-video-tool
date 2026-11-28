@@ -57,6 +57,7 @@ const toolList = [
   { to: "/channel-inspect", title: "Channel Inspector", desc: "Audit an existing channel — see what is missing, get fixes, and apply them to the channel.", img: toolChannel, cta: "Inspect a channel" },
   { to: "/characters", title: "Character Studio", desc: "Design your own cartoon characters, name them and give each a voice — they star in your animated stories.", img: scene1, cta: "Design a character" },
   { to: "/voice-clone", title: "Voice Cloner", desc: "Give a 15–20 sec voice sample — clone it, name it, and voice any script in that voice.", img: scene2, cta: "Clone a voice" },
+  { to: "/explainer3d", title: "3D Explainer", desc: "Pro 3D explainer videos rendered in your browser — a flying globe with glowing routes, cut-away objects, labels and big number cards. No Blender, nothing paid.", img: scene3, cta: "Make a 3D explainer" },
 ] as const;
 
 // Numbered by position, so the order above is the order on the page.
