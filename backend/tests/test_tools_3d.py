@@ -17,9 +17,11 @@ from tools_3d import assets, prompts, render, shots, style  # noqa: E402
 from tools_3d.assemble import build_srt  # noqa: E402
 
 GOOD = [
-    {"template": "globe", "duration": 6, "narration": "One.",
+    {"template": "globe", "duration": 36, "narration": "One.",
+     "visualizes": "One.",
      "camera": {"distance": "wide"}},
     {"template": "data_card", "duration": 4, "narration": "Two.",
+     "visualizes": "Two.",
      "camera": {"distance": "close"}},
 ]
 
@@ -54,6 +56,115 @@ class ShotsTest(unittest.TestCase):
         clean, _ = shots.validate_shotlist(GOOD)
         self.assertEqual(shots.variety_warnings(clean), [])
 
+    def test_visualizes_missing_errors(self):
+        _clean, errors = shots.validate_shotlist(
+            [{"template": "globe", "duration": 3, "narration": "One."}])
+        self.assertTrue(any("missing 'visualizes'" in e for e in errors),
+                        errors)
+
+    def test_visualizes_empty_errors(self):
+        _clean, errors = shots.validate_shotlist(
+            [{"template": "globe", "duration": 3, "narration": "One.",
+              "visualizes": "  "}])
+        self.assertTrue(any("missing 'visualizes'" in e for e in errors),
+                        errors)
+
+    def test_visualizes_present_no_such_error(self):
+        clean, errors = shots.validate_shotlist(GOOD)
+        self.assertFalse(any("visualizes" in e for e in errors), errors)
+        self.assertEqual(clean[0]["visualizes"], "One.")
+        self.assertEqual(clean[1]["visualizes"], "Two.")
+
+    def test_every_template_example_has_visualizes(self):
+        for name, spec in shots.TEMPLATES.items():
+            self.assertTrue(
+                str(spec["example"].get("visualizes") or "").strip(),
+                f"{name} example missing visualizes")
+            self.assertTrue(spec["example"].get("narration"), name)
+
+    def test_card_cap_warning(self):
+        plan = [
+            {"template": "data_card", "duration": 2,
+             "camera": {"distance": "wide"}},
+            {"template": "globe", "duration": 20,
+             "camera": {"distance": "medium"}},
+            {"template": "data_card", "duration": 2,
+             "camera": {"distance": "close"}},
+            {"template": "map_zoom", "duration": 20,
+             "camera": {"distance": "wide"}},
+        ]
+        warnings = shots.variety_warnings(plan)
+        self.assertTrue(
+            any("data_card" in w and "at most 1" in w for w in warnings),
+            warnings)
+
+    def test_card_duration_share_warning(self):
+        plan = [
+            {"template": "data_card", "duration": 10,
+             "camera": {"distance": "close"}},
+            {"template": "globe", "duration": 10,
+             "camera": {"distance": "wide"}},
+        ]
+        warnings = shots.variety_warnings(plan)
+        self.assertTrue(
+            any("data_card" in w and "15%" in w for w in warnings),
+            warnings)
+
+    def test_template_total_repeat_warning(self):
+        # globe 3 times in total, but never more than 2 in a row.
+        plan = [
+            {"template": "globe", "duration": 3,
+             "camera": {"distance": "wide"}},
+            {"template": "map_zoom", "duration": 3,
+             "camera": {"distance": "medium"}},
+            {"template": "globe", "duration": 3,
+             "camera": {"distance": "close"}},
+            {"template": "map_zoom", "duration": 3,
+             "camera": {"distance": "wide"}},
+            {"template": "globe", "duration": 3,
+             "camera": {"distance": "medium"}},
+        ]
+        warnings = shots.variety_warnings(plan)
+        self.assertTrue(
+            any("globe" in w and "in total" in w for w in warnings),
+            warnings)
+
+    def test_globe_routes_nested_passthrough_floats(self):
+        clean, errors = shots.validate_shotlist([{
+            "template": "globe", "duration": 6, "narration": "One.",
+            "visualizes": "One.",
+            "params": {"routes": [{
+                "from": {"lat": 31, "lon": 74, "label": "Lahore"},
+                "to": {"lat": 51, "lon": 0, "label": "London"}}]},
+        }])
+        self.assertEqual(errors, [])
+        route = clean[0]["params"]["routes"][0]
+        self.assertEqual(route["from"]["label"], "Lahore")
+        self.assertEqual(route["to"]["label"], "London")
+        self.assertIsInstance(route["from"]["lat"], float)
+        self.assertIsInstance(route["from"]["lon"], float)
+        self.assertEqual(route["from"]["lat"], 31.0)
+        self.assertEqual(route["to"]["lon"], 0.0)
+
+    def test_globe_routes_flat_normalized_to_nested(self):
+        clean, errors = shots.validate_shotlist([{
+            "template": "globe", "duration": 6, "narration": "One.",
+            "visualizes": "One.",
+            "params": {"routes": [{
+                "fromLat": 31.5, "fromLon": 74.3,
+                "toLat": 51.5, "toLon": -0.1,
+                "fromLabel": "Lahore", "toLabel": "London"}]},
+        }])
+        self.assertEqual(errors, [])
+        route = clean[0]["params"]["routes"][0]
+        self.assertNotIn("fromLat", route)
+        self.assertEqual(route["from"],
+                         {"lat": 31.5, "lon": 74.3, "label": "Lahore"})
+        self.assertEqual(route["to"],
+                         {"lat": 51.5, "lon": -0.1, "label": "London"})
+        self.assertIsInstance(route["from"]["lat"], float)
+        self.assertIsInstance(route["to"]["lon"], float)
+
 
 class PromptsTest(unittest.TestCase):
     def test_shot_prompt_lists_every_template(self):
@@ -72,6 +183,32 @@ class PromptsTest(unittest.TestCase):
         text = prompts.narration_prompt("Ocean trade")
         self.assertIn("Ocean trade", text)
         self.assertIn("SOURCES:", text)
+
+    def test_shot_prompt_requires_visualizes(self):
+        text = prompts.shot_prompt("T", "Narr.", "Src")
+        self.assertIn("visualizes", text)
+        self.assertIn(
+            '"visualizes": "<the exact narration sentence(s) '
+            'this shot depicts>"', text)
+
+    def test_shot_prompt_data_card_last_resort_at_most_one(self):
+        text = prompts.shot_prompt("T", "Narr.", "Src").lower()
+        self.assertIn("last resort", text)
+        self.assertIn("at most one", text)
+        self.assertIn("data_card", text)
+
+    def test_shot_prompt_lists_new_visualization_templates(self):
+        text = prompts.shot_prompt("T", "Narr.", "Src")
+        for name in ("growth_chart_3d", "stack_growth", "process_flow",
+                     "timeline", "comparison_split", "object_orbit"):
+            self.assertIn(name, text)
+
+    def test_fix_prompt_requires_visualizes(self):
+        project = {"title": "T", "narration": "N", "sources": "S",
+                   "shots": GOOD}
+        text = prompts.fix_shot_prompt(project, 0)
+        self.assertIn("visualizes", text)
+        self.assertIn("last resort", text.lower())
 
     def test_fix_prompt_saved_sources_only(self):
         project = {"title": "T", "narration": "N", "sources": "S",

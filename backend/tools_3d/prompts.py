@@ -16,11 +16,18 @@ import json
 from .shots import TEMPLATES
 from .style import style_summary
 
-VARIETY_RULES = """VARIETY RULES (must follow):
+VARIETY_RULES = """VISUALIZATION-FIRST RULES (must follow):
+- Every shot must VISUALIZE its narration segment: the scene must show what the words say. Before choosing a template, write the shot's "visualizes" field naming the exact narration sentence(s) the shot depicts, then pick the scene that shows that.
+- Show numbers INSIDE scenes, not on standalone cards: use stack_growth steps, growth_chart_3d values, or labels/cards overlaid on a scene shot so the viewer sees the number in context.
+- data_card is a LAST RESORT: at most ONE data_card per video, and never the default way to show a number. Use it only when no scene template can show the number.
+- Prefer the visualization templates when the narration is about growth (growth_chart_3d, stack_growth), a process or steps (process_flow), time or a sequence of events (timeline), a comparison (comparison_split), or parts of a thing (cutaway, object_orbit).
 - Never use the same template more than 2 times in a row.
+- No template more than twice in total across the whole video, without a very good reason.
 - Change the camera distance between shots (wide / medium / close — do not repeat the same distance 3 shots running).
 - One main idea per shot.
 - On-screen text (labels) is 1-4 words only, or one number with its unit (data cards)."""
+
+VISUALIZATION_RULES = VARIETY_RULES
 
 ACCURACY_RULES = """ACCURACY RULES (must follow):
 - Use ONLY numbers, names and facts that appear in the narration or the sources below. Never invent data, statistics, dates or places.
@@ -79,9 +86,12 @@ NARRATION (the narrator will read exactly this):
 SOURCES (research these with web search before planning, and stay faithful to them):
 {sources or "(none supplied — research the title topic with web search and use only facts you can source)"}
 
-Split the narration into shots. Each shot is one JSON object with:
+Split the narration into shots. For EVERY shot, FIRST fill in "visualizes" — the exact narration sentence(s) this shot depicts — BEFORE choosing the template or params, then choose the template and params that actually show what those sentences say. "visualizes" is a REQUIRED field on every shot.
+
+Each shot is one JSON object with:
 {{"id": "shot-1", "template": "<template name>", "duration": <seconds, number > 0>,
   "narration": "<the exact narration words spoken during this shot>",
+  "visualizes": "<the exact narration sentence(s) this shot depicts>",
   "say": "<optional trigger: the word/phrase in the narration at which the key visual moment happens>",
   "params": {{...}}, "labels": [{{"text": "...", "anchor": "top|bottom|left|right|center", "t0": 0, "t1": 0}}],
   "cards": [{{"value": "...", "unit": "...", "sub": "...", "t0": 0, "t1": 0}}],
@@ -120,6 +130,8 @@ STYLE: {style_summary()}
 
 THE SHOT TO FIX (shot number {shot_index + 1}):
 {json.dumps(shot, indent=2)}
+
+The fixed shot MUST include "visualizes": "<the exact narration sentence(s) this shot depicts>" — this is a REQUIRED field. Fill in "visualizes" FIRST, before choosing the template or params, and choose a template that actually shows what those sentences say. Remember: data_card is a last resort (at most one per video) — show numbers inside a scene instead whenever a scene template can show them.
 
 TEMPLATES (use only these):
 {_template_catalogue()}
